@@ -1,0 +1,45 @@
+# Archivos y carpetas generados por Composer
+/vendor/
+composer.lock
+
+# Archivos y carpetas generados por NPM/Yarn/Vite
+/node_modules/
+/public/build/
+/public/hot
+npm-debug.log
+yarn-error.log
+
+# Archivo de entorno - ¡MUY IMPORTANTE!
+# Nunca subas tu archivo .env con las credenciales a un repositorio público.
+.env
+
+# Archivos de la base de datos local
+# (Si usas SQLite para desarrollo local)
+/database/database.sqlite
+/database/*.sqlite
+
+# Archivos de logs
+/storage/logs/*.log
+/storage/logs/laravel.log
+
+# Archivos generados por el framework
+/storage/app/public/*
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/framework/testing/*
+
+# Archivos de reportes y cobertura de pruebas
+/report.xml
+/coverage/
+
+# Archivos de configuración de editores
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+._*
