@@ -320,24 +320,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // =================================================================
 // ===== RUTA PÚBLICA PARA NOTIFICACIONES DE N8N =====================
 // =================================================================
-Route::post('/chatbot/notify', function (Request $request) {
-    $validated = $request->validate([
-        'response' => 'required|string',
-        'userId' => 'required|integer',
-    ]);
+// Route::post('/chatbot/notify', function (Request $request) {
+//     $validated = $request->validate([
+//         'response' => 'required|string',
+//         'userId' => 'required|integer',
+//     ]);
 
-    $botMessage = Message::create([
-        'user_id' => 0,
-        'body' => $validated['response']
-    ]);
+//     $botMessage = Message::create([
+//         'user_id' => 0,
+//         'body' => $validated['response']
+//     ]);
 
-    broadcast(new ChatbotResponseReceived(
-        $botMessage->body,
-        $validated['userId']
-    ));
+//     broadcast(new ChatbotResponseReceived(
+//         $botMessage->body,
+//         $validated['userId']
+//     ));
 
-    return response()->json(['status' => 'notification_sent_to_user']);
-})->name('chatbot.notify');
+//     return response()->json(['status' => 'notification_sent_to_user']);
+// })->name('chatbot.notify');
 
 
 // Radicados - Rutas que necesitan estar fuera del middleware principal

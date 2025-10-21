@@ -53,11 +53,13 @@ Route::post('/chatbot/notify', function (Request $request) {
         'userId' => 'required|integer',
     ]);
 
+    // ✅ Crear mensaje del bot (user_id = 0 indica que es el bot)
     $botMessage = Message::create([
-        'user_id' => 14, // <-- USA EL ID QUE TE DIO TINKER
+        'user_id' => 0, 
         'body' => $validated['response']
     ]);
 
+    // ✅ Broadcast al usuario específico
     broadcast(new ChatbotResponseReceived(
         $botMessage->body,
         $validated['userId']
