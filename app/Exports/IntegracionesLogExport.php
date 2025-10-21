@@ -58,7 +58,7 @@ class IntegracionesLogExport implements FromQuery, WithHeadings, WithMapping
     {
         $query = IntegracionExternaLog::query()
             ->when($this->filters['servicio'] ?? null, function ($q, $servicio) {
-                $q->where('servicio', 'like', '%' . $servicio . '%');
+                $q->where('servicio', 'Ilike', '%' . $servicio . '%');
             })
             ->when($this->filters['fecha_desde'] ?? null, function ($q, $fecha_desde) {
                 $q->whereDate('fecha_solicitud', '>=', $fecha_desde);

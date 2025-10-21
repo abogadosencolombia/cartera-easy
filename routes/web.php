@@ -199,6 +199,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/documentos/{documento}/descargar-pdf', [GeneradorDocumentoController::class, 'descargarPdf'])->name('documentos.descargar.pdf');
         Route::get('/procesos-judiciales/{caso}/edit', [ProcesoJudicialController::class, 'edit'])->name('procesos-judiciales.edit');
         Route::put('/procesos-judiciales/{caso}', [ProcesoJudicialController::class, 'update'])->name('procesos-judiciales.update');
+        Route::post('personas/{persona}/restore', [PersonaController::class, 'restore'])->name('personas.restore');
 
         // --- GESTIÓN > HONORARIOS ---
         Route::get('/gestion/honorarios', [ContratosController::class, 'index'])->name('gestion.honorarios.index');

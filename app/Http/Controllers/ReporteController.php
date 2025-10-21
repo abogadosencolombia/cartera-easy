@@ -135,8 +135,8 @@ class ReporteController extends Controller
 
         $casosQuery->when($request->filled('cooperativa_id'), fn($q) => $q->where('cooperativa_id', $request->input('cooperativa_id')));
         $casosQuery->when($request->filled('user_id'), fn($q) => $q->where('user_id', $request->input('user_id')));
-        $casosQuery->when($request->filled('tipo_proceso'), fn($q) => $q->where('tipo_proceso', 'like', '%' . $request->input('tipo_proceso') . '%'));
-        $casosQuery->when($request->filled('estado_proceso'), fn($q) => $q->where('estado_proceso', 'like', '%' . $request->input('estado_proceso') . '%'));
+        $casosQuery->when($request->filled('tipo_proceso'), fn($q) => $q->where('tipo_proceso', 'Ilike', '%' . $request->input('tipo_proceso') . '%'));
+        $casosQuery->when($request->filled('estado_proceso'), fn($q) => $q->where('estado_proceso', 'Ilike', '%' . $request->input('estado_proceso') . '%'));
         $casosQuery->when($request->filled('fecha_desde'), fn($q) => $q->whereDate('created_at', '>=', $request->input('fecha_desde')));
         $casosQuery->when($request->filled('fecha_hasta'), fn($q) => $q->whereDate('created_at', '<=', $request->input('fecha_hasta')));
 

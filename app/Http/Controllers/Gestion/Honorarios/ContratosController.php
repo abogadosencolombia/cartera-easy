@@ -30,7 +30,7 @@ class ContratosController extends Controller
 
         if ($q !== '') {
             $contratosQuery->where(function ($w) use ($q) {
-                $w->where('contratos.id','like',"%{$q}%")
+                $w->where('contratos.id','Ilike',"%{$q}%")
                 ->orWhere('personas.nombre_completo', 'ilike', "%{$q}%");
             });
         }

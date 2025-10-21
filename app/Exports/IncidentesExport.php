@@ -22,7 +22,7 @@ class IncidentesExport implements FromQuery, WithHeadings, WithMapping, ShouldAu
         $query = IncidenteJuridico::with('responsable:id,name')->latest('fecha_registro');
 
         $query->when($this->filters['search'] ?? null, function ($query, $search) {
-            $query->where('asunto', 'like', "%{$search}%");
+            $query->where('asunto', 'Ilike', "%{$search}%");
         });
         $query->when($this->filters['estado'] ?? null, function ($query, $estado) {
             $query->where('estado', $estado);

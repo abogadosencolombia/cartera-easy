@@ -26,7 +26,7 @@ class Caso extends Model
         'subtipo_proceso',
         'etapa_procesal',
         'juzgado_id', 'especialidad_id',
-        'estado', // <-- AÑADIDO: Campo clave para la lógica del listener
+        'estado',
     ];
 
     protected $casts = [
@@ -39,18 +39,75 @@ class Caso extends Model
         'ultima_actividad' => 'datetime',
     ];
 
+    /**
+     * The accessors to append to the model's array form.
+     * Laravel convertirá automáticamente camelCase (diasEnMora) a snake_case (dias_en_mora).
+     */
     protected $appends = ['semaforo', 'dias_en_mora'];
 
-    // --- TUS ACCESSORS (diasEnMora y semaforo) VAN AQUÍ ---
-    // (No los modifico, están bien como están)
-    protected function diasEnMora(): Attribute { /* ...tu código... */ }
-    protected function semaforo(): Attribute { /* ...tu código... */ }
+    // --- ACCESSORS CORREGIDOS ---
+
+    /**
+     * Calcula los días que han pasado desde la fecha de vencimiento.
+     *
+     * @return \Illuminate\Database\Eloquent\Casts\Attribute
+     */
+    protected function diasEnMora(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value, $attributes) {
+                // Si no hay fecha de vencimiento, no hay mora.
+                if (empty($attributes['fecha_vencimiento'])) {
+                    return 0;
+                }
+
+                $fechaVencimiento = Carbon::parse($attributes['fecha_vencimiento']);
+                $hoy = Carbon::now();
+
+                // Si la fecha de vencimiento aún no ha llegado, la mora es 0.
+                if ($fechaVencimiento->isFuture()) {
+                    return 0;
+                }
+
+                // Si ya pasó, calcula la diferencia de días.
+                return $fechaVencimiento->diffInDays($hoy);
+            }
+        );
+    }
+
+    /**
+     * Determina el color del semáforo basado en los días en mora.
+     *
+     * @return \Illuminate\Database\Eloquent\Casts\Attribute
+     */
+    protected function semaforo(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value, $attributes) {
+                // Este accessor depende del cálculo de 'dias_en_mora'.
+                // Lo podemos llamar directamente con $this->dias_en_mora.
+                $dias = $this->dias_en_mora;
+
+                if (empty($attributes['fecha_vencimiento'])) {
+                    return 'gris'; // Un color por defecto si no hay fecha.
+                }
+
+                if ($dias <= 30) {
+                    return 'verde'; // Al día o con mora temprana.
+                } elseif ($dias <= 90) {
+                    return 'amarillo'; // Mora moderada.
+                } else {
+                    return 'rojo'; // Mora alta.
+                }
+            }
+        );
+    }
 
 
     // --- RELACIONES ---
     public function cooperativa(): BelongsTo { return $this->belongsTo(Cooperativa::class); }
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
-    public function deudor(): BelongsTo { return $this->belongsTo(Persona::class, 'deudor_id'); } // <-- ¡Esta es la importante!
+    public function deudor(): BelongsTo { return $this->belongsTo(Persona::class, 'deudor_id'); }
     public function codeudor1(): BelongsTo { return $this->belongsTo(Persona::class, 'codeudor1_id');}
     public function codeudor2(): BelongsTo { return $this->belongsTo(Persona::class, 'codeudor2_id');}
     public function documentos(): HasMany { return $this->hasMany(DocumentoCaso::class); }
@@ -68,9 +125,9 @@ class Caso extends Model
         return $this->morphMany(AuditoriaEvento::class, 'auditable')->latest();
     }
 
-    public function juzgado(): BelongsTo 
-    { 
-        return $this->belongsTo(Juzgado::class, 'juzgado_id'); 
+    public function juzgado(): BelongsTo
+    {
+        return $this->belongsTo(Juzgado::class, 'juzgado_id');
     }
 
     public function especialidad()

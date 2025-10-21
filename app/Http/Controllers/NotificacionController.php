@@ -31,7 +31,7 @@ class NotificacionController extends Controller
         $query->where('fecha_envio', '<=', now());
         $query->when($request->input('leido') === 'si', fn ($q) => $q->where('leido', true));
         $query->when($request->input('leido') === 'no', fn ($q) => $q->where('leido', false));
-        $query->when($request->filled('tipo'), fn ($q) => $q->where('tipo', 'like', '%' . $request->input('tipo') . '%'));
+        $query->when($request->filled('tipo'), fn ($q) => $q->where('tipo', 'Ilike', '%' . $request->input('tipo') . '%'));
         $notificaciones = $query->orderBy('created_at', 'desc')->paginate(15)->withQueryString();
 
         return Inertia::render('Notificaciones/Index', [

@@ -20,35 +20,37 @@ class PersonaController extends Controller
     {
         $this->authorize('viewAny', Persona::class);
 
-        $filters = $request->only('search', 'sort_by', 'sort_direction');
         $sortBy = $request->input('sort_by', 'created_at');
         $sortDirection = $request->input('sort_direction', 'desc');
-
         $validSortColumns = ['nombre_completo', 'created_at'];
         if (!in_array($sortBy, $validSortColumns)) {
             $sortBy = 'created_at';
         }
 
-        $personas = Persona::query()
-            ->when($request->input('search'), function ($query, $search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('nombre_completo', 'ilike', "%{$search}%")
-                        ->orWhere('numero_documento', 'ilike', "%{$search}%")
-                        ->orWhere('celular_1', 'ilike', "%{$search}%")
-                        ->orWhere('correo_1', 'ilike', "%{$search}%")
-                        ->orWhereRaw('CAST(id AS TEXT) LIKE ?', ["%{$search}%"]);
-                });
-            })
-            // --- CAMBIO AQUÍ: Eliminamos el ->select(...) ---
-            // Dejamos que Eloquent traiga todos los campos necesarios.
-            // Esto es más simple y robusto.
-            ->orderBy($sortBy, $sortDirection)
+        $query = Persona::query();
+
+        if ($request->input('status') === 'suspended') {
+            $query->onlyTrashed();
+        }
+
+        $query->when($request->input('search'), function ($query, $search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('nombre_completo', 'ilike', "%{$search}%")
+                    ->orWhere('numero_documento', 'ilike', "%{$search}%")
+                    ->orWhere('celular_1', 'ilike', "%{$search}%")
+                    ->orWhere('correo_1', 'ilike', "%{$search}%")
+                    ->orWhereRaw('CAST(id AS TEXT) Ilike ?', ["%{$search}%"]);
+            });
+        });
+
+        // --- CORRECCIÓN AQUÍ: Eliminamos el ->with([...]) que causaba el error 500 ---
+        $personas = $query->orderBy($sortBy, $sortDirection)
             ->paginate(20)
             ->withQueryString();
 
         return Inertia::render('Personas/Index', [
             'personas' => $personas,
-            'filters' => $filters,
+            'filters' => $request->only('search', 'sort_by', 'sort_direction', 'status'),
             'can' => [
                 'delete_personas' => Auth::user()->can('delete', Persona::class)
             ]
@@ -66,14 +68,12 @@ class PersonaController extends Controller
         $this->authorize('create', Persona::class);
         $data = $request->validated();
 
-        // Limpia las filas vacías de redes sociales
         if (isset($data['social_links'])) {
             $data['social_links'] = array_values(array_filter($data['social_links'], fn ($r) =>
                 isset($r['url']) && trim((string)$r['url']) !== ''
             ));
         }
         
-        // Limpia las filas vacías de direcciones
         if (isset($data['addresses'])) {
             $data['addresses'] = array_values(array_filter($data['addresses'], fn ($r) =>
                 (isset($r['address']) && trim((string)$r['address']) !== '') || 
@@ -102,14 +102,12 @@ class PersonaController extends Controller
         $this->authorize('update', $persona);
         $data = $request->validated();
 
-        // Limpia las filas vacías de redes sociales
         if (isset($data['social_links'])) {
             $data['social_links'] = array_values(array_filter($data['social_links'], fn ($r) =>
                 isset($r['url']) && trim((string)$r['url']) !== ''
             ));
         }
 
-        // Limpia las filas vacías de direcciones
         if (isset($data['addresses'])) {
             $data['addresses'] = array_values(array_filter($data['addresses'], fn ($r) =>
                 (isset($r['address']) && trim((string)$r['address']) !== '') || 
@@ -125,6 +123,19 @@ class PersonaController extends Controller
     {
         $this->authorize('delete', $persona);
         $persona->delete();
-        return to_route('personas.index')->with('success', '¡Persona eliminada del directorio!');
+        
+        return to_route('personas.index')->with('success', '¡Persona suspendida correctamente!');
+    }
+
+    public function restore($id): RedirectResponse
+    {
+        // Nota: La autorización para 'restore' ahora está en tu PersonaPolicy.
+        $this->authorize('restore', Persona::class);
+        
+        $persona = Persona::onlyTrashed()->findOrFail($id);
+        $persona->restore();
+
+        return redirect()->back()->with('success', '¡Persona reactivada correctamente!');
     }
 }
+

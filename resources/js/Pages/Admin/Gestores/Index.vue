@@ -1,48 +1,62 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue';
 import { debounce, pickBy } from 'lodash';
 
-// --- Iconos para una UI más rica ---
-import { UserGroupIcon, BanknotesIcon, FolderOpenIcon, BuildingOffice2Icon, TrophyIcon, ChevronDownIcon } from '@heroicons/vue/24/outline';
+// --- Iconos ---
+import { UserGroupIcon, BanknotesIcon, FolderOpenIcon, BuildingOffice2Icon, TrophyIcon, ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     filters: Object,
-    rows: Array,
+    rows: Object, // Paginator object
+    totals: Object,
 });
 
-// --- Estado de Filtros y UI ---
+// --- Estado de UI y Filtros ---
 const q = ref(props.filters?.q ?? '');
 const sort = ref(props.filters?.sort ?? 'total_recovered');
 const dir = ref(props.filters?.dir ?? 'desc');
 const openRowId = ref(null);
+const isMounted = ref(false);
 
 // --- Lógica de Filtros Automáticos ---
 watch([q, sort, dir], debounce(() => {
-    router.get(route('admin.gestores.index'), pickBy({ 
-        q: q.value, 
-        sort: sort.value, 
-        dir: dir.value 
-    }), { 
-        preserveState: true, 
-        replace: true, 
-        only: ['rows', 'filters'] 
+    router.get(route('admin.gestores.index'), pickBy({
+        q: q.value,
+        sort: sort.value,
+        dir: dir.value
+    }), {
+        preserveState: true,
+        replace: true,
+        only: ['rows', 'filters', 'totals']
     });
-}, 500));
+}, 300));
 
-// --- Prop Computada Segura ---
-// Garantiza que `rows` siempre sea un array para evitar errores en el template.
-const safeRows = computed(() => props.rows || []);
+// --- Animación de Conteo para KPIs ---
+const animatedTotalRecovered = ref(0);
+watch(() => props.totals.totalRecovered, (newValue) => {
+    const startValue = animatedTotalRecovered.value;
+    const duration = 1500;
+    let startTime = null;
 
-// --- Datos Calculados para KPIs ---
-const totals = computed(() => {
-    // Usamos safeRows aquí también para consistencia
-    const totalRecovered = safeRows.value.reduce((sum, row) => sum + (row.total_recovered || 0), 0);
-    const totalCasos = safeRows.value.reduce((sum, row) => sum + (row.casos_count || 0), 0);
-    const coopIds = new Set();
-    safeRows.value.forEach(row => (row.cooperativas || []).forEach(coop => coopIds.add(coop.id)));
-    return { totalRecovered, totalCasos, totalCoops: coopIds.size };
+    const animate = (timestamp) => {
+        if (!startTime) startTime = timestamp;
+        const progress = Math.min((timestamp - startTime) / duration, 1);
+        const currentValue = Math.floor(progress * (newValue - startValue) + startValue);
+        animatedTotalRecovered.value = currentValue;
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        }
+    };
+    requestAnimationFrame(animate);
+}, { immediate: true });
+
+onMounted(() => {
+    // Para evitar que la animación de entrada se ejecute en la carga inicial
+    setTimeout(() => {
+        isMounted.value = true;
+    }, 100);
 });
 
 // --- Funciones de Ayuda ---
@@ -50,111 +64,119 @@ const formatCurrency = (value) => {
     return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value || 0);
 };
 
-// Determina si las medallas de ranking deben mostrarse
+// --- Medallas de Ranking ---
 const showRankingMedals = computed(() => {
     return sort.value === 'total_recovered' && dir.value === 'desc' && q.value === '';
 });
+
+// --- Insignias de Rol ---
+const roleBadgeClass = (role) => {
+    return {
+        'admin': 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
+        'abogado': 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
+        'gestor': 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
+    }[role] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+};
 </script>
 
 <template>
-    <Head title="Reporte de Gestores" />
+    <Head title="Dashboard de Rendimiento" />
 
     <AuthenticatedLayout>
         <template #header>
-            <div class="flex justify-between items-center">
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight flex items-center">
                     <TrophyIcon class="h-6 w-6 mr-3 text-indigo-500" />
-                    Dashboard de Rendimiento
+                    Muro de Campeones
                 </h2>
+                <div class="flex items-center gap-4 w-full sm:w-auto">
+                    <div class="relative flex-grow sm:w-64">
+                         <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                        <input v-model="q" type="text" class="w-full pl-10 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Buscar por nombre...">
+                    </div>
+                    <select v-model="sort" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        <option value="total_recovered">Mayor Recuperación</option>
+                        <option value="casos_count">Más Casos</option>
+                        <option value="name">Nombre (A-Z)</option>
+                    </select>
+                </div>
             </div>
         </template>
 
         <div class="py-12">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-                
-                <!-- PANEL UNIFICADO DE RENDIMIENTO -->
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-xl sm:rounded-xl border dark:border-gray-700">
-                    
-                    <!-- KPIs Integrados -->
-                    <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 border-b border-gray-200 dark:border-gray-700">
+
+                <!-- KPIs Globales -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg border border-transparent hover:border-green-500 transition-all duration-300">
                         <div class="flex items-center">
                             <div class="flex-shrink-0 bg-green-100 dark:bg-green-900/50 p-3 rounded-full">
                                 <BanknotesIcon class="h-7 w-7 text-green-600 dark:text-green-400" />
                             </div>
                             <div class="ml-4">
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Recuperado</p>
-                                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatCurrency(totals.totalRecovered) }}</p>
+                                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatCurrency(animatedTotalRecovered) }}</p>
                             </div>
                         </div>
-                        <div class="flex items-center">
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg border border-transparent hover:border-indigo-500 transition-all duration-300">
+                         <div class="flex items-center">
                             <div class="flex-shrink-0 bg-indigo-100 dark:bg-indigo-900/50 p-3 rounded-full">
                                 <FolderOpenIcon class="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
                             </div>
                             <div class="ml-4">
-                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Casos Asignados</p>
+                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Casos</p>
                                 <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ totals.totalCasos }}</p>
                             </div>
                         </div>
-                        <div class="flex items-center">
-                            <div class="flex-shrink-0 bg-orange-100 dark:bg-orange-900/50 p-3 rounded-full">
-                                <BuildingOffice2Icon class="h-7 w-7 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg border border-transparent hover:border-sky-500 transition-all duration-300">
+                         <div class="flex items-center">
+                            <div class="flex-shrink-0 bg-sky-100 dark:bg-sky-900/50 p-3 rounded-full">
+                                <UserGroupIcon class="h-7 w-7 text-sky-600 dark:text-sky-400" />
                             </div>
                             <div class="ml-4">
-                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Cooperativas Atendidas</p>
-                                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ totals.totalCoops }}</p>
+                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Gestores</p>
+                                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ totals.totalUsers }}</p>
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Cabecera de la lista con filtros -->
-                    <div class="p-6">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                            <div class="md:col-span-1">
-                                <label for="search" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Filtrar por nombre</label>
-                                <input v-model="q" id="search" type="text" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Buscar abogado...">
-                            </div>
-                            <div>
-                                <label for="sort" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Ordenar por</label>
-                                <select v-model="sort" id="sort" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                                    <option value="total_recovered">Monto recuperado</option>
-                                    <option value="name">Nombre (A-Z)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="dir" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Dirección</label>
-                                <select v-model="dir" id="dir" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                                    <option value="desc">Descendente</option>
-                                    <option value="asc">Ascendente</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
+                </div>
 
-                    <!-- LISTA DE RESULTADOS -->
-                    <div class="divide-y divide-gray-200 dark:divide-gray-700">
-                        <div v-if="safeRows.length === 0" class="text-center py-16 text-gray-500 dark:text-gray-400">
-                            <UserGroupIcon class="h-12 w-12 mx-auto text-gray-400" />
-                            <p class="mt-2">No se encontraron gestores con los filtros actuales.</p>
-                        </div>
-                        
-                        <div v-for="(row, index) in safeRows" :key="row.id" class="flex flex-col">
-                            <div @click="openRowId = openRowId === row.id ? null : row.id" class="p-4 flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
-                                <div class="w-12 text-center">
-                                    <TrophyIcon v-if="showRankingMedals && index === 0" class="h-6 w-6 text-amber-400 mx-auto" />
-                                    <TrophyIcon v-else-if="showRankingMedals && index === 1" class="h-6 w-6 text-slate-400 mx-auto" />
-                                    <TrophyIcon v-else-if="showRankingMedals && index === 2" class="h-6 w-6 text-amber-600 mx-auto" />
-                                    <span v-else class="font-bold text-gray-500">{{ index + 1 }}</span>
+                <!-- Lista de Gestores -->
+                <div v-if="rows.data.length === 0" class="text-center py-20 text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 rounded-2xl shadow-lg">
+                    <UserGroupIcon class="h-16 w-16 mx-auto text-gray-400" />
+                    <p class="mt-4 text-lg font-semibold">No se encontraron resultados</p>
+                    <p class="mt-1 text-sm">Prueba con otro término de búsqueda.</p>
+                </div>
+                
+                <div v-else>
+                    <!-- EL CAMBIO CLAVE ESTÁ AQUÍ: La clase "space-y-6" ahora está en el transition-group -->
+                    <transition-group name="list" tag="div" class="space-y-6">
+                        <div v-for="(row, index) in rows.data" :key="row.id" class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg transition-all duration-300 hover:shadow-2xl hover:-translate-y-1" :style="{ transitionDelay: isMounted ? `${index * 50}ms` : '0ms' }">
+                            <div @click="openRowId = openRowId === row.id ? null : row.id" class="p-4 flex items-center space-x-4 cursor-pointer">
+                                <!-- Ranking -->
+                                <div class="w-12 text-center flex-shrink-0">
+                                    <span v-if="showRankingMedals && (rows.current_page - 1) * rows.per_page + index === 0" class="text-3xl">🥇</span>
+                                    <span v-else-if="showRankingMedals && (rows.current_page - 1) * rows.per_page + index === 1" class="text-3xl">🥈</span>
+                                    <span v-else-if="showRankingMedals && (rows.current_page - 1) * rows.per_page + index === 2" class="text-3xl">🥉</span>
+                                    <span v-else class="font-bold text-gray-500 text-lg">{{ (rows.current_page - 1) * rows.per_page + index + 1 }}</span>
                                 </div>
 
-                                <div class="flex-grow flex items-center w-full md:w-1/3">
+                                <!-- Info Usuario -->
+                                <div class="flex-grow flex items-center min-w-0">
                                     <img :src="`https://ui-avatars.com/api/?name=${row.name}&background=random`" alt="Avatar" class="h-12 w-12 rounded-full mr-4">
-                                    <div>
-                                        <div class="font-bold text-lg text-gray-900 dark:text-white">{{ row.name }}</div>
-                                        <div class="text-sm text-gray-500 dark:text-gray-400">{{ row.email }}</div>
+                                    <div class="min-w-0">
+                                        <div class="font-bold text-lg text-gray-900 dark:text-white truncate">{{ row.name }}</div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-sm text-gray-500 dark:text-gray-400 truncate">{{ row.email }}</span>
+                                            <span class="text-xs font-semibold px-2 py-0.5 rounded-full" :class="roleBadgeClass(row.tipo_usuario)">{{ row.tipo_usuario }}</span>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div class="grid grid-cols-3 gap-4 text-center w-full md:w-auto md:flex-grow">
+                                <!-- KPIs Individuales -->
+                                <div class="hidden md:grid grid-cols-3 gap-4 text-center flex-shrink-0 w-1/2">
                                     <div>
                                         <div class="text-xs text-gray-500 uppercase tracking-wider">Recuperado</div>
                                         <div class="font-semibold text-lg text-gray-800 dark:text-gray-200">{{ formatCurrency(row.total_recovered) }}</div>
@@ -169,41 +191,54 @@ const showRankingMedals = computed(() => {
                                     </div>
                                 </div>
 
-                                <div class="w-12 text-center">
+                                <!-- Chevron -->
+                                <div class="w-12 text-center flex-shrink-0">
                                    <ChevronDownIcon class="h-6 w-6 text-gray-400 transition-transform mx-auto" :class="{ 'rotate-180': openRowId === row.id }" />
                                 </div>
                             </div>
-                            
+
+                            <!-- Panel Desplegable -->
                             <transition name="fade">
-                                <div v-if="openRowId === row.id" class="bg-gray-50 dark:bg-gray-900/50 p-6">
-                                    <div class="grid md:grid-cols-2 gap-x-8 gap-y-6">
-                                        <div>
-                                            <h3 class="font-semibold mb-3 text-gray-800 dark:text-gray-200">Casos Asignados</h3>
-                                            <div class="space-y-2 text-sm max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                                                <div v-for="caso in row.cases" :key="caso.id" class="flex justify-between items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                                                    <div>
-                                                        <Link :href="route('casos.show', caso.id)" class="font-medium text-indigo-600 hover:underline">Caso #{{ caso.id }}</Link>
-                                                        <span class="text-gray-500 text-xs block">{{ caso.cooperativa?.name || 'N/A' }}</span>
-                                                    </div>
-                                                    <span class="font-semibold text-gray-700 dark:text-gray-300">{{ formatCurrency(caso.recovered) }}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <h3 class="font-semibold mb-3 text-gray-800 dark:text-gray-200">Cooperativas Asignadas</h3>
-                                            <ul class="space-y-2 text-sm">
-                                                <li v-for="coop in row.cooperativas" :key="coop.id">
-                                                    <Link :href="route('cooperativas.show', coop.id)" class="text-indigo-600 hover:underline flex items-center group">
-                                                      <BuildingOffice2Icon class="h-4 w-4 mr-2 text-gray-400 group-hover:text-indigo-500" />
-                                                      <span>{{ coop.name }}</span>
-                                                    </Link>
-                                                </li>
-                                            </ul>
-                                        </div>
+                                <div v-if="openRowId === row.id" class="p-6 pt-2 transition-all duration-300 ease-in-out bg-slate-50 dark:bg-slate-800/50 rounded-b-2xl">
+                                    <h4 class="text-sm font-semibold text-slate-800 dark:text-slate-200 border-b dark:border-slate-700 pb-2">
+                                        Detalle de Cooperativas
+                                    </h4>
+                                    <div v-if="row.cooperativas && row.cooperativas.length" class="flow-root mt-3">
+                                        <ul role="list" class="-my-2 divide-y divide-slate-200 dark:divide-slate-700">
+                                            <li v-for="coop in row.cooperativas" :key="coop.id" class="py-2.5">
+                                                <Link :href="route('cooperativas.show', coop.id)" class="group flex items-center text-sm">
+                                                    <BuildingOffice2Icon class="h-5 w-5 mr-3 text-slate-400 group-hover:text-indigo-500 transition-colors" />
+                                                    <span class="text-slate-700 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{{ coop.nombre }}</span>
+                                                </Link>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    <div v-else class="text-sm text-slate-500 italic py-4 text-center">
+                                        No tiene cooperativas asignadas.
                                     </div>
                                 </div>
                             </transition>
                         </div>
+                    </transition-group>
+                </div>
+                
+                 <!-- Paginación -->
+                <div v-if="rows.links.length > 3" class="flex justify-center mt-8">
+                    <div class="flex rounded-lg shadow">
+                         <Link
+                            v-for="(link, k) in rows.links"
+                            :key="k"
+                            :href="link.url"
+                            v-html="link.label"
+                            class="px-4 py-2 text-sm font-medium transition"
+                            :class="{
+                                'bg-indigo-600 text-white': link.active,
+                                'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700': !link.active && link.url,
+                                'bg-white text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-500': !link.url,
+                                'rounded-l-lg': k === 0,
+                                'rounded-r-lg': k === rows.links.length - 1
+                            }"
+                        />
                     </div>
                 </div>
 
@@ -213,18 +248,40 @@ const showRankingMedals = computed(() => {
 </template>
 
 <style scoped>
-.fade-enter-active, .fade-leave-active {
-  transition: all 0.3s ease-in-out;
-  overflow: hidden;
+.fade-enter-active,
+.fade-leave-active {
+    transition: all 0.3s ease-in-out;
+    overflow: hidden;
 }
-.fade-enter-from, .fade-leave-to {
-  opacity: 0;
-  max-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
 }
-.fade-enter-to, .fade-leave-from {
-  max-height: 1000px; /* Un valor grande para permitir la expansión */
+
+.fade-enter-to,
+.fade-leave-from {
+    max-height: 500px;
+}
+
+.list-move,
+.list-enter-active,
+.list-leave-active {
+    transition: all 0.5s cubic-bezier(0.55, 0, 0.1, 1);
+}
+
+.list-enter-from,
+.list-leave-to {
+    opacity: 0;
+    transform: scale(0.95) translateY(30px);
+}
+
+.list-leave-active {
+    position: absolute;
 }
 
 /* Scrollbar minimalista */
@@ -242,4 +299,3 @@ const showRankingMedals = computed(() => {
     background-color: #4b5563; /* gray-600 */
 }
 </style>
-

@@ -32,10 +32,10 @@ class CooperativaController extends Controller
         // Aplicamos el filtro de búsqueda si existe
         $query->when($request->input('search'), function ($query, $search) {
             $query->where(function ($q) use ($search) {
-                $q->where('nombre', 'like', "%{$search}%")
-                  ->orWhere('NIT', 'like', "%{$search}%")
-                  ->orWhere('representante_legal_nombre', 'like', "%{$search}%")
-                  ->orWhere('contacto_correo', 'like', "%{$search}%");
+                $q->where('nombre', 'Ilike', "%{$search}%")
+                  ->orWhere('NIT', 'Ilike', "%{$search}%")
+                  ->orWhere('representante_legal_nombre', 'Ilike', "%{$search}%")
+                  ->orWhere('contacto_correo', 'Ilike', "%{$search}%");
             });
         });
 

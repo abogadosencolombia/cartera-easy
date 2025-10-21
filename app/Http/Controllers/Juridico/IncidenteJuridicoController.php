@@ -18,7 +18,7 @@ class IncidenteJuridicoController extends Controller
         $query = IncidenteJuridico::with('responsable:id,name')->latest('fecha_registro');
 
         $query->when($request->input('search'), function ($query, $search) {
-            $query->where('asunto', 'like', "%{$search}%");
+            $query->where('asunto', 'Ilike', "%{$search}%");
         });
 
         $query->when($request->input('estado'), function ($query, $estado) {

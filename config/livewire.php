@@ -21,7 +21,7 @@ return [
     |---------------------------------------------------------------------------
     |
     | This value is used to specify where Livewire component Blade templates are
-    | stored when running file creation commands like `artisan make:livewire`.
+    | stored when running file creation commands Ilike `artisan make:livewire`.
     | It is also used if you choose to omit a component's render() method.
     |
     */
@@ -83,7 +83,7 @@ return [
     |---------------------------------------------------------------------------
     |
     | This value determines if Livewire will run a component's `render()` method
-    | after a redirect has been triggered using something like `redirect(...)`
+    | after a redirect has been triggered using something Ilike `redirect(...)`
     | Setting this to true will render the view once more before redirecting
     |
     */
@@ -123,7 +123,7 @@ return [
     |
     | By adding `wire:navigate` to links in your Livewire application, Livewire
     | will prevent the default link handling and instead request those pages
-    | via AJAX, creating an SPA-like effect. Configure this behavior here.
+    | via AJAX, creating an SPA-Ilike effect. Configure this behavior here.
     |
     */
 

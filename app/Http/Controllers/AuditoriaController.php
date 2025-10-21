@@ -26,7 +26,7 @@
             });
 
             $query->when($request->filled('evento'), function ($q) use ($request) {
-                $q->where('evento', 'like', '%' . $request->input('evento') . '%');
+                $q->where('evento', 'Ilike', '%' . $request->input('evento') . '%');
             });
             
             $query->when($request->filled('fecha_desde'), function ($q) use ($request) {

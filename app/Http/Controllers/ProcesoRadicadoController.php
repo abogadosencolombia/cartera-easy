@@ -35,8 +35,8 @@ class ProcesoRadicadoController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('radicado', 'ilike', "%{$search}%")
                   ->orWhere('asunto', 'ilike', "%{$search}%")
-                  ->orWhereHas('demandante', fn($sq) => $sq->where('nombre_completo', 'like', "%{$search}%"))
-                  ->orWhereHas('demandado', fn($sq) => $sq->where('nombre_completo', 'like', "%{$search}%"));
+                  ->orWhereHas('demandante', fn($sq) => $sq->where('nombre_completo', 'Ilike', "%{$search}%"))
+                  ->orWhereHas('demandado', fn($sq) => $sq->where('nombre_completo', 'Ilike', "%{$search}%"));
             });
         }
 
