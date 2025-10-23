@@ -293,24 +293,30 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // =================================================================
     Route::post('/chatbot/send', function (Request $request) {
         $validated = $request->validate([
-            'message' => 'required_without:file|string|max:4096',
-            'file' => 'nullable|file|max:10240',
+            'message' => 'required|string|max:4096',
         ]);
-        $userMessage = new Message();
-        $userMessage->user_id = Auth::id();
-        $userMessage->body = $validated['message'] ?? null;
-        if ($request->hasFile('file')) {
-            $path = $request->file('file')->store('chat_attachments', 'public');
-            $userMessage->file_url = $path;
-            $userMessage->file_name = $request->file('file')->getClientOriginalName();
+        
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['error' => 'Unauthorized'], 401);
         }
-        $userMessage->save();
-        Http::post('https://cobrocartera.app.n8n.cloud/webhook/mensajes-prueba', [
-            'message' => $userMessage->body,
-            'userId' => $userMessage->user_id,
-            'fileUrl' => $userMessage->file_url ? asset('storage/' . $userMessage->file_url) : null,
-            'fileName' => $userMessage->file_name,
+        
+        // Guardar mensaje del usuario
+        $userMessage = Message::create([
+            'user_id' => $user->id,
+            'body' => $validated['message'],
         ]);
+        
+        // Enviar a n8n
+        try {
+            Http::post('https://cobrocartera-n8n.hrymiz.easypanel.host/webhook/messages-customers', [
+                'message' => $userMessage->body,
+                'userId' => $user->id,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('[Chatbot] Error enviando a n8n: ' . $e->getMessage());
+        }
+        
         return response()->json($userMessage);
     })->name('chatbot.send');
     // =================================================================

@@ -48,22 +48,42 @@ Route::get('/health', fn () => [
 // --- RUTA DEL CHATBOT (para recibir notificaciones de n8n) ---
 // Esta ruta no necesita protección CSRF porque es una API externa la que la llama.
 Route::post('/chatbot/notify', function (Request $request) {
+    \Log::info('[Chatbot Notify] Datos recibidos de n8n:', $request->all());
+    
     $validated = $request->validate([
-        'response' => 'required|string',
+        'message' => 'required_without:response|string',
+        'response' => 'required_without:message|string',
         'userId' => 'required|integer',
     ]);
 
-    // ✅ Crear mensaje del bot (user_id = 0 indica que es el bot)
+    // Acepta tanto 'message' como 'response'
+    $messageBody = $validated['response'] ?? $validated['message'];
+
+    // ✅ Crear mensaje del bot
     $botMessage = Message::create([
-        'user_id' => 0, 
-        'body' => $validated['response']
+        'user_id' => null, 
+        'body' => $messageBody
+    ]);
+
+    \Log::info('[Chatbot Notify] Broadcasting mensaje:', [
+        'message_id' => $botMessage->id,
+        'user_id' => $validated['userId'],
+        'body' => $messageBody
     ]);
 
     // ✅ Broadcast al usuario específico
-    broadcast(new ChatbotResponseReceived(
-        $botMessage->body,
-        $validated['userId']
-    ));
+    try {
+        broadcast(new ChatbotResponseReceived(
+            $botMessage->body,
+            $validated['userId']
+        ));
+        \Log::info('[Chatbot Notify] ✅ Broadcast enviado exitosamente');
+    } catch (\Exception $e) {
+        \Log::error('[Chatbot Notify] ❌ Error en broadcast: ' . $e->getMessage());
+    }
 
-    return response()->json(['status' => 'notification_sent_to_user']);
+    return response()->json([
+        'status' => 'success',
+        'message_id' => $botMessage->id
+    ]);
 });

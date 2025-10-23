@@ -1,6 +1,5 @@
 <script setup>
 import { ref, onMounted, nextTick, watch, computed } from 'vue';
-// Se importa 'usePage' de Inertia para acceder a los datos compartidos del servidor, como el usuario autenticado.
 import { usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 
@@ -15,24 +14,14 @@ const messagesContainer = ref(null);
 const inputMessage = ref(null);
 
 // --- DATOS DE USUARIO DINÁMICOS ---
-// Se obtiene el objeto 'page' que contiene toda la información que Laravel comparte con el frontend.
 const page = usePage();
-// Se crea una propiedad computada 'user' que apunta directamente a los datos del usuario autenticado.
-// Esto asegura que siempre tengamos la información más actualizada del usuario que ha iniciado sesión.
 const user = computed(() => page.props.auth.user);
 
 // --- FUNCIONES ---
-
-/**
- * Alterna la visibilidad de la ventana de chat.
- */
 const toggleChat = () => {
   isOpen.value = !isOpen.value;
 };
 
-/**
- * Desplaza el contenedor de mensajes hasta el final para mostrar siempre el último mensaje.
- */
 const scrollToBottom = async () => {
   await nextTick();
   if (messagesContainer.value) {
@@ -40,23 +29,14 @@ const scrollToBottom = async () => {
   }
 };
 
-/**
- * Agrega un nuevo mensaje al array 'messages', lo que lo renderiza en la UI.
- * @param {string} html - El contenido del mensaje.
- * @param {'user'|'bot'|'error'} type - Define el estilo y la alineación de la burbuja del mensaje.
- */
 const addMessage = (html, type) => {
   const timestamp = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   messages.value.push({ id: Date.now() + Math.random(), html, type, timestamp });
   scrollToBottom();
 };
 
-/**
- * Envía el mensaje del usuario al webhook de n8n.
- */
 const sendMessage = async () => {
   const messageText = newMessage.value.trim();
-  // Se asegura de que no se envíen mensajes vacíos y de que haya un usuario autenticado.
   if (messageText === '' || !user.value) return;
 
   isLoading.value = true;
@@ -64,75 +44,69 @@ const sendMessage = async () => {
   newMessage.value = '';
 
   try {
-    const formData = new FormData();
-    formData.append('message', messageText);
-    // ¡CRÍTICO! Se envía el ID del usuario real y dinámico.
-    formData.append('userId', user.value.id);
-
-    // URL del webhook en n8n que inicia el flujo de la IA.
-    const n8nWebhookUrl = 'https://cartera-crearcop-n8n.hrymiz.easypanel.host/webhook/messages-customers';
-
-    await axios.post(n8nWebhookUrl, formData);
+    // ✅ USAR LA RUTA DE LARAVEL (no directamente n8n)
+    const response = await axios.post('/chatbot/send', {
+      message: messageText,
+    });
     
-    // El indicador 'isLoading' se desactivará cuando el evento de Echo sea recibido.
-
+    console.log('[Chat] Mensaje enviado exitosamente:', response.data);
+    
   } catch (error) {
-    console.error('Error enviando el mensaje a n8n:', error);
+    console.error('[Chat] Error enviando mensaje:', error);
     addMessage('Hubo un error al conectar con el servidor. Por favor, inténtalo de nuevo.', 'error');
     isLoading.value = false;
   }
 };
 
-
 // --- CICLO DE VIDA Y WATCHERS ---
-
 onMounted(() => {
-  console.log('[Chat Debug] Componente montado.');
+  console.log('[Chat] Componente montado');
+  console.log('[Chat] Usuario:', user.value);
+  console.log('[Chat] Echo disponible:', !!window.Echo);
   
   if (user.value && window.Echo) {
-    console.log(`[Chat Debug] Usuario autenticado (ID: ${user.value.id}). Intentando conectar a Echo.`);
+    const userId = user.value.id;
+    const channelName = `App.Models.User.${userId}`;
     
-    // ✅ USA EL CANAL DE USUARIO QUE YA ESTÁ DEFINIDO EN channels.php
-    const channel = window.Echo.private(`App.Models.User.${user.value.id}`);
+    console.log(`[Chat] Intentando suscribirse al canal: ${channelName}`);
+    
+    const channel = window.Echo.private(channelName);
 
     channel
       .subscribed(() => {
-        console.log(`[Chat Debug] ¡ÉXITO! Suscrito correctamente al canal privado: App.Models.User.${user.value.id}`);
+        console.log(`[Chat] ✅ Suscrito correctamente a ${channelName}`);
       })
       .listen('.chatbot.response', (e) => {
-        console.log('[Chat Debug] ¡EVENTO RECIBIDO!', e);
+        console.log('[Chat] 📨 Evento recibido:', e);
         
         isLoading.value = false;
         if (e && e.message) {
-            addMessage(e.message, 'bot');
+          addMessage(e.message, 'bot');
         } else {
-            console.error('[Chat Debug] Evento de chat recibido con formato inesperado:', e);
+          console.error('[Chat] Formato de evento inesperado:', e);
         }
       })
       .error((error) => {
-        console.error('[Chat Debug] ERROR de autenticación de Echo.', error);
+        console.error('[Chat] ❌ Error de Echo:', error);
       });
 
   } else {
-      if (!user.value) {
-          console.warn('[Chat Debug] No hay un usuario autenticado. Echo no se iniciará.');
-      }
-      if (!window.Echo) {
-          console.warn('[Chat Debug] La librería Laravel Echo (window.Echo) no está disponible.');
-      }
+    if (!user.value) {
+      console.warn('[Chat] ⚠️ No hay usuario autenticado');
+    }
+    if (!window.Echo) {
+      console.warn('[Chat] ⚠️ Echo no está disponible');
+    }
   }
 });
 
-// Se activa cada vez que se abre la ventana del chat.
 watch(isOpen, (newVal) => {
   if (newVal) {
     scrollToBottom();
     setTimeout(() => {
-      // Muestra el mensaje de bienvenida solo la primera vez.
       if (messages.value.length === 0) {
         addMessage('¡Hola! Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?', 'bot');
       }
-      // Pone el cursor automáticamente en el campo de texto.
       inputMessage.value?.focus();
     }, 400); 
   }
@@ -140,7 +114,6 @@ watch(isOpen, (newVal) => {
 </script>
 
 <style>
-/* --- ESTILOS "OBRA DE ARTE" --- */
 :root {
   --chat-bg: #f8f9fa;
   --header-bg: #111827;
@@ -157,7 +130,6 @@ watch(isOpen, (newVal) => {
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #adb5bd; }
 
-/* Indicador de escribiendo con animación de pulso */
 .typing-indicator { display: flex; align-items: center; gap: 5px; }
 .typing-indicator span { 
     height: 9px; width: 9px; 
@@ -173,9 +145,6 @@ watch(isOpen, (newVal) => {
   30% { opacity: 1; transform: scale(1); }
 }
 
-/* --- ANIMACIONES DE TRANSICIÓN --- */
-
-/* Ventana de Chat: emerge desde el botón */
 .chat-window-enter-active, .chat-window-leave-active { 
   transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   transform-origin: bottom right;
@@ -185,14 +154,12 @@ watch(isOpen, (newVal) => {
   transform: scale(0.1); 
 }
 
-/* Botón flotante: rotación y cambio de ícono */
 .fab-icon-enter-active, .fab-icon-leave-active { 
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s; 
 }
 .fab-icon-enter-from { opacity: 0; transform: rotate(-180deg) scale(0.5); }
 .fab-icon-leave-to { opacity: 0; transform: rotate(180deg) scale(0.5); }
 
-/* Mensajes: aparecen con elegancia */
 .message-list-enter-active {
     transition: all 0.4s ease-out;
 }
@@ -202,7 +169,7 @@ watch(isOpen, (newVal) => {
 }
 .message-list-leave-active {
     transition: all 0.3s ease-in;
-    position: absolute; /* Evita que salten al eliminarse */
+    position: absolute;
 }
 .message-list-leave-to {
     opacity: 0;
@@ -212,11 +179,9 @@ watch(isOpen, (newVal) => {
 
 <template>
   <div v-if="user" class="fixed bottom-5 right-5 z-[1000]">
-    <!-- Ventana del Chat -->
     <transition name="chat-window">
       <div v-if="isOpen" class="w-[calc(100vw-40px)] sm:w-96 bg-white rounded-xl shadow-2xl flex flex-col h-[70vh] max-h-[600px] overflow-hidden border border-slate-200/80">
         
-        <!-- Cabecera Minimalista -->
         <div class="bg-white text-slate-800 p-4 flex-shrink-0 border-b border-slate-200/80 flex justify-between items-center">
           <div class="flex items-center gap-3">
             <div class="relative">
@@ -232,7 +197,6 @@ watch(isOpen, (newVal) => {
           </div>
         </div>
         
-        <!-- Contenedor de Mensajes -->
         <div ref="messagesContainer" class="flex-1 p-4 overflow-y-auto bg-slate-100/50 custom-scrollbar">
             <transition-group name="message-list" tag="div" class="space-y-4">
                 <div v-for="message in messages" :key="message.id" 
@@ -254,7 +218,6 @@ watch(isOpen, (newVal) => {
                 </div>
             </transition-group>
             
-          <!-- Indicador de "Escribiendo..." -->
           <div v-if="isLoading" class="flex justify-start pt-4">
             <div class="px-4 py-3 rounded-2xl rounded-bl-lg bg-white shadow-sm border border-slate-200/60">
               <div class="typing-indicator"><span></span><span></span><span></span></div>
@@ -262,12 +225,10 @@ watch(isOpen, (newVal) => {
           </div>
         </div>
         
-        <!-- Pie de página (Input de mensaje) -->
         <div class="p-2 bg-white/70 backdrop-blur-sm border-t border-slate-200/60 flex-shrink-0">
           <form @submit.prevent="sendMessage" class="flex items-center gap-2 p-1">
             <input ref="inputMessage" type="text" v-model="newMessage" :disabled="isLoading" placeholder="Escribe un mensaje..." class="flex-1 w-full text-sm bg-slate-100 border-transparent rounded-full py-2.5 px-4 focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:opacity-70 transition-all duration-300">
             
-            <!-- Botón de envío con animación -->
             <button type="submit" :disabled="isLoading || newMessage.trim() === ''" class="bg-slate-800 text-white rounded-full h-10 w-10 flex items-center justify-center flex-shrink-0 transition-all duration-300 transform focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-800" :class="{'scale-110 hover:bg-slate-900': newMessage.trim() !== '', 'scale-100 bg-slate-400 cursor-not-allowed': newMessage.trim() === ''}">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.428A1 1 0 009.586 16.5l-4.293-4.293a1 1 0 010-1.414l7-7a1 1 0 011.414 0l4.293 4.293-5.586 5.586a1 1 0 00.28 1.55l5 1.428a1 1 0 001.17-1.408l-7-14z" />
@@ -278,15 +239,11 @@ watch(isOpen, (newVal) => {
       </div>
     </transition>
 
-    <!-- Botón Flotante Animado -->
     <button @click="toggleChat" class="bg-slate-800 text-white rounded-full h-16 w-16 flex items-center justify-center shadow-xl hover:bg-slate-900 transition-all duration-300 transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-slate-400/50">
       <transition name="fab-icon" mode="out-in">
-        <!-- Icono de Mensaje -->
         <svg v-if="!isOpen" key="open" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
-        <!-- Icono de Cerrar (X) -->
         <svg v-else key="close" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
       </transition>
     </button>
   </div>
 </template>
-
