@@ -73,6 +73,8 @@ use App\Events\ChatbotResponseReceived;
 |--------------------------------------------------------------------------
 */
 
+Broadcast::routes(['middleware' => ['web', 'auth']]);
+
 // Ruta pública de bienvenida / login
 Route::get('/', function () {
     if (auth()->check()) {

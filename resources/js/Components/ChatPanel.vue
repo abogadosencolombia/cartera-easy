@@ -87,27 +87,22 @@ const sendMessage = async () => {
 // --- CICLO DE VIDA Y WATCHERS ---
 
 onMounted(() => {
-  // Se ejecuta cuando el componente está listo en el navegador.
   console.log('[Chat Debug] Componente montado.');
   
-  // Solo intenta conectarse a Echo si hay un usuario y la librería Echo existe.
   if (user.value && window.Echo) {
     console.log(`[Chat Debug] Usuario autenticado (ID: ${user.value.id}). Intentando conectar a Echo.`);
     
-    // ¡CRÍTICO! Se suscribe a un canal privado y único para el usuario actual.
-    const channel = window.Echo.private(`chat.${user.value.id}`);
+    // ✅ USA EL CANAL DE USUARIO QUE YA ESTÁ DEFINIDO EN channels.php
+    const channel = window.Echo.private(`App.Models.User.${user.value.id}`);
 
     channel
       .subscribed(() => {
-        // Si ves este mensaje, el frontend se conectó correctamente al canal.
-        console.log(`[Chat Debug] ¡ÉXITO! Suscrito correctamente al canal privado: chat.${user.value.id}`);
+        console.log(`[Chat Debug] ¡ÉXITO! Suscrito correctamente al canal privado: App.Models.User.${user.value.id}`);
       })
       .listen('.chatbot.response', (e) => {
-        // Si ves este mensaje, ¡todo el sistema funciona!
         console.log('[Chat Debug] ¡EVENTO RECIBIDO!', e);
         
-        isLoading.value = false; // Detiene el indicador de "escribiendo".
-        // Añade el mensaje del bot a la UI.
+        isLoading.value = false;
         if (e && e.message) {
             addMessage(e.message, 'bot');
         } else {
@@ -115,8 +110,7 @@ onMounted(() => {
         }
       })
       .error((error) => {
-        // Si ves este error, el problema está en la autenticación del canal privado.
-        console.error('[Chat Debug] ERROR de autenticación de Echo. Revisa la configuración de broadcasting.php y Reverb/Pusher.', error);
+        console.error('[Chat Debug] ERROR de autenticación de Echo.', error);
       });
 
   } else {
@@ -124,7 +118,7 @@ onMounted(() => {
           console.warn('[Chat Debug] No hay un usuario autenticado. Echo no se iniciará.');
       }
       if (!window.Echo) {
-          console.warn('[Chat Debug] La librería Laravel Echo (window.Echo) no está disponible. Revisa tu archivo resources/js/bootstrap.js.');
+          console.warn('[Chat Debug] La librería Laravel Echo (window.Echo) no está disponible.');
       }
   }
 });
