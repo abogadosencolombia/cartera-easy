@@ -11,6 +11,9 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use App\Models\AuditoriaEvento;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+// --- INICIO: AÑADIR IMPORT REVISION DIARIA ---
+use App\Models\RevisionDiaria;
+// --- FIN: AÑADIR IMPORT REVISION DIARIA ---
 
 class Caso extends Model
 {
@@ -147,5 +150,14 @@ class Caso extends Model
         return $this->morphMany(Actuacion::class, 'actuable')->orderBy('created_at', 'desc');
     }
     // --- FIN: AÑADIR RELACIÓN DE ACTUACIONES ---
-}
 
+    // --- INICIO: AÑADIR RELACIÓN DE REVISIÓN DIARIA ---
+    /**
+     * Obtiene todas las revisiones diarias para este caso.
+     */
+    public function revisionesDiarias(): MorphMany
+    {
+        return $this->morphMany(RevisionDiaria::class, 'revisable');
+    }
+    // --- FIN: AÑADIR RELACIÓN DE REVISIÓN DIARIA ---
+}

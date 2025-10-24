@@ -41,9 +41,10 @@ class GestoresController extends Controller
         // 5. Calcular KPIs Totales
         $kpiQuery = $query->clone();
         $allMatchingUsers = $kpiQuery->get();
+        $totalCasosReales = DB::table('casos')->count();
         $totals = [
             'totalRecovered' => $allMatchingUsers->sum('total_recovered'),
-            'totalCasos' => $allMatchingUsers->sum('casos_count'),
+            'totalCasos' => $totalCasosReales, // <-- ¡Usamos el conteo real!
             'totalUsers' => $allMatchingUsers->count(),
         ];
 

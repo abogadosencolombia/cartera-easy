@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 // --- INICIO: AÑADIR IMPORT ---
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use App\Models\RevisionDiaria; // <-- AÑADIDO
 // --- FIN: AÑADIR IMPORT ---
 
 class ProcesoRadicado extends Model
@@ -54,4 +55,14 @@ class ProcesoRadicado extends Model
         return $this->morphMany(Actuacion::class, 'actuable')->orderBy('created_at', 'desc');
     }
     // --- FIN: AÑADIR RELACIÓN DE ACTUACIONES ---
+
+    // --- INICIO: AÑADIR RELACIÓN DE REVISIÓN DIARIA ---
+    /**
+     * Obtiene todas las revisiones diarias para este radicado.
+     */
+    public function revisionesDiarias(): MorphMany
+    {
+        return $this->morphMany(RevisionDiaria::class, 'revisable');
+    }
+    // --- FIN: AÑADIR RELACIÓN DE REVISIÓN DIARIA ---
 }

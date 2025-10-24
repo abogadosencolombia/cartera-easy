@@ -139,6 +139,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // --- INICIO: NUEVA RUTA REVISIÓN DIARIA ---
     Route::get('/revision-diaria', [RevisionDiariaController::class, 'index'])->name('revision.index');
+    // --- INICIO: AÑADIR RUTA TOGGLE ---
+    Route::post('/revision-diaria/toggle', [RevisionDiariaController::class, 'toggle'])->name('revision.toggle');
+    // --- FIN: AÑADIR RUTA TOGGLE ---
     // --- FIN: NUEVA RUTA REVISIÓN DIARIA ---
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

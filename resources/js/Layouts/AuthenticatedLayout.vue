@@ -23,6 +23,10 @@ import {
     Cog6ToothIcon, ShieldCheckIcon, KeyIcon, DocumentTextIcon,
     ListBulletIcon, ExclamationTriangleIcon, CircleStackIcon, GlobeAltIcon,
     BanknotesIcon,
+    // --- INICIO: CORRECCIÓN DE ERROR ---
+    // El icono se añade directamente a la lista de importación.
+    ClipboardDocumentCheckIcon,
+    // --- FIN: CORRECCIÓN DE ERROR ---
 } from '@heroicons/vue/24/outline';
 
 
@@ -33,6 +37,17 @@ const NAV_ITEMS = [
     { type: 'link', label: 'Reportes', href: route('reportes.index'), active: 'reportes.*', icon: ChartBarIcon, roles: ['admin', 'gestor', 'abogado'] },
 
     { type: 'notification', label: 'Notificaciones', href: route('notificaciones.index'), active: 'notificaciones.*', icon: BellIcon, roles: ['admin', 'gestor', 'abogado'] },
+
+    // --- INICIO: AÑADIR REVISIÓN DIARIA ---
+    { 
+        type: 'link', 
+        label: 'Revisión Diaria', 
+        href: route('revision.index'), 
+        active: 'revision.*', 
+        icon: ClipboardDocumentCheckIcon, 
+        roles: ['admin', 'gestor', 'abogado'] 
+    },
+    // --- FIN: AÑADIR REVISIÓN DIARIA ---
 
     {
         type: 'dropdown', label: 'Entidades', icon: UsersIcon,
@@ -315,3 +330,4 @@ onMounted(() => {
         <ChatPanel />
     </div>
 </template>
+

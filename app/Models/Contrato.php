@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany; // Asegúrate que esté importado
 use Carbon\Carbon; // Asegúrate que esté importado
+// --- INICIO: AÑADIR IMPORT REVISION DIARIA ---
+use App\Models\RevisionDiaria;
+// --- FIN: AÑADIR IMPORT REVISION DIARIA ---
 
 class Contrato extends Model
 {
@@ -102,5 +105,14 @@ class Contrato extends Model
     {
         return $this->morphMany(Actuacion::class, 'actuable')->latest(); // Ordenar por más reciente
     }
-}
 
+    // --- INICIO: AÑADIR RELACIÓN DE REVISIÓN DIARIA ---
+    /**
+     * Obtiene todas las revisiones diarias para este contrato.
+     */
+    public function revisionesDiarias(): MorphMany
+    {
+        return $this->morphMany(RevisionDiaria::class, 'revisable');
+    }
+    // --- FIN: AÑADIR RELACIÓN DE REVISIÓN DIARIA ---
+}
