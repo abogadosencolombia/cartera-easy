@@ -76,16 +76,17 @@ onMounted(() => {
       .subscribed(() => {
         console.log(`[Chat] ✅ Suscrito correctamente a ${channelName}`);
       })
-      .listen('.chatbot.response', (e) => {
+    
+    .listen('.chatbot.response', (e) => {
         console.log('[Chat] 📨 Evento recibido:', e);
         
         isLoading.value = false;
-        if (e && e.message) {
-          addMessage(e.message, 'bot');
+        if (e && e.body) { // <--- CAMBIO AQUÍ
+          addMessage(e.body, 'bot'); // <--- CAMBIO AQUÍ
         } else {
           console.error('[Chat] Formato de evento inesperado:', e);
         }
-      })
+    })
       .error((error) => {
         console.error('[Chat] ❌ Error de Echo:', error);
       });

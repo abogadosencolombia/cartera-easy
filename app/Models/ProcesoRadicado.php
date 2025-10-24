@@ -6,6 +6,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+// --- INICIO: AÑADIR IMPORT ---
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+// --- FIN: AÑADIR IMPORT ---
 
 class ProcesoRadicado extends Model
 {
@@ -40,4 +43,15 @@ class ProcesoRadicado extends Model
     {
         return $this->hasMany(DocumentoProceso::class, 'proceso_radicado_id');
     }
+
+    // --- INICIO: AÑADIR RELACIÓN DE ACTUACIONES ---
+    /**
+     * Get all of the radicado's actuations.
+     * Se ordenan de la más reciente a la más antigua por defecto.
+     */
+    public function actuaciones(): MorphMany
+    {
+        return $this->morphMany(Actuacion::class, 'actuable')->orderBy('created_at', 'desc');
+    }
+    // --- FIN: AÑADIR RELACIÓN DE ACTUACIONES ---
 }

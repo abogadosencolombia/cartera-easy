@@ -122,6 +122,12 @@ const submit = () => form.post(route('personas.update', props.persona.id));
                     <InputLabel for="correo_2" value="Correo Secundario (Opcional)" />
                     <TextInput v-model="form.correo_2" id="correo_2" type="email" class="mt-1 block w-full" />
                   </div>
+                  <!-- CAMPO AÑADIDO QUE FALTABA -->
+                  <div>
+                    <InputLabel for="telefono_fijo" value="Teléfono Fijo (Opcional)" />
+                    <TextInput v-model="form.telefono_fijo" id="telefono_fijo" type="text" class="mt-1 block w-full" />
+                    <InputError :message="form.errors.telefono_fijo" class="mt-2" />
+                  </div>
                 </div>
               </section>
               
@@ -161,11 +167,11 @@ const submit = () => form.post(route('personas.update', props.persona.id));
                     <option value="Oficina" />
                     <option value="Apartamento" />
                     <option value="Finca" />
-                </datalist>
+                 </datalist>
               </section>
               <!-- ^-^- FIN DE LA SECCIÓN DE DIRECCIONES -^-^ -->
 
-               <section>
+                <section>
                     <h3 class="mb-4 text-lg font-medium text-gray-900 dark:text-gray-100">Información Adicional</h3>
                      <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                         <div>
@@ -229,4 +235,3 @@ const submit = () => form.post(route('personas.update', props.persona.id));
     </div>
   </AuthenticatedLayout>
 </template>
-

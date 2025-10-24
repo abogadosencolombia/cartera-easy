@@ -26,9 +26,17 @@ class UpdatePersonaRequest extends FormRequest
         $personaId = $this->route('persona')->id;
 
         return [
+            // --- CAMPOS OBLIGATORIOS ---
             'nombre_completo'    => 'required|string|max:255',
             'tipo_documento'     => 'required|string|max:255',
-            'numero_documento'   => ['required', 'string', 'max:255', Rule::unique(Persona::class)->ignore($personaId)],
+            'numero_documento'   => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('personas', 'numero_documento')->whereNull('deleted_at')->ignore($personaId)
+            ],
+
+            // --- CAMPOS OPCIONALES ---
             'fecha_expedicion'   => 'nullable|date',
             'telefono_fijo'      => 'nullable|string|max:255',
             'celular_1'          => 'nullable|string|max:255',
@@ -39,11 +47,16 @@ class UpdatePersonaRequest extends FormRequest
             'cargo'              => 'nullable|string|max:255',
             'observaciones'      => 'nullable|string',
 
+            // --- CAMPOS AÑADIDOS QUE FALTABAN ---
+            'direccion'          => 'nullable|string|max:255',
+            'ciudad'             => 'nullable|string|max:255',
+            // ------------------------------------
+
             // Reglas para Direcciones Dinámicas
-            'addresses'             => ['nullable', 'array', 'max:20'],
-            'addresses.*.label'     => ['required_with:addresses.*.address', 'nullable', 'string', 'max:255'],
-            'addresses.*.address'   => ['required_with:addresses.*.label', 'nullable', 'string', 'max:1024'],
-            'addresses.*.city'      => ['required_with:addresses.*.address', 'nullable', 'string', 'max:255'],
+            'addresses'            => ['nullable', 'array', 'max:20'],
+            'addresses.*.label'    => ['required_with:addresses.*.address', 'nullable', 'string', 'max:255'],
+            'addresses.*.address'  => ['required_with:addresses.*.label', 'nullable', 'string', 'max:1024'],
+            'addresses.*.city'     => ['required_with:addresses.*.address', 'nullable', 'string', 'max:255'],
 
             // Reglas para Redes Sociales
             'social_links'         => ['nullable','array','max:50'],

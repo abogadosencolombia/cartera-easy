@@ -6,23 +6,23 @@ use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast; // <-- 1. Asegúrate de que implementa esto
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class ChatbotResponseReceived implements ShouldBroadcast
+class ChatbotResponseReceived implements ShouldBroadcast // <-- 1. (de nuevo)
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public string $message;
-    public int $userId;
+    public $body;
+    public $userId;
 
     /**
      * Create a new event instance.
      */
-    public function __construct(string $message, int $userId)
+    public function __construct(string $body, int $userId)
     {
-        $this->message = $message;
+        $this->body = $body;
         $this->userId = $userId;
     }
 
@@ -33,10 +33,21 @@ class ChatbotResponseReceived implements ShouldBroadcast
      */
     public function broadcastOn(): array
     {
-        // Usamos un canal privado para que solo el usuario correcto reciba su mensaje.
-        // La comunicación será segura y específica para cada usuario.
+        // 2. ESTA ES LA PARTE CRUCIAL
+        // Le dice a Laravel que envíe este evento al canal privado
+        // que coincide exactamente con el que tu frontend está escuchando.
         return [
-            new PrivateChannel('chat.' . $this->userId),
+            new PrivateChannel('App.Models.User.' . $this->userId)
         ];
+    }
+
+    /**
+     * El nombre del evento que el frontend escuchará.
+     * (Opcional pero recomendado)
+     */
+    public function broadcastAs(): string
+    {
+        // 3. Este es el nombre que usará tu Echo en el frontend
+        return 'chatbot.response';
     }
 }

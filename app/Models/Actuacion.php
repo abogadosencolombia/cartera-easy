@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Builder; // <-- Añadido para Query Scopes
 
 class Actuacion extends Model
 {
@@ -28,6 +29,7 @@ class Actuacion extends Model
         'actuable_id',
         'user_id', // Quién creó
         'nota',
+        'fecha_actuacion', // <-- Añadido
         'verified_by_user_id', // Quién verificó
         'verified_at', // Cuándo verificó
     ];
@@ -39,8 +41,9 @@ class Actuacion extends Model
      */
     protected $casts = [
         'verified_at' => 'datetime',
-        'created_at' => 'datetime', // Fecha de la actuación
+        'created_at' => 'datetime', // Fecha en que se registró en el sistema
         'updated_at' => 'datetime',
+        'fecha_actuacion' => 'date', // <-- Añadido: Fecha real de la actuación
     ];
 
     /**
@@ -73,7 +76,8 @@ class Actuacion extends Model
      * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopePendiente($query)
+    // --- Corregido: Añadir tipo Builder ---
+    public function scopePendiente(Builder $query): Builder
     {
         return $query->whereNull('verified_at');
     }
@@ -84,8 +88,10 @@ class Actuacion extends Model
      * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeVerificada($query)
+    // --- Corregido: Añadir tipo Builder ---
+    public function scopeVerificada(Builder $query): Builder
     {
         return $query->whereNotNull('verified_at');
     }
 }
+

@@ -14,9 +14,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Caso extends Model
 {
-    use HasFactory;
+    use HasFactory; // Line 16
 
-    protected $fillable = [
+    // Line 17 is now truly empty
+
+    protected $fillable = [ // Line 18
         'cooperativa_id', 'user_id', 'deudor_id', 'codeudor1_id', 'codeudor2_id',
         'referencia_credito', 'tipo_proceso', 'estado_proceso', 'tipo_garantia_asociada',
         'fecha_apertura', 'fecha_vencimiento', 'monto_total', 'tasa_interes_corriente',
@@ -134,4 +136,16 @@ class Caso extends Model
     {
         return $this->belongsTo(\App\Models\EspecialidadJuridica::class, 'especialidad_id');
     }
+
+    // --- INICIO: AÑADIR RELACIÓN DE ACTUACIONES ---
+    /**
+     * Get all of the caso's actuations.
+     * Se ordenan de la más reciente a la más antigua por defecto.
+     */
+    public function actuaciones(): MorphMany
+    {
+        return $this->morphMany(Actuacion::class, 'actuable')->orderBy('created_at', 'desc');
+    }
+    // --- FIN: AÑADIR RELACIÓN DE ACTUACIONES ---
 }
+

@@ -64,6 +64,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use App\Models\Message;
 use App\Events\ChatbotResponseReceived;
+use Illuminate\Support\Facades\Broadcast; // <-- Añadido
 // =======================================================
 
 
@@ -216,6 +217,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             
             // Rutas con parámetros dinámicos
             Route::get('/{id}', [ContratosController::class, 'show'])->name('show');
+            Route::delete('/{id}', [ContratosController::class, 'destroy'])->name('destroy'); // --- Ruta Eliminar Contrato ---
             Route::get('/{id}/reestructurar', [ContratosController::class, 'reestructurar'])->name('reestructurar');
             Route::get('/archivado/{id}', [ContratosController::class, 'showArchivado'])->name('showArchivado');
             
@@ -237,6 +239,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
             // PDFs
             Route::get('/{id}/pdf/contrato', [ContratosController::class, 'pdfContrato'])->name('pdf.contrato');
             Route::get('/{id}/pdf/liquidacion', [ContratosController::class, 'pdfLiquidacion'])->name('pdf.liquidacion');
+
+            // --- INICIO: Rutas CRUD Actuaciones ---
+            Route::post('/{id}/actuaciones', [ContratosController::class, 'storeActuacion'])->name('actuaciones.store');
+            // Usar un prefijo /actuaciones/ para las rutas de update y destroy
+            Route::put('/actuaciones/{actuacion}', [ContratosController::class, 'updateActuacion'])->name('actuaciones.update');
+            Route::delete('/actuaciones/{actuacion}', [ContratosController::class, 'destroyActuacion'])->name('actuaciones.destroy');
+            // --- FIN: Rutas CRUD Actuaciones ---
         });
     });
 
@@ -361,3 +370,4 @@ Route::get('documentos-proceso/{documento}/descargar', [DocumentoProcesoControll
 
 // Archivo de rutas de autenticación (login, registro, etc.)
 require __DIR__.'/auth.php';
+
