@@ -16,7 +16,7 @@ class StoreDocumentoCasoRequest extends FormRequest
     {
         return [
             'tipo_documento' => ['required', Rule::in(['pagaré', 'carta instrucciones', 'certificación saldo', 'libranza', 'cédula deudor', 'cédula codeudor', 'otros'])],
-            'archivo' => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120', // PDF, Imagen o Word, Máx 5MB
+            'archivo' => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:131072', // PDF, Imagen o Word, Máx 5MB
             'fecha_carga' => 'required|date',
         ];
     }

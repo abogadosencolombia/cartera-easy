@@ -237,7 +237,7 @@ const statusColors = {
         <Modal :show="confirmingDocumentUpload" @close="closeUploadModal">
             <div class="p-6">
                 <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Subir Nuevo Documento Legal</h2>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Complete la información y seleccione el archivo a subir (PDF, JPG, PNG - Máx 2MB).</p>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Complete la información y seleccione el archivo a subir (PDF, JPG, PNG - Máx 128MB).</p>
                 <form @submit.prevent="submitDocument" class="mt-6 space-y-6">
                     <div>
                         <InputLabel for="tipo_documento" value="Tipo de Documento" />

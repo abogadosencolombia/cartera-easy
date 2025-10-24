@@ -56,6 +56,10 @@ use App\Http\Controllers\ProcesoRadicadoController;
 use App\Models\ProcesoRadicado;
 use App\Http\Controllers\DocumentoProcesoController;
 
+// --- INICIO: NUEVO CONTROLADOR REVISIÓN DIARIA ---
+use App\Http\Controllers\RevisionDiariaController;
+// --- FIN: NUEVO CONTROLADOR REVISIÓN DIARIA ---
+
 // =======================================================
 // ===== NUEVAS DECLARACIONES PARA EL CHATBOT ============
 // =======================================================
@@ -132,6 +136,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // --- Dashboard, Perfil y Notificaciones ---
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // --- INICIO: NUEVA RUTA REVISIÓN DIARIA ---
+    Route::get('/revision-diaria', [RevisionDiariaController::class, 'index'])->name('revision.index');
+    // --- FIN: NUEVA RUTA REVISIÓN DIARIA ---
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -173,6 +182,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/procesos/{proceso}/close', [ProcesoRadicadoController::class, 'close'])->name('procesos.close');
     Route::patch('/procesos/{proceso}/reopen', [ProcesoRadicadoController::class, 'reopen'])->name('procesos.reopen');
 
+    // --- INICIO: Rutas CRUD Actuaciones para Radicados ---
+    Route::post('procesos/{proceso}/actuaciones', [ProcesoRadicadoController::class, 'storeActuacion'])->name('procesos.actuaciones.store');
+    Route::put('procesos/actuaciones/{actuacion}', [ProcesoRadicadoController::class, 'updateActuacion'])->name('procesos.actuaciones.update');
+    Route::delete('procesos/actuaciones/{actuacion}', [ProcesoRadicadoController::class, 'destroyActuacion'])->name('procesos.actuaciones.destroy');
+    // --- FIN: Rutas CRUD Actuaciones para Radicados ---
+
     // =================================================================
     // ===== RUTAS DE BÚSQUEDA ASÍNCRONA (CORREGIDAS Y UNIFICADAS) =====
     // =================================================================
@@ -185,6 +200,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // --- RUTAS PARA GESTORES Y ABOGADOS (Y ADMINS) ---
     Route::middleware('role:admin,gestor,abogado')->group(function() {
         Route::resource('casos', CasoController::class);
+
+        // --- INICIO: Rutas CRUD Actuaciones para Casos ---
+        Route::post('casos/{caso}/actuaciones', [CasoController::class, 'storeActuacion'])->name('casos.actuaciones.store');
+        Route::put('casos/actuaciones/{actuacion}', [CasoController::class, 'updateActuacion'])->name('casos.actuaciones.update');
+        Route::delete('casos/actuaciones/{actuacion}', [CasoController::class, 'destroyActuacion'])->name('casos.actuaciones.destroy');
+        // --- FIN: Rutas CRUD Actuaciones para Casos ---
+
         Route::resource('personas', PersonaController::class);
         Route::resource('cooperativas', CooperativaController::class);
         Route::resource('plantillas', PlantillaDocumentoController::class)->except(['show', 'edit', 'update']);

@@ -18,6 +18,10 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
+// --- INICIO: Añadidos para Actuaciones ---
+use App\Models\Actuacion;
+// --- FIN: Añadidos para Actuaciones ---
+
 class CasoController extends Controller
 {
     use AuthorizesRequests;
@@ -88,10 +92,10 @@ class CasoController extends Controller
 
         return Inertia::render('Casos/Create', [
             'cooperativas'        => $cooperativas,
-            'abogadosYGestores'  => $abogadosYGestores,
+            'abogadosYGestores'   => $abogadosYGestores,
             'personas'            => $personas,
             'tiposYSubtipos'      => TipoProceso::with('subtipos')->orderBy('nombre')->get(),
-            'etapas_procesales'  => DB::table('etapas_procesales')->orderBy('nombre')->pluck('nombre')->all(),
+            'etapas_procesales'   => DB::table('etapas_procesales')->orderBy('nombre')->pluck('nombre')->all(),
         ]);
     }
 
@@ -128,6 +132,11 @@ class CasoController extends Controller
             'pagos.usuario',
             'validacionesLegales.requisito',
             'juzgado',
+            // --- INICIO: Cargar actuaciones ---
+            'actuaciones' => function ($query) {
+                $query->with('user:id,name')->orderBy('fecha_actuacion', 'desc')->orderBy('created_at', 'desc');
+            }
+            // --- FIN: Cargar actuaciones ---
         ]);
 
         $caso->setRelation('auditoria', $caso->bitacoras);
@@ -146,6 +155,7 @@ class CasoController extends Controller
 
         return Inertia::render('Casos/Show', [
             'caso' => $caso,
+            'actuaciones' => $caso->actuaciones, // <-- Añadido
             'plantillas' => $plantillasDisponibles,
             'can' => [
                 'update' => Auth::user()->can('update', $caso),
@@ -199,6 +209,11 @@ class CasoController extends Controller
     public function destroy(Caso $caso): RedirectResponse
     {
         $this->authorize('delete', $caso);
+        
+        // --- INICIO: Eliminar actuaciones asociadas ---
+        $caso->actuaciones()->delete();
+        // --- FIN: Eliminar actuaciones asociadas ---
+
         $caso->delete();
 
         return to_route('casos.index')->with('success', '¡Caso eliminado exitosamente!');
@@ -220,4 +235,72 @@ class CasoController extends Controller
             'etapas_procesales' => DB::table('etapas_procesales')->orderBy('nombre')->pluck('nombre')->all(),
         ]);
     }
+
+    // --- INICIO: Métodos CRUD para Actuaciones de Casos ---
+
+    /**
+     * Guarda una nueva actuación manual para un caso.
+     */
+    public function storeActuacion(Request $request, Caso $caso)
+    {
+        $validated = $request->validate([
+            'nota' => ['required', 'string', 'max:5000'],
+            'fecha_actuacion' => ['required', 'date', 'before_or_equal:today'],
+        ]);
+
+        $caso->actuaciones()->create([
+            'nota' => $validated['nota'],
+            'fecha_actuacion' => $validated['fecha_actuacion'],
+            'user_id' => Auth::id(),
+        ]);
+
+        // (Opcional: Si 'casos' tiene un campo 'ultima_actuacion',
+        //  se añadiría la lógica de actualización aquí)
+        // $this->actualizarUltimaActuacion($caso);
+
+        return back()->with('success', 'Actuación registrada.');
+    }
+
+    /**
+     * Actualiza una actuación específica.
+     */
+    public function updateActuacion(Request $request, Actuacion $actuacion)
+    {
+        $user = Auth::user();
+        if (!$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
+             abort(403, 'No autorizado para editar esta actuación.');
+        }
+
+        $validated = $request->validate([
+            'nota' => ['required', 'string', 'max:5000'],
+            'fecha_actuacion' => ['required', 'date', 'before_or_equal:today'],
+        ]);
+
+        $actuacion->update($validated);
+
+        // (Opcional: actualizar 'ultima_actuacion' del caso)
+        // $this->actualizarUltimaActuacion($actuacion->actuable);
+
+        return back(303)->with('success', 'Actuación actualizada.');
+    }
+
+    /**
+     * Elimina una actuación específica.
+     */
+    public function destroyActuacion(Actuacion $actuacion)
+    {
+        $user = Auth::user();
+        if (!$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
+             abort(403, 'No autorizado para eliminar esta actuación.');
+        }
+
+        $caso = $actuacion->actuable; // Guardar referencia antes de borrar
+        $actuacion->delete();
+
+        // (Opcional: actualizar 'ultima_actuacion' del caso)
+        // $this->actualizarUltimaActuacion($caso);
+
+        return back(303)->with('success', 'Actuación eliminada.');
+    }
+    // --- FIN: Métodos CRUD para Actuaciones de Casos ---
 }

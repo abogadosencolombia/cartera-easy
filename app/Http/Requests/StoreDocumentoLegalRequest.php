@@ -25,7 +25,7 @@ class StoreDocumentoLegalRequest extends FormRequest
         return [
             'tipo_documento' => ['required', Rule::in(['Poder', 'Certificado Existencia', 'Carta Autorización', 'Protocolo Interno'])],
             // La regla 'file' asegura que es un archivo. 'mimes' restringe los tipos de archivo permitidos.
-            'archivo' => 'required|file|mimes:pdf,jpg,jpeg,png|max:2048', // max:2048 significa 2MB
+            'archivo' => 'required|file|mimes:pdf,jpg,jpeg,png|max:131072', // max:131072 significa 128MB
             'fecha_expedicion' => 'required|date',
             'fecha_vencimiento' => 'nullable|date|after_or_equal:fecha_expedicion',
         ];

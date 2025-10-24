@@ -25,7 +25,7 @@ class DocumentoLegalController extends Controller
             'tipo_documento' => 'required|string|max:255',
             'fecha_expedicion' => 'required|date',
             'fecha_vencimiento' => 'nullable|date|after_or_equal:fecha_expedicion',
-            'archivo' => 'required|file|mimes:pdf,jpg,jpeg,png|max:2048',
+            'archivo' => 'required|file|mimes:pdf,jpg,jpeg,png|max:131072',
         ]);
 
         $path = $request->file('archivo')->store('documentos_legales', 'public');

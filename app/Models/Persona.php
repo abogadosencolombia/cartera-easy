@@ -75,5 +75,17 @@ class Persona extends Model
                     ->withPivot('cargo', 'status') 
                     ->withTimestamps();
     }
+
+    /**
+     * Relación: Abogados (Users) asignados a esta persona.
+     */
+    public function abogados(): BelongsToMany
+    {
+        // El nombre de la tabla pivote será 'persona_user'
+        // 'persona_id' es la llave de este modelo (Persona)
+        // 'abogado_id' será la llave del modelo que unimos (User)
+        return $this->belongsToMany(User::class, 'persona_user', 'persona_id', 'abogado_id')
+                    ->withTimestamps();
+    }
 }
 

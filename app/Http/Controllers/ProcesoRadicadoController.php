@@ -15,6 +15,12 @@ use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\ProcesosImport;
 use Maatwebsite\Excel\Validators\ValidationException;
 
+// --- INICIO: Añadidos para Actuaciones ---
+use App\Models\Actuacion;
+use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon; // <-- Añadido para formatear la fecha
+// --- FIN: Añadidos para Actuaciones ---
+
 class ProcesoRadicadoController extends Controller
 {
     /**
@@ -66,9 +72,9 @@ class ProcesoRadicadoController extends Controller
 
         return Inertia::render('Radicados/Index', [
             'procesos' => $query->orderByDesc('fecha_proxima_revision')
-                                ->orderBy('radicado')
-                                ->paginate(15)
-                                ->withQueryString(),
+                                    ->orderBy('radicado')
+                                    ->paginate(15)
+                                    ->withQueryString(),
             // Pasamos el nuevo filtro a la vista
             'filtros'  => $request->only(['search', 'rev_desde', 'rev_hasta', 'estado']),
             'abogados' => $abogadosParaFiltro,
@@ -114,10 +120,16 @@ class ProcesoRadicadoController extends Controller
             'demandante',
             'demandado',
             'documentos' => fn($q) => $q->latest('created_at'),
+            // --- INICIO: Cargar actuaciones con usuario ---
+            'actuaciones' => function ($query) {
+                $query->with('user:id,name')->orderBy('fecha_actuacion', 'desc')->orderBy('created_at', 'desc');
+            }
+            // --- FIN: Cargar actuaciones con usuario ---
         ]);
 
         return Inertia::render('Radicados/Show', [
             'proceso' => $proceso,
+            'actuaciones' => $proceso->actuaciones, // <-- Pasar actuaciones
         ]);
     }
 
@@ -157,6 +169,11 @@ class ProcesoRadicadoController extends Controller
      */
     public function destroy(ProcesoRadicado $proceso)
     {
+        // (Asumiendo que no se usa SoftDeletes. Si se usa, las actuaciones
+        // deberían borrarse manualmente si es necesario, o usar observers).
+        $proceso->actuaciones()->delete(); // Borrar actuaciones relacionadas
+        $proceso->documentos()->delete(); // Borrar documentos relacionados (si aplica)
+        
         $proceso->delete();
 
         return to_route('procesos.index')
@@ -225,5 +242,96 @@ class ProcesoRadicadoController extends Controller
 
         return back()->with('success', 'El caso ha sido reabierto exitosamente.');
     }
+
+    // --- INICIO: Métodos CRUD para Actuaciones de Radicados ---
+
+    /**
+     * Guarda una nueva actuación manual para un radicado.
+     */
+    public function storeActuacion(Request $request, ProcesoRadicado $proceso)
+    {
+        $validated = $request->validate([
+            'nota' => ['required', 'string', 'max:5000'],
+            'fecha_actuacion' => ['required', 'date', 'before_or_equal:today'],
+        ]);
+
+        $actuacion = $proceso->actuaciones()->create([
+            'nota' => $validated['nota'],
+            'fecha_actuacion' => $validated['fecha_actuacion'],
+            'user_id' => Auth::id(),
+        ]);
+
+        // --- INICIO: Actualizar ultima_actuacion ---
+        $this->actualizarUltimaActuacion($proceso);
+        // --- FIN: Actualizar ultima_actuacion ---
+
+        return back()->with('success', 'Actuación registrada.');
+    }
+
+    /**
+     * Actualiza una actuación específica.
+     */
+    public function updateActuacion(Request $request, Actuacion $actuacion)
+    {
+        $user = Auth::user();
+        if (!$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
+             abort(403, 'No autorizado para editar esta actuación.');
+        }
+
+        $validated = $request->validate([
+            'nota' => ['required', 'string', 'max:5000'],
+            'fecha_actuacion' => ['required', 'date', 'before_or_equal:today'],
+        ]);
+
+        $actuacion->update($validated);
+
+        // --- INICIO: Actualizar ultima_actuacion ---
+        $this->actualizarUltimaActuacion($actuacion->actuable);
+        // --- FIN: Actualizar ultima_actuacion ---
+
+        return back(303)->with('success', 'Actuación actualizada.');
+    }
+
+    /**
+     * Elimina una actuación específica.
+     */
+    public function destroyActuacion(Actuacion $actuacion)
+    {
+        $user = Auth::user();
+        if (!$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
+             abort(403, 'No autorizado para eliminar esta actuación.');
+        }
+
+        $proceso = $actuacion->actuable; // Guardar referencia antes de borrar
+        $actuacion->delete();
+
+        // --- INICIO: Actualizar ultima_actuacion ---
+        $this->actualizarUltimaActuacion($proceso);
+        // --- FIN: Actualizar ultima_actuacion ---
+
+        return back(303)->with('success', 'Actuación eliminada.');
+    }
+    
+    /**
+     * Función helper para actualizar el campo 'ultima_actuacion' del radicado.
+     */
+    private function actualizarUltimaActuacion(ProcesoRadicado $proceso)
+    {
+        if (!$proceso) return;
+
+        // Encontrar la fecha de actuación más reciente para este proceso
+        $fechaMasReciente = $proceso->actuaciones()->max('fecha_actuacion');
+
+        // Formatea la fecha a texto o déjala null si no hay actuaciones
+        $textoUltimaActuacion = $fechaMasReciente
+            ? Carbon::parse($fechaMasReciente)->isoFormat('DD [de] MMMM [de] YYYY') // Formato "24 de octubre de 2025"
+            : null; // Si no hay actuaciones, se limpia el campo
+
+        // Actualiza el campo en el radicado
+        $proceso->update([
+            'ultima_actuacion' => $textoUltimaActuacion
+        ]);
+    }
+    // --- FIN: Métodos CRUD para Actuaciones de Radicados ---
 }
 

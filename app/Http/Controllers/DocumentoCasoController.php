@@ -24,7 +24,7 @@ class DocumentoCasoController extends Controller
         $request->validate([
             'tipo_documento' => 'required|string',
             'fecha_carga' => 'required|date',
-            'archivo' => 'required|file|mimes:pdf,jpg,png,jpeg|max:5120', // 5MB Max
+            'archivo' => 'required|file|mimes:pdf,jpg,png,jpeg|max:131072', // 128MB Max
         ]);
         
         $path = $request->file('archivo')->store('casos_documentos', 'local');

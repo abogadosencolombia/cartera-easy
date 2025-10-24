@@ -95,6 +95,16 @@ class User extends Authenticatable
         return $this->hasMany(NotificacionCaso::class);
     }
 
+    /**
+     * Relación: Personas asignadas a este abogado (User).
+     */
+    public function personasAsignadas(): BelongsToMany
+    {
+        // Esta es la relación inversa de la que definimos en Persona.php
+        return $this->belongsToMany(Persona::class, 'persona_user', 'abogado_id', 'persona_id')
+                    ->withTimestamps();
+    }
+
     // --- ACCESSORS (ATRIBUTOS MÁGICOS) ---
 
     /**

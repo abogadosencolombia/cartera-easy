@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Persona;
+use App\Models\Cooperativa;
+use App\Models\User;
 use App\Http\Requests\StorePersonaRequest;
 use App\Http\Requests\UpdatePersonaRequest;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -11,6 +13,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Exports\PersonasExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PersonaController extends Controller
 {
@@ -43,14 +47,39 @@ class PersonaController extends Controller
             });
         });
 
-        // --- CORRECCIÓN AQUÍ: Eliminamos el ->with([...]) que causaba el error 500 ---
-        $personas = $query->orderBy($sortBy, $sortDirection)
+        // --- AÑADIDO: Lógica para filtrar por Cooperativa ---
+        $query->when($request->input('cooperativa_id'), function ($q, $cooperativaId) {
+            $q->whereHas('cooperativas', fn($sq) => $sq->where('cooperativas.id', $cooperativaId));
+        });
+
+        // --- AÑADIDO: Lógica para filtrar por Abogado ---
+        $query->when($request->input('abogado_id'), function ($q, $abogadoId) {
+            $q->whereHas('abogados', fn($sq) => $sq->where('users.id', $abogadoId));
+        });
+
+        // Cargamos las relaciones de forma ligera
+        $personas = $query->with([
+            'cooperativas:id,nombre',
+            'abogados:id,name'
+        ])
+            ->orderBy($sortBy, $sortDirection)
             ->paginate(20)
             ->withQueryString();
 
+        // --- AÑADIDO: Cargar listas para los filtros ---
+        $allCooperativas = Cooperativa::select('id', 'nombre')->orderBy('nombre')->get();
+        $allAbogados = User::whereIn('tipo_usuario', ['abogado', 'gestor'])
+                            ->select('id', 'name')
+                            ->orderBy('name')
+                            ->get();
+
         return Inertia::render('Personas/Index', [
             'personas' => $personas,
-            'filters' => $request->only('search', 'sort_by', 'sort_direction', 'status'),
+            // --- AÑADIDO: Enviar listas al frontend ---
+            'allCooperativas' => $allCooperativas,
+            'allAbogados' => $allAbogados,
+            // --- MODIFICADO: Incluir nuevos filtros ---
+            'filters' => $request->only('search', 'sort_by', 'sort_direction', 'status', 'cooperativa_id', 'abogado_id'),
             'can' => [
                 'delete_personas' => Auth::user()->can('delete', Persona::class)
             ]
@@ -60,7 +89,21 @@ class PersonaController extends Controller
     public function create(): Response
     {
         $this->authorize('create', Persona::class);
-        return Inertia::render('Personas/Create');
+
+        // Obtenemos todas las cooperativas (solo ID y nombre)
+        $allCooperativas = Cooperativa::select('id', 'nombre')->orderBy('nombre')->get();
+        
+        // Obtenemos todos los usuarios que sean 'abogado' o 'gestor'
+        $allAbogados = User::whereIn('tipo_usuario', ['abogado', 'gestor'])
+                            ->select('id', 'name')
+                            ->orderBy('name')
+                            ->get();
+
+        return Inertia::render('Personas/Create', [
+            // Enviamos las listas al formulario de Vue
+            'allCooperativas' => $allCooperativas,
+            'allAbogados' => $allAbogados,
+        ]);
     }
 
     public function store(StorePersonaRequest $request): RedirectResponse
@@ -81,7 +124,15 @@ class PersonaController extends Controller
             ));
         }
 
-        Persona::create($data);
+        $persona = Persona::create($data);
+
+        if ($request->has('cooperativas_ids')) {
+            $persona->cooperativas()->sync($request->input('cooperativas_ids'));
+        }
+        if ($request->has('abogados_ids')) {
+            $persona->abogados()->sync($request->input('abogados_ids'));
+        }
+
         return to_route('personas.index')->with('success', '¡Persona registrada exitosamente!');
     }
 
@@ -94,7 +145,20 @@ class PersonaController extends Controller
     public function edit(Persona $persona): Response
     {
         $this->authorize('update', $persona);
-        return Inertia::render('Personas/Edit', ['persona' => $persona]);
+
+        $allCooperativas = Cooperativa::select('id', 'nombre')->orderBy('nombre')->get();
+        $allAbogados = User::whereIn('tipo_usuario', ['abogado', 'gestor'])
+                            ->select('id', 'name')
+                            ->orderBy('name')
+                            ->get();
+
+        $persona->load('cooperativas:id', 'abogados:id');
+
+        return Inertia::render('Personas/Edit', [
+            'persona' => $persona,
+            'allCooperativas' => $allCooperativas,
+            'allAbogados' => $allAbogados,
+        ]);
     }
 
     public function update(UpdatePersonaRequest $request, Persona $persona): RedirectResponse
@@ -116,6 +180,10 @@ class PersonaController extends Controller
         }
 
         $persona->update($data);
+
+        $persona->cooperativas()->sync($request->input('cooperativas_ids'));
+        $persona->abogados()->sync($request->input('abogados_ids'));
+
         return to_route('personas.index')->with('success', '¡Datos de persona actualizados!');
     }
 
@@ -129,13 +197,31 @@ class PersonaController extends Controller
 
     public function restore($id): RedirectResponse
     {
-        // Nota: La autorización para 'restore' ahora está en tu PersonaPolicy.
         $this->authorize('restore', Persona::class);
         
         $persona = Persona::onlyTrashed()->findOrFail($id);
         $persona->restore();
 
         return redirect()->back()->with('success', '¡Persona reactivada correctamente!');
+    }
+
+    /**
+     * Exporta los datos de personas a un archivo Excel, aplicando los filtros actuales.
+     */
+    public function exportExcel(Request $request)
+    {
+        // 1. Autorización (Aseguramos que solo usuarios autorizados puedan exportar)
+        //    Usamos 'viewAny' como permiso base, puedes ajustarlo si necesitas uno específico.
+        $this->authorize('viewAny', Persona::class);
+
+        // 2. Recogemos todos los filtros válidos de la URL (los mismos que usa index)
+        $filters = $request->only(['search', 'status', 'cooperativa_id', 'abogado_id', 'sort_by', 'sort_direction']);
+
+        // 3. Generamos un nombre de archivo dinámico
+        $fileName = 'personas_' . date('Ymd_His') . '.xlsx';
+
+        // 4. Usamos la clase PersonasExport (pasándole los filtros) para generar y descargar el Excel
+        return Excel::download(new PersonasExport($filters), $fileName);
     }
 }
 

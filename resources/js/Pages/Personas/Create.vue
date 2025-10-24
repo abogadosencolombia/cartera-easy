@@ -9,22 +9,31 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import { PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 import { reactive } from 'vue';
 
+// Recibimos las listas de cooperativas y abogados desde el PersonaController
+const props = defineProps({
+  allCooperativas: { type: Array, default: () => [] },
+  allAbogados: { type: Array, default: () => [] },
+});
+
 const form = useForm({
   nombre_completo: '',
   tipo_documento: 'CC',
   numero_documento: '',
-  fecha_expedicion: '', // <-- AÑADIDO
+  fecha_expedicion: '',
   telefono_fijo: '',
   celular_1: '',
   celular_2: '',
   correo_1: '',
   correo_2: '',
-  // 'ciudad' -> ELIMINADO (Ahora va dentro de 'addresses')
   empresa: '',
   cargo: '',
   observaciones: '',
   social_links: [],
-  addresses: [], // <-- CAMBIADO de 'direcciones' a 'addresses'
+  addresses: [],
+  
+  // Nuevos campos para enviar los IDs seleccionados
+  cooperativas_ids: [],
+  abogados_ids: [],
 });
 
 // Lógica para redes sociales
@@ -39,7 +48,7 @@ const normalizeUrl = (l) => {
   if (!/^https?:\/\//i.test(l.url)) l.url = `https://${l.url}`;
 };
 
-// Lógica para direcciones (CORREGIDA)
+// Lógica para direcciones
 const addAddressRow = () => {
   form.addresses.push(reactive({ label: 'Casa', address: '', city: '' }));
 };
@@ -105,7 +114,6 @@ const submit = () => form.post(route('personas.store'));
                 <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Información de Contacto</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <!-- CORREGIDO -->
                     <InputLabel for="celular_1" value="Celular Principal (Opcional)" />
                     <TextInput v-model="form.celular_1" id="celular_1" type="text" class="mt-1 block w-full" />
                     <InputError :message="form.errors.celular_1" class="mt-2" />
@@ -115,7 +123,6 @@ const submit = () => form.post(route('personas.store'));
                     <TextInput v-model="form.celular_2" id="celular_2" type="text" class="mt-1 block w-full" />
                   </div>
                   <div>
-                    <!-- CORREGIDO -->
                     <InputLabel for="correo_1" value="Correo Principal (Opcional)" />
                     <TextInput v-model="form.correo_1" id="correo_1" type="email" class="mt-1 block w-full" />
                     <InputError :message="form.errors.correo_1" class="mt-2" />
@@ -124,7 +131,7 @@ const submit = () => form.post(route('personas.store'));
                     <InputLabel for="correo_2" value="Correo Secundario (Opcional)" />
                     <TextInput v-model="form.correo_2" id="correo_2" type="email" class="mt-1 block w-full" />
                   </div>
-                   <div>
+                    <div>
                     <InputLabel for="telefono_fijo" value="Teléfono Fijo (Opcional)" />
                     <TextInput v-model="form.telefono_fijo" id="telefono_fijo" type="text" class="mt-1 block w-full" />
                     <InputError :message="form.errors.telefono_fijo" class="mt-2" />
@@ -132,7 +139,7 @@ const submit = () => form.post(route('personas.store'));
                 </div>
               </section>
 
-              <!-- SECCIÓN 3: DIRECCIONES (CORREGIDA) -->
+              <!-- SECCIÓN 3: DIRECCIONES -->
               <section>
                 <div class="flex items-center justify-between mb-2">
                   <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Direcciones</h3>
@@ -191,6 +198,57 @@ const submit = () => form.post(route('personas.store'));
                  </div>
               </section>
 
+              <!-- v-v- SECCIÓN NUEVA: COOPERATIVAS v-v- -->
+              <section>
+                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Asignar Cooperativas</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Selecciona las cooperativas a las que pertenece esta persona.</p>
+                
+                <!-- *** CORREGIDO AQUÍ: 'v->if' a 'v-if' *** -->
+                <div v-if="!props.allCooperativas.length" class="rounded-md border border-dashed border-gray-300 dark:border-gray-600 p-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  No hay cooperativas para asignar.
+                </div>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3">
+                  <label v-for="coop in props.allCooperativas" :key="coop.id" class="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      :value="coop.id"
+                      v-model="form.cooperativas_ids"
+                      class="rounded border-gray-300 dark:border-gray-700 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:bg-gray-900 dark:focus:ring-indigo-600"
+                    />
+                    <span class="text-gray-700 dark:text-gray-300">{{ coop.nombre }}</span>
+                  </label>
+                </div>
+                <InputError :message="form.errors.cooperativas_ids" class="mt-2" />
+              </section>
+              <!-- ^-^- FIN SECCIÓN COOPERATIVAS -^-^ -->
+
+
+              <!-- v-v- SECCIÓN NUEVA: ABOGADOS v-v- -->
+              <section>
+                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Asignar Abogados / Gestores</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Selecciona los abogados o gestores que manejarán esta persona.</p>
+                
+                <!-- *** CORREGIDO AQUÍ: 'v->if' a 'v-if' *** -->
+                <div v-if="!props.allAbogados.length" class="rounded-md border border-dashed border-gray-300 dark:border-gray-600 p-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  No hay abogados o gestores para asignar.
+                </div>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3">
+                  <label v-for="abogado in props.allAbogados" :key="abogado.id" class="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      :value="abogado.id"
+                      v-model="form.abogados_ids"
+                      class="rounded border-gray-300 dark:border-gray-700 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:bg-gray-900 dark:focus:ring-indigo-600"
+                    />
+                    <span class="text-gray-700 dark:text-gray-300">{{ abogado.name }}</span>
+                  </label>
+                </div>
+                <InputError :message="form.errors.abogados_ids" class="mt-2" />
+              </section>
+              <!-- ^-^- FIN SECCIÓN ABOGADOS -^-^ -->
+
               <!-- SECCIÓN 5: REDES SOCIALES -->
               <section>
                 <div class="flex items-center justify-between mb-2">
@@ -243,3 +301,4 @@ const submit = () => form.post(route('personas.store'));
     </div>
   </AuthenticatedLayout>
 </template>
+

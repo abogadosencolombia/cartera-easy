@@ -1,13 +1,12 @@
 <script setup>
 /**
  * Personas/Index.vue
- * v2.4 - Implementación de Soft Deletes (Suspender/Reactivar)
+ * v2.9 - Añadida función de exportar a Excel con filtros
  */
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import Modal from '@/Components/Modal.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
-import SocialLinksDropdown from '@/Components/SocialLinksDropdown.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm, usePage, router } from '@inertiajs/vue3';
 import { ref, watch, reactive, computed, onMounted, onUnmounted } from 'vue';
@@ -18,20 +17,23 @@ import {
     PencilIcon,
     ChatBubbleLeftEllipsisIcon,
     EnvelopeIcon,
-    LinkIcon,
     UserPlusIcon,
     MagnifyingGlassIcon,
     ArrowUpIcon,
     ArrowDownIcon,
     SparklesIcon,
-    // --- CAMBIO 1: Importar ícono para reactivar ---
     ArrowUturnLeftIcon,
+    BuildingLibraryIcon,
+    BriefcaseIcon,
+    ArrowDownTrayIcon, // <-- Icono añadido
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     personas: Object,
     can: Object,
     filters: Object,
+    allCooperativas: { type: Array, default: () => [] },
+    allAbogados: { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -49,12 +51,13 @@ onUnmounted(() => {
 });
 
 /* ------------------------- Filtros y Ordenamiento ------------------------- */
-// --- CAMBIO 2: Añadir filtro de estado ---
 const filtersForm = reactive({
     search: props.filters?.search ?? '',
     sort_by: props.filters?.sort_by ?? 'created_at',
     sort_direction: props.filters?.sort_direction ?? 'desc',
-    status: props.filters?.status ?? 'active', // 'active' o 'suspended'
+    status: props.filters?.status ?? 'active',
+    cooperativa_id: props.filters?.cooperativa_id ?? '',
+    abogado_id: props.filters?.abogado_id ?? '',
 });
 
 watch(filtersForm, throttle(() => {
@@ -69,22 +72,25 @@ const resetFilters = () => {
     filtersForm.search = '';
     filtersForm.sort_by = 'created_at';
     filtersForm.sort_direction = 'desc';
-    filtersForm.status = 'active'; // Resetear a 'active'
+    filtersForm.status = 'active';
+    filtersForm.cooperativa_id = '';
+    filtersForm.abogado_id = '';
 };
 
 const areFiltersActive = computed(() =>
     filtersForm.search !== '' ||
     filtersForm.sort_by !== 'created_at' ||
     filtersForm.sort_direction !== 'desc' ||
-    filtersForm.status !== 'active' // Añadir a la comprobación
+    filtersForm.status !== 'active' ||
+    filtersForm.cooperativa_id !== '' ||
+    filtersForm.abogado_id !== ''
 );
 
 /* ------------------------- Modal de Acciones (Suspender/Reactivar) ------------------------- */
-// --- CAMBIO 3: Lógica unificada para acciones ---
 const confirmingAction = ref(false);
 const itemToAction = ref(null);
-const actionType = ref(''); // 'suspend' o 'restore'
-const form = useForm({}); // Un solo form para ambas acciones
+const actionType = ref('');
+const form = useForm({});
 
 const confirmAction = (item, type) => {
     itemToAction.value = item;
@@ -132,10 +138,42 @@ const sendEmail = (raw) => {
     const w = window.open(gmailCompose(email), '_blank', 'noopener,noreferrer');
     if (!w) window.location.href = mailtoUrl(email);
 };
+
+const getCooperativasNombres = (persona) => {
+    if (!persona.cooperativas || !persona.cooperativas.length) return '';
+    return persona.cooperativas.map(c => c.nombre).join(', ');
+};
+
+const getAbogadosNombres = (persona) => {
+    if (!persona.abogados || !persona.abogados.length) return '';
+    return persona.abogados.map(a => a.name).join(', ');
+};
+
+// --- AÑADIDO: Función para Exportar a Excel ---
+const exportarExcel = () => {
+    // Construye la URL base
+    let url = route('personas.export.excel');
+    
+    // Prepara los parámetros de filtro (solo los que tienen valor)
+    const params = {};
+    for (const key in filtersForm) {
+        if (filtersForm[key]) { // Solo añade si no está vacío
+            params[key] = filtersForm[key];
+        }
+    }
+
+    // Si hay parámetros, los añade a la URL
+    if (Object.keys(params).length > 0) {
+        url += '?' + (new URLSearchParams(params)).toString();
+    }
+    
+    // Redirige el navegador para iniciar la descarga
+    window.location.href = url;
+};
 </script>
 
 <style>
-/* Animación para las filas de la tabla */
+/* ... (tus estilos .list-move, .loading-bar, etc. van aquí) ... */
 .list-move,
 .list-enter-active,
 .list-leave-active {
@@ -149,7 +187,6 @@ const sendEmail = (raw) => {
 .list-leave-active {
     position: absolute;
 }
-/* Estilos para la barra de carga */
 .loading-bar {
     position: absolute;
     top: 0;
@@ -176,13 +213,29 @@ const sendEmail = (raw) => {
                 <h2 class="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">
                     Gestión de Personas
                 </h2>
-                <Link
-                    :href="route('personas.create')"
-                    class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-white shadow transition hover:bg-indigo-700 active:bg-indigo-800"
-                >
-                    <UserPlusIcon class="h-5 w-5" />
-                    Registrar Persona
-                </Link>
+                
+                <!-- Grupo de botones a la derecha -->
+                <div class="flex items-center gap-3">
+                    
+                    <!-- --- AÑADIDO: Botón Exportar Excel --- -->
+                    <button
+                        @click="exportarExcel"
+                        type="button"
+                        class="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:focus:ring-offset-gray-800"
+                    >
+                        <ArrowDownTrayIcon class="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                        Exportar Excel
+                    </button>
+                    <!-- --- FIN Botón Exportar Excel --- -->
+
+                    <Link
+                        :href="route('personas.create')"
+                        class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-white shadow transition hover:bg-indigo-700 active:bg-indigo-800"
+                    >
+                        <UserPlusIcon class="h-5 w-5" />
+                        Registrar Persona
+                    </Link>
+                </div>
             </div>
         </template>
 
@@ -209,9 +262,8 @@ const sendEmail = (raw) => {
                 <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
                     <div v-if="loading" class="loading-bar"></div>
 
-                    <div class="border-b border-gray-100 p-4 dark:border-gray-700 sm:p-6">
-                        <!-- --- CAMBIO 4: Añadir botones de filtro de estado --- -->
-                        <div class="mb-4">
+                    <div class="border-b border-gray-100 p-4 dark:border-gray-700 sm:p-6 space-y-4">
+                        <div>
                             <div class="isolate inline-flex rounded-md shadow-sm">
                                 <button
                                     @click="filtersForm.status = 'active'"
@@ -237,41 +289,71 @@ const sendEmail = (raw) => {
                                 </button>
                             </div>
                         </div>
-                        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div class="relative flex-1">
-                                <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                                <TextInput
-                                    v-model="filtersForm.search"
-                                    type="text"
-                                    placeholder="Buscar por nombre, ID, doc..."
-                                    class="block w-full pl-10"
-                                />
+                        
+                        <!-- Contenedor de Filtros -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Búsqueda y Ordenamiento -->
+                            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div class="relative flex-1">
+                                    <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                                    <TextInput
+                                        v-model="filtersForm.search"
+                                        type="text"
+                                        placeholder="Buscar por nombre, ID, doc..."
+                                        class="block w-full pl-10"
+                                    />
+                                </div>
+                                <div class="flex flex-shrink-0 items-center gap-2">
+                                    <select
+                                        v-model="filtersForm.sort_by"
+                                        class="rounded-md border-gray-300 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-900"
+                                    >
+                                        <option value="created_at">Fecha de Creación</option>
+                                        <option value="nombre_completo">Nombre</option>
+                                    </select>
+                                    <button
+                                        @click="filtersForm.sort_direction = filtersForm.sort_direction === 'asc' ? 'desc' : 'asc'"
+                                        class="rounded-md border border-gray-300 p-2 shadow-sm transition hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700"
+                                        aria-label="Cambiar dirección de ordenamiento"
+                                    >
+                                        <ArrowUpIcon v-if="filtersForm.sort_direction === 'asc'" class="h-5 w-5" />
+                                        <ArrowDownIcon v-else class="h-5 w-5" />
+                                    </button>
+                                </div>
                             </div>
-                            <div class="flex flex-shrink-0 items-center gap-2">
-                                <select
-                                    v-model="filtersForm.sort_by"
-                                    class="rounded-md border-gray-300 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-900"
-                                >
-                                    <option value="created_at">Fecha de Creación</option>
-                                    <option value="nombre_completo">Nombre</option>
-                                </select>
-                                <button
-                                    @click="filtersForm.sort_direction = filtersForm.sort_direction === 'asc' ? 'desc' : 'asc'"
-                                    class="rounded-md border border-gray-300 p-2 shadow-sm transition hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700"
-                                    aria-label="Cambiar dirección de ordenamiento"
-                                >
-                                    <ArrowUpIcon v-if="filtersForm.sort_direction === 'asc'" class="h-5 w-5" />
-                                    <ArrowDownIcon v-else class="h-5 w-5" />
-                                </button>
-                                <button
-                                    v-if="areFiltersActive"
-                                    @click="resetFilters"
-                                    class="inline-flex items-center gap-2 rounded-md bg-gray-100 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-                                >
-                                    <SparklesIcon class="h-4 w-4" />
-                                    Limpiar
-                                </button>
+                            
+                            <!-- --- AÑADIDO: Nuevos Filtros --- -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <!-- Filtro Cooperativas -->
+                                <div>
+                                    <select v-model="filtersForm.cooperativa_id" class="block w-full rounded-md border-gray-300 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                                        <option value="">Todas las Cooperativas</option>
+                                        <option v-for="coop in props.allCooperativas" :key="coop.id" :value="coop.id">
+                                            {{ coop.nombre }}
+                                        </option>
+                                    </select>
+                                </div>
+                                <!-- Filtro Abogados -->
+                                <div>
+                                    <select v-model="filtersForm.abogado_id" class="block w-full rounded-md border-gray-300 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                                        <option value="">Todos los Abogados</option>
+                                        <option v-for="abogado in props.allAbogados" :key="abogado.id" :value="abogado.id">
+                                            {{ abogado.name }}
+                                        </option>
+                                    </select>
+                                </div>
                             </div>
+                        </div>
+
+                        <!-- Botón Limpiar -->
+                        <div v-if="areFiltersActive" class="flex justify-start">
+                            <button
+                                @click="resetFilters"
+                                class="inline-flex items-center gap-2 rounded-md bg-gray-100 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                            >
+                                <SparklesIcon class="h-4 w-4" />
+                                Limpiar Filtros
+                            </button>
                         </div>
                     </div>
 
@@ -284,13 +366,14 @@ const sendEmail = (raw) => {
                         leave-to-class="opacity-0"
                         mode="out-in"
                     >
-                        <div :key="(personas.current_page || 0) + filtersForm.search + filtersForm.sort_by + filtersForm.sort_direction + filtersForm.status" class="overflow-x-auto">
+                        <div :key="(personas.current_page || 0) + filtersForm.search + filtersForm.sort_by + filtersForm.sort_direction + filtersForm.status + filtersForm.cooperativa_id + filtersForm.abogado_id" class="overflow-x-auto">
                             <table class="min-w-full">
                                 <thead class="bg-gray-50/60 dark:bg-gray-700/40">
                                     <tr>
                                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">Nombre</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">Documento</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">Contacto</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">Asignaciones</th>
                                         <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">Acciones</th>
                                     </tr>
                                 </thead>
@@ -314,13 +397,31 @@ const sendEmail = (raw) => {
                                             <div class="flex flex-col">
                                                 <span v-if="persona.celular_1" class="truncate">{{ persona.celular_1 }}</span>
                                                 <span v-if="persona.correo_1" class="truncate">{{ persona.correo_1 }}</span>
-                                                <span v-if="persona.direcciones && persona.direcciones.length" class="truncate text-xs text-gray-400 mt-1" :title="persona.direcciones[0].direccion">
-                                                    {{ persona.direcciones[0].label }}: {{ persona.direcciones[0].direccion }}
+                                                <span v-if="persona.addresses && persona.addresses.length" class="truncate text-xs text-gray-400 mt-1" :title="persona.addresses[0].address">
+                                                    {{ persona.addresses[0].label }}: {{ persona.addresses[0].address }}
                                                 </span>
                                             </div>
                                         </td>
+                                        <td class="whitespace-nowrap px-6 py-4 text-sm">
+                                            <div class="flex flex-col gap-1.5 text-xs">
+                                                <div v-if="persona.cooperativas && persona.cooperativas.length" class="flex items-center gap-1.5 text-gray-600 dark:text-gray-300">
+                                                    <BuildingLibraryIcon class="h-4 w-4 shrink-0" />
+                                                    <span class="truncate" :title="getCooperativasNombres(persona)">
+                                                        {{ getCooperativasNombres(persona) }}
+                                                    </span>
+                                                </div>
+                                                <div v-if="persona.abogados && persona.abogados.length" class="flex items-center gap-1.5 text-gray-600 dark:text-gray-300">
+                                                    <BriefcaseIcon class="h-4 w-4 shrink-0" />
+                                                    <span class="truncate" :title="getAbogadosNombres(persona)">
+                                                        {{ getAbogadosNombres(persona) }}
+                                                    </span>
+                                                </div>
+                                                <div v-if="(!persona.cooperativas || !persona.cooperativas.length) && (!persona.abogados || !persona.abogados.length)" class="text-gray-400">
+                                                    Sin asignaciones
+                                                </div>
+                                            </div>
+                                        </td>
                                         <td class="whitespace-nowrap px-6 py-4">
-                                            <!-- --- CAMBIO 5: Lógica de botones de acción --- -->
                                             <div class="flex items-center justify-end gap-1.5 sm:gap-2">
                                                 <a v-if="persona.celular_1 && !persona.deleted_at" :href="formatWhatsAppLink(persona.celular_1)" target="_blank" rel="noopener" title="Enviar WhatsApp" class="rounded-full p-2 text-gray-600 transition hover:bg-emerald-50 hover:text-emerald-700 dark:text-gray-300 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-200">
                                                     <ChatBubbleLeftEllipsisIcon class="h-5 w-5" />
@@ -332,12 +433,10 @@ const sendEmail = (raw) => {
                                                     <PencilIcon class="h-5 w-5" />
                                                 </Link>
                                                 
-                                                <!-- Botón para Reactivar (si está suspendida) -->
                                                 <button v-if="persona.deleted_at && can.delete_personas" @click="confirmAction(persona, 'restore')" title="Reactivar Persona" class="rounded-full p-2 text-green-600 transition hover:bg-green-50 hover:text-green-700 dark:text-green-300 dark:hover:bg-green-900/30 dark:hover:text-green-200">
                                                     <ArrowUturnLeftIcon class="h-5 w-5" />
                                                 </button>
                                                 
-                                                <!-- Botón para Suspender (si está activa) -->
                                                 <button v-if="!persona.deleted_at && can.delete_personas" @click="confirmAction(persona, 'suspend')" title="Suspender Persona" class="rounded-full p-2 text-red-600 transition hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:bg-red-900/30 dark:hover:text-red-200">
                                                     <TrashIcon class="h-5 w-5" />
                                                 </button>
@@ -345,7 +444,7 @@ const sendEmail = (raw) => {
                                         </td>
                                     </tr>
                                     <tr v-if="!(personas.data || personas).length" key="empty-state">
-                                        <td colspan="4" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                        <td colspan="5" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                                             <div class="mx-auto mb-3 grid h-12 w-12 place-content-center rounded-full bg-gray-100 dark:bg-gray-700">
                                                 <MagnifyingGlassIcon class="h-6 w-6" />
                                             </div>
@@ -381,7 +480,6 @@ const sendEmail = (raw) => {
             </div>
         </div>
 
-        <!-- --- CAMBIO 6: Modal dinámico para ambas acciones --- -->
         <Modal :show="confirmingAction" @close="closeModal">
             <div class="p-6">
                 <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
@@ -425,3 +523,4 @@ const sendEmail = (raw) => {
         </Modal>
     </AuthenticatedLayout>
 </template>
+

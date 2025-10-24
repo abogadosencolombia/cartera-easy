@@ -62,6 +62,14 @@ class UpdatePersonaRequest extends FormRequest
             'social_links'         => ['nullable','array','max:50'],
             'social_links.*.label' => ['nullable','string','max:50'],
             'social_links.*.url'   => ['nullable','url','max:2048'],
+
+            // Reglas para las Cooperativas Asignadas
+            'cooperativas_ids'         => ['nullable', 'array'],
+            'cooperativas_ids.*'       => ['integer', 'exists:cooperativas,id'],
+            
+            // Reglas para los Abogados Asignados
+            'abogados_ids'             => ['nullable', 'array'],
+            'abogados_ids.*'           => ['integer', 'exists:users,id'],
         ];
     }
 }

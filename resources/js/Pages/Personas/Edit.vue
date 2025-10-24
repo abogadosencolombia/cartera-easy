@@ -9,10 +9,14 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import { PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 import { reactive } from 'vue';
 
+// Añadimos las nuevas props que envía el PersonaController@edit
 const props = defineProps({
   persona: { type: Object, required: true },
+  allCooperativas: { type: Array, default: () => [] },
+  allAbogados: { type: Array, default: () => [] },
 });
 
+// Cargamos los datos de la persona Y las nuevas relaciones
 const form = useForm({
   _method: 'PATCH',
   nombre_completo: props.persona.nombre_completo,
@@ -30,6 +34,11 @@ const form = useForm({
   // Aseguramos que los arrays existan y sean copias para evitar mutar props
   addresses: Array.isArray(props.persona.addresses) ? props.persona.addresses.map(a => ({ ...a })) : [],
   social_links: Array.isArray(props.persona.social_links) ? props.persona.social_links.map(l => ({ ...l })) : [],
+
+  // Mapeamos las relaciones cargadas (que son arrays de objetos)
+  // a un simple array de IDs. Esto pre-seleccionará los checkboxes.
+  cooperativas_ids: props.persona.cooperativas ? props.persona.cooperativas.map(c => c.id) : [],
+  abogados_ids: props.persona.abogados ? props.persona.abogados.map(a => a.id) : [],
 });
 
 // --- Lógica para Direcciones ---
@@ -122,7 +131,6 @@ const submit = () => form.post(route('personas.update', props.persona.id));
                     <InputLabel for="correo_2" value="Correo Secundario (Opcional)" />
                     <TextInput v-model="form.correo_2" id="correo_2" type="email" class="mt-1 block w-full" />
                   </div>
-                  <!-- CAMPO AÑADIDO QUE FALTABA -->
                   <div>
                     <InputLabel for="telefono_fijo" value="Teléfono Fijo (Opcional)" />
                     <TextInput v-model="form.telefono_fijo" id="telefono_fijo" type="text" class="mt-1 block w-full" />
@@ -131,7 +139,7 @@ const submit = () => form.post(route('personas.update', props.persona.id));
                 </div>
               </section>
               
-              <!-- v-vv- SECCIÓN DE DIRECCIONES DINÁMICAS v-vv- -->
+              <!-- SECCIÓN DE DIRECCIONES DINÁMICAS -->
               <section>
                 <div class="mb-2 flex items-center justify-between">
                   <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Direcciones</h3>
@@ -169,27 +177,78 @@ const submit = () => form.post(route('personas.update', props.persona.id));
                     <option value="Finca" />
                  </datalist>
               </section>
-              <!-- ^-^- FIN DE LA SECCIÓN DE DIRECCIONES -^-^ -->
 
-                <section>
-                    <h3 class="mb-4 text-lg font-medium text-gray-900 dark:text-gray-100">Información Adicional</h3>
-                     <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                        <div>
-                            <InputLabel for="empresa" value="Empresa (Opcional)" />
-                            <TextInput v-model="form.empresa" id="empresa" type="text" class="mt-1 block w-full" />
-                        </div>
-                        <div>
-                            <InputLabel for="cargo" value="Cargo (Opcional)" />
-                            <TextInput v-model="form.cargo" id="cargo" type="text" class="mt-1 block w-full" />
-                        </div>
-                        <div class="md:col-span-2">
-                            <InputLabel for="observaciones" value="Observaciones (Opcional)" />
-                            <Textarea v-model="form.observaciones" id="observaciones" class="mt-1 block w-full" rows="3" />
-                        </div>
-                     </div>
-                  </section>
+              <!-- SECCIÓN DE INFORMACIÓN ADICIONAL -->
+              <section>
+                  <h3 class="mb-4 text-lg font-medium text-gray-900 dark:text-gray-100">Información Adicional</h3>
+                   <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                      <div>
+                          <InputLabel for="empresa" value="Empresa (Opcional)" />
+                          <TextInput v-model="form.empresa" id="empresa" type="text" class="mt-1 block w-full" />
+                      </div>
+                      <div>
+                          <InputLabel for="cargo" value="Cargo (Opcional)" />
+                          <TextInput v-model="form.cargo" id="cargo" type="text" class="mt-1 block w-full" />
+                      </div>
+                      <div class="md:col-span-2">
+                          <InputLabel for="observaciones" value="Observaciones (Opcional)" />
+                          <Textarea v-model="form.observaciones" id="observaciones" class="mt-1 block w-full" rows="3" />
+                      </div>
+                   </div>
+              </section>
 
-              <!-- Redes sociales -->
+              <!-- v-v- SECCIÓN NUEVA: COOPERATIVAS v-v- -->
+              <section>
+                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Asignar Cooperativas</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Selecciona las cooperativas a las que pertenece esta persona.</p>
+                
+                <!-- *** CORREGIDO AQUÍ: 'v->if' a 'v-if' *** -->
+                <div v-if="!props.allCooperativas.length" class="rounded-md border border-dashed border-gray-300 dark:border-gray-600 p-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  No hay cooperativas para asignar.
+                </div>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3">
+                  <label v-for="coop in props.allCooperativas" :key="coop.id" class="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      :value="coop.id"
+                      v-model="form.cooperativas_ids"
+                      class="rounded border-gray-300 dark:border-gray-700 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:bg-gray-900 dark:focus:ring-indigo-600"
+                    />
+                    <span class="text-gray-700 dark:text-gray-300">{{ coop.nombre }}</span>
+                  </label>
+                </div>
+                <InputError :message="form.errors.cooperativas_ids" class="mt-2" />
+              </section>
+              <!-- ^-^- FIN SECCIÓN COOPERATIVAS -^-^ -->
+
+
+              <!-- v-v- SECCIÓN NUEVA: ABOGADOS v-v- -->
+              <section>
+                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Asignar Abogados / Gestores</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Selecciona los abogados o gestores que manejarán esta persona.</p>
+                
+                <!-- *** CORREGIDO AQUÍ: 'v->if' a 'v-if' *** -->
+                <div v-if="!props.allAbogados.length" class="rounded-md border border-dashed border-gray-300 dark:border-gray-600 p-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  No hay abogados o gestores para asignar.
+                </div>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3">
+                  <label v-for="abogado in props.allAbogados" :key="abogado.id" class="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      :value="abogado.id"
+                      v-model="form.abogados_ids"
+                      class="rounded border-gray-300 dark:border-gray-700 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:bg-gray-900 dark:focus:ring-indigo-600"
+                    />
+                    <span class="text-gray-700 dark:text-gray-300">{{ abogado.name }}</span>
+                  </label>
+                </div>
+                <InputError :message="form.errors.abogados_ids" class="mt-2" />
+              </section>
+              <!-- ^-^- FIN SECCIÓN ABOGADOS -^-^ -->
+
+              <!-- SECCIÓN DE REDES SOCIALES -->
               <section>
                 <div class="mb-2 flex items-center justify-between">
                   <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Redes Sociales</h3>
@@ -235,3 +294,4 @@ const submit = () => form.post(route('personas.update', props.persona.id));
     </div>
   </AuthenticatedLayout>
 </template>
+
