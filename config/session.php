@@ -3,10 +3,7 @@
 use Illuminate\Support\Str;
 
 return [
-    
-    'domain' => env('SESSION_DOMAIN', '.hrymiz.easypanel.host'),
-    'secure' => env('SESSION_SECURE_COOKIE', true),
-    'same_site' => env('SESSION_SAME_SITE', 'none'),
+
     /*
     |--------------------------------------------------------------------------
     | Default Session Driver

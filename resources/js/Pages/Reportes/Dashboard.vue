@@ -1,6 +1,6 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, router } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { Chart, registerables } from 'chart.js';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
@@ -85,6 +85,8 @@ const chartTendenciaSemanal = ref(null);
 // --- Lógica para GRÁFICAS DE ALERTAS (tu código) ---
 const alertasPorTipoData = computed(() => {
     if (!props.graficas || !props.graficas.alertas_por_tipo) return null;
+    // CORRECCIÓN: Asegurarse de que hay datos
+    if (Object.keys(props.graficas.alertas_por_tipo).length === 0) return null;
     const labels = Object.keys(props.graficas.alertas_por_tipo).map(label => label.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
     const data = Object.values(props.graficas.alertas_por_tipo);
     return {
@@ -100,6 +102,8 @@ const alertasPorTipoData = computed(() => {
 
 const tendenciaSemanalData = computed(() => {
     if (!props.graficas || !props.graficas.tendencia_semanal_alertas) return null;
+    // CORRECCIÓN: Asegurarse de que hay datos
+    if (props.graficas.tendencia_semanal_alertas.length === 0) return null;
     const labels = props.graficas.tendencia_semanal_alertas.map(item => new Date(item.date + 'T00:00:00').toLocaleDateString('es-CO', { month: 'short', day: 'numeric' }));
     const data = props.graficas.tendencia_semanal_alertas.map(item => item.total);
     return {
@@ -122,21 +126,28 @@ const renderCharts = () => {
             canvasRef.value.chartInstance.destroy();
         }
         const ctx = canvasRef.value?.getContext('2d');
-        if (ctx && data && data.labels && data.labels.length > 0) {
+        // CORRECCIÓN: Se elimina la validación "data.labels.length > 0"
+        // Esta validación se hace ahora en el template con un v-if
+        // para mostrar el estado vacío.
+        if (ctx && data && data.labels) {
             canvasRef.value.chartInstance = new Chart(ctx, { type, data, options });
         }
     };
 
     // Tus gráficas existentes
-    renderChart(chartPagosMensuales, 'line', {
-        labels: props.graficas.pagos_mensuales.map(item => new Date(item.anio, item.mes - 1).toLocaleString('es-CO', { month: 'short', year: '2-digit' })),
-        datasets: [{ label: 'Total Recuperado', data: props.graficas.pagos_mensuales.map(item => item.total), borderColor: 'hsl(147, 71%, 41%)', backgroundColor: 'hsla(147, 71%, 41%, 0.2)', fill: true, tension: 0.4 }]
-    }, { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } });
+    if (props.graficas.pagos_mensuales && props.graficas.pagos_mensuales.length > 0) {
+        renderChart(chartPagosMensuales, 'line', {
+            labels: props.graficas.pagos_mensuales.map(item => new Date(item.anio, item.mes - 1).toLocaleString('es-CO', { month: 'short', year: '2-digit' })),
+            datasets: [{ label: 'Total Recuperado', data: props.graficas.pagos_mensuales.map(item => item.total), borderColor: 'hsl(147, 71%, 41%)', backgroundColor: 'hsla(147, 71%, 41%, 0.2)', fill: true, tension: 0.4 }]
+        }, { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } });
+    }
 
-    renderChart(chartCasosPorEstado, 'bar', {
-        labels: Object.keys(props.graficas.casos_por_estado),
-        datasets: [{ label: 'Número de Casos', data: Object.values(props.graficas.casos_por_estado), backgroundColor: ['#36A2EB', '#FFCE56', '#FF6384', '#4BC0C0', '#9966FF'], borderRadius: 4 }]
-    }, { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } });
+    if (props.graficas.casos_por_estado && Object.keys(props.graficas.casos_por_estado).length > 0) {
+        renderChart(chartCasosPorEstado, 'bar', {
+            labels: Object.keys(props.graficas.casos_por_estado),
+            datasets: [{ label: 'Número de Casos', data: Object.values(props.graficas.casos_por_estado), backgroundColor: ['#36A2EB', '#FFCE56', '#FF6384', '#4BC0C0', '#9966FF'], borderRadius: 4 }]
+        }, { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } });
+    }
 
     if (props.graficas.cartera_por_edad && Object.keys(props.graficas.cartera_por_edad).length > 0) {
         renderChart(chartCarteraPorEdad, 'doughnut', {
@@ -151,18 +162,43 @@ const renderCharts = () => {
             datasets: [{ label: 'Nueva Mora Mensual', data: props.graficas.mora_mensual.map(item => item.total), borderColor: 'hsl(348, 83%, 47%)', backgroundColor: 'hsla(348, 83%, 47%, 0.2)', fill: true, tension: 0.4 }]
         }, { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } });
     }
-
-    if (props.graficas.alertas_por_tipo) {
+    
+    // CORRECCIÓN: Asegurarse que los datos computados no son nulos
+    if (alertasPorTipoData.value) {
         renderChart(chartAlertasPorTipo, 'bar', alertasPorTipoData.value, { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } });
     }
 
-    if (props.graficas.tendencia_semanal_alertas) {
+    if (tendenciaSemanalData.value) {
         renderChart(chartTendenciaSemanal, 'line', tendenciaSemanalData.value, { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } });
     }
 };
 
-onMounted(() => { renderCharts(); });
-watch(() => props.graficas, () => { renderCharts(); }, { deep: true });
+// CORRECCIÓN: Renderizar gráficos solo cuando la pestaña activa cambie a una
+// que tenga gráficos Y en el montaje inicial.
+onMounted(() => {
+    if (activeTab.value === 'estrategico') {
+        renderCharts();
+    }
+});
+
+watch(activeTab, (newTab) => {
+    if (newTab === 'estrategico') {
+        // Usar nextTick (o un setTimeout 0) para asegurar que los canvas existen en el DOM
+        // antes de intentar dibujar en ellos.
+        setTimeout(() => {
+            renderCharts();
+        }, 0);
+    }
+});
+
+// Renderizar si los props (y filtros) cambian
+watch(() => props.graficas, () => {
+    if (activeTab.value === 'estrategico') {
+        setTimeout(() => {
+            renderCharts();
+        }, 0);
+    }
+}, { deep: true });
 
 // --- Tus funciones de formato y filtros ---
 const formatCurrency = (value) => {
@@ -200,7 +236,7 @@ const tiposValidacionNombres = {
 };
 
 const formatDateForCompliance = (dateString) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return 'Sin Revisión'; // CORRECCIÓN: "N/A" cambiado a "Sin Revisión"
     const options = { year: 'numeric', month: 'short', day: 'numeric' };
     return new Date(dateString).toLocaleDateString('es-CO', options);
 };
@@ -288,6 +324,7 @@ const formatDateForCompliance = (dateString) => {
                                     class="block text-sm font-medium text-gray-700 dark:text-gray-300">Gestor
                                     Asignado</label>
                                 <select v-model="filtroForm.user_id" id="filtro_abogado"
+                                    @change="aplicarFiltros"
                                     class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
                                     <option value="">Todos</option>
                                     <option v-for="user in abogadosYGestores" :key="user.id" :value="user.id">{{
@@ -373,13 +410,15 @@ const formatDateForCompliance = (dateString) => {
                                 <div class="text-center md:text-left">
                                     <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Cartera en Mora
                                     </h4>
-                                    <p class="text-3xl font-bold text-indigo-700 dark:text-indigo-300 mt-1">{{
+                                    <!-- CORRECCIÓN: Clases de texto responsivo -->
+                                    <p class="text-xl md:text-xl lg:text-2xl font-bold text-indigo-700 dark:text-indigo-300 mt-1 break-all">{{
                                         formatCurrency(consolidadoCooperativa.cartera_en_mora) }}</p>
                                 </div>
                                 <div class="text-center md:text-left">
                                     <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Recuperado
                                     </h4>
-                                    <p class="text-3xl font-bold text-indigo-700 dark:text-indigo-300 mt-1">{{
+                                    <!-- CORRECCIÓN: Clases de texto responsivo -->
+                                    <p class="text-xl md:text-xl lg:text-2xl font-bold text-indigo-700 dark:text-indigo-300 mt-1 break-all">{{
                                         formatCurrency(consolidadoCooperativa.total_recuperado) }}</p>
                                 </div>
                             </div>
@@ -404,8 +443,10 @@ const formatDateForCompliance = (dateString) => {
                             <div>
                                 <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Cartera en Mora
                                 </h4>
-                                <p class="text-3xl font-bold text-red-600 dark:text-red-400 mt-1">{{
-                                    formatCurrency(kpis.cartera_en_mora) }}</p>
+                                <!-- CORRECCIÓN MÁS AGRESIVA: text-xl en md, text-2xl en lg -->
+                                <p class="text-xl md:text-xl lg:text-2xl font-bold text-red-600 dark:text-red-400 mt-1 break-all">
+                                    {{ formatCurrency(kpis.cartera_en_mora) }}
+                                </p>
                             </div>
                         </div>
                         <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm flex items-center space-x-4">
@@ -414,8 +455,10 @@ const formatDateForCompliance = (dateString) => {
                             </div>
                             <div>
                                 <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Recuperado</h4>
-                                <p class="text-3xl font-bold text-green-600 dark:text-green-400 mt-1">{{
-                                    formatCurrency(kpis.total_recuperado) }}</p>
+                                <!-- CORRECCIÓN MÁS AGRESIVA: text-xl en md, text-2xl en lg -->
+                                <p class="text-xl md:text-xl lg:text-2xl font-bold text-green-600 dark:text-green-400 mt-1 break-all">
+                                    {{ formatCurrency(kpis.total_recuperado) }}
+                                </p>
                             </div>
                         </div>
                         <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm flex items-center space-x-4">
@@ -425,9 +468,11 @@ const formatDateForCompliance = (dateString) => {
                             <div>
                                 <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Promedio Días
                                     Recuperación</h4>
-                                <p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{{
-                                    kpis.promedio_dias_recuperacion }} <span class="text-xl font-semibold">días</span>
+                                <!-- CORRECCIÓN: Manejo de "0 días" -->
+                                <p v-if="kpis.promedio_dias_recuperacion" class="text-3xl font-bold text-gray-900 dark:text-white mt-1">
+                                    {{ kpis.promedio_dias_recuperacion }} <span class="text-xl font-semibold">días</span>
                                 </p>
+                                <p v-else class="text-3xl font-bold text-gray-500 dark:text-gray-400 mt-1">N/A</p>
                             </div>
                         </div>
                     </div>
@@ -467,13 +512,27 @@ const formatDateForCompliance = (dateString) => {
                                     <h4 class="font-semibold text-center text-gray-700 dark:text-gray-300 mb-4">
                                         Distribución de
                                         Alertas</h4>
-                                    <div class="h-64"><canvas ref="chartAlertasPorTipo"></canvas></div>
+                                    <!-- CORRECCIÓN: Estado vacío para gráfico -->
+                                    <div class="h-64 flex items-center justify-center">
+                                        <canvas v-if="alertasPorTipoData" ref="chartAlertasPorTipo"></canvas>
+                                        <div v-else class="text-center text-gray-500">
+                                            <BellIcon class="h-16 w-16 mx-auto text-gray-300 dark:text-gray-600" />
+                                            <p class="mt-2 font-semibold">No hay alertas para mostrar</p>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                     <h4 class="font-semibold text-center text-gray-700 dark:text-gray-300 mb-4">
                                         Tendencia
                                         Semanal de Alertas</h4>
-                                    <div class="h-64"><canvas ref="chartTendenciaSemanal"></canvas></div>
+                                    <!-- CORRECCIÓN: Estado vacío para gráfico -->
+                                    <div class="h-64 flex items-center justify-center">
+                                        <canvas v-if="tendenciaSemanalData" ref="chartTendenciaSemanal"></canvas>
+                                        <div v-else class="text-center text-gray-500">
+                                            <ChartBarIcon class="h-16 w-16 mx-auto text-gray-300 dark:text-gray-600" />
+                                            <p class="mt-2 font-semibold">Sin datos de tendencia</p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -483,7 +542,14 @@ const formatDateForCompliance = (dateString) => {
                             <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                                 <ChartBarIcon class="h-6 w-6 mr-2" />Recuperación Mensual
                             </h4>
-                            <div class="h-80"><canvas ref="chartPagosMensuales"></canvas></div>
+                            <!-- CORRECCIÓN: Estado vacío para gráfico -->
+                            <div class="h-80 flex items-center justify-center">
+                                <canvas v-if="props.graficas.pagos_mensuales && props.graficas.pagos_mensuales.length > 0" ref="chartPagosMensuales"></canvas>
+                                <div v-else class="text-center text-gray-500">
+                                    <ChartBarIcon class="h-16 w-16 mx-auto text-gray-300 dark:text-gray-600" />
+                                    <p class="mt-2 font-semibold">No hay datos de recuperación</p>
+                                </div>
+                            </div>
                         </div>
                         <div class="lg:col-span-1 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm">
                             <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
@@ -517,7 +583,14 @@ const formatDateForCompliance = (dateString) => {
                             <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                                 <BriefcaseIcon class="h-6 w-6 mr-2" />Casos por Estado
                             </h4>
-                            <div class="h-80"><canvas ref="chartCasosPorEstado"></canvas></div>
+                            <!-- CORRECCIÓN: Estado vacío para gráfico -->
+                            <div class="h-80 flex items-center justify-center">
+                                <canvas v-if="props.graficas.casos_por_estado && Object.keys(props.graficas.casos_por_estado).length > 0" ref="chartCasosPorEstado"></canvas>
+                                <div v-else class="text-center text-gray-500">
+                                    <BriefcaseIcon class="h-16 w-16 mx-auto text-gray-300 dark:text-gray-600" />
+                                    <p class="mt-2 font-semibold">No hay casos para mostrar</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
@@ -606,9 +679,10 @@ const formatDateForCompliance = (dateString) => {
                                         class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                         <tr v-for="abogado in rankingAbogados" :key="abogado.id"
                                             class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                            <td
-                                                class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                                                {{ abogado.name }}</td>
+                                            <!-- CORRECCIÓN: Se elimina whitespace-nowrap para permitir ajuste de texto -->
+                                            <td class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
+                                                {{ abogado.name }}
+                                            </td>
                                             <td
                                                 class="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500 dark:text-gray-400">
                                                 {{ abogado.casos_count }}</td>
@@ -721,11 +795,12 @@ const formatDateForCompliance = (dateString) => {
                                                 #{{
                                                 falla.caso.id }}</Link>
                                             </td>
-                                            <td
-                                                class="px-4 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                                            <!-- CORRECCIÓN: Se elimina whitespace-nowrap y se añade min-w -->
+                                            <td class="px-4 py-4 text-sm text-gray-800 dark:text-gray-200 min-w-[200px]">
                                                 {{
                                                     falla.caso.deudor ?falla.caso.deudor.nombre_completo : 'N/A' }}</td>
-                                            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{
+                                            <!-- CORRECCIÓN: Se elimina whitespace-nowrap y se añade min-w -->
+                                            <td class="px-4 py-4 text-sm text-gray-500 min-w-[150px]">{{
                                                 falla.caso.cooperativa.nombre }}</td>
                                             <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{
                                                 tiposValidacionNombres[falla.tipo] }}</td>

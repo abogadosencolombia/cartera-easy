@@ -13,29 +13,35 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // --- SEEDERS DE PRODUCCIÓN (Esenciales) ---
-        // Estos se ejecutarán SIEMPRE, tanto en tu computadora como en el servidor.
-        // Contienen los catálogos y datos necesarios para que la app funcione.
         $this->call([
             IntegracionTokenSeeder::class,
-            EspecialidadesJuridicasSeeder::class,
-            TiposProcesoSeeder::class,
+            
+            // ¡ESTE ES EL ÚNICO SEEDER DE ESTRUCTURA QUE NECESITAMOS!
+            // Él ya crea las especialidades, tipos, subtipos y subprocesos.
+            EstructuraProcesalSeeder::class, 
+            
             EtapasProcesalesSeeder::class,
-            SubtiposProcesoSeeder::class,
             JuzgadoSeeder::class,
-            EspecialidadSeeder::class,
+            
+            // Los siguientes seeders son redundantes si 'EstructuraProcesalSeeder'
+            // ya maneja la creación de estos datos. Los comento para evitar conflictos.
+            // TiposProcesoSeeder::class,
+            // SubtiposProcesoSeeder::class,
+            // EspecialidadSeeder::class, 
         ]);
 
         // --- SEEDERS DE DESARROLLO (Datos de Prueba) ---
-        // Este bloque solo se ejecutará en tu computadora (entorno 'local').
-        // El servidor de Hostinger lo ignorará por completo, evitando el error de Faker.
         if (app()->environment('local')) {
             // Aquí van todos los llamados a factories para generar datos de prueba.
-            User::factory(10)->create();
+            // User::factory(10)->create(); // Comentado para no crear usuarios extra por defecto
 
-            User::factory()->create([
-                'name' => 'Test User',
-                'email' => 'test@example.com',
-            ]);
+            // Asegurarse de que el usuario de prueba exista si no estamos en producción
+            if (!User::where('email', 'test@example.com')->exists()) {
+                 User::factory()->create([
+                    'name' => 'Test User',
+                    'email' => 'test@example.com',
+                ]);
+            }
         }
     }
 }

@@ -40,18 +40,16 @@ class ProcesoRadicadoController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('radicado', 'ilike', "%{$search}%")
-                  ->orWhere('asunto', 'ilike', "%{$search}%")
-                  ->orWhereHas('demandante', fn($sq) => $sq->where('nombre_completo', 'Ilike', "%{$search}%"))
-                  ->orWhereHas('demandado', fn($sq) => $sq->where('nombre_completo', 'Ilike', "%{$search}%"));
+                    ->orWhere('asunto', 'ilike', "%{$search}%")
+                    ->orWhereHas('demandante', fn($sq) => $sq->where('nombre_completo', 'Ilike', "%{$search}%"))
+                    ->orWhereHas('demandado', fn($sq) => $sq->where('nombre_completo', 'Ilike', "%{$search}%"));
             });
         }
 
-        // --- INICIO DE LA MODIFICACIÓN ---
         // Añadimos el filtro por estado del proceso
         if ($request->filled('estado') && in_array($request->input('estado'), ['ACTIVO', 'CERRADO'])) {
             $query->where('estado', $request->input('estado'));
         }
-        // --- FIN DE LA MODIFICACIÓN ---
 
         if ($desde = $request->date('rev_desde')) {
             $query->whereDate('fecha_proxima_revision', '>=', $desde);
@@ -75,7 +73,6 @@ class ProcesoRadicadoController extends Controller
                                     ->orderBy('radicado')
                                     ->paginate(15)
                                     ->withQueryString(),
-            // Pasamos el nuevo filtro a la vista
             'filtros'  => $request->only(['search', 'rev_desde', 'rev_hasta', 'estado']),
             'abogados' => $abogadosParaFiltro,
         ]);
@@ -96,10 +93,8 @@ class ProcesoRadicadoController extends Controller
     {
         $data = $request->validated();
         $data['created_by'] = $request->user()->id;
-        // --- INICIO DE LA MODIFICACIÓN ---
         // Aseguramos que los nuevos procesos se creen como ACTIVOS por defecto
         $data['estado'] = 'ACTIVO';
-        // --- FIN DE LA MODIFICACIÓN ---
 
         $proceso = ProcesoRadicado::create($data);
 
@@ -117,19 +112,24 @@ class ProcesoRadicadoController extends Controller
             'responsableRevision',
             'juzgado',
             'tipoProceso',
-            'demandante',
+            'demandante', // Necesario para el botón "Generar Contrato"
             'demandado',
             'documentos' => fn($q) => $q->latest('created_at'),
-            // --- INICIO: Cargar actuaciones con usuario ---
             'actuaciones' => function ($query) {
                 $query->with('user:id,name')->orderBy('fecha_actuacion', 'desc')->orderBy('created_at', 'desc');
-            }
-            // --- FIN: Cargar actuaciones con usuario ---
+            },
+            // ===== MODIFICACIÓN AQUÍ =====
+            // Cargar la relación 'contrato' con su ID y la foreign key
+            // Seleccionamos solo las columnas necesarias para evitar cargar datos innecesarios.
+            'contrato:id,proceso_id'
+            // =============================
         ]);
 
+        // Pasamos el objeto $proceso completo a la vista.
+        // Incluirá 'actuaciones' y 'contrato' (si existe) debido al ->load() anterior.
         return Inertia::render('Radicados/Show', [
             'proceso' => $proceso,
-            'actuaciones' => $proceso->actuaciones, // <-- Pasar actuaciones
+            // 'actuaciones' => $proceso->actuaciones, // <-- Ya no es estrictamente necesario pasarlo por separado
         ]);
     }
 
@@ -169,11 +169,14 @@ class ProcesoRadicadoController extends Controller
      */
     public function destroy(ProcesoRadicado $proceso)
     {
-        // (Asumiendo que no se usa SoftDeletes. Si se usa, las actuaciones
-        // deberían borrarse manualmente si es necesario, o usar observers).
+        // Considerar borrar el contrato asociado si existe y la lógica de negocio lo requiere
+        // if ($proceso->contrato) {
+        //     $proceso->contrato->delete(); // ¡Cuidado! Esto borraría el contrato también.
+        // }
+
         $proceso->actuaciones()->delete(); // Borrar actuaciones relacionadas
         $proceso->documentos()->delete(); // Borrar documentos relacionados (si aplica)
-        
+
         $proceso->delete();
 
         return to_route('procesos.index')
@@ -261,9 +264,8 @@ class ProcesoRadicadoController extends Controller
             'user_id' => Auth::id(),
         ]);
 
-        // --- INICIO: Actualizar ultima_actuacion ---
+        // Actualizar ultima_actuacion
         $this->actualizarUltimaActuacion($proceso);
-        // --- FIN: Actualizar ultima_actuacion ---
 
         return back()->with('success', 'Actuación registrada.');
     }
@@ -274,7 +276,8 @@ class ProcesoRadicadoController extends Controller
     public function updateActuacion(Request $request, Actuacion $actuacion)
     {
         $user = Auth::user();
-        if (!$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
+        // Verificar si la actuación pertenece a un ProcesoRadicado y si el usuario tiene permisos
+        if ($actuacion->actuable_type !== ProcesoRadicado::class || !$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
              abort(403, 'No autorizado para editar esta actuación.');
         }
 
@@ -285,9 +288,11 @@ class ProcesoRadicadoController extends Controller
 
         $actuacion->update($validated);
 
-        // --- INICIO: Actualizar ultima_actuacion ---
-        $this->actualizarUltimaActuacion($actuacion->actuable);
-        // --- FIN: Actualizar ultima_actuacion ---
+        // Actualizar ultima_actuacion del radicado asociado
+        if ($actuacion->actuable instanceof ProcesoRadicado) {
+            $this->actualizarUltimaActuacion($actuacion->actuable);
+        }
+
 
         return back(303)->with('success', 'Actuación actualizada.');
     }
@@ -298,26 +303,31 @@ class ProcesoRadicadoController extends Controller
     public function destroyActuacion(Actuacion $actuacion)
     {
         $user = Auth::user();
-        if (!$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
+         // Verificar si la actuación pertenece a un ProcesoRadicado y si el usuario tiene permisos
+        if ($actuacion->actuable_type !== ProcesoRadicado::class || !$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
              abort(403, 'No autorizado para eliminar esta actuación.');
         }
 
         $proceso = $actuacion->actuable; // Guardar referencia antes de borrar
         $actuacion->delete();
 
-        // --- INICIO: Actualizar ultima_actuacion ---
-        $this->actualizarUltimaActuacion($proceso);
-        // --- FIN: Actualizar ultima_actuacion ---
+        // Actualizar ultima_actuacion del radicado asociado (si aún existe)
+        if ($proceso instanceof ProcesoRadicado) {
+             $this->actualizarUltimaActuacion($proceso);
+        }
 
         return back(303)->with('success', 'Actuación eliminada.');
     }
-    
+
     /**
      * Función helper para actualizar el campo 'ultima_actuacion' del radicado.
      */
     private function actualizarUltimaActuacion(ProcesoRadicado $proceso)
     {
         if (!$proceso) return;
+
+        // Forzar recarga de actuaciones para obtener la más reciente después de cambios
+        $proceso->load('actuaciones');
 
         // Encontrar la fecha de actuación más reciente para este proceso
         $fechaMasReciente = $proceso->actuaciones()->max('fecha_actuacion');
@@ -327,8 +337,8 @@ class ProcesoRadicadoController extends Controller
             ? Carbon::parse($fechaMasReciente)->isoFormat('DD [de] MMMM [de] YYYY') // Formato "24 de octubre de 2025"
             : null; // Si no hay actuaciones, se limpia el campo
 
-        // Actualiza el campo en el radicado
-        $proceso->update([
+        // Actualiza el campo en el radicado SIN disparar eventos para evitar bucles si hay observers
+        $proceso->updateQuietly([
             'ultima_actuacion' => $textoUltimaActuacion
         ]);
     }

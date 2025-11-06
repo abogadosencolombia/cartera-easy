@@ -439,8 +439,8 @@ const eliminarActuacion = (actuacionId) => {
                  router.reload({ only: ['actuaciones'], preserveState: false })
             },
             onError: (errors) => {
-                console.error("Error al eliminar actuación:", errors);
-                alert("Error: No se pudo eliminar la actuación. Es posible que no tengas permiso.");
+                 console.error("Error al eliminar actuación:", errors);
+                 alert("Error: No se pudo eliminar la actuación. Es posible que no tengas permiso.");
             }
         })
     }
@@ -492,10 +492,17 @@ const navegarPagina = (url) => {
 // --- MODAL REESTRUCTURACIÓN ---
 const reestructurarModalAbierto = ref(false)
 const crearContratoForm = useForm({ cliente_id: null, modalidad: 'CUOTAS', inicio: today, monto_total: '', cuotas: 12, anticipo: '', porcentaje_litis: '', nota: '', contrato_origen_id: null })
-const clienteSearch = ref(''); const selectedClientName = ref(''); const isClientListOpen = ref(false); const clientDropdown = ref(null)
-const filteredClients = computed(() => { if (!clienteSearch.value) return props.clientes.slice(0, 10); return props.clientes.filter(c => c.nombre.toLowerCase().includes(clienteSearch.value.toLowerCase())).slice(0, 10) })
-const selectClient = (client) => { crearContratoForm.cliente_id = client.id; selectedClientName.value = client.nombre; clienteSearch.value = client.nombre; isClientListOpen.value = false }
-watch(clienteSearch, (newVal) => { if (newVal !== selectedClientName.value) { crearContratoForm.cliente_id = null } })
+
+// --- CORRECCIÓN DE BUG: ---
+// Variables re-declaradas eliminadas (ya existen en el scope global del script setup)
+const clienteSearch = ref(''); 
+const selectedClientName = ref(''); 
+const isClientListOpen = ref(false); 
+const clientDropdown = ref(null)
+// const filteredClients = computed(() => { ... }) // Ya existe arriba
+// const selectClient = (client) => { ... } // Ya existe arriba
+// watch(clienteSearch, (newVal) => { ... }) // Ya existe arriba
+
 onClickOutside(clientDropdown, () => isClientListOpen.value = false)
 const abrirReestructurarModal = () => {
     crearContratoForm.defaults({ cliente_id: props.contrato?.cliente_id ?? null, modalidad: props.contrato?.modalidad ?? 'CUOTAS', inicio: today, monto_total: props.contrato?.monto_total ?? '', cuotas: 12, anticipo: props.contrato?.anticipo ?? '', porcentaje_litis: props.contrato?.porcentaje_litis ?? '', nota: `Reestructuración del contrato #${props.contrato?.id ?? ''}.`, contrato_origen_id: props.contrato?.id ?? null })
@@ -567,14 +574,11 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
                         Reestructurar
                     </button>
 
-                    <!-- INICIO: BOTÓN DE ELIMINAR (Re-añadido) -->
                     <button @click="abrirModalConfirmarEliminacion"
                             class="text-sm px-3 py-1.5 rounded-md bg-red-600 text-white hover:bg-red-700 flex items-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                         Eliminar
                     </button>
-                    <!-- FIN: BOTÓN DE ELIMINAR -->
-
                     <div class="relative">
                         <template v-if="!props.contrato.documento_contrato">
                             <button @click="abrirSubirDocumentoModal" class="text-sm px-3 py-1.5 rounded-md bg-green-50 dark:bg-green-900/40 text-green-700 dark:text-green-200 border border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900 flex items-center gap-2">
@@ -745,8 +749,8 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
                                                      c.estado === 'PAGADO'
                                                          ? 'bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-900'
                                                          : (String(c.tipo || '') === 'INTERES_MORA'
-                                                             ? 'bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-900'
-                                                             : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700')
+                                                            ? 'bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-900'
+                                                            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700')
                                                  ]">
                                                 <div class="flex items-start sm:items-center gap-4 p-4 flex-col sm:flex-row">
                                                     <div class="flex-shrink-0">
@@ -769,8 +773,8 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
                                                             </span>
                                                             <span class="px-2 py-0.5 text-xs rounded-full font-semibold"
                                                                   :class="String(c.tipo || '') === 'INTERES_MORA'
-                                                                      ? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
-                                                                      : 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300'">
+                                                                     ? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+                                                                     : 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300'">
                                                                 {{ String(c.tipo || '').replace('_', ' ') || 'CARGO' }}
                                                             </span>
                                                             <span class="text-gray-500">Aplicado el {{ fmtDate(c.fecha_aplicado) }}</span>
@@ -857,7 +861,6 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
                                         </div>
                                     </div>
 
-                                    <!-- INICIO: Contenido Pestaña Actuaciones (Actualizado con CRUD) -->
                                     <div v-if="pestanaActiva === 'actuaciones'">
                                         <form @submit.prevent="guardarActuacion" class="mb-6 pb-6 border-b dark:border-gray-700">
                                             <h4 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Nueva Actuación Manual</h4>
@@ -904,8 +907,6 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
                                                         Registrado por: {{ actuacion.user?.name ?? 'Usuario desconocido' }} el {{ fmtDateTime(actuacion.created_at) }}
                                                         <span v-if="actuacion.fecha_actuacion"> | Fecha Actuación: {{ fmtDate(actuacion.fecha_actuacion) }}</span>
                                                     </span>
-                                                    <!-- INICIO: Botones Editar/Eliminar Actuación (Corrección de v-if) -->
-                                                    <!-- $page.props.auth.user es el objeto de usuario autenticado -->
                                                     <div v-if="$page.props.auth.user" class="flex-shrink-0 flex items-center gap-2">
                                                         <button @click="abrirModalEditar(actuacion)" type="button" class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300" title="Editar">
                                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
@@ -914,13 +915,10 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
                                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                                         </button>
                                                     </div>
-                                                    <!-- FIN: Botones Editar/Eliminar Actuación -->
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                    <!-- FIN: Contenido Pestaña Actuaciones -->
-
                                 </div>
                             </div>
                         </div>
@@ -967,6 +965,30 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
                                         {{ props.contrato.estado?.replace('_', ' ') }}
                                     </span>
                                 </div>
+
+                                <div v-if="props.contrato.proceso" class="flex justify-between border-t pt-4 mt-4 dark:border-gray-700">
+                                    <span class="text-gray-500 dark:text-gray-400">Proceso Asociado:</span>
+                                    <Link 
+                                        :href="route('procesos.show', props.contrato.proceso.id)" 
+                                        class="font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                                    >
+                                        Radicado #{{ props.contrato.proceso.radicado }}
+                                    </Link>
+                                </div>
+                                
+                                <!-- ===== INICIO: MOSTRAR CASO ID ===== -->
+                                <div v-if="props.contrato.caso" class="flex justify-between border-t pt-4 mt-4 dark:border-gray-700">
+                                    <span class="text-gray-500 dark:text-gray-400">Caso Asociado:</span>
+                                    <Link 
+                                        :href="route('casos.show', props.contrato.caso.id)" 
+                                        class="font-medium text-green-600 dark:text-green-400 hover:underline flex items-center gap-1"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                        Caso #{{ props.contrato.caso.id }}
+                                    </Link>
+                                </div>
+                                <!-- ===== FIN: MOSTRAR CASO ID ===== -->
+                                
                             </div>
                         </div>
                     </div>
@@ -974,7 +996,6 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
             </div>
         </div>
 
-        <!-- Modales existentes -->
         <Modal :show="pagoModalAbierto" @close="cerrarPagoModal">
            <form @submit.prevent="registrarPagoCuota">
                <div class="p-6 border-b dark:border-gray-700">
@@ -1194,11 +1215,11 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
                     <div>
                          <InputLabel for="cliente_search_reestructurar" value="Cliente" />
                          <TextInput
-                               id="cliente_search_reestructurar"
-                               type="text"
-                               v-model="clienteSearch"
-                               disabled
-                               class="mt-1 block w-full disabled:bg-gray-100 dark:disabled:bg-gray-800/50"
+                                id="cliente_search_reestructurar"
+                                type="text"
+                                v-model="clienteSearch"
+                                disabled
+                                class="mt-1 block w-full disabled:bg-gray-100 dark:disabled:bg-gray-800/50"
                          />
                          <InputError class="mt-2" :message="crearContratoForm.errors.cliente_id" />
                     </div>
@@ -1316,7 +1337,6 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
             </form>
         </Modal>
 
-        <!-- INICIO: MODAL DE CONFIRMACIÓN DE ELIMINACIÓN (Re-añadido) -->
         <Modal :show="confirmandoEliminacion" @close="cerrarModalConfirmarEliminacion">
             <form @submit.prevent="eliminarContrato" class="p-6">
                 <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
@@ -1341,50 +1361,46 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
                 </div>
             </form>
         </Modal>
-        <!-- FIN: MODAL DE CONFIRMACIÓN DE ELIMINACIÓN -->
-
-        <!-- INICIO: MODAL PARA EDITAR ACTUACIÓN -->
         <Modal :show="editActuacionModalAbierto" @close="cerrarModalEditar">
             <form @submit.prevent="actualizarActuacion" class="p-6">
                  <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
                     Editar Actuación Manual
-                </h2>
+                 </h2>
 
-                <div class="mt-6 space-y-4">
+                 <div class="mt-6 space-y-4">
                      <div>
-                        <InputLabel for="edit_actuacion_nota" value="Descripción de la Actuación" />
-                        <Textarea
-                            id="edit_actuacion_nota"
-                            v-model="editActuacionForm.nota"
-                            rows="4"
-                            class="mt-1 block w-full"
-                            required
-                        />
-                        <InputError class="mt-2" :message="editActuacionForm.errors.nota" />
-                    </div>
-                    <div>
-                        <InputLabel for="edit_fecha_actuacion" value="Fecha de Actuación" />
-                        <TextInput
-                            id="edit_fecha_actuacion"
-                            type="date"
-                            v-model="editActuacionForm.fecha_actuacion"
-                            class="mt-1 block w-full"
-                            required
-                        />
-                        <InputError class="mt-2" :message="editActuacionForm.errors.fecha_actuacion" />
-                    </div>
-                </div>
+                         <InputLabel for="edit_actuacion_nota" value="Descripción de la Actuación" />
+                         <Textarea
+                             id="edit_actuacion_nota"
+                             v-model="editActuacionForm.nota"
+                             rows="4"
+                             class="mt-1 block w-full"
+                             required
+                         />
+                         <InputError class="mt-2" :message="editActuacionForm.errors.nota" />
+                     </div>
+                     <div>
+                         <InputLabel for="edit_fecha_actuacion" value="Fecha de Actuación" />
+                         <TextInput
+                             id="edit_fecha_actuacion"
+                             type="date"
+                             v-model="editActuacionForm.fecha_actuacion"
+                             class="mt-1 block w-full"
+                             required
+                         />
+                         <InputError class="mt-2" :message="editActuacionForm.errors.fecha_actuacion" />
+                     </div>
+                 </div>
 
-                <div class="mt-6 flex justify-end gap-3">
-                    <SecondaryButton type="button" @click="cerrarModalEditar"> Cancelar </SecondaryButton>
-                    <PrimaryButton type="submit" :disabled="editActuacionForm.processing">
-                        {{ editActuacionForm.processing ? 'Guardando...' : 'Guardar Cambios' }}
-                    </PrimaryButton>
-                </div>
+                 <div class="mt-6 flex justify-end gap-3">
+                      <SecondaryButton type="button" @click="cerrarModalEditar"> Cancelar </SecondaryButton>
+                      <PrimaryButton type="submit" :disabled="editActuacionForm.processing">
+                           {{ editActuacionForm.processing ? 'Guardando...' : 'Guardar Cambios' }}
+                      </PrimaryButton>
+                 </div>
             </form>
         </Modal>
-        <!-- FIN: MODAL PARA EDITAR ACTUACIÓN -->
-
+        
     </AuthenticatedLayout>
 </template>
 

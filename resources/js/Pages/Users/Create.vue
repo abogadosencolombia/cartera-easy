@@ -3,12 +3,13 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import SecondaryButton from '@/Components/SecondaryButton.vue'; // Importado para "Añadir"
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import Multiselect from 'vue-multiselect';
+import { TrashIcon, PlusIcon } from '@heroicons/vue/24/outline'; // Importar iconos
 
 // --- PROPS ---
-// Se definen las propiedades que el controlador de Laravel envía al componente.
 defineProps({
     allCooperativas: Array,
     allEspecialidades: Array,
@@ -16,20 +17,27 @@ defineProps({
 });
 
 // --- FORMULARIO ---
-// Se inicializa el formulario con todos los campos necesarios.
 const form = useForm({
     name: '',
     email: '',
     password: '',
     password_confirmation: '',
-    tipo_usuario: 'cliente', // El rol por defecto es 'cliente'
+    tipo_usuario: 'cliente',
     cooperativas: [],
-    especialidades: [], // Nuevo campo para las especialidades
+    especialidades: [],
     persona_id: null,
+    addresses: [], // --- AÑADIDO: Array para direcciones ---
 });
 
+// --- LÓGICA DE DIRECCIONES ---
+function addAddress() {
+    form.addresses.push({ address: '', city: '', details: '' });
+}
+function removeAddress(index) {
+    form.addresses.splice(index, 1);
+}
+
 // --- SUBMIT ---
-// Lógica para enviar el formulario al backend.
 const submit = () => {
     form.post(route('admin.users.store'), {
         onFinish: () => form.reset('password', 'password_confirmation'),
@@ -37,7 +45,7 @@ const submit = () => {
 };
 </script>
 
-<!-- Estilos para Multiselect y su adaptación al tema oscuro -->
+<!-- Estilos para Multiselect (sin cambios) -->
 <style src="vue-multiselect/dist/vue-multiselect.css"></style>
 <style>
 /* Personalización para que el multiselect se integre con el tema oscuro y los colores de la app */
@@ -174,6 +182,45 @@ const submit = () => {
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- --- INICIO: SECCIÓN DE DIRECCIONES --- -->
+                            <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
+                                <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Información de Contacto (Opcional)</h3>
+                                <InputError class="mt-2" :message="form.errors.addresses" />
+
+                                <div class="mt-4 space-y-4">
+                                    <div v-for="(address, index) in form.addresses" :key="index" class="p-4 border border-gray-200 dark:border-gray-700 rounded-lg space-y-4 relative">
+                                        <button 
+                                            type="button" 
+                                            @click="removeAddress(index)" 
+                                            class="absolute -top-3 -right-3 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-full"
+                                        >
+                                            <TrashIcon class="h-4 w-4" />
+                                        </button>
+                                        
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <InputLabel :for="'address_' + index" value="Dirección" />
+                                                <TextInput :id="'address_' + index" type="text" class="mt-1 block w-full" v-model="address.address" placeholder="Ej: Calle 10 # 43A-20" />
+                                            </div>
+                                            <div>
+                                                <InputLabel :for="'city_' + index" value="Ciudad" />
+                                                <TextInput :id="'city_' + index" type="text" class="mt-1 block w-full" v-model="address.city" placeholder="Ej: Medellín" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <InputLabel :for="'details_' + index" value="Detalles Adicionales" />
+                                            <TextInput :id="'details_' + index" type="text" class="mt-1 block w-full" v-model="address.details" placeholder="Ej: Apto 501, Barrio El Poblado" />
+                                        </div>
+                                    </div>
+
+                                    <SecondaryButton type="button" @click="addAddress" class="mt-2">
+                                        <PlusIcon class="h-4 w-4 mr-2" />
+                                        Añadir Dirección
+                                    </SecondaryButton>
+                                </div>
+                            </div>
+                            <!-- --- FIN: SECCIÓN DE DIRECCIONES --- -->
 
                             <!-- Botón de Registro -->
                             <div class="flex items-center justify-end mt-4 border-t border-gray-200 dark:border-gray-700 pt-6">

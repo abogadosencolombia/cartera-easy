@@ -34,7 +34,7 @@ const submit = () => {
             
             <div class="relative z-10 text-center animate-fade-in-down">
                 <Link href="/" class="flex justify-center mb-8">
-                     <svg class="h-16 w-auto text-[#D4AF37] drop-shadow-[0_0_15px_rgba(212,175,55,0.5)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <svg class="h-16 w-auto text-[#D4AF37] drop-shadow-[0_0_15px_rgba(212,175,55,0.5)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 3a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m15-3V6a2.25 2.25 0 00-2.25-2.25H9.375a3 3 0 11-6 0H3.75A2.25 2.25 0 001.5 6v3m18-3h-2.25m-15 0H3.75" />
                     </svg>
                 </Link>
@@ -76,7 +76,7 @@ const submit = () => {
                             <Checkbox name="remember" class="text-[#0052CC] focus:ring-[#0052CC]" v-model:checked="form.remember" />
                             <span class="ml-2 text-sm text-slate-600 dark:text-slate-400">Recordarme</span>
                         </label>
-                         <Link v-if="canResetPassword" :href="route('password.request')" class="text-sm font-medium text-[#0052CC] hover:text-[#0041A3] dark:hover:text-blue-400 transition-colors duration-300">
+                        <Link v-if="canResetPassword" :href="route('password.request')" class="text-sm font-medium text-[#0052CC] hover:text-[#0041A3] dark:hover:text-blue-400 transition-colors duration-300">
                             ¿Olvidaste tu contraseña?
                         </Link>
                     </div>
@@ -99,12 +99,13 @@ const submit = () => {
     </div>
 </template>
 
-<style>
+<style scoped>
 /* Animaciones de entrada */
 @keyframes fade-in-down {
     from { opacity: 0; transform: translateY(-20px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
 .animate-fade-in-down {
     animation: fade-in-down 1s ease-out forwards;
 }
@@ -113,11 +114,12 @@ const submit = () => {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
 .animate-fade-in-up {
     animation: fade-in-up 1s ease-out forwards;
 }
 
-/* Estilos para el fondo de partículas (requiere particles.js) */
+/* Estilos para el fondo de partículas */
 #particles-js {
     position: absolute;
     width: 100%;
@@ -126,23 +128,33 @@ const submit = () => {
 }
 
 /* Estilos para los inputs */
-input[type="email"], input[type="password"], input[type="text"] {
+input[type="email"],
+input[type="password"],
+input[type="text"] {
     background-color: #F8FAFC;
     border: 1px solid #E2E8F0;
     transition: all 0.3s ease;
 }
-input[type="email"]:focus, input[type="password"]:focus, input[type="text"]:focus {
+
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="text"]:focus {
     border-color: #D4AF37;
     box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
     background-color: white;
 }
 
-.dark input[type="email"], .dark input[type="password"], .dark input[type="text"] {
+.dark input[type="email"],
+.dark input[type="password"],
+.dark input[type="text"] {
     background-color: #1E293B;
     border-color: #334155;
     color: #E2E8F0;
 }
-.dark input[type="email"]:focus, .dark input[type="password"]:focus, .dark input[type="text"]:focus {
+
+.dark input[type="email"]:focus,
+.dark input[type="password"]:focus,
+.dark input[type="text"]:focus {
     border-color: #D4AF37;
     background-color: #0F172A;
 }

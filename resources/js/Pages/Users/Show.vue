@@ -95,8 +95,8 @@ const getDocumentUrl = (path) => {
         <template #header>
             <div class="flex items-center space-x-4">
                  <Link :href="route('admin.users.index')" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-2 rounded-full">
-                    <ArrowLeftIcon class="h-6 w-6" />
-                </Link>
+                     <ArrowLeftIcon class="h-6 w-6" />
+                 </Link>
                 <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
                     Perfil de Usuario
                 </h2>
@@ -133,10 +133,10 @@ const getDocumentUrl = (path) => {
                                 </span>
                             </div>
                              <div class="mt-6 w-full">
-                                <Link :href="route('admin.users.edit', user.id)" class="w-full text-center inline-flex items-center justify-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase hover:bg-indigo-500">
-                                    Editar Información
-                                </Link>
-                            </div>
+                                 <Link :href="route('admin.users.edit', user.id)" class="w-full text-center inline-flex items-center justify-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase hover:bg-indigo-500">
+                                     Editar Información
+                                 </Link>
+                             </div>
                         </div>
                     </div>
 
@@ -144,7 +144,22 @@ const getDocumentUrl = (path) => {
                         <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg p-6">
                             <h3 class="text-lg font-medium text-gray-900 dark:text-white">Información General</h3>
                             <dl class="mt-4 divide-y divide-gray-200 dark:divide-gray-700">
-                                <div class="py-4 grid grid-cols-3 gap-4"><dt class="text-sm font-medium text-gray-500">Ubicación</dt><dd class="text-sm text-gray-900 dark:text-gray-100 col-span-2">{{ user.direccion || 'No especificada' }}, {{ user.ciudad || 'No especificada' }}</dd></div>
+                                
+                                <!-- --- INICIO: SECCIÓN DE DIRECCIONES MODIFICADA --- -->
+                                <div class="py-4 grid grid-cols-3 gap-4">
+                                    <dt class="text-sm font-medium text-gray-500">Direcciones</dt>
+                                    <dd class="text-sm text-gray-900 dark:text-gray-100 col-span-2">
+                                        <ul v-if="user.addresses && user.addresses.length > 0" class="space-y-2">
+                                            <li v-for="(addr, index) in user.addresses" :key="index">
+                                                <span class="block font-medium">{{ addr.address || 'N/A' }}, {{ addr.city || 'N/A' }}</span>
+                                                <span v-if="addr.details" class="block text-xs text-gray-500">{{ addr.details }}</span>
+                                            </li>
+                                        </ul>
+                                        <span v-else class="text-gray-500 dark:text-gray-400">No especificadas</span>
+                                    </dd>
+                                </div>
+                                <!-- --- FIN: SECCIÓN DE DIRECCIONES MODIFICADA --- -->
+
                                 <div class="py-4 grid grid-cols-3 gap-4"><dt class="text-sm font-medium text-gray-500">Cooperativas</dt><dd class="text-sm text-gray-900 dark:text-gray-100 col-span-2">{{ user.cooperativas_display || 'Ninguna' }}</dd></div>
                                 <div class="py-4 grid grid-cols-3 gap-4"><dt class="text-sm font-medium text-gray-500">Especialidades</dt><dd class="text-sm text-gray-900 dark:text-gray-100 col-span-2">{{ user.especialidades_display || 'Ninguna' }}</dd></div>
                             </dl>

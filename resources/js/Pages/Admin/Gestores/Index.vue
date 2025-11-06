@@ -3,9 +3,16 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue';
 import { debounce, pickBy } from 'lodash';
-
-// --- Iconos ---
-import { UserGroupIcon, BanknotesIcon, FolderOpenIcon, BuildingOffice2Icon, TrophyIcon, ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline';
+import { 
+    UserGroupIcon, 
+    BanknotesIcon, 
+    FolderOpenIcon, 
+    BuildingOffice2Icon, 
+    TrophyIcon, 
+    ChevronDownIcon, 
+    MagnifyingGlassIcon, 
+    FolderIcon // <-- Este es el que añadimos
+} from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     filters: Object,
@@ -199,25 +206,46 @@ const roleBadgeClass = (role) => {
 
                             <!-- Panel Desplegable -->
                             <transition name="fade">
-                                <div v-if="openRowId === row.id" class="p-6 pt-2 transition-all duration-300 ease-in-out bg-slate-50 dark:bg-slate-800/50 rounded-b-2xl">
-                                    <h4 class="text-sm font-semibold text-slate-800 dark:text-slate-200 border-b dark:border-slate-700 pb-2">
-                                        Detalle de Cooperativas
-                                    </h4>
-                                    <div v-if="row.cooperativas && row.cooperativas.length" class="flow-root mt-3">
-                                        <ul role="list" class="-my-2 divide-y divide-slate-200 dark:divide-slate-700">
-                                            <li v-for="coop in row.cooperativas" :key="coop.id" class="py-2.5">
-                                                <Link :href="route('cooperativas.show', coop.id)" class="group flex items-center text-sm">
-                                                    <BuildingOffice2Icon class="h-5 w-5 mr-3 text-slate-400 group-hover:text-indigo-500 transition-colors" />
-                                                    <span class="text-slate-700 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{{ coop.nombre }}</span>
-                                                </Link>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                    <div v-else class="text-sm text-slate-500 italic py-4 text-center">
-                                        No tiene cooperativas asignadas.
-                                    </div>
-                                </div>
-                            </transition>
+    <div v-if="openRowId === row.id" class="p-6 pt-2 transition-all duration-300 ease-in-out bg-slate-50 dark:bg-slate-800/50 rounded-b-2xl">
+        
+        <h4 class="text-sm font-semibold text-slate-800 dark:text-slate-200 border-b dark:border-slate-700 pb-2">
+            Detalle de Cooperativas
+        </h4>
+        <div v-if="row.cooperativas && row.cooperativas.length" class="flow-root mt-3">
+            <ul role="list" class="-my-2 divide-y divide-slate-200 dark:divide-slate-700">
+                <li v-for="coop in row.cooperativas" :key="coop.id" class="py-2.5">
+                    <Link :href="route('cooperativas.show', coop.id)" class="group flex items-center text-sm">
+                        <BuildingOffice2Icon class="h-5 w-5 mr-3 text-slate-400 group-hover:text-indigo-500 transition-colors" />
+                        <span class="text-slate-700 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{{ coop.nombre }}</span>
+                    </Link>
+                </li>
+            </ul>
+        </div>
+        <div v-else class="text-sm text-slate-500 italic py-4 text-center">
+            No tiene cooperativas asignadas.
+        </div>
+
+        <h4 class="mt-6 text-sm font-semibold text-slate-800 dark:text-slate-200 border-b dark:border-slate-700 pb-2">
+            Detalle de Casos
+        </h4>
+        <div v-if="row.casos && row.casos.length" class="flow-root mt-3">
+            <ul role="list" class="-my-2 divide-y divide-slate-200 dark:divide-slate-700">
+                <li v-for="caso in row.casos" :key="caso.id" class="py-2.5">
+                    <Link :href="route('casos.show', caso.id)" class="group flex items-center justify-between text-sm">
+                        <div class="flex items-center">
+                            <FolderIcon class="h-5 w-5 mr-3 text-slate-400 group-hover:text-indigo-500 transition-colors" />
+                            <span class="text-slate-700 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{{ caso.proceso }}</span>
+                        </div>
+                        <span class="text-xs text-slate-500 dark:text-slate-400 group-hover:text-indigo-600">{{ caso.referencia }}</span>
+                    </Link>
+                </li>
+            </ul>
+        </div>
+        <div v-else class="text-sm text-slate-500 italic py-4 text-center">
+            No tiene casos asignados.
+        </div>
+        </div>
+</transition>
                         </div>
                     </transition-group>
                 </div>

@@ -15,15 +15,13 @@ import { useProcesos } from '@/composables/useProcesos';
 
 const props = defineProps({
     proceso: { type: Object, required: true },
-    // --- INICIO: Añadir prop actuaciones ---
-    actuaciones: { type: Array, default: () => [] },
-    // --- FIN: Añadir prop actuaciones ---
+    // 'actuaciones' ya no se necesita como prop separada, vendrá dentro de 'proceso'
 });
 
 // Usamos la lógica centralizada desde nuestro composable
-const { formatDate, getRevisionStatus } = useProcesos(); // <-- CORREGIDO EL TYPO AQUÍ
+const { formatDate, getRevisionStatus } = useProcesos();
 
-// --- INICIO: Helpers de Fecha ---
+// --- INICIO: Helpers de Fecha (Puedes eliminarlos si los importas de useProcesos y son idénticos) ---
 const fmtDateTime = (d) =>
     d ? new Date(String(d).replace(' ', 'T')).toLocaleString('es-CO', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'UTC' }) : 'N/A';
 
@@ -37,7 +35,7 @@ const fmtDateSimple = (d) => {
             const [, year, month, day] = dateOnlyMatch;
             const dateOnlyObj = new Date(Date.UTC(year, month - 1, day));
              if (!isNaN(dateOnlyObj.getTime())) {
-                 return dateOnlyObj.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+                  return dateOnlyObj.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
              }
         }
         return 'Fecha Inválida';
@@ -51,6 +49,11 @@ const today = new Date().toISOString().slice(0, 10);
 // Propiedad computada para saber si el caso está cerrado
 const isClosed = computed(() => props.proceso.estado === 'CERRADO');
 const files = computed(() => props.proceso?.documentos ?? []);
+// ===== NUEVA COMPUTADA =====
+// Verifica si el proceso tiene un contrato asociado (cargado desde el controller)
+const tieneContrato = computed(() => !!props.proceso?.contrato?.id);
+// ==========================
+const actuaciones = computed(() => props.proceso?.actuaciones ?? []); // Obtenemos actuaciones del proceso
 const asText = (v) => v ?? '—';
 
 
@@ -111,6 +114,8 @@ const submitUpload = () => {
     onSuccess: () => {
       uploadForm.reset();
       if (fileInput.value) fileInput.value.value = '';
+      // Refrescar documentos después de subir
+      router.reload({ only: ['proceso'], preserveState: true, preserveScroll: true });
     },
   });
 };
@@ -124,7 +129,14 @@ const doDeleteDoc = () => {
   if (!deletingDoc.value) return;
   delDocForm.delete(
     route('procesos.documentos.destroy', { proceso: props.proceso.id, documento: deletingDoc.value.id }),
-    { preserveScroll: true, onSuccess: () => closeDeleteDoc() },
+    {
+        preserveScroll: true,
+        onSuccess: () => {
+            closeDeleteDoc();
+            // Refrescar documentos después de eliminar
+            router.reload({ only: ['proceso'], preserveState: true, preserveScroll: true });
+        }
+    },
   );
 };
 
@@ -140,7 +152,8 @@ const guardarActuacion = () => {
         onSuccess: () => {
             actuacionForm.reset()
             actuacionForm.fecha_actuacion = today
-            router.reload({ only: ['actuaciones', 'proceso'], preserveState: true }) // <-- CORREGIDO
+            // Refrescar datos incluyendo el proceso (que contiene actuaciones)
+            router.reload({ only: ['proceso'], preserveState: true })
         },
         onError: (errors) => {
              console.error("Error al guardar actuación:", errors);
@@ -178,7 +191,7 @@ const actualizarActuacion = () => {
         preserveScroll: true,
         onSuccess: () => {
             cerrarModalEditar()
-            router.reload({ only: ['actuaciones', 'proceso'], preserveState: true }) // <-- CORREGIDO
+            router.reload({ only: ['proceso'], preserveState: true })
         },
         onError: (errors) => {
              console.error("Error al actualizar actuación:", errors);
@@ -187,15 +200,17 @@ const actualizarActuacion = () => {
 }
 
 const eliminarActuacion = (actuacionId) => {
+    // Usar un modal de confirmación en lugar de confirm()
     if (confirm('¿Estás seguro de que quieres eliminar esta actuación? Esta acción no se puede deshacer.')) {
         router.delete(route('procesos.actuaciones.destroy', actuacionId), {
             preserveScroll: true,
             onSuccess: () => {
-                 router.reload({ only: ['actuaciones', 'proceso'], preserveState: true }) // <-- CORREGIDO
+                 router.reload({ only: ['proceso'], preserveState: true })
             },
             onError: (errors) => {
-                console.error("Error al eliminar actuación:", errors);
-                alert("Error: No se pudo eliminar la actuación. Es posible que no tengas permiso.");
+                 console.error("Error al eliminar actuación:", errors);
+                 // Mostrar error en un componente de notificación/toast en lugar de alert()
+                 alert("Error: No se pudo eliminar la actuación. Es posible que no tengas permiso.");
             }
         })
     }
@@ -211,7 +226,7 @@ const eliminarActuacion = (actuacionId) => {
     <template #header>
       <div class="flex flex-col md:flex-row items-center justify-between gap-4">
         <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 flex-wrap">
             <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight truncate">
               Expediente <span class="text-indigo-600 dark:text-indigo-400">{{ proceso.radicado || '—' }}</span>
             </h2>
@@ -226,27 +241,68 @@ const eliminarActuacion = (actuacionId) => {
               {{ proceso.estado }}
             </span>
           </div>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 truncate">
+          <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 truncate" :title="asText(proceso.asunto)">
             {{ asText(proceso.asunto) }}
           </p>
         </div>
-        <div class="flex items-center gap-3 flex-shrink-0">
+
+        <div class="flex items-center gap-3 flex-shrink-0 flex-wrap justify-end">
+
           <Link :href="route('procesos.edit', proceso.id)">
             <PrimaryButton :disabled="isClosed">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z" /></svg>
               Editar
             </PrimaryButton>
           </Link>
-          
-          <!-- BOTONES DE CERRAR/REABRIR -->
+
+          <!-- ================================== -->
+          <!-- =====   BOTÓN CONDICIONAL AQUÍ ===== -->
+          <!-- ================================== -->
+          <!-- SI NO TIENE CONTRATO Y ESTÁ ACTIVO -->
+          <Link
+            v-if="!tieneContrato && !isClosed"
+            :href="route('honorarios.contratos.create', {
+              proceso_id: proceso.id,
+              cliente_id: proceso.demandante?.id // Pasa el ID del cliente si existe
+            })"
+          >
+            <PrimaryButton
+              class="!bg-blue-600 hover:!bg-blue-700 focus:!bg-blue-700 active:!bg-blue-800 focus:!ring-blue-500"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Generar Contrato
+            </PrimaryButton>
+          </Link>
+
+          <!-- SI YA TIENE CONTRATO -->
+          <Link
+            v-else-if="tieneContrato"
+            :href="route('honorarios.contratos.show', proceso.contrato.id)"
+          >
+            <PrimaryButton
+               class="!bg-teal-600 hover:!bg-teal-700 focus:!bg-teal-700 active:!bg-teal-800 focus:!ring-teal-500"
+            >
+               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+               </svg>
+               Ver Contrato
+            </PrimaryButton>
+          </Link>
+          <!-- ================================== -->
+          <!-- ===== FIN BOTÓN CONDICIONAL  ===== -->
+          <!-- ================================== -->
+
           <DangerButton @click="openCloseModal" v-if="!isClosed">Cerrar</DangerButton>
           <PrimaryButton @click="openReopenModal" v-if="isClosed" class="!bg-blue-600 hover:!bg-blue-700 focus:!bg-blue-700 active:!bg-blue-800 focus:!ring-blue-500">Reabrir</PrimaryButton>
-          
+
           <DangerButton @click="askDelete" :disabled="isClosed">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
             Eliminar
           </DangerButton>
-          
+
           <Link :href="route('procesos.index')">
             <SecondaryButton>Volver</SecondaryButton>
           </Link>
@@ -276,7 +332,7 @@ const eliminarActuacion = (actuacionId) => {
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-          
+
           <!-- Columna Principal -->
           <div class="lg:col-span-2 space-y-8">
             <!-- Información del Proceso -->
@@ -310,7 +366,7 @@ const eliminarActuacion = (actuacionId) => {
                 </dl>
               </div>
             </div>
-            
+
             <!-- Documentos -->
             <fieldset :disabled="isClosed" :class="{ 'opacity-60': isClosed }">
               <div class="grid grid-cols-1 md:grid-cols-5 gap-8">
@@ -370,6 +426,7 @@ const eliminarActuacion = (actuacionId) => {
                             target="_blank"
                             rel="noopener"
                             class="font-medium text-gray-900 dark:text-gray-100 break-all hover:underline"
+                            :title="asText(doc.file_name)"
                           >
                             {{ asText(doc.file_name) }}
                           </a>
@@ -379,13 +436,13 @@ const eliminarActuacion = (actuacionId) => {
                           </p>
                         </div>
                         <div class="shrink-0 flex items-center gap-2">
-                          <a :href="route('documentos-proceso.view', doc.id)" target="_blank" rel="noopener" class="text-gray-400 hover:text-indigo-600" title="Ver">
+                          <a :href="route('documentos-proceso.view', doc.id)" target="_blank" rel="noopener" class="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400" title="Ver">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5c-7.633 0-10 7-10 7s2.367 7 10 7 10-7 10-7-2.367-7-10-7Zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10Z"/></svg>
                           </a>
                           <a :href="route('documentos-proceso.download', doc.id)" class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" title="Descargar">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                           </a>
-                          <button type="button" @click="askDeleteDoc(doc)" class="text-gray-400 hover:text-red-600" title="Eliminar">
+                          <button type="button" @click="askDeleteDoc(doc)" class="text-gray-400 hover:text-red-600 dark:hover:text-red-400" title="Eliminar">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                           </button>
                         </div>
@@ -435,13 +492,13 @@ const eliminarActuacion = (actuacionId) => {
                     </fieldset>
 
                     <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Historial de Actuaciones</h3>
-                    <div v-if="!props.actuaciones || props.actuaciones.length === 0" class="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <div v-if="!actuaciones || actuaciones.length === 0" class="text-center py-8 text-gray-500 dark:text-gray-400">
                         No hay actuaciones registradas para este radicado.
                     </div>
                     <div v-else class="space-y-4">
-                        <div v-for="actuacion in props.actuaciones" :key="actuacion.id" class="p-4 border rounded-lg bg-gray-50 dark:bg-gray-800/50 dark:border-gray-700">
+                        <div v-for="actuacion in actuaciones" :key="actuacion.id" class="p-4 border rounded-lg bg-gray-50 dark:bg-gray-800/50 dark:border-gray-700">
                             <p class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{{ actuacion.nota }}</p>
-                            <div class="mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between">
+                            <div class="mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between flex-wrap gap-2">
                                 <span>
                                     Registrado por: {{ actuacion.user?.name ?? 'Usuario desconocido' }} el {{ fmtDateTime(actuacion.created_at) }}
                                     <span v-if="actuacion.fecha_actuacion"> | Fecha Actuación: {{ fmtDateSimple(actuacion.fecha_actuacion) }}</span>
@@ -461,9 +518,9 @@ const eliminarActuacion = (actuacionId) => {
                 </div>
             </div>
             <!-- --- FIN: SECCIÓN DE ACTUACIONES --- -->
-            
+
           </div>
-          
+
           <!-- Columna Lateral -->
           <div class="lg:col-span-1">
             <div class="sticky top-8 space-y-6">
@@ -621,12 +678,12 @@ const eliminarActuacion = (actuacionId) => {
         </div>
     </Modal>
     <!-- FIN DE NUEVOS MODALES -->
-    
+
     <!-- --- INICIO: MODAL PARA EDITAR ACTUACIÓN --- -->
     <Modal :show="editActuacionModalAbierto" @close="cerrarModalEditar">
         <form @submit.prevent="actualizarActuacion" class="p-6">
              <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-                Editar Actuación Manual
+                  Editar Actuación Manual
             </h2>
 
             <div class="mt-6 space-y-4">
@@ -655,8 +712,8 @@ const eliminarActuacion = (actuacionId) => {
             </div>
 
             <div class="mt-6 flex justify-end gap-3">
-                <SecondaryButton type="button" @click="cerrarModalEditar"> Cancelar </SecondaryButton>
-                <PrimaryButton type="submit" :disabled="editActuacionForm.processing">
+                 <SecondaryButton type="button" @click="cerrarModalEditar"> Cancelar </SecondaryButton>
+                 <PrimaryButton type="submit" :disabled="editActuacionForm.processing">
                     {{ editActuacionForm.processing ? 'Guardando...' : 'Guardar Cambios' }}
                 </PrimaryButton>
             </div>

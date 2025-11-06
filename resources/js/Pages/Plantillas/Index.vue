@@ -99,7 +99,7 @@ const limpiarFiltros = () => {
     <AuthenticatedLayout>
         <template #header>
             <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-                Arsenal de Plantillas de Documentos
+            Plantillas de Documentos
             </h2>
         </template>
 

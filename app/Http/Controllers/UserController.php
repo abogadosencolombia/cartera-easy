@@ -54,22 +54,33 @@ class UserController extends Controller
     {
         $this->authorize('create', User::class);
 
-        $request->validate([
+        $data = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'tipo_usuario' => 'required|in:admin,gestor,abogado,cliente',
             'cooperativas' => 'nullable|array',
             'especialidades' => 'nullable|array',
-            'persona_id' => 'nullable|exists:personas,id'
+            'persona_id' => 'nullable|exists:personas,id',
+            'addresses' => 'nullable|array', // --- AÑADIDO ---
         ]);
 
+        // --- AÑADIDO: Filtro de addresses (copiado de PersonaController) ---
+        if (isset($data['addresses'])) {
+            $data['addresses'] = array_values(array_filter($data['addresses'], fn ($r) =>
+                (isset($r['address']) && trim((string)$r['address']) !== '') || 
+                (isset($r['city']) && trim((string)$r['city']) !== '')
+            ));
+        }
+        // --- FIN DE LA MODIFICACIÓN ---
+
         $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'tipo_usuario' => $request->tipo_usuario,
-            'persona_id' => $request->persona_id,
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => Hash::make($data['password']),
+            'tipo_usuario' => $data['tipo_usuario'],
+            'persona_id' => $data['persona_id'] ?? null,
+            'addresses' => $data['addresses'] ?? null, // --- AÑADIDO ---
         ]);
 
         if ($request->has('cooperativas') && in_array($user->tipo_usuario, ['abogado', 'gestor', 'cliente'])) {
@@ -132,8 +143,18 @@ class UserController extends Controller
             'cooperativas.*' => 'exists:cooperativas,id',
             'especialidades' => 'nullable|array',
             'especialidades.*' => 'exists:especialidades,id',
-            'persona_id' => 'nullable|exists:personas,id'
+            'persona_id' => 'nullable|exists:personas,id',
+            'addresses' => 'nullable|array', // --- AÑADIDO ---
         ]);
+        
+        // --- AÑADIDO: Filtro de addresses (copiado de PersonaController) ---
+        if (isset($validated['addresses'])) {
+            $validated['addresses'] = array_values(array_filter($validated['addresses'], fn ($r) =>
+                (isset($r['address']) && trim((string)$r['address']) !== '') || 
+                (isset($r['city']) && trim((string)$r['city']) !== '')
+            ));
+        }
+        // --- FIN DE LA MODIFICACIÓN ---
         
         $user->name = $validated['name'];
         $user->email = $validated['email'];
@@ -141,6 +162,7 @@ class UserController extends Controller
         $user->estado_activo = $validated['estado_activo'];
         $user->persona_id = $validated['persona_id'] ?? null;
         $user->preferencias_notificacion = $validated['preferencias_notificacion'];
+        $user->addresses = $validated['addresses'] ?? null; // --- AÑADIDO ---
 
         if (!empty($validated['password'])) {
             $user->password = Hash::make($validated['password']);

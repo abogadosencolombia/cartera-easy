@@ -11,6 +11,10 @@ use Carbon\Carbon; // Asegúrate que esté importado
 // --- INICIO: AÑADIR IMPORT REVISION DIARIA ---
 use App\Models\RevisionDiaria;
 // --- FIN: AÑADIR IMPORT REVISION DIARIA ---
+// --- INICIO: AÑADIR IMPORT ProcesoRadicado ---
+use App\Models\ProcesoRadicado; // <-- Importar ProcesoRadicado
+// --- FIN: AÑADIR IMPORT ProcesoRadicado ---
+
 
 class Contrato extends Model
 {
@@ -31,7 +35,8 @@ class Contrato extends Model
         'nota',
         'contrato_origen_id',
         'documento_contrato', // Añadido
-        // Añadir otros campos si es necesario
+        'proceso_id', 
+        'caso_id', // <--- AÑADE ESTA LÍNEA
     ];
 
     protected $casts = [
@@ -115,4 +120,23 @@ class Contrato extends Model
         return $this->morphMany(RevisionDiaria::class, 'revisable');
     }
     // --- FIN: AÑADIR RELACIÓN DE REVISIÓN DIARIA ---
+
+    // ===== NUEVA RELACIÓN =====
+    /**
+     * Obtiene el proceso radicado asociado a este contrato.
+     */
+    public function proceso(): BelongsTo
+    {
+        // Asume que la clave foránea en la tabla 'contratos' es 'proceso_id'
+        return $this->belongsTo(ProcesoRadicado::class, 'proceso_id');
+    }
+    // ==========================
+
+    /**
+     * Obtiene el caso de cobro asociado a este contrato.
+     */
+    public function caso(): BelongsTo
+    {
+        return $this->belongsTo(Caso::class, 'caso_id');
+    }
 }

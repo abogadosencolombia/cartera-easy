@@ -1,12 +1,13 @@
 @php
-    // --- PREPARACIÓN DE DATOS (Lógica sin cambios) ---
-    $clienteNombre = $cliente->nombre ?? 'ID ' . $contrato->cliente_id;
+    // --- PREPARACIÓN DE DATOS (Lógica CORREGIDA) ---
+    // $cliente y $contrato AHORA SON OBJETOS Eloquent
+    $clienteNombre = $cliente->nombre_completo ?? 'ID ' . $contrato->cliente_id;
 
     // 1. Crear una colección unificada de todas las transacciones (pagos y cargos pagados)
     $transacciones = collect();
 
-    // 2. Añadir los pagos normales
-    foreach ($pagos as $pago) {
+    // 2. Añadir los pagos normales ($pagos AHORA ES UNA COLECCIÓN de stdClass)
+    foreach ($pagos as $pago) { // $pago es un objeto stdClass
         $transacciones->push([
             'fecha' => \Illuminate\Support\Carbon::parse($pago->fecha),
             'concepto' => $pago->cuota_id ? 'Pago Cuota #'.$pago->cuota_numero : 'Abono General',
@@ -15,8 +16,8 @@
         ]);
     }
 
-    // 3. Añadir los cargos que ya han sido pagados
-    foreach ($cargosPagados as $cargo) {
+    // 3. Añadir los cargos que ya han sido pagados ($cargosPagados AHORA ES UNA COLECCIÓN de stdClass)
+    foreach ($cargosPagados as $cargo) { // $cargo es un objeto stdClass
         $conceptoCargo = '';
         $tipoCargo = '';
         switch ($cargo->tipo) {
@@ -191,7 +192,7 @@
                 <div>
                      <h3 class="text-base font-semibold text-gray-800">Notas Adicionales</h3>
                      <p class="text-xs text-gray-500 mt-2">
-                        Este es un resumen del estado de su contrato a la fecha de emisión. Para cualquier consulta, no dude en contactarnos. Los pagos pueden tardar hasta 48 horas en verse reflejados.
+                         Este es un resumen del estado de su contrato a la fecha de emisión. Para cualquier consulta, no dude en contactarnos. Los pagos pueden tardar hasta 48 horas en verse reflejados.
                      </p>
                 </div>
                 <!-- Columna para el resumen de totales -->
@@ -229,4 +230,5 @@
     </div>
 </body>
 </html>
+
 

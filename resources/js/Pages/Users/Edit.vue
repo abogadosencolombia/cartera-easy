@@ -3,15 +3,16 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import SecondaryButton from '@/Components/SecondaryButton.vue'; // Importado para "Añadir"
 import TextInput from '@/Components/TextInput.vue';
 import Checkbox from '@/Components/Checkbox.vue';
 import SelectInput from '@/Components/SelectInput.vue';
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import Multiselect from 'vue-multiselect';
+import { TrashIcon, PlusIcon } from '@heroicons/vue/24/outline'; // Importar iconos
 
 // --- PROPS ---
-// Se definen las propiedades que el controlador de Laravel envía al componente.
 const props = defineProps({
     user: Object,
     allCooperativas: Array,
@@ -20,12 +21,10 @@ const props = defineProps({
 });
 
 // --- LÓGICA DE EDICIÓN ---
-// Se comprueba si el administrador está editando su propia cuenta para deshabilitar campos críticos.
 const authUser = usePage().props.auth.user;
 const isEditingSelf = computed(() => props.user.id === authUser.id);
 
 // --- FORMULARIO ---
-// Se inicializa el formulario con los datos existentes del usuario.
 const form = useForm({
     _method: 'patch',
     name: props.user.name,
@@ -34,15 +33,22 @@ const form = useForm({
     estado_activo: props.user.estado_activo,
     password: '',
     password_confirmation: '',
-    // Se mapean los arrays de objetos a arrays de IDs para el Multiselect.
     cooperativas: props.user.cooperativas.map(c => c.id),
     especialidades: props.user.especialidades.map(e => e.id),
     persona_id: props.user.persona_id,
     preferencias_notificacion: props.user.preferencias_notificacion || { 'email': true, 'in-app': true },
+    addresses: props.user.addresses || [], // --- AÑADIDO: Cargar direcciones existentes ---
 });
 
+// --- LÓGICA DE DIRECCIONES ---
+function addAddress() {
+    form.addresses.push({ address: '', city: '', details: '' });
+}
+function removeAddress(index) {
+    form.addresses.splice(index, 1);
+}
+
 // --- SUBMIT ---
-// Lógica para enviar el formulario de actualización.
 const submit = () => {
     form.post(route('admin.users.update', props.user.id), {
         preserveScroll: true,
@@ -50,7 +56,7 @@ const submit = () => {
 };
 </script>
 
-<!-- Estilos para Multiselect y su adaptación al tema oscuro -->
+<!-- Estilos para Multiselect (sin cambios) -->
 <style src="vue-multiselect/dist/vue-multiselect.css"></style>
 <style>
 /* Personalización para que el multiselect se integre con el tema oscuro y los colores de la app */
@@ -176,11 +182,50 @@ const submit = () => {
                              <div v-if="form.tipo_usuario === 'cliente'">
                                  <InputLabel for="persona_id" value="Persona Asociada a esta Cuenta"/>
                                  <SelectInput v-model="form.persona_id" id="persona_id" class="mt-1 block w-full">
-                                     <option :value="null">Ninguna / Desvincular</option>
-                                     <option v-for="p in personas" :key="p.id" :value="p.id">{{ p.nombre_completo }} ({{ p.numero_documento }})</option>
+                                      <option :value="null">Ninguna / Desvincular</option>
+                                      <option v-for="p in personas" :key="p.id" :value="p.id">{{ p.nombre_completo }} ({{ p.numero_documento }})</option>
                                  </SelectInput>
                                  <InputError :message="form.errors.persona_id" class="mt-2" />
                              </div>
+
+                            <!-- --- INICIO: SECCIÓN DE DIRECCIONES --- -->
+                            <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
+                                <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Información de Contacto</h3>
+                                <InputError class="mt-2" :message="form.errors.addresses" />
+
+                                <div class="mt-4 space-y-4">
+                                    <div v-for="(address, index) in form.addresses" :key="index" class="p-4 border border-gray-200 dark:border-gray-700 rounded-lg space-y-4 relative">
+                                        <button 
+                                            type="button" 
+                                            @click="removeAddress(index)" 
+                                            class="absolute -top-3 -right-3 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-full"
+                                        >
+                                            <TrashIcon class="h-4 w-4" />
+                                        </button>
+                                        
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <InputLabel :for="'address_' + index" value="Dirección" />
+                                                <TextInput :id="'address_' + index" type="text" class="mt-1 block w-full" v-model="address.address" placeholder="Ej: Calle 10 # 43A-20" />
+                                            </div>
+                                            <div>
+                                                <InputLabel :for="'city_' + index" value="Ciudad" />
+                                                <TextInput :id="'city_' + index" type="text" class="mt-1 block w-full" v-model="address.city" placeholder="Ej: Medellín" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <InputLabel :for="'details_' + index" value="Detalles Adicionales" />
+                                            <TextInput :id="'details_' + index" type="text" class="mt-1 block w-full" v-model="address.details" placeholder="Ej: Apto 501, Barrio El Poblado" />
+                                        </div>
+                                    </div>
+
+                                    <SecondaryButton type="button" @click="addAddress" class="mt-2">
+                                        <PlusIcon class="h-4 w-4 mr-2" />
+                                        Añadir Dirección
+                                    </SecondaryButton>
+                                </div>
+                            </div>
+                            <!-- --- FIN: SECCIÓN DE DIRECCIONES --- -->
 
                             <!-- Preferencias de Notificación -->
                             <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
@@ -232,4 +277,5 @@ const submit = () => {
         </div>
     </AuthenticatedLayout>
 </template>
+
 

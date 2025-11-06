@@ -8,14 +8,15 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Auth; // <-- Importado
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Carbon\Carbon;
-// --- INICIO: Añadir modelos ---
+use App\Models\Caso;
 use App\Models\Contrato;
 use App\Models\Persona;
-use App\Models\Actuacion; // <-- Importado
-// --- FIN: Añadir modelos ---
+use App\Models\ProcesoRadicado;
+use App\Models\Actuacion;
 
 class ContratosController extends Controller
 {
@@ -25,19 +26,23 @@ class ContratosController extends Controller
         $estado = trim((string)$request->input('estado',''));
         $stats = ['activeValue'=>0,'activeCount'=>0,'closedCount'=>0];
 
-        // --- INICIO: Revertir withCount a subquery DB::raw ---
         $contratosQuery = Contrato::query()
             ->where('estado', '!=', 'REESTRUCTURADO')
-            ->with('cliente:id,nombre_completo') // Cargar relación cliente
-            ->addSelect(['*', DB::raw('(SELECT SUM(valor) FROM contrato_pagos WHERE contrato_pagos.contrato_id = contratos.id) as total_pagado')]); // Subquery para total_pagado
-        // --- FIN: Revertir withCount a subquery DB::raw ---
+            ->with([
+                'cliente:id,nombre_completo',
+                // ===== CORRECCIÓN 1 (INDEX) =====
+                // Cargamos el 'proceso' con 'id' y 'radicado'
+                'proceso:id,radicado',
+                'caso:id',
+            ])
+            ->addSelect(['*', DB::raw('(SELECT SUM(valor) FROM contrato_pagos WHERE contrato_pagos.contrato_id = contratos.id) as total_pagado')]);
 
         if ($q !== '') {
             $contratosQuery->where(function ($query) use ($q) {
                 $query->where('id', 'ilike', "%{$q}%")
-                      ->orWhereHas('cliente', function ($subQuery) use ($q) {
-                          $subQuery->where('nombre_completo', 'ilike', "%{$q}%");
-                      });
+                            ->orWhereHas('cliente', function ($subQuery) use ($q) {
+                                $subQuery->where('nombre_completo', 'ilike', "%{$q}%");
+                            });
             });
         }
 
@@ -46,26 +51,32 @@ class ContratosController extends Controller
         }
 
         $contratos = $contratosQuery->orderByDesc('created_at')->paginate(10)
-            ->through(fn ($contrato) => [ // Transformar para la vista si es necesario
+            ->through(fn ($contrato) => [
                 'id' => $contrato->id,
                 'cliente_id' => $contrato->cliente_id,
                 'persona_nombre' => $contrato->cliente?->nombre_completo,
                 'estado' => $contrato->estado,
                 'monto_total' => $contrato->monto_total,
-                'total_pagado' => $contrato->total_pagado ?? 0, // Usar el alias de la subquery
+                'total_pagado' => $contrato->total_pagado ?? 0,
                 'created_at' => $contrato->created_at,
-                'modalidad' => $contrato->modalidad, // Asegúrate de incluir todos los campos necesarios para Index.vue
-                // Añadir otros campos que necesite la vista Index
+                'modalidad' => $contrato->modalidad,
+                'caso_id' => $contrato->caso?->id,
+                // ===== CORRECCIÓN 2 (INDEX) =====
+                // Pasa la información del proceso formateada
+                'proceso' => $contrato->proceso ? [
+                    'id' => $contrato->proceso->id,
+                    // Usamos la columna 'radicado'
+                    'numero' => $contrato->proceso->radicado ?: $contrato->proceso->id, 
+                ] : null,
             ]);
 
-        // --- Stats usando Modelo ---
         try {
             $active = Contrato::whereIn('estado',['ACTIVO', 'PAGOS_PENDIENTES', 'EN_MORA']);
             $stats['activeCount'] = (clone $active)->count();
             $stats['activeValue'] = (clone $active)->sum('monto_total');
             $stats['closedCount'] = Contrato::where('estado','CERRADO')->count();
         } catch (\Throwable $e) {
-            // Manejar posible error si la tabla no existe o algo falla
+            Log::error("Error calculando estadísticas de contratos: " . $e->getMessage());
         }
 
         return Inertia::render('Gestion/Honorarios/Contratos/Index', [
@@ -79,149 +90,215 @@ class ContratosController extends Controller
     {
         $plantilla = null;
         if ($request->has('from')) {
-            // --- Usando Modelo ---
             $plantilla = Contrato::find($request->input('from'));
+        }
+
+        $proceso = null;
+        $clienteSeleccionado = null;
+
+        // ===== INICIO: NUEVA LÓGICA PARA LEER EL CASO =====
+        $datosCaso = null; 
+        if ($request->has('caso_id')) {
+            // Buscamos el caso y cargamos su deudor (para preseleccionar al cliente)
+            $caso = Caso::with('deudor:id,nombre_completo')->find($request->input('caso_id'));
+
+            if ($caso) {
+                $datosCaso = [
+                    'id' => $caso->id,
+                    'monto_total' => $caso->monto_total,
+                ];
+
+                // Pre-seleccionar el cliente si viene del caso
+                if ($caso->deudor) {
+                    // Lo creamos como objeto para que coincida con la estructura de $clienteSeleccionado
+                    $clienteSeleccionado = (object) [
+                        'id' => $caso->deudor->id,
+                        'nombre_completo' => $caso->deudor->nombre_completo,
+                        'nombre' => $caso->deudor->nombre_completo, // Añadido para compatibilidad con el buscador
+                    ];
+                }
+            }
+        }
+        // ===== FIN: NUEVA LÓGICA PARA LEER EL CASO =====
+
+        if ($request->has('proceso_id')) {
+            // Carga solo las columnas necesarias
+            $proceso = ProcesoRadicado::select('id', 'demandante_id', 'radicado')->find($request->input('proceso_id'));
+        }
+
+        if ($request->has('cliente_id')) {
+            // Carga solo las columnas necesarias
+            $clienteSeleccionado = Persona::select('id', 'nombre_completo')->find($request->input('cliente_id'));
+        }
+        elseif ($proceso && $proceso->demandante_id && !$clienteSeleccionado) { // Evita sobreescribir si ya viene del caso
+            // Carga solo las columnas necesarias
+            $clienteSeleccionado = Persona::select('id', 'nombre_completo')->find($proceso->demandante_id);
         }
 
         $personas = [];
         $modalidades = ['CUOTAS','PAGO_UNICO','LITIS','CUOTA_MIXTA'];
 
         try {
-            // --- Usando Modelo Persona si existe ---
+            // Carga solo columnas necesarias con alias 'nombre' para el buscador
             if (class_exists(Persona::class)) {
                 $personas = Persona::select('id','nombre_completo as nombre')
                                         ->orderBy('nombre_completo')
-                                        ->limit(500) // Considerar si este límite sigue siendo necesario
+                                        ->limit(500) // Considera aumentar si tienes muchos clientes
                                         ->get();
             } else {
-                // Fallback a DB::table si el modelo Persona no existe
                 $personas = DB::table('personas')
                     ->select('id','nombre_completo as nombre')
                     ->orderBy('nombre_completo')
                     ->limit(500)
                     ->get();
             }
-        } catch (\Throwable $e) {}
+        } catch (\Throwable $e) {
+            Log::error("Error cargando lista de personas para crear contrato: " . $e->getMessage());
+        }
 
         return Inertia::render('Gestion/Honorarios/Contratos/Create', [
-            'clientes'    => $personas,
-            'modalidades' => $modalidades,
-            'plantilla'   => $plantilla ? $plantilla->toArray() : null, // Convertir a array para props
+            'clientes'           => $personas,
+            'modalidades'        => $modalidades,
+            'plantilla'          => $plantilla ? $plantilla->toArray() : null,
+            'proceso'            => $proceso, // Pasar el objeto ProcesoRadicado o null
+            'clienteSeleccionado' => $clienteSeleccionado, // Pasar el objeto Persona o null
+            'datosCaso'          => $datosCaso, // <--- AÑADE ESTA LÍNEA
         ]);
     }
 
     public function store(Request $request)
     {
         $rules = [
-            'cliente_id' => ['required', 'exists:personas,id'], // Asegurar existencia del cliente
+            'cliente_id' => ['required', 'exists:personas,id'],
             'modalidad'  => ['required', 'in:CUOTAS,PAGO_UNICO,LITIS,CUOTA_MIXTA'],
             'inicio'     => ['required', 'date'],
             'anticipo'   => ['nullable', 'numeric', 'min:0'],
-            'nota'       => ['nullable', 'string'],
+            'nota'       => ['nullable', 'string', 'max:5000'], // Ajusta el max si es necesario
             'contrato_origen_id' => ['nullable', 'integer', 'exists:contratos,id'],
+            'proceso_id' => ['nullable', 'integer', 'exists:proceso_radicados,id'], // Validar proceso_id
+            'caso_id' => ['nullable', 'integer', 'exists:casos,id', 'unique:contratos,caso_id'],
         ];
 
         $modalidad = $request->input('modalidad');
 
         if ($modalidad === 'CUOTAS' || $modalidad === 'PAGO_UNICO' || $modalidad === 'CUOTA_MIXTA') {
             $rules['monto_total'] = ['required', 'numeric', 'min:0'];
-            $rules['cuotas']      = ['required', 'integer', 'min:1', 'max:120'];
+            $rules['cuotas']      = ['required', 'integer', 'min:1', 'max:120']; // Max 10 años
         }
 
         if ($modalidad === 'LITIS' || $modalidad === 'CUOTA_MIXTA') {
             $rules['porcentaje_litis'] = ['required', 'numeric', 'min:0', 'max:100'];
         }
 
-        $validatedData = Validator::make($request->all(), $rules, [], ['cliente_id' => 'cliente'])->validate();
+        // Añadir mensajes personalizados si lo deseas
+        $validatedData = Validator::make($request->all(), $rules, ['caso_id.unique' => 'Este caso ya tiene un contrato asociado.'], ['cliente_id' => 'cliente'])->validate();
 
         $monto_total = round((float)($validatedData['monto_total'] ?? 0), 2);
         $anticipo    = round((float)($validatedData['anticipo'] ?? 0), 2);
 
-        if ($anticipo > $monto_total && in_array($modalidad, ['CUOTAS', 'PAGO_UNICO', 'CUOTA_MIXTA'])) {
+        if (in_array($modalidad, ['CUOTAS', 'PAGO_UNICO', 'CUOTA_MIXTA']) && $anticipo > $monto_total) {
             return back()->withErrors(['anticipo' => 'El anticipo no puede superar el monto total.'])->withInput();
         }
 
         $contrato = null;
 
-        DB::transaction(function () use (&$contrato, $validatedData, $monto_total, $anticipo, $modalidad) {
-            $contrato_origen_id = $validatedData['contrato_origen_id'] ?? null;
+        try {
+            DB::transaction(function () use (&$contrato, $validatedData, $monto_total, $anticipo, $modalidad) {
+                $contrato_origen_id = $validatedData['contrato_origen_id'] ?? null;
 
-            if ($contrato_origen_id) {
-                Contrato::where('id', $contrato_origen_id)->update(['estado' => 'REESTRUCTURADO']);
-            }
-
-            // --- Creación usando Modelo ---
-            $contrato = Contrato::create([
-                'cliente_id'         => $validatedData['cliente_id'],
-                'monto_total'        => $monto_total,
-                'anticipo'           => $anticipo,
-                'porcentaje_litis'   => $validatedData['porcentaje_litis'] ?? null,
-                'monto_base_litis'   => null,
-                'modalidad'          => $modalidad,
-                'estado'             => 'ACTIVO',
-                'inicio'             => $validatedData['inicio'],
-                'nota'               => $validatedData['nota'] ?? null,
-                'contrato_origen_id' => $contrato_origen_id,
-            ]);
-
-            if ($modalidad === 'LITIS') {
-                return;
-            }
-
-            $neto = max(0, $monto_total - $anticipo);
-            $cuotasCount = (int)($validatedData['cuotas'] ?? 1);
-
-            if ($modalidad === 'PAGO_UNICO') {
-                // Asumiendo que existe el modelo ContratoCuota
-                // Si no, mantener DB::table('contrato_cuotas')->insert(...)
-                DB::table('contrato_cuotas')->insert([
-                    'contrato_id'       => $contrato->id,
-                    'numero'            => 1,
-                    'fecha_vencimiento' => $validatedData['inicio'],
-                    'valor'             => $neto,
-                    'estado'            => $neto > 0 ? 'PENDIENTE' : 'PAGADA',
-                    'created_at'        => now(),
-                    'updated_at'        => now(),
-                ]);
-            } elseif ($modalidad === 'CUOTAS' || $modalidad === 'CUOTA_MIXTA') {
-                if ($cuotasCount < 1) $cuotasCount = 1;
-                $netoCents  = (int) round($neto * 100);
-                $baseCents  = intdiv($netoCents, $cuotasCount);
-                $restoCents = $netoCents - ($baseCents * $cuotasCount);
-
-                $cuotasData = [];
-                for ($i = 1; $i <= $cuotasCount; $i++) {
-                    $valorCents = $baseCents + ($i <= $restoCents ? 1 : 0);
-                    $valor      = $valorCents / 100.0;
-                    $fecha      = Carbon::parse($validatedData['inicio'])->addMonthsNoOverflow($i - 1)->toDateString();
-
-                    $cuotasData[] = [
-                        'contrato_id'       => $contrato->id,
-                        'numero'            => $i,
-                        'fecha_vencimiento' => $fecha,
-                        'valor'             => $valor,
-                        'estado'            => $valor > 0 ? 'PENDIENTE' : 'PAGADA',
-                        'created_at'        => now(),
-                        'updated_at'        => now(),
-                    ];
+                if ($contrato_origen_id) {
+                    Contrato::where('id', $contrato_origen_id)->update(['estado' => 'REESTRUCTURADO']);
                 }
-                // Insertar en bloque
-                DB::table('contrato_cuotas')->insert($cuotasData);
-            }
-        });
 
-        return redirect()->route('honorarios.contratos.show', $contrato->id)->with('success', 'Contrato creado.');
+                $contrato = Contrato::create([
+                    'cliente_id'         => $validatedData['cliente_id'],
+                    'monto_total'        => $monto_total,
+                    'anticipo'           => $anticipo,
+                    'porcentaje_litis'   => $validatedData['porcentaje_litis'] ?? null,
+                    'monto_base_litis'   => null, // Se establece al resolver litis
+                    'modalidad'          => $modalidad,
+                    'estado'             => 'ACTIVO',
+                    'inicio'             => $validatedData['inicio'],
+                    'nota'               => $validatedData['nota'] ?? null,
+                    'contrato_origen_id' => $contrato_origen_id,
+                    'proceso_id'         => $validatedData['proceso_id'] ?? null, // Guardar el ID del radicado
+                    'caso_id'            => $validatedData['caso_id'] ?? null,
+                ]);
+
+                // Generación de cuotas (solo si no es LITIS puro)
+                if ($modalidad !== 'LITIS') {
+                    $neto = max(0, $monto_total - $anticipo);
+                    $cuotasCount = ($modalidad === 'PAGO_UNICO') ? 1 : (int)($validatedData['cuotas'] ?? 1);
+                    if ($cuotasCount < 1) $cuotasCount = 1; // Mínimo 1 cuota
+
+                    // Si el neto es 0, solo PAGO_UNICO puede tener 1 cuota de 0, los demás no generan cuotas
+                    if ($neto == 0 && $modalidad !== 'PAGO_UNICO') {
+                       // No generar cuotas si el neto es 0 para CUOTAS o MIXTA
+                    } else {
+                        $netoCents  = (int) round($neto * 100);
+                        $baseCents  = intdiv($netoCents, $cuotasCount);
+                        $restoCents = $netoCents % $cuotasCount; // Usar módulo para el resto
+
+                        $cuotasData = [];
+                        $fechaActual = Carbon::parse($validatedData['inicio']);
+
+                        for ($i = 1; $i <= $cuotasCount; $i++) {
+                            $valorCents = $baseCents + ($i <= $restoCents ? 1 : 0);
+                            $valor      = $valorCents / 100.0;
+
+                            $cuotasData[] = [
+                                'contrato_id'       => $contrato->id,
+                                'numero'            => $i,
+                                // Clonar fechaActual antes de modificarla para la siguiente iteración
+                                'fecha_vencimiento' => $fechaActual->copy()->addMonthsNoOverflow($i - 1)->toDateString(),
+                                'valor'             => $valor,
+                                // Si el neto es 0 (solo en PAGO_UNICO), marcar como pagada
+                                'estado'            => $neto > 0 ? 'PENDIENTE' : 'PAGADA',
+                                'created_at'        => now(),
+                                'updated_at'        => now(),
+                            ];
+                        }
+                        if (!empty($cuotasData)) {
+                             DB::table('contrato_cuotas')->insert($cuotasData);
+                        }
+                    }
+                }
+            });
+
+            // --- INICIO: CORRECCIÓN ---
+            // Redirigir de vuelta al Caso SI se proveyó un caso_id.
+            // Esto fuerza al CasoController@show a recargar los datos,
+            // mostrando el botón "Ver Contrato" y el resumen financiero actualizado.
+            if ($contrato->caso_id) {
+                return redirect()->route('casos.show', $contrato->caso_id)->with('success', 'Contrato creado y asociado al caso exitosamente.');
+            }
+
+            // Si no hay caso_id, redirigir a la vista normal del contrato.
+            return redirect()->route('honorarios.contratos.show', $contrato->id)->with('success', 'Contrato creado exitosamente.');
+            // --- FIN: CORRECCIÓN ---
+
+        } catch (\Exception $e) {
+            Log::error("Error al crear contrato: " . $e->getMessage());
+            // Considera retornar un error más específico o genérico
+            return back()->with('error', 'Ocurrió un error al crear el contrato. Por favor, inténtalo de nuevo.')->withInput();
+        }
     }
 
+
+    // --- El resto de tus métodos (show, reestructurar, pagar, etc.) ---
     public function show($id)
     {
         // --- Usando Modelo con relaciones precargadas ---
         $contrato = Contrato::with([
-                'cliente:id,nombre_completo', // <-- CORREGIDO: Cargar nombre_completo
+                'cliente:id,nombre_completo', 
                 'contratoOrigen:id,estado,monto_total,modalidad',
                 'actuaciones' => function ($query) {
                     $query->with('user:id,name')->orderBy('created_at', 'desc');
-                }
+                },
+                // ===== CORRECCIÓN 1 (SHOW) =====
+                // Cargamos la relación con el proceso
+                'proceso:id,radicado',
+                'caso:id',
             ])
             ->findOrFail($id);
 
@@ -267,6 +344,7 @@ class ContratosController extends Controller
         // --- INICIO: CORRECCIÓN - Pasar objetos Eloquent directamente ---
         return Inertia::render('Gestion/Honorarios/Contratos/Show', [
             'contrato' => $contrato,
+            // 'proceso' ya está incluido dentro de $contrato->proceso
             'contratoOrigen' => $contratoOrigen,
             'cliente' => $cliente,
             'cuotas' => $cuotas,
@@ -386,7 +464,7 @@ class ContratosController extends Controller
             ]);
             // Forzar estado a Pagos Pendientes al resolver Litis si hay honorarios
              if ($honorarios > 0 && $contrato->estado !== 'PAGOS_PENDIENTES') {
-                 $contrato->update(['estado' => 'PAGOS_PENDIENTES']);
+                  $contrato->update(['estado' => 'PAGOS_PENDIENTES']);
              }
         });
 
@@ -620,14 +698,17 @@ class ContratosController extends Controller
             ->orderBy('numero')
             ->get();
 
+        // ===== INICIO: CORRECCIÓN DEL ERROR =====
+        // Dejamos de convertir a array y pasamos los objetos Eloquent/Colecciones.
         $data = [
-            'contrato' => $contrato->toArray(),
-            'cliente' => $cliente ? $cliente->toArray() : null,
-            'pagos' => $pagos->toArray(),
-            'cargosPagados' => $cargosPagados->toArray(),
+            'contrato' => $contrato, // <-- ANTES: $contrato->toArray()
+            'cliente' => $cliente, // <-- ANTES: $cliente ? $cliente->toArray() : null
+            'pagos' => $pagos, // <-- ANTES: $pagos->toArray()
+            'cargosPagados' => $cargosPagados, // <-- ANTES: $cargosPagados->toArray()
             'totalCargosValor' => $totalCargosValor,
-            'cuotasPendientes' => $cuotasPendientes->toArray()
+            'cuotasPendientes' => $cuotasPendientes // <-- ANTES: $cuotasPendientes->toArray()
         ];
+        // ===== FIN: CORRECCIÓN DEL ERROR =====
 
         if (class_exists('\\Barryvdh\\DomPDF\\Facade\\Pdf')) {
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('honorarios.liquidacion', $data); // Asegúrate que la vista exista
@@ -746,15 +827,13 @@ class ContratosController extends Controller
             DB::table('contrato_cuotas')->where('contrato_id', $contrato->id)->delete();
             DB::table('contrato_cargos')->where('contrato_id', $contrato->id)->delete();
             DB::table('contrato_pagos')->where('contrato_id', $contrato->id)->delete();
-            // --- INICIO: Eliminar actuaciones asociadas ---
-            // Nota: Usar Actuacion::class requiere importar la clase
+            // Eliminar actuaciones asociadas
             Actuacion::where('actuable_type', Contrato::class)->where('actuable_id', $contrato->id)->delete();
-            // --- FIN: Eliminar actuaciones asociadas ---
 
             // 3. Eliminar el contrato principal
             $contrato->delete();
 
-            // Opcional: ¿Qué hacer con los contratos REESTRUCTURADOS que apuntaban a este?
+            // Opcional: Desvincular contratos REESTRUCTURADOS que apuntaban a este
             // Contrato::where('contrato_origen_id', $contrato->id)->update(['contrato_origen_id' => null]);
         });
 
@@ -776,24 +855,22 @@ class ContratosController extends Controller
         $contrato->actuaciones()->create([
             'nota' => $validated['nota'],
             'fecha_actuacion' => $validated['fecha_actuacion'],
-            'user_id' => Auth::id(), // Asigna el usuario autenticado
+            'user_id' => Auth::id(),
         ]);
 
         return back()->with('success', 'Actuación registrada.');
     }
 
-    // --- INICIO: Métodos CRUD para Actuaciones ---
     /**
      * Actualiza una actuación específica.
      */
     public function updateActuacion(Request $request, Actuacion $actuacion)
     {
-        // --- INICIO: Autorización por Rol (Corregida) ---
         $user = Auth::user();
-        if (!$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
+        // Verifica si la actuación pertenece a un contrato antes de verificar el rol
+        if ($actuacion->actuable_type !== Contrato::class || !$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
              abort(403, 'No autorizado para editar esta actuación.');
         }
-        // --- FIN: Autorización por Rol (Corregida) ---
 
         $validated = $request->validate([
             'nota' => ['required', 'string', 'max:5000'],
@@ -802,7 +879,7 @@ class ContratosController extends Controller
 
         $actuacion->update($validated);
 
-        return back(303)->with('success', 'Actuación actualizada.'); // Usar 303 para PUT/DELETE con Inertia
+        return back(303)->with('success', 'Actuación actualizada.');
     }
 
     /**
@@ -810,17 +887,18 @@ class ContratosController extends Controller
      */
     public function destroyActuacion(Actuacion $actuacion)
     {
-        // --- INICIO: Autorización por Rol (Corregida) ---
         $user = Auth::user();
-        if (!$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
+         // Verifica si la actuación pertenece a un contrato antes de verificar el rol
+        if ($actuacion->actuable_type !== Contrato::class || !$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
              abort(403, 'No autorizado para eliminar esta actuación.');
         }
-        // --- FIN: Autorización por Rol (Corregida) ---
 
         $actuacion->delete();
 
-        return back(303)->with('success', 'Actuación eliminada.'); // Usar 303 para PUT/DELETE con Inertia
+        return back(303)->with('success', 'Actuación eliminada.');
     }
-    // --- FIN: Métodos CRUD para Actuaciones ---
-}
+
+} // Fin de la clase ContratosController
+
+
 

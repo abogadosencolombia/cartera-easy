@@ -20,7 +20,6 @@ use App\Http\Controllers\PersonaController;
 use App\Http\Controllers\PlantillaDocumentoController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReporteController;
-use App\Http\Controllers\ReporteCumplimientoController;
 use App\Http\Controllers\RequisitoDocumentoController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ValidacionLegalController;
@@ -82,14 +81,18 @@ Broadcast::routes(['middleware' => ['web', 'auth']]);
 
 // Ruta pública de bienvenida / login
 Route::get('/', function () {
+    // Si el usuario ya inició sesión, llévalo al dashboard
     if (auth()->check()) {
         return redirect()->route('dashboard');
     }
-    return Inertia::render('Auth/Login', [
-        'canResetPassword' => Route::has('password.request'),
-        'status' => session('status'),
+
+    // --- AQUÍ ESTÁ LA CORRECCIÓN ---
+    // Muestra la vista 'Welcome' si no está logueado
+    return Inertia::render('Welcome', [
+        'canLogin' => Route::has('login'),
+        'canRegister' => Route::has('register'),
     ]);
-});
+})->name('welcome');
 
 // Rutas de prueba y simulación (pueden ser eliminadas en producción)
 Route::get('/_push-test', function () {
@@ -155,7 +158,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // --- Reportes y Validaciones ---
     Route::get('/reportes', [ReporteController::class, 'index'])->name('reportes.index');
     Route::get('/reportes/exportar', [ReporteController::class, 'exportar'])->name('reportes.exportar');
-    Route::get('/reportes/cumplimiento', ReporteCumplimientoController::class)->name('reportes.cumplimiento');
     Route::get('/reportes/cumplimiento/exportar', [ReporteController::class, 'exportarCumplimiento'])->name('reportes.cumplimiento.exportar');
     Route::put('/validaciones-legales/{validacion}/corregir', ValidacionLegalController::class)->name('validaciones.corregir');
 
@@ -203,6 +205,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // --- RUTAS PARA GESTORES Y ABOGADOS (Y ADMINS) ---
     Route::middleware('role:admin,gestor,abogado')->group(function() {
         Route::resource('casos', CasoController::class);
+        Route::patch('/casos/{caso}/unlock', [CasoController::class, 'unlock'])->name('casos.unlock');
+
+        // --- INICIO: RUTA AÑADIDA ---
+        Route::patch('/casos/{caso}/reopen', [CasoController::class, 'reopen'])->name('casos.reopen');
+        // --- FIN: RUTA AÑADIDA ---
+
+        Route::patch('/casos/{caso}/reopen', [CasoController::class, 'reopen'])->name('casos.reopen');
+        Route::patch('/casos/{caso}/close', [CasoController::class, 'close'])->name('casos.close'); // <-- AÑADIDA ESTA LÍNEA
 
         // --- INICIO: Rutas CRUD Actuaciones para Casos ---
         Route::post('casos/{caso}/actuaciones', [CasoController::class, 'storeActuacion'])->name('casos.actuaciones.store');
@@ -210,7 +220,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('casos/actuaciones/{actuacion}', [CasoController::class, 'destroyActuacion'])->name('casos.actuaciones.destroy');
         // --- FIN: Rutas CRUD Actuaciones para Casos ---
 
+        // ================================================
+        // ===== INICIO DE LA CORRECCIÓN DE RUTAS =========
+        // ================================================
+        
+        // La ruta de exportación DEBE ir ANTES del route resource
+        // para que 'exportar-excel' no sea interpretado como un ID de persona.
+        Route::get('/personas/exportar-excel', [PersonaController::class, 'exportExcel'])->name('personas.export.excel');
+        
+        // Esta ruta (resource) debe ir DESPUÉS de cualquier ruta
+        // personalizada que comience con /personas/
         Route::resource('personas', PersonaController::class);
+        
+        // ================================================
+        // ===== FIN DE LA CORRECCIÓN DE RUTAS ============
+        // ================================================
+        
         Route::resource('cooperativas', CooperativaController::class);
         Route::resource('plantillas', PlantillaDocumentoController::class)->except(['show', 'edit', 'update']);
         Route::post('/plantillas/{plantilla}/clonar', [PlantillaDocumentoController::class, 'clonar'])->name('plantillas.clonar');
@@ -381,6 +406,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 //     return response()->json(['status' => 'notification_sent_to_user']);
 // })->name('chatbot.notify');
 
+# Export de pendientes
+
+Route::get('/revision-diaria/exportar-pendientes', [App\Http\Controllers\RevisionDiariaController::class, 'exportPendientesExcel'])
+    ->middleware(['auth', 'verified']) // Asegura que solo usuarios logueados puedan acceder
+    ->name('revision.export.pendientes');
 
 // Radicados - Rutas que necesitan estar fuera del middleware principal
 Route::model('proceso', ProcesoRadicado::class);

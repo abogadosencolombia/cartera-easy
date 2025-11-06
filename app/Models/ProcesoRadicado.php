@@ -6,10 +6,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-// --- INICIO: AÑADIR IMPORT ---
+use Illuminate\Database\Eloquent\Relations\HasOne; // <-- Añadido para la relación con Contrato
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use App\Models\RevisionDiaria; // <-- AÑADIDO
-// --- FIN: AÑADIR IMPORT ---
+use App\Models\RevisionDiaria;
+use App\Models\Contrato; // <-- Añadido para referenciar el modelo Contrato
 
 class ProcesoRadicado extends Model
 {
@@ -45,7 +45,6 @@ class ProcesoRadicado extends Model
         return $this->hasMany(DocumentoProceso::class, 'proceso_radicado_id');
     }
 
-    // --- INICIO: AÑADIR RELACIÓN DE ACTUACIONES ---
     /**
      * Get all of the radicado's actuations.
      * Se ordenan de la más reciente a la más antigua por defecto.
@@ -54,9 +53,7 @@ class ProcesoRadicado extends Model
     {
         return $this->morphMany(Actuacion::class, 'actuable')->orderBy('created_at', 'desc');
     }
-    // --- FIN: AÑADIR RELACIÓN DE ACTUACIONES ---
 
-    // --- INICIO: AÑADIR RELACIÓN DE REVISIÓN DIARIA ---
     /**
      * Obtiene todas las revisiones diarias para este radicado.
      */
@@ -64,5 +61,16 @@ class ProcesoRadicado extends Model
     {
         return $this->morphMany(RevisionDiaria::class, 'revisable');
     }
-    // --- FIN: AÑADIR RELACIÓN DE REVISIÓN DIARIA ---
+
+    // ===== NUEVA RELACIÓN AÑADIDA =====
+    /**
+     * Obtiene el contrato asociado a este radicado (si existe).
+     */
+    public function contrato(): HasOne
+    {
+        // Asume que la tabla 'contratos' tiene una columna 'proceso_id'
+        // que es la llave foránea hacia 'proceso_radicados.id'
+        return $this->hasOne(Contrato::class, 'proceso_id');
+    }
+    // ===================================
 }

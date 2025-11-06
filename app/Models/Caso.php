@@ -15,6 +15,13 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use App\Models\RevisionDiaria;
 // --- FIN: AÑADIR IMPORT REVISION DIARIA ---
 
+// --- INICIO: AÑADIDO PARA CODEUDORES ---
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+// Asumo que tu modelo Codeudor.php está en App\Models
+use App\Models\Codeudor; 
+// --- FIN: AÑADIDO PARA CODEUDORES ---
+
+
 class Caso extends Model
 {
     use HasFactory; // Line 16
@@ -22,13 +29,31 @@ class Caso extends Model
     // Line 17 is now truly empty
 
     protected $fillable = [ // Line 18
-        'cooperativa_id', 'user_id', 'deudor_id', 'codeudor1_id', 'codeudor2_id',
-        'referencia_credito', 'tipo_proceso', 'estado_proceso', 'tipo_garantia_asociada',
+        'cooperativa_id', 'user_id', 'deudor_id', 
+        
+        // --- INICIO: CAMBIO ---
+        // 'codeudor1_id', 'codeudor2_id', // <-- ELIMINADOS
+        // --- FIN: CAMBIO ---
+
+        'referencia_credito', 'radicado', // <-- 'radicado' ya estaba
+        
+        'tipo_proceso', 'estado_proceso', 'tipo_garantia_asociada',
         'fecha_apertura', 'fecha_vencimiento', 'monto_total', 'tasa_interes_corriente',
-        'tasa_moratoria', 'origen_documental', 'bloqueado', 'motivo_bloqueo',
+        
+        // --- INICIO: CAMBIO TASA ---
+        'fecha_tasa_interes', // <-- AÑADIDO
+        // 'tasa_moratoria', // <-- ELIMINADO
+        // --- FIN: CAMBIO TASA ---
+
+        'origen_documental', 'bloqueado', 'motivo_bloqueo',
         'etapa_actual', 'medio_contacto', 'ultima_actividad', 'notas_legales',
         'clonado_de_id',
         'subtipo_proceso',
+
+        // --- INICIO: CORRECCIÓN L4 (AÑADIDO) ---
+        'subproceso', // <-- AÑADIDO PARA GUARDAR EL NIVEL 4
+        // --- FIN: CORRECCIÓN L4 ---
+
         'etapa_procesal',
         'juzgado_id', 'especialidad_id',
         'estado',
@@ -39,7 +64,12 @@ class Caso extends Model
         'fecha_vencimiento' => 'date',
         'monto_total' => 'decimal:2',
         'tasa_interes_corriente' => 'decimal:2',
-        'tasa_moratoria' => 'decimal:2',
+        
+        // --- INICIO: CAMBIO TASA ---
+        // 'tasa_moratoria' => 'decimal:2', // <-- ELIMINADO
+        'fecha_tasa_interes' => 'date', // <-- AÑADIDO
+        // --- FIN: CAMBIO TASA ---
+
         'bloqueado' => 'boolean',
         'ultima_actividad' => 'datetime',
     ];
@@ -113,8 +143,21 @@ class Caso extends Model
     public function cooperativa(): BelongsTo { return $this->belongsTo(Cooperativa::class); }
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
     public function deudor(): BelongsTo { return $this->belongsTo(Persona::class, 'deudor_id'); }
-    public function codeudor1(): BelongsTo { return $this->belongsTo(Persona::class, 'codeudor1_id');}
-    public function codeudor2(): BelongsTo { return $this->belongsTo(Persona::class, 'codeudor2_id');}
+    
+    // --- INICIO: CAMBIO ---
+    // public function codeudor1(): BelongsTo { return $this->belongsTo(Persona::class, 'codeudor1_id');} // <-- ELIMINADO
+    // public function codeudor2(): BelongsTo { return $this->belongsTo(Persona::class, 'codeudor2_id');} // <-- ELIMINADO
+
+    /**
+     * Relación específica para obtener solo los codeudores
+     * de la NUEVA tabla 'codeudores'.
+     */
+    public function codeudores(): BelongsToMany
+    {
+        return $this->belongsToMany(Codeudor::class, 'caso_codeudor');
+    }
+    // --- FIN: CAMBIO ---
+    
     public function documentos(): HasMany { return $this->hasMany(DocumentoCaso::class); }
     public function bitacoras(): HasMany { return $this->hasMany(BitacoraCaso::class)->orderBy('created_at', 'desc'); }
     public function pagos(): HasMany { return $this->hasMany(PagoCaso::class); }
@@ -160,4 +203,16 @@ class Caso extends Model
         return $this->morphMany(RevisionDiaria::class, 'revisable');
     }
     // --- FIN: AÑADIR RELACIÓN DE REVISIÓN DIARIA ---
+
+    // ===== ¡ESTA ES LA RELACIÓN IMPORTANTE QUE FALTA EN TU SERVIDOR! =====
+    /**
+     * Obtiene el contrato de honorarios asociado a este caso.
+     */
+    public function contrato(): HasOne
+    {
+        // Esto asume que la llave foránea 'caso_id' está en la tabla 'contratos'
+        return $this->hasOne(Contrato::class, 'caso_id');
+    }
+    // ====================================================================
 }
+

@@ -20,17 +20,22 @@ import { ZiggyVue } from '../../vendor/tightenco/ziggy/dist/vue.m.js';
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
 createInertiaApp({
-    title: (title) => `${title} - ${appName}`,
-    resolve: (name) => resolvePageComponent(`./Pages/${name}.vue`, import.meta.glob('./Pages/**/*.vue')),
-    setup({ el, App, props, plugin }) {
-        return createApp({ render: () => h(App, props) })
-            .use(plugin)
-            .use(ZiggyVue) // ESTA ES LA FORMA CORRECTA Y FINAL
-            .component('Link', Link)
-            .component('Head', Head)
-            .mount(el);
-    },
-    progress: {
-        color: '#4B5563',
-    },
+    title: (title) => `${title} - ${appName}`,
+    
+    // --- ESTA ES LA LÍNEA ORIGINAL Y CORRECTA ---
+    // Le dice a Inertia que busque SÓLO en la carpeta ./Pages/
+    resolve: (name) => resolvePageComponent(`./Pages/${name}.vue`, import.meta.glob('./Pages/**/*.vue')),
+    // --- FIN DE LA LÍNEA ---
+
+    setup({ el, App, props, plugin }) {
+        return createApp({ render: () => h(App, props) })
+            .use(plugin)
+            .use(ZiggyVue) 
+            .component('Link', Link)
+            .component('Head', Head)
+            .mount(el);
+    },
+    progress: {
+        color: '#4B5563',
+    },
 });

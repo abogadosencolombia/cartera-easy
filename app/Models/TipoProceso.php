@@ -4,33 +4,38 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo; // <-- Importado
+use Illuminate\Database\Eloquent\Relations\HasMany;   // <-- Importado
 
 class TipoProceso extends Model
 {
     use HasFactory;
 
-    /**
-     * The table associated with the model.
-     *
-     * @var string
-     */
+    // Tu tabla de L2 (según tu modelo anterior)
     protected $table = 'tipos_proceso';
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'nombre',
         'descripcion',
+        'especialidad_juridica_id', // <-- Llave foránea a L1
     ];
 
     /**
-     * Get the subtipos for the tipo de proceso.
+     * RELACIÓN L2 -> L1
+     * Un Tipo de Proceso pertenece a una Especialidad.
      */
-    public function subtipos()
+    public function especialidad(): BelongsTo
     {
+        return $this->belongsTo(EspecialidadJuridica::class, 'especialidad_juridica_id');
+    }
+
+    /**
+     * RELACIÓN L2 -> L3
+     * Un Tipo de Proceso tiene muchos Subtipos.
+     */
+    public function subtipos(): HasMany
+    {
+        // Esta es la relación que carga el Nivel 3
         return $this->hasMany(SubtipoProceso::class, 'tipo_proceso_id');
     }
 }

@@ -10,7 +10,8 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Casts\Attribute; // --- AÑADIDO ---
+use Illuminate\Support\Facades\Log;              // --- AÑADIDO ---
 use NotificationChannels\WebPush\HasPushSubscriptions;
 
 class User extends Authenticatable
@@ -28,6 +29,7 @@ class User extends Authenticatable
         'estado_activo',
         'persona_id',
         'preferencias_notificacion',
+        'addresses', // --- AÑADIDO ---
     ];
 
     /**
@@ -55,6 +57,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'estado_activo' => 'boolean',
             'preferencias_notificacion' => 'array',
+            // No añadimos 'addresses' aquí, se maneja con el Accessor/Mutator
         ];
     }
 
@@ -136,10 +139,40 @@ class User extends Authenticatable
             }
         );
     }
-  
-  public function documents()
-  {
-      return $this->hasMany(UserDocument::class);
-  }
-  
+ 
+    public function documents()
+    {
+        return $this->hasMany(UserDocument::class);
+    }
+
+    // --- INICIO: NUEVO ACCESSOR SEGURO PARA JSON (copiado de Persona) ---
+
+    /**
+     * Decodifica de forma segura el campo 'addresses'.
+     */
+    protected function addresses(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                if (empty($value)) {
+                    return []; // Devolver un array vacío por defecto
+                }
+
+                try {
+                    // Intentar decodificar el JSON
+                    $data = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
+                    // Asegurarse de que es un array
+                    return is_array($data) ? $data : [];
+                } catch (\JsonException $e) {
+                    // Si el JSON es inválido, registrar el error y devolver array vacío
+                    Log::warning("JSON inválido en 'addresses' para User ID: {$this->id}. Valor: {$value}");
+                    return [];
+                }
+            },
+            // El 'set' codifica el array a JSON (para cuando guardas)
+            set: fn ($value) => is_array($value) ? json_encode($value) : null
+        );
+    }
+
+    // --- FIN: NUEVO ACCESSOR SEGURO PARA JSON ---
 }

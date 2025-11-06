@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Caso;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
@@ -29,9 +30,11 @@ class GestoresController extends Controller
         // 3. Construir la consulta base con Eloquent y filtro de roles
         $query = User::query()
             ->whereIn('tipo_usuario', ['admin', 'gestor', 'abogado'])
-            ->withCount('casos')
             ->select('id', 'name', 'email', 'tipo_usuario')
-            ->addSelect(DB::raw("(SELECT SUM({$recAmtCol}) FROM {$T_RECS} WHERE {$recUserFk} = users.id) as total_recovered"));
+            ->addSelect(DB::raw("(SELECT SUM({$recAmtCol}) FROM {$T_RECS} WHERE {$recUserFk} = users.id) as total_recovered"))
+            ->addSelect(DB::raw(
+                "(SELECT COUNT(*) FROM casos WHERE casos.user_id = users.id OR casos.user_id = users.id) as casos_count"
+        ));
 
         // 4. Aplicar filtro de búsqueda por nombre
         if ($request->filled('q')) {
@@ -57,24 +60,45 @@ class GestoresController extends Controller
         $rows = $query->paginate(10)->withQueryString();
 
         // 8. Cargar y transformar los datos explícitamente para el frontend
-        $finalRows = $rows->through(function ($user) {
-            $user->load('cooperativas:id,nombre');
-            
-            return [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'tipo_usuario' => $user->tipo_usuario,
-                'total_recovered' => (float) $user->total_recovered,
-                'casos_count' => $user->casos_count,
-                'cooperativas_count' => $user->cooperativas->count(),
-                // ¡AQUÍ ESTÁ LA MAGIA! Forzamos la inclusión de la lista detallada.
-                'cooperativas' => $user->cooperativas->map(fn($coop) => [
-                    'id' => $coop->id,
-                    'nombre' => $coop->nombre,
-                ]),
-            ];
-        });
+        // 8. Cargar y transformar los datos explícitamente para el frontend
+$finalRows = $rows->through(function ($user) {
+    // Cargar cooperativas (como ya estaba)
+    $user->load('cooperativas:id,nombre');
+    
+    // --- INICIO DE LÓGICA CORREGIDA ---
+    
+    // 1. Cargar TODOS los casos asignados a este usuario (sea gestor o abogado)
+    // He reemplazado 'nombre_caso' y 'radicado' con las columnas de tus screenshots:
+    $todosLosCasos = Caso::where('user_id', $user->id)
+                            // ↓↓↓↓ ESTAS SON LAS COLUMNAS REALES DE TU TABLA ↓↓↓↓
+                            ->select('id', 'referencia_credito', 'tipo_proceso') 
+                            ->get();
+    
+    // --- FIN DE LÓGICA CORREGIDA ---
+
+    return [
+        'id' => $user->id,
+        'name' => $user->name,
+        'email' => $user->email,
+        'tipo_usuario' => $user->tipo_usuario,
+        'total_recovered' => (float) $user->total_recovered,
+        'casos_count' => $user->casos_count, // Este valor viene de tu Paso 3 y está BIEN
+        'cooperativas_count' => $user->cooperativas->count(),
+        'cooperativas' => $user->cooperativas->map(fn($coop) => [
+            'id' => $coop->id,
+            'nombre' => $coop->nombre,
+        ]),
+        
+        // --- ¡AQUÍ ESTÁ LA MAGIA! ---
+        // Forzamos la inclusión de la lista detallada de casos.
+        'casos' => $todosLosCasos->map(fn($caso) => [
+            'id' => $caso->id,
+             // ↓↓↓↓ He cambiado los nombres para que tu frontend los reciba ↓↓↓↓
+            'referencia' => $caso->referencia_credito, 
+            'proceso' => $caso->tipo_proceso,
+        ]),
+    ];
+});
 
         // 9. Devolver todo a la vista de Inertia
         return Inertia::render('Admin/Gestores/Index', [
