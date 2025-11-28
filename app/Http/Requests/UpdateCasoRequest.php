@@ -7,19 +7,11 @@ use Illuminate\Validation\Rule;
 
 class UpdateCasoRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return $this->user()->can('update', $this->route('caso'));
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
@@ -29,7 +21,6 @@ class UpdateCasoRequest extends FormRequest
             'referencia_credito' => ['nullable', 'string', 'max:255'],
             'radicado' => ['nullable', 'string', 'max:255'],
             
-            // ===== INICIO: CORRECCIÓN (OPCIONAL) =====
             'especialidad_id' => ['nullable', 'integer', 'exists:especialidades_juridicas,id'],
             'tipo_proceso' => [
                 'nullable', 
@@ -42,7 +33,6 @@ class UpdateCasoRequest extends FormRequest
                     }
                 }),
             ],
-            // ===== FIN: CORRECCIÓN =====
             
             'estado_proceso' => ['required', Rule::in(['prejurídico', 'demandado', 'en ejecución', 'sentencia', 'cerrado'])],
             'tipo_garantia_asociada' => ['required', Rule::in(['codeudor', 'hipotecaria', 'prendaria', 'sin garantía'])],
@@ -50,14 +40,16 @@ class UpdateCasoRequest extends FormRequest
             'fecha_vencimiento' => ['nullable', 'date', 'after_or_equal:fecha_apertura'],
             'origen_documental' => ['required', Rule::in(['pagaré', 'libranza', 'contrato', 'otro'])],
 
-            // --- DATOS FINANCIEROS (CORREGIDOS) ---
+            // --- LINK DRIVE (YA ESTABA, PERO ES CRUCIAL MANTENERLO) ---
+            'link_drive' => ['nullable', 'url', 'max:2048'],
+
+            // --- DATOS FINANCIEROS ---
             'monto_total' => ['required', 'numeric', 'min:0'],
+            'monto_deuda_actual' => ['nullable', 'numeric', 'min:0'],
+            'monto_total_pagado' => ['nullable', 'numeric', 'min:0'],
+
             'tasa_interes_corriente' => ['required', 'numeric', 'min:0', 'max:100'],
-            
-            // ===== INICIO: CORRECCIÓN =====
-            'tasa_moratoria' => ['nullable', 'numeric', 'min:0'],
-            'fecha_tasa_interes' => ['nullable', 'date'],
-            // ===== FIN: CORRECCIÓN =====
+            'fecha_inicio_credito' => ['nullable', 'date', 'before_or_equal:today'],
 
             // --- PERSONAS INVOLUCRADAS ---
             'deudor_id' => ['required', 'exists:personas,id'],
@@ -69,8 +61,10 @@ class UpdateCasoRequest extends FormRequest
             'codeudores.*.tipo_documento' => ['nullable', 'string', 'max:10'],
             'codeudores.*.celular' => ['nullable', 'string', 'max:20'],
             'codeudores.*.correo' => ['nullable', 'email', 'max:255'], 
-            'codeudores.*.addresses' => ['nullable', 'json'],
-            'codeudores.*.social_links' => ['nullable', 'json'],
+            
+            // --- ARRAYS (CRUCIAL PARA EVITAR ERRORES DE GUARDADO) ---
+            'codeudores.*.addresses' => ['nullable', 'array'],
+            'codeudores.*.social_links' => ['nullable', 'array'],
 
             // --- LÓGICA DE CONTROL Y BLOQUEO ---
             'etapa_actual' => ['nullable', 'string', 'max:255'],
@@ -79,7 +73,6 @@ class UpdateCasoRequest extends FormRequest
             'bloqueado' => ['required', 'boolean'],
             'motivo_bloqueo' => ['nullable', 'string', 'max:1000', 'required_if:bloqueado,true'],
 
-            // ===== INICIO: CORRECCIÓN (OPCIONAL Y SEGURA) =====
             'subtipo_proceso' => [
                 'nullable',
                 'string',
@@ -92,11 +85,9 @@ class UpdateCasoRequest extends FormRequest
                     }
                 }),
             ],
-            // ===== FIN: CORRECCIÓN =====
 
-            // --- INICIO: CORRECCIÓN L4 (OPCIONAL Y SEGURA) ---
             'subproceso' => [
-                'nullable', // Permitir nulo si no aplica
+                'nullable',
                 'string',
                 'max:255',
                 Rule::exists('subprocesos', 'nombre')->where(function ($query) {
@@ -105,8 +96,8 @@ class UpdateCasoRequest extends FormRequest
                     
                     if ($tipoProcesoId) {
                         $subtipoProcesoId = \App\Models\SubtipoProceso::where('nombre', $this->input('subtipo_proceso'))
-                                                                     ->where('tipo_proceso_id', $tipoProcesoId)
-                                                                     ->value('id');
+                                                                        ->where('tipo_proceso_id', $tipoProcesoId)
+                                                                        ->value('id');
                     }
                     
                     if ($subtipoProcesoId) {
@@ -116,36 +107,27 @@ class UpdateCasoRequest extends FormRequest
                     }
                 }),
             ],
-            // --- FIN: CORRECCIÓN L4 ---
 
             'etapa_procesal' => ['nullable', 'string', Rule::exists('etapas_procesales', 'nombre')],
             'juzgado_id' => ['nullable', 'integer', 'exists:juzgados,id'],
         ];
     }
 
-    /**
-     * Prepare the data for validation.
-     */
     protected function prepareForValidation(): void
     {
         $caso = $this->route('caso');
 
-        // Normaliza boolean; si no viene, usa el valor actual
         $bloqueado = $this->boolean('bloqueado');
         if (is_null($this->input('bloqueado'))) {
             $bloqueado = (bool) ($caso->bloqueado ?? false);
         }
 
         if (($this->user()->tipo_usuario ?? null) !== 'admin') {
-            // No-admin: no pueden cambiar bloqueo ni motivo
-            // --- INICIO: LÍNEA CORREGIDA ---
             $this->replace(array_merge($this->all(), [
-            // --- FIN: LÍNEA CORREGIDA ---
                 'bloqueado' => (bool) $caso->bloqueado,
                 'motivo_bloqueo' => $caso->motivo_bloqueo,
             ]));
         } else {
-            // Admin: limpia motivo si desbloquea
             $this->merge([
                 'bloqueado' => $bloqueado,
                 'motivo_bloqueo' => $bloqueado ? $this->input('motivo_bloqueo') : null,
@@ -153,4 +135,3 @@ class UpdateCasoRequest extends FormRequest
         }
     }
 }
-

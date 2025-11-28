@@ -8,6 +8,12 @@ Alpine.start();
 // 2. Cargar Bootstrap (Axios, Echo)
 import './bootstrap';
 
+// --- INICIO DE LA SOLUCIÓN "ANTI-FANTASMA" ---
+// ¡HEMOS QUITADO EL INTERCEPTOR DE AXIOS QUE CAUSABA EL RELOAD!
+// Ya no forzaremos la recarga de la página.
+// --- FIN DE LA SOLUCIÓN "ANTI-FANTASMA" ---
+
+
 // 3. Cargar el CSS principal
 import '../css/app.css';
 
@@ -20,22 +26,22 @@ import { ZiggyVue } from '../../vendor/tightenco/ziggy/dist/vue.m.js';
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
 createInertiaApp({
-    title: (title) => `${title} - ${appName}`,
+    title: (title) => `${title} - ${appName}`,
     
     // --- ESTA ES LA LÍNEA ORIGINAL Y CORRECTA ---
     // Le dice a Inertia que busque SÓLO en la carpeta ./Pages/
-    resolve: (name) => resolvePageComponent(`./Pages/${name}.vue`, import.meta.glob('./Pages/**/*.vue')),
+    resolve: (name) => resolvePageComponent(`./Pages/${name}.vue`, import.meta.glob('./Pages/**/*.vue')),
     // --- FIN DE LA LÍNEA ---
 
-    setup({ el, App, props, plugin }) {
-        return createApp({ render: () => h(App, props) })
-            .use(plugin)
-            .use(ZiggyVue) 
-            .component('Link', Link)
-            .component('Head', Head)
-            .mount(el);
-    },
-    progress: {
-        color: '#4B5563',
-    },
+    setup({ el, App, props, plugin }) {
+        return createApp({ render: () => h(App, props) })
+            .use(plugin)
+            .use(ZiggyVue) 
+            .component('Link', Link)
+            .component('Head', Head)
+            .mount(el);
+    },
+    progress: {
+        color: '#4B5563',
+    },
 });

@@ -9,20 +9,19 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import { PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 import { reactive } from 'vue';
 
-// Añadimos las nuevas props que envía el PersonaController@edit
 const props = defineProps({
   persona: { type: Object, required: true },
   allCooperativas: { type: Array, default: () => [] },
   allAbogados: { type: Array, default: () => [] },
 });
 
-// Cargamos los datos de la persona Y las nuevas relaciones
 const form = useForm({
   _method: 'PATCH',
   nombre_completo: props.persona.nombre_completo,
   tipo_documento: props.persona.tipo_documento,
   numero_documento: props.persona.numero_documento,
   fecha_expedicion: props.persona.fecha_expedicion,
+  fecha_nacimiento: props.persona.fecha_nacimiento, // <--- NUEVO CAMPO
   telefono_fijo: props.persona.telefono_fijo,
   celular_1: props.persona.celular_1,
   celular_2: props.persona.celular_2,
@@ -31,17 +30,12 @@ const form = useForm({
   empresa: props.persona.empresa,
   cargo: props.persona.cargo,
   observaciones: props.persona.observaciones,
-  // Aseguramos que los arrays existan y sean copias para evitar mutar props
   addresses: Array.isArray(props.persona.addresses) ? props.persona.addresses.map(a => ({ ...a })) : [],
   social_links: Array.isArray(props.persona.social_links) ? props.persona.social_links.map(l => ({ ...l })) : [],
-
-  // Mapeamos las relaciones cargadas (que son arrays de objetos)
-  // a un simple array de IDs. Esto pre-seleccionará los checkboxes.
   cooperativas_ids: props.persona.cooperativas ? props.persona.cooperativas.map(c => c.id) : [],
   abogados_ids: props.persona.abogados ? props.persona.abogados.map(a => a.id) : [],
 });
 
-// --- Lógica para Direcciones ---
 const addAddressRow = () => {
   form.addresses.push(reactive({ label: 'Casa', address: '', city: '' }));
 };
@@ -49,7 +43,6 @@ const removeAddressRow = (idx) => {
   form.addresses.splice(idx, 1);
 };
 
-// --- Lógica para Redes Sociales ---
 const addLinkRow = () => {
   form.social_links.push(reactive({ label: '', url: '' }));
 };
@@ -102,11 +95,19 @@ const submit = () => form.post(route('personas.update', props.persona.id));
                     <TextInput v-model="form.numero_documento" id="numero_documento" type="text" class="mt-1 block w-full" required />
                     <InputError :message="form.errors.numero_documento" class="mt-2" />
                   </div>
-                   <div>
+                  
+                  <!-- FECHAS (Expedición y Nacimiento) -->
+                  <div>
                     <InputLabel for="fecha_expedicion" value="Fecha de Expedición (Opcional)" />
                     <TextInput v-model="form.fecha_expedicion" id="fecha_expedicion" type="date" class="mt-1 block w-full" />
                     <InputError :message="form.errors.fecha_expedicion" class="mt-2" />
                   </div>
+                  <div>
+                    <InputLabel for="fecha_nacimiento" value="Fecha de Nacimiento (Opcional)" />
+                    <TextInput v-model="form.fecha_nacimiento" id="fecha_nacimiento" type="date" class="mt-1 block w-full" />
+                    <InputError :message="form.errors.fecha_nacimiento" class="mt-2" />
+                  </div>
+
                 </div>
               </section>
 
@@ -139,7 +140,6 @@ const submit = () => form.post(route('personas.update', props.persona.id));
                 </div>
               </section>
               
-              <!-- SECCIÓN DE DIRECCIONES DINÁMICAS -->
               <section>
                 <div class="mb-2 flex items-center justify-between">
                   <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Direcciones</h3>
@@ -178,7 +178,6 @@ const submit = () => form.post(route('personas.update', props.persona.id));
                  </datalist>
               </section>
 
-              <!-- SECCIÓN DE INFORMACIÓN ADICIONAL -->
               <section>
                   <h3 class="mb-4 text-lg font-medium text-gray-900 dark:text-gray-100">Información Adicional</h3>
                    <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -197,12 +196,10 @@ const submit = () => form.post(route('personas.update', props.persona.id));
                    </div>
               </section>
 
-              <!-- v-v- SECCIÓN NUEVA: COOPERATIVAS v-v- -->
               <section>
                 <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Asignar Cooperativas</h3>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Selecciona las cooperativas a las que pertenece esta persona.</p>
                 
-                <!-- *** CORREGIDO AQUÍ: 'v->if' a 'v-if' *** -->
                 <div v-if="!props.allCooperativas.length" class="rounded-md border border-dashed border-gray-300 dark:border-gray-600 p-4 text-center text-sm text-gray-500 dark:text-gray-400">
                   No hay cooperativas para asignar.
                 </div>
@@ -220,15 +217,11 @@ const submit = () => form.post(route('personas.update', props.persona.id));
                 </div>
                 <InputError :message="form.errors.cooperativas_ids" class="mt-2" />
               </section>
-              <!-- ^-^- FIN SECCIÓN COOPERATIVAS -^-^ -->
 
-
-              <!-- v-v- SECCIÓN NUEVA: ABOGADOS v-v- -->
               <section>
                 <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Asignar Abogados / Gestores</h3>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Selecciona los abogados o gestores que manejarán esta persona.</p>
                 
-                <!-- *** CORREGIDO AQUÍ: 'v->if' a 'v-if' *** -->
                 <div v-if="!props.allAbogados.length" class="rounded-md border border-dashed border-gray-300 dark:border-gray-600 p-4 text-center text-sm text-gray-500 dark:text-gray-400">
                   No hay abogados o gestores para asignar.
                 </div>
@@ -246,9 +239,7 @@ const submit = () => form.post(route('personas.update', props.persona.id));
                 </div>
                 <InputError :message="form.errors.abogados_ids" class="mt-2" />
               </section>
-              <!-- ^-^- FIN SECCIÓN ABOGADOS -^-^ -->
 
-              <!-- SECCIÓN DE REDES SOCIALES -->
               <section>
                 <div class="mb-2 flex items-center justify-between">
                   <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Redes Sociales</h3>
@@ -256,9 +247,6 @@ const submit = () => form.post(route('personas.update', props.persona.id));
                     <PlusIcon class="h-4 w-4" /> Agregar enlace
                   </button>
                 </div>
-                <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">
-                  Añade tantos enlaces como necesites (Facebook, Instagram, LinkedIn, etc.).
-                </p>
                 <div v-if="!form.social_links.length" class="rounded-md border border-dashed border-gray-300 p-4 text-center text-sm text-gray-500 dark:border-gray-600">
                   No hay enlaces todavía.
                 </div>
@@ -294,4 +282,3 @@ const submit = () => form.post(route('personas.update', props.persona.id));
     </div>
   </AuthenticatedLayout>
 </template>
-

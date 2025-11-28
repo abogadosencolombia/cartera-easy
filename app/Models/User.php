@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Casts\Attribute; // --- AÑADIDO ---
-use Illuminate\Support\Facades\Log;              // --- AÑADIDO ---
+use Illuminate\Support\Facades\Log;          // --- AÑADIDO ---
 use NotificationChannels\WebPush\HasPushSubscriptions;
 
 class User extends Authenticatable
@@ -173,6 +173,26 @@ class User extends Authenticatable
             set: fn ($value) => is_array($value) ? json_encode($value) : null
         );
     }
-
+    
     // --- FIN: NUEVO ACCESSOR SEGURO PARA JSON ---
+
+    // ===== INICIO DE LA MODIFICACIÓN (MÓDULO DE TAREAS) =====
+
+    /**
+     * Tareas que este usuario debe realizar.
+     */
+    public function tareasAsignadas(): HasMany
+    {
+        return $this->hasMany(Tarea::class, 'user_id');
+    }
+
+    /**
+     * Tareas que este usuario (como admin) ha creado.
+     */
+    public function tareasCreadas(): HasMany
+    {
+        return $this->hasMany(Tarea::class, 'admin_id');
+    }
+    
+    // ===== FIN DE LA MODIFICACIÓN =====
 }

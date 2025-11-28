@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PlantillaDocumento;
 use App\Models\Cooperativa;
-use App\Models\TipoProceso; // <-- 1. IMPORTAR EL MODELO
+use App\Models\TipoProceso;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
@@ -31,7 +31,7 @@ class PlantillaDocumentoController extends Controller
             $query->whereIn('cooperativa_id', $cooperativaIds);
         }
 
-        // --- LÓGICA DE FILTRADO AÑADIDA ---
+        // --- LÓGICA DE FILTRADO ---
         $query->when($request->input('tipo'), function ($q, $tipo) {
             $q->where('tipo', $tipo);
         });
@@ -39,18 +39,15 @@ class PlantillaDocumentoController extends Controller
         $query->when($request->filled('activa'), function ($q) use ($request) {
             $q->where('activa', $request->input('activa'));
         });
-        // --- FIN DE LA LÓGICA DE FILTRADO ---
+        
+        // Ordenamos por nombre para mejor visualización
+        $query->orderBy('nombre');
 
         return Inertia::render('Plantillas/Index', [
             'plantillas' => $query->get(),
             'cooperativas' => Cooperativa::all(['id', 'nombre']),
-            
-            // --- 2. CAMBIO AQUÍ ---
-            // Carga dinámica de los tipos de proceso
             'tipos_proceso' => TipoProceso::orderBy('nombre')->pluck('nombre')->all(),
-            // --- FIN DEL CAMBIO ---
-
-            'filtros' => $request->only(['tipo', 'activa']), // Pasamos los filtros a la vista
+            'filtros' => $request->only(['tipo', 'activa']),
             'can' => [
                 'create_plantillas' => $user->can('create', PlantillaDocumento::class),
             ]
@@ -60,13 +57,15 @@ class PlantillaDocumentoController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', PlantillaDocumento::class);
+        
         $validated = $request->validate([
             'cooperativa_id' => ['nullable', 'exists:cooperativas,id'],
             'nombre' => ['required', 'string', 'max:255'],
             'tipo' => ['required', Rule::in(['demanda', 'carta', 'medida cautelar', 'notificación', 'otros'])],
             'version' => ['nullable', 'string', 'max:50'],
             'aplica_a' => ['nullable', 'array'],
-            'archivo' => ['required', 'file', 'mimes:docx', 'max:5120'],
+            // AUMENTADO: Permitimos hasta 20MB (20480 KB)
+            'archivo' => ['required', 'file', 'mimes:docx', 'max:20480'], 
         ]);
 
         $path = $request->file('archivo')->store('plantillas', 'local');
@@ -76,12 +75,7 @@ class PlantillaDocumentoController extends Controller
             'nombre' => $validated['nombre'],
             'tipo' => $validated['tipo'],
             'version' => $validated['version'] ?? '1.0',
-            
-            // --- 3. CAMBIO AQUÍ ---
-            // Guardar NULL si el array 'aplica_a' está vacío
             'aplica_a' => !empty($validated['aplica_a']) ? $validated['aplica_a'] : null,
-            // --- FIN DEL CAMBIO ---
-
             'archivo' => $path,
         ]);
 

@@ -23,6 +23,7 @@ class DashboardController extends Controller
     public function index(Request $request): Response
     {
         $user = Auth::user();
+        $props = []; // Inicializa props
 
         try {
             if ($user->tipo_usuario === 'cliente' && $user->persona_id) {
@@ -32,7 +33,9 @@ class DashboardController extends Controller
             }
         } catch (\Exception $e) {
             report($e);
-             return Inertia::render('Dashboard/Index', [
+            
+            // Este bloque 'catch' ahora enviará todas las props que Vue espera
+            return Inertia::render('Dashboard/Index', [
                 'kpis' => null,
                 'chartData' => null,
                 'ranking' => [],
@@ -43,6 +46,8 @@ class DashboardController extends Controller
             ]);
         }
 
+        // Asegurarse de que serverError no se envíe si todo fue bien
+        $props['serverError'] = null;
         return Inertia::render('Dashboard/Index', $props);
     }
 
@@ -94,6 +99,11 @@ class DashboardController extends Controller
         ];
     }
 
+    /**
+     * Prepara los datos para el dashboard de Clientes.
+     * * ¡CORREGIDO! Esta función ahora consulta la tabla pivote 'caso_codeudor'
+     * para encontrar los casos del cliente.
+     */
     private function getClientDashboardData(User $user): array
     {
         $cfg = config('cartera', []);
@@ -101,13 +111,26 @@ class DashboardController extends Controller
         $Col_MONTO_PAGO = $this->pickColumn($T_PAGOS, $cfg['recovery_amount_candidates'] ?? [], 'monto_pagado');
         $Fk_CASO_EN_PAGO = $this->pickColumn($T_PAGOS, $cfg['recovery_case_fk_candidates'] ?? [], 'caso_id');
 
-        $casosQuery = Caso::query()->where(fn ($q) => 
-            $q->where('deudor_id', $user->persona_id)
-              ->orWhere('codeudor1_id', $user->persona_id)
-              ->orWhere('codeudor2_id', $user->persona_id)
-        );
+        // === INICIO DE LA CORRECCIÓN ===
+        
+        // 1. Obtener los IDs de los casos donde el usuario es un CODEUDOR
+        //    usando la tabla pivote 'caso_codeudor'.
+        $casosComoCodeudorIds = DB::table('caso_codeudor')
+                                  ->where('codeudor_id', $user->persona_id)
+                                  ->pluck('caso_id');
 
-        // --- CAMBIO AQUÍ TAMBIÉN ---
+        // 2. Crear la consulta principal
+        // --- AQUÍ ESTÁ LA CORRECCIÓN DE SINTAXIS ---
+        // Se cambió `fn ($q) use (...) =>` por `function ($q) use (...) { ... }`
+        $casosQuery = Caso::query()->where(function ($q) use ($user, $casosComoCodeudorIds) {
+            // Condición 1: El usuario es el DEUDOR principal en la tabla 'casos'
+            $q->where('deudor_id', $user->persona_id)
+            // Condición 2: O el ID del caso está en la lista que obtuvimos de la tabla pivote
+              ->orWhereIn('id', $casosComoCodeudorIds);
+        });
+        
+        // === FIN DE LA CORRECCIÓN ===
+
         // Se considera activo cualquier caso que no esté 'cerrado' para el cliente.
         $casosActivosQuery = (clone $casosQuery)->where('estado_proceso', '!=', 'cerrado');
         $casosActivosIds = (clone $casosActivosQuery)->pluck('id');
@@ -115,12 +138,19 @@ class DashboardController extends Controller
         
         $totalPagado = $casosActivosIds->isEmpty() ? 0 : DB::table($T_PAGOS)->whereIn($Fk_CASO_EN_PAGO, $casosActivosIds)->sum($Col_MONTO_PAGO);
         
+        // Devuelve todas las props que Index.vue espera
         return [
             'kpis' => [
                 'saldo_total_pendiente' => $montoTotalDeuda - $totalPagado,
                 'casos_activos' => $casosActivosIds->count(),
             ],
             'userRole' => 'cliente',
+            
+            // Props añadidas para consistencia
+            'chartData'    => null, 
+            'ranking'      => [],
+            'cooperativas' => [],
+            'filters'      => null,
         ];
     }
 
@@ -130,9 +160,7 @@ class DashboardController extends Controller
             ->whereBetween('fecha_apertura', [$period['start'], $period['end']])
             ->when($cooperativaId, fn($q) => $q->where('cooperativa_id', $cooperativaId));
         
-        // --- ¡LA CORRECCIÓN PRINCIPAL ESTÁ AQUÍ! ---
         // Ahora, "casos activos" incluye CUALQUIER estado que NO SEA 'cerrado'.
-        // Si tienes otros estados de finalización como 'finalizado' o 'archivado', añádelos aquí.
         $casosActivosQuery = (clone $baseQuery)->whereNotIn('estado_proceso', ['cerrado']);
         
         $casosActivosIds = $casosActivosQuery->pluck('id');
@@ -149,6 +177,9 @@ class DashboardController extends Controller
 
         $montoTotalDeudas = (clone $casosActivosQuery)->sum('monto_total');
         $totalPagado = DB::table($tablaPagos)->whereIn($fkCasoEnPago, $casosActivosIds)->sum($colMontoPago);
+        
+        // --- CORRECCIÓN DE LA ERRATA AQUÍ ---
+        // Se eliminó la 'D' mayúscula que causaba el error de sintaxis.
         $tasaRecuperacion = ($montoTotalDeudas > 0) ? round(($totalPagado / $montoTotalDeudas) * 100, 1) : 0;
 
         return [
@@ -221,4 +252,3 @@ class DashboardController extends Controller
         return $candidates[0] ?? $fallback ?? 'id';
     }
 }
-

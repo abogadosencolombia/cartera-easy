@@ -77,12 +77,20 @@ const getInitials = (name) => {
     return `${names[0][0]}`.toUpperCase();
 };
 
+// --- HELPER PARA LISTAS (NUEVO) ---
+// Esta función toma un array de objetos (como especialidades) y devuelve sus nombres separados por comas
+const formatList = (items) => {
+    if (Array.isArray(items) && items.length > 0) {
+        return items.map(item => item.nombre).join(', ');
+    }
+    return 'Ninguna';
+};
+
 // --- PROPIEDADES COMPUTADAS PARA URLS ---
 const professionalCardUrl = computed(() => {
     return props.user.tarjeta_profesional_url ? `/storage/${props.user.tarjeta_profesional_url}` : null;
 });
 
-// Función para generar la URL de un documento general
 const getDocumentUrl = (path) => {
     return path ? `/storage/${path}` : null;
 };
@@ -145,7 +153,6 @@ const getDocumentUrl = (path) => {
                             <h3 class="text-lg font-medium text-gray-900 dark:text-white">Información General</h3>
                             <dl class="mt-4 divide-y divide-gray-200 dark:divide-gray-700">
                                 
-                                <!-- --- INICIO: SECCIÓN DE DIRECCIONES MODIFICADA --- -->
                                 <div class="py-4 grid grid-cols-3 gap-4">
                                     <dt class="text-sm font-medium text-gray-500">Direcciones</dt>
                                     <dd class="text-sm text-gray-900 dark:text-gray-100 col-span-2">
@@ -158,10 +165,20 @@ const getDocumentUrl = (path) => {
                                         <span v-else class="text-gray-500 dark:text-gray-400">No especificadas</span>
                                     </dd>
                                 </div>
-                                <!-- --- FIN: SECCIÓN DE DIRECCIONES MODIFICADA --- -->
 
-                                <div class="py-4 grid grid-cols-3 gap-4"><dt class="text-sm font-medium text-gray-500">Cooperativas</dt><dd class="text-sm text-gray-900 dark:text-gray-100 col-span-2">{{ user.cooperativas_display || 'Ninguna' }}</dd></div>
-                                <div class="py-4 grid grid-cols-3 gap-4"><dt class="text-sm font-medium text-gray-500">Especialidades</dt><dd class="text-sm text-gray-900 dark:text-gray-100 col-span-2">{{ user.especialidades_display || 'Ninguna' }}</dd></div>
+                                <!-- AQUÍ ESTÁ LA CORRECCIÓN: Usamos formatList() -->
+                                <div class="py-4 grid grid-cols-3 gap-4">
+                                    <dt class="text-sm font-medium text-gray-500">Cooperativas</dt>
+                                    <dd class="text-sm text-gray-900 dark:text-gray-100 col-span-2">
+                                        {{ formatList(user.cooperativas) }}
+                                    </dd>
+                                </div>
+                                <div class="py-4 grid grid-cols-3 gap-4">
+                                    <dt class="text-sm font-medium text-gray-500">Especialidades</dt>
+                                    <dd class="text-sm text-gray-900 dark:text-gray-100 col-span-2">
+                                        {{ formatList(user.especialidades) }}
+                                    </dd>
+                                </div>
                             </dl>
                         </div>
 

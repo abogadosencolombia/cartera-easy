@@ -5,26 +5,25 @@ namespace App\Http\Controllers;
 use App\Models\Caso;
 use App\Models\Cooperativa;
 use App\Models\Persona;
-// --- INICIO: AÑADIDOS ---
-use App\Models\Codeudor; // Asumo que está en App\Models
-// --- FIN: AÑADIDOS ---
+use App\Models\Codeudor;
 use App\Models\User;
 use App\Models\PlantillaDocumento;
-// use App\Models\TipoProceso; // <-- Comentado, ya no se usa directamente aquí
-use App\Models\EspecialidadJuridica; // <-- AÑADIDO
+use App\Models\EspecialidadJuridica;
+use App\Models\TipoProceso;
+use App\Models\RequisitoDocumento;
+use App\Models\AuditoriaEvento;
 use App\Http\Requests\StoreCasoRequest;
 use App\Http\Requests\UpdateCasoRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB; // <--- ASEGÚRATE QUE ESTÉ IMPORTADO
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-
-// --- INICIO: Añadidos para Actuaciones ---
 use App\Models\Actuacion;
-// --- FIN: Añadidos para Actuaciones ---
+use App\Models\Contrato; 
+use Carbon\Carbon;
 
 class CasoController extends Controller
 {
@@ -37,61 +36,62 @@ class CasoController extends Controller
 
         $query = Caso::with(['cooperativa', 'deudor', 'user']);
 
-        // Visibilidad por rol
+        // --- 1. Filtros por Rol de Usuario ---
         if ($user->tipo_usuario === 'admin') {
             // Admin ve todo
         } elseif (in_array($user->tipo_usuario, ['gestor', 'abogado'])) {
-            $cooperativaIds = $user->cooperativas->pluck('id');
-            $query->whereIn('cooperativa_id', $cooperativaIds);
+             if (method_exists($user, 'cooperativas')) {
+                $cooperativaIds = $user->cooperativas->pluck('id');
+                $query->whereIn('cooperativa_id', $cooperativaIds);
+             }
         } elseif ($user->tipo_usuario === 'cli') {
             $query->where(function ($q) use ($user) {
                 $q->where('deudor_id', $user->persona_id);
-                // --- INICIO: CAMBIO ---
-                // Las búsquedas 'codeudor1_id' y 'codeudor2_id' se eliminan
-                // ya que los codeudores ahora están en una tabla separada
-                // y no están vinculados directamente a un 'user' tipo 'cli'.
-                // --- FIN: CAMBIO ---
             });
         }
 
-        // Búsqueda unificada
+        // --- 2. Nuevo Filtro por Abogado/Gestor (Seleccionado en el Frontend) ---
+        $query->when($request->input('abogado_id'), function ($q, $abogadoId) {
+            $q->where('user_id', $abogadoId);
+        });
+
+        // --- 3. Filtro de Búsqueda General ---
         $query->when($request->input('search'), function ($q, $search) {
             $q->where(function ($subq) use ($search) {
                 $subq->where('tipo_proceso', 'ilike', "%{$search}%")
                     ->orWhere('etapa_actual', 'ilike', "%{$search}%")
-                    ->orWhere('referencia_credito', 'ilike', "%{$search}%") // Nro. Proceso en UI (CORREGIDO)
-                    
-                    // --- INICIO: CAMBIO (BUSCADOR MEJORADO) ---
+                    ->orWhere('referencia_credito', 'ilike', "%{$search}%")
                     ->orWhere('radicado', 'ilike', "%{$search}%")
-                    ->orWhere('estado_proceso', 'ilike', "%{$search}%") // Buscar por estado
-                    ->orWhere('subtipo_proceso', 'ilike', "%{$search}%") // Buscar por proceso (subtipo)
-                    // --- FIN: CAMBIO (BUSCADOR MEJORADO) ---
-
                     ->orWhereHas('deudor', function ($deudorQuery) use ($search) {
                         $deudorQuery->where('nombre_completo', 'ilike', "%{$search}%")
                                     ->orWhere('numero_documento', 'ilike', "%{$search}%");
-                    })
-                    ->orWhereHas('cooperativa', function ($coopQuery) use ($search) {
-                        $coopQuery->where('nombre', 'ilike', "%{$search}%"); // CORREGIDO
-                    })
-                    ->orWhereHas('user', function ($userQuery) use ($search) {
-                        $userQuery->where('name', 'ilike', "%{$search}%"); // CORREGIDO
-                    })
-                    // --- INICIO: CAMBIO (BUSCADOR MEJORADO) ---
-                    ->orWhereHas('juzgado', function ($juzgadoQuery) use ($search) {
-                        $juzgadoQuery->where('nombre', 'ilike', "%{$search}%"); // Buscar por nombre de juzgado
                     });
-                    // --- FIN: CAMBIO (BUSCADOR MEJORADO) ---
             });
         });
 
         $casos = $query->latest()->paginate(20)->withQueryString();
 
+        // --- 4. Obtener lista de Abogados para el Select ---
+        $abogados = [];
+        // Solo mostramos la lista si el usuario tiene permiso (admin, gestor, abogado)
+        if (in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
+            $abogados = User::whereIn('tipo_usuario', ['abogado', 'gestor'])
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get();
+        }
+
         return Inertia::render('Casos/Index', [
-            'casos'   => $casos,
-            'filters' => $request->only(['search']),
-            'can'     => ['delete_cases' => $user->can('delete', Caso::class)],
+            'casos'    => $casos,
+            'abogados' => $abogados, // Enviamos la lista a la vista
+            'filters'  => $request->only(['search', 'abogado_id']),
+            'can'      => ['delete_cases' => true],
         ]);
+    }
+
+    public function export(Request $request)
+    {
+        return back(); 
     }
 
     public function create(): Response
@@ -103,30 +103,16 @@ class CasoController extends Controller
             ? Cooperativa::select('id', 'nombre')->get()
             : $user->cooperativas()->select('id', 'nombre')->get();
 
-        $abogadosYGestores = User::whereIn('tipo_usuario', ['abogado', 'gestor'])
-            ->select('id', 'name')
-            ->get();
-
+        $abogadosYGestores = User::whereIn('tipo_usuario', ['abogado', 'gestor'])->select('id', 'name')->get();
         $personas = Persona::select('id', 'nombre_completo', 'numero_documento')->get();
 
         return Inertia::render('Casos/Create', [
             'cooperativas'        => $cooperativas,
             'abogadosYGestores'   => $abogadosYGestores,
             'personas'            => $personas,
-            
-            // =================================================================
-            // ===== ¡CAMBIO IMPORTANTE AQUÍ! (Carga de 4 NIVELES) =========
-            // =================================================================
-            // 'estructuraProcesal'  => EspecialidadJuridica::with('tiposProceso.subtipos')->orderBy('nombre')->get(), // <-- LÍNEA ANTIGUA (3 NIVELES)
             'estructuraProcesal'  => EspecialidadJuridica::with([
-                                        'tiposProceso' => fn($q) => $q->orderBy('nombre'),
-                                        'tiposProceso.subtipos' => fn($q) => $q->orderBy('nombre'),
-                                        'tiposProceso.subtipos.subprocesos' => fn($q) => $q->orderBy('nombre') // <-- LÍNEA NUEVA (4 NIVELES)
-                                    ])->orderBy('nombre')->get(),
-            // =================================================================
-            // =================== FIN DEL CAMBIO ==============================
-            // =================================================================
-
+                                                'tiposProceso.subtipos.subprocesos' => fn($q) => $q->orderBy('nombre')
+                                            ])->orderBy('nombre')->get(),
             'etapas_procesales'   => DB::table('etapas_procesales')->orderBy('nombre')->pluck('nombre')->all(),
         ]);
     }
@@ -134,136 +120,138 @@ class CasoController extends Controller
     public function store(StoreCasoRequest $request): RedirectResponse
     {
         $this->authorize('create', Caso::class);
-
-        // --- INICIO: CAMBIO (Lógica de Codeudores) ---
         $validated = $request->validated();
         
-        // 1. Separar los datos de los codeudores
+        if ($request->has('link_drive')) {
+            $validated['link_drive'] = $request->input('link_drive');
+        }
+
         $datosCodeudores = $validated['codeudores'] ?? [];
         unset($validated['codeudores']);
 
         $caso = null;
         DB::transaction(function () use ($validated, $datosCodeudores, $request, &$caso) {
-            
-            // 2. Crear el Caso
-            // $validated ahora incluye 'subproceso' (L4)
             $caso = Caso::create($validated);
-
-            // 3. Sincronizar los codeudores
             $this->sincronizarCodeudores($caso, $datosCodeudores);
-
-            // 4. Crear bitácora (lógica original)
+            
             $caso->bitacoras()->create([
                 'user_id'   => auth()->id(),
                 'accion'    => $request->clonado_de_id ? 'Clonación de Caso' : 'Creación del Caso',
-                'comentario'=> $request->clonado_de_id
-                    ? 'El caso fue creado como un clon del caso #' . $request->clonado_de_id
-                    : 'El caso ha sido registrado en el sistema.',
+                'comentario'=> 'Caso registrado en el sistema.',
             ]);
-            
-        });
-        // --- FIN: CAMBIO ---
 
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'CREAR_CASO',
+                'descripcion_breve' => "Se ha creado el caso #{$caso->id} para el deudor {$caso->deudor?->nombre_completo}",
+                'criticidad' => 'media',
+                'direccion_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+        });
         return to_route('casos.show', $caso->id)->with('success', '¡Caso registrado exitosamente!');
     }
 
-    // ===== ESTE ES EL MÉTODO CRÍTICO QUE CORREGIMOS =====
     public function show(Caso $caso): Response
     {
         $this->authorize('view', $caso);
 
         $caso->load([
-            // --- INICIO: CORRECCIÓN (POLIMORFISMO) ---
-            // Cargamos el ID y nombre del deudor (que es una Persona)
             'deudor:id,nombre_completo',
-            // Cargamos los codeudores (solo necesitamos sus datos base)
             'codeudores', 
-            // --- FIN: CORRECCIÓN ---
             'cooperativa',
             'user',
-            // --- INICIO: CORRECCIÓN (POLIMORFISMO) ---
-            // Cargamos ambas relaciones polimórficas en los documentos.
-            // La vista (Vue) decidirá cuál mostrar.
-            'documentos' => function ($query) {
-                $query->with(['persona:id,nombre_completo', 'codeudor:id,nombre_completo']);
-            },
-            // --- FIN: CORRECCIÓN ---
+            'documentos.persona:id,nombre_completo',
+            'documentosGenerados.plantilla',
             'bitacoras.user',
-            'documentosGenerados.usuario',
-            
-            // 'pagos.usuario', // <-- ¡ELIMINADO!
-            
-            'validacionesLegales.requisito',
-            'juzgado',
-            'especialidad',
             'actuaciones' => function ($query) {
-                $query->with('user:id,name')->orderBy('fecha_actuacion', 'desc')->orderBy('created_at', 'desc');
+                $query->with('user:id,name')->orderBy('fecha_actuacion', 'desc');
             },
-            
-            // --- INICIO: CORRECCIÓN ---
-            // Se debe seleccionar la clave foránea (caso_id) para que Eloquent
-            // pueda "unir" la relación después de cargarla.
-            'contrato:id,monto_total,caso_id' 
-            // --- FIN: CORRECCIÓN ---
+            'juzgado:id,nombre', 
+            'especialidad:id,nombre',
         ]);
 
-        // ===== INICIO: NUEVA LÓGICA DE RESUMEN FINANCIERO =====
-        $resumenFinanciero = [
-            'monto_total'     => (float) $caso->monto_total, // Valor por defecto del caso
-            'total_pagado'    => 0.0,
-            'saldo_pendiente' => (float) $caso->monto_total,
-        ];
-
-        // Si el contrato existe (gracias al 'contrato:id,monto_total,caso_id' de arriba),
-        // calcula las finanzas basado en él.
-        if ($caso->contrato) {
-            
-            // Usamos la misma lógica de DB::table de tu ContratosController
-            // ya que los modelos de pago y cargos del contrato no están implementados
-            // como relaciones de Eloquent (según tu Contrato.php).
-            
-            $totalPagado = DB::table('contrato_pagos')
-                                ->where('contrato_id', $caso->contrato->id)
-                                ->sum('valor');
-
-            $totalCargos = DB::table('contrato_cargos')
-                                ->where('contrato_id', $caso->contrato->id)
-                                ->sum('monto');
-            
-            // El Monto Total real es el del contrato (parte fija) + cargos (litis, gastos, etc.)
-            $montoTotalContrato = (float) $caso->contrato->monto_total + (float) $totalCargos;
-
-            $resumenFinanciero = [
-                'monto_total'     => $montoTotalContrato,
-                'total_pagado'    => (float) $totalPagado,
-                'saldo_pendiente' => $montoTotalContrato - (float) $totalPagado,
-            ];
+        $contratoActual = Contrato::where('caso_id', $caso->id)
+            ->where('estado', '!=', 'REESTRUCTURADO')
+            ->orderBy('id', 'desc')
+            ->first();
+        
+        if (!$contratoActual) {
+             $contratoActual = Contrato::where('caso_id', $caso->id)->orderBy('id', 'desc')->first();
         }
-        // ===== FIN: NUEVA LÓGICA DE RESUMEN FINANCIERO =====
+        $caso->setRelation('contrato', $contratoActual);
 
+        // --- CÁLCULO FINANCIERO ---
+        $montoMostrar = (float) $caso->monto_total;
+        $totalPagado = (float) $caso->monto_total_pagado;
+        $diasMoraVisual = $caso->dias_en_mora; 
+
+        if ($contratoActual) {
+            $valorContrato = DB::table('contrato_cuotas')->where('contrato_id', $contratoActual->id)->sum('valor');
+            if ($valorContrato == 0 && isset($contratoActual->monto)) $valorContrato = (float) $contratoActual->monto;
+            $montoMostrar = $valorContrato;
+            
+            $cargosEnContrato = DB::table('contrato_cargos')->where('contrato_id', $contratoActual->id)->sum('monto');
+            $moraEnContrato = DB::table('contrato_cuotas')->where('contrato_id', $contratoActual->id)->where('estado', '!=', 'PAGADA')->sum('intereses_mora_acumulados');
+            $saldoPendiente = ($valorContrato + $cargosEnContrato + $moraEnContrato) - $totalPagado;
+        } else {
+            $saldoPendiente = ($montoMostrar - $totalPagado);
+        }
+        
+        $resumenFinanciero = [
+            'monto_total'     => $montoMostrar,
+            'total_pagado'    => $totalPagado,
+            'saldo_pendiente' => max(0, $saldoPendiente),
+            'dias_mora'       => $diasMoraVisual,
+        ];
+        
         $caso->setRelation('auditoria', $caso->bitacoras);
+
+        // Motor de Cumplimiento
+        $tipoProceso = TipoProceso::where('nombre', 'Ilike', trim($caso->tipo_proceso))->first();
+        $requisitosAplicables = collect();
+        if ($tipoProceso) {
+            $requisitosAplicables = RequisitoDocumento::where('tipo_proceso_id', $tipoProceso->id)
+                ->where(function ($q) use ($caso) {
+                    $q->whereNull('cooperativa_id') 
+                      ->orWhere('cooperativa_id', $caso->cooperativa_id);
+                })
+                ->get();
+        }
+
+        $documentosSubidos = $caso->documentos->pluck('tipo_documento')
+            ->map(fn($doc) => strtolower(trim($doc)))
+            ->toArray();
+
+        $cumplimientoLegal = $requisitosAplicables->map(function ($req) use ($documentosSubidos) {
+            $nombreDocRequerido = strtolower(trim($req->tipo_documento_requerido));
+            $cumple = in_array($nombreDocRequerido, $documentosSubidos);
+
+            return [
+                'id' => $req->id,
+                'validacion' => ucfirst($req->tipo_documento_requerido),
+                'estado' => $cumple ? 'CUMPLE' : 'FALTANTE',
+                'riesgo' => $cumple ? 'BAJO' : 'ALTO',
+                'observacion' => $cumple 
+                    ? 'El documento ha sido cargado correctamente.' 
+                    : 'Este documento es obligatorio para el proceso y no se encuentra en el expediente.',
+                'accion_correctiva' => $cumple ? null : 'Subir Documento',
+            ];
+        });
 
         $plantillasDisponibles = PlantillaDocumento::where('activa', true)
             ->where(function ($query) use ($caso) {
                 $query->where('cooperativa_id', $caso->cooperativa_id)
                       ->orWhereNull('cooperativa_id');
             })
-            ->where(function ($query) use ($caso) {
-                $query->whereNull('aplica_a')
-                      ->orWhereJsonLength('aplica_a', 0)
-                      ->orWhereJsonContains('aplica_a', $caso->tipo_proceso);
-            })
             ->orderBy('nombre')
             ->get(['id', 'nombre', 'version']);
 
         return Inertia::render('Casos/Show', [
             'caso' => $caso,
-            
-            // --- ¡AÑADIDO! ---
-            // Pasamos el nuevo resumen financiero a la vista.
-            'resumen_financiero' => $resumenFinanciero, 
-            
-            'actuaciones' => $caso->actuaciones, // <-- Añadido
+            'resumen_financiero' => $resumenFinanciero,
+            'cumplimiento_legal' => $cumplimientoLegal,
+            'actuaciones' => $caso->actuaciones,
             'plantillas' => $plantillasDisponibles,
             'can' => [
                 'update' => Auth::user()->can('update', $caso),
@@ -271,33 +259,15 @@ class CasoController extends Controller
             ],
         ]);
     }
-    // ===== FIN DEL MÉTODO CORREGIDO =====
 
     public function edit(Caso $caso): Response
     {
         $this->authorize('update', $caso);
         $user = Auth::user();
-
-        // --- INICIO: CAMBIO ---
-        $caso->load([
-            'juzgado', 
-            'cooperativa', 
-            'user', 
-            'deudor', 
-            // 'codeudor1', // <-- ELIMINADO
-            // 'codeudor2', // <-- ELIMINADO
-            'codeudores' // <-- AÑADIDO
-        ]);
-        // --- FIN: CAMBIO ---
-
-        $cooperativas = ($user->tipo_usuario === 'admin')
-            ? Cooperativa::select('id', 'nombre')->get()
-            : $user->cooperativas()->select('id', 'nombre')->get();
-
-        $abogadosYGestores = User::whereIn('tipo_usuario', ['abogado', 'gestor'])
-            ->select('id', 'name')
-            ->get();
-
+        $caso->load(['juzgado', 'cooperativa', 'user', 'deudor', 'codeudores']);
+        
+        $cooperativas = ($user->tipo_usuario === 'admin') ? Cooperativa::select('id', 'nombre')->get() : $user->cooperativas()->select('id', 'nombre')->get();
+        $abogadosYGestores = User::whereIn('tipo_usuario', ['abogado', 'gestor'])->select('id', 'name')->get();
         $personas = Persona::select('id', 'nombre_completo', 'numero_documento')->get();
 
         return Inertia::render('Casos/Edit', [
@@ -305,20 +275,7 @@ class CasoController extends Controller
             'cooperativas' => $cooperativas,
             'abogadosYGestores' => $abogadosYGestores,
             'personas' => $personas,
-            
-            // =================================================================
-            // ===== ¡CAMBIO IMPORTANTE AQUÍ! (Carga de 4 NIVELES) =========
-            // =================================================================
-            // 'estructuraProcesal'  => EspecialidadJuridica::with('tiposProceso.subtipos')->orderBy('nombre')->get(), // <-- LÍNEA ANTIGUA (3 NIVELES)
-            'estructuraProcesal'  => EspecialidadJuridica::with([
-                                        'tiposProceso' => fn($q) => $q->orderBy('nombre'),
-                                        'tiposProceso.subtipos' => fn($q) => $q->orderBy('nombre'),
-                                        'tiposProceso.subtipos.subprocesos' => fn($q) => $q->orderBy('nombre') // <-- LÍNEA NUEVA (4 NIVELES)
-                                    ])->orderBy('nombre')->get(),
-            // =================================================================
-            // =================== FIN DEL CAMBIO ==============================
-            // =================================================================
-
+            'estructuraProcesal'  => EspecialidadJuridica::with(['tiposProceso.subtipos.subprocesos' => fn($q) => $q->orderBy('nombre')])->orderBy('nombre')->get(),
             'etapas_procesales' => DB::table('etapas_procesales')->orderBy('nombre')->pluck('nombre')->all(),
         ]);
     }
@@ -326,277 +283,198 @@ class CasoController extends Controller
     public function update(UpdateCasoRequest $request, Caso $caso): RedirectResponse
     {
         $this->authorize('update', $caso);
-
-        // --- INICIO: CAMBIO (Lógica de Codeudores) ---
         $validated = $request->validated();
         
-        // 1. Separar los datos de los codeudores
+        if ($request->has('link_drive')) {
+            $validated['link_drive'] = $request->input('link_drive');
+        }
+        
         $datosCodeudores = $validated['codeudores'] ?? [];
         unset($validated['codeudores']);
 
         DB::transaction(function () use ($caso, $validated, $datosCodeudores) {
-            
-            // 2. Actualizar el Caso
-            // $validated ahora incluye 'subproceso' (L4)
-            // y 'fecha_tasa_interes'
             $caso->update($validated);
-
-            // 3. Sincronizar los codeudores
             $this->sincronizarCodeudores($caso, $datosCodeudores);
-
-            // 4. Crear bitácora (lógica original)
+            
             $caso->bitacoras()->create([
                 'user_id'   => auth()->id(),
                 'accion'    => 'Actualización de Caso',
                 'comentario'=> 'Se actualizaron los datos principales del caso.',
             ]);
 
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'EDITAR_CASO',
+                'descripcion_breve' => "Se actualizó el caso #{$caso->id} (Rad: {$caso->radicado})",
+                'criticidad' => 'baja',
+                'direccion_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
         });
-        // --- FIN: CAMBIO ---
-
         return to_route('casos.show', $caso->id)->with('success', '¡Caso actualizado exitosamente!');
-    }
-
-    /**
-     * Desbloquea un caso específico.
-     */
-    public function unlock(Request $request, Caso $caso): RedirectResponse
-    {
-        $user = Auth::user();
-
-        // 1. Autorización: Verificamos que el usuario sea uno de los roles permitidos
-        if (!in_array($user->tipo_usuario, ['admin', 'abogado', 'gestor'])) {
-            return to_route('casos.show', $caso->id)
-                ->with('error', 'No tienes permiso para desbloquear este caso.');
-        }
-
-        // 2. Autorización de Policy (Opcional pero recomendado):
-        // Nos aseguramos que el abogado/gestor pertenezca a la cooperativa del caso.
-        // Asumimos que tu CasoPolicy@update ya maneja esta lógica.
-        $this->authorize('update', $caso);
-
-        // 3. Ejecutar la acción
-        $caso->update([
-            'bloqueado' => false,
-            'motivo_bloqueo' => null,
-        ]);
-
-        // 4. Registrar en bitácora
-        $caso->bitacoras()->create([
-            'user_id' => $user->id,
-            'accion' => 'Desbloqueo de Caso',
-            'comentario' => 'El caso ha sido desbloqueado por ' . $user->name,
-        ]);
-
-        return to_route('casos.show', $caso->id)
-            ->with('success', '¡Caso desbloqueado exitosamente!');
     }
 
     public function destroy(Caso $caso): RedirectResponse
     {
-        $this->authorize('delete', $caso);
-        
-        // --- INICIO: Eliminar actuaciones asociadas ---
-        $caso->actuaciones()->delete();
-        // --- FIN: Eliminar actuaciones asociadas ---
+        if (Auth::user()->tipo_usuario !== 'admin') {
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'INTENTO_ELIMINAR_CASO',
+                'descripcion_breve' => "Usuario no autorizado intentó eliminar el caso #{$caso->id}",
+                'criticidad' => 'alta',
+                'direccion_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+            return back()->with('error', 'Acción no autorizada. Solo los administradores pueden eliminar casos.');
+        }
 
-        // --- INICIO: CAMBIO (Limpiar tabla pivote) ---
-        $caso->codeudores()->detach();
-        // --- FIN: CAMBIO ---
+        AuditoriaEvento::create([
+            'user_id' => Auth::id(),
+            'evento' => 'ELIMINAR_CASO',
+            'descripcion_breve' => "El administrador eliminó permanentemente el caso #{$caso->id} (Rad: {$caso->radicado})",
+            'criticidad' => 'alta',
+            'direccion_ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
 
         $caso->delete();
-
         return to_route('casos.index')->with('success', '¡Caso eliminado exitosamente!');
     }
 
-    public function clonar(Caso $caso): Response
+    public function close(Request $request, Caso $caso): RedirectResponse
     {
-        $this->authorize('create', Caso::class);
-        $this->authorize('view', $caso);
-
-        // --- INICIO: CAMBIO (CORRECCIÓN PARA CLONAR) ---
-        // Cargamos todas las relaciones necesarias que 'Create.vue' espera en 'casoAClonar'
-        $caso->load('juzgado', 'codeudores', 'cooperativa', 'user', 'deudor');
-        // --- FIN: CAMBIO ---
-
-        return Inertia::render('Casos/Create', [
-            'casoAClonar' => $caso,
-            'cooperativas' => Cooperativa::all(['id', 'nombre']),
-            'abogadosYGestores' => User::whereIn('tipo_usuario', ['abogado', 'gestor'])->select('id', 'name')->get(),
-            'personas' => Persona::select('id', 'nombre_completo', 'numero_documento')->get(),
-            
-            // =================================================================
-            // ===== ¡CAMBIO IMPORTANTE AQUÍ! (Carga de 4 NIVELES) =========
-            // =================================================================
-            // 'estructuraProcesal'  => EspecialidadJuridica::with('tiposProceso.subtipos')->orderBy('nombre')->get(), // <-- LÍNEA ANTIGUA (3 NIVELES)
-            'estructuraProcesal'  => EspecialidadJuridica::with([
-                                        'tiposProceso' => fn($q) => $q->orderBy('nombre'),
-                                        'tiposProceso.subtipos' => fn($q) => $q->orderBy('nombre'),
-                                        'tiposProceso.subtipos.subprocesos' => fn($q) => $q->orderBy('nombre') // <-- LÍNEA NUEVA (4 NIVELES)
-                                    ])->orderBy('nombre')->get(),
-            // =================================================================
-            // =================== FIN DEL CAMBIO ==============================
-            // =================================================================
-
-            'etapas_procesales' => DB::table('etapas_procesales')->orderBy('nombre')->pluck('nombre')->all(),
-        ]);
-    }
-
-    // --- INICIO: Métodos CRUD para Actuaciones de Casos ---
-
-    /**
-     * Guarda una nueva actuación manual para un caso.
-     */
-    public function storeActuacion(Request $request, Caso $caso)
-    {
-        $validated = $request->validate([
-            'nota' => ['required', 'string', 'max:5000'],
-            'fecha_actuacion' => ['required', 'date', 'before_or_equal:today'],
+        $this->authorize('update', $caso);
+        $validated = $request->validate(['nota_cierre' => ['required', 'string', 'max:2000']]);
+        
+        $caso->update(['estado_proceso' => 'cerrado', 'nota_cierre' => $validated['nota_cierre']]);
+        
+        $caso->bitacoras()->create([
+            'user_id' => auth()->id(),
+            'accion' => 'Cierre de Caso',
+            'comentario' => 'Caso cerrado. Motivo: ' . $validated['nota_cierre'],
         ]);
 
-        $caso->actuaciones()->create([
-            'nota' => $validated['nota'],
-            'fecha_actuacion' => $validated['fecha_actuacion'],
+        AuditoriaEvento::create([
             'user_id' => Auth::id(),
+            'evento' => 'CERRAR_CASO',
+            'descripcion_breve' => "Caso #{$caso->id} cerrado. Nota: {$validated['nota_cierre']}",
+            'criticidad' => 'media',
+            'direccion_ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
         ]);
 
-        return back()->with('success', 'Actuación registrada.');
+        return to_route('casos.edit', $caso->id)->with('success', '¡Caso cerrado exitosamente!');
     }
 
-    /**
-     * Actualiza una actuación específica.
-     */
-    public function updateActuacion(Request $request, Actuacion $actuacion)
-    {
-        $user = Auth::user();
-        if (!$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
-             abort(403, 'No autorizado para editar esta actuación.');
-        }
-
-        $validated = $request->validate([
-            'nota' => ['required', 'string', 'max:5000'],
-            'fecha_actuacion' => ['required', 'date', 'before_or_equal:today'],
-        ]);
-
-        $actuacion->update($validated);
-
-        return back(303)->with('success', 'Actuación actualizada.');
-    }
-
-    /**
-     * Reabre un caso que estaba cerrado.
-     */
     public function reopen(Request $request, Caso $caso): RedirectResponse
     {
-        // 1. Autorización: Solo el admin puede reabrir
         if (Auth::user()->tipo_usuario !== 'admin') {
-            return to_route('casos.edit', $caso->id)
-                ->with('error', 'No tienes permiso para reabrir este caso.');
+            return to_route('casos.edit', $caso->id)->with('error', 'No tienes permiso para reabrir este caso.');
         }
-
-        // 2. Ejecutar la acción de reapertura
-        $caso->update([
-            'estado_proceso' => 'prejurídico', // Vuelve al estado inicial
-            'nota_cierre' => null,            // Borra la nota de cierre
-        ]);
-
-        // 3. Registrar en bitácora
+        
+        $caso->update(['estado_proceso' => 'prejurídico', 'nota_cierre' => null]);
+        
         $caso->bitacoras()->create([
             'user_id' => auth()->id(),
             'accion' => 'Reapertura de Caso',
             'comentario' => 'El caso ha sido reabierto por ' . Auth::user()->name,
         ]);
 
-        // 4. Redirigir de vuelta a la página de edición
-        return to_route('casos.edit', $caso->id)
-            ->with('success', '¡Caso reabierto exitosamente!');
+        AuditoriaEvento::create([
+            'user_id' => Auth::id(),
+            'evento' => 'REABRIR_CASO',
+            'descripcion_breve' => "Caso #{$caso->id} reabierto por administrador.",
+            'criticidad' => 'media',
+            'direccion_ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        return to_route('casos.edit', $caso->id)->with('success', '¡Caso reabierto exitosamente!');
     }
 
-     /**
-     * Cierra un caso que estaba activo.
-     */
-    public function close(Request $request, Caso $caso): RedirectResponse
+    public function storeActuacion(Request $request, Caso $caso)
     {
-        $this->authorize('update', $caso);
-
         $validated = $request->validate([
-            'nota_cierre' => ['required', 'string', 'max:2000'],
+            'nota' => ['required', 'string', 'max:5000'],
+            'fecha_actuacion' => ['required', 'date', 'before_or_equal:today'],
         ]);
-
-        $caso->update([
-            'estado_proceso' => 'cerrado',
-            'nota_cierre' => $validated['nota_cierre'],
+        $caso->actuaciones()->create([
+            'nota' => $validated['nota'],
+            'fecha_actuacion' => $validated['fecha_actuacion'],
+            'user_id' => Auth::id(),
         ]);
-
-        $caso->bitacoras()->create([
-            'user_id' => auth()->id(),
-            'accion' => 'Cierre de Caso',
-            'comentario' => 'El caso ha sido cerrado por ' . Auth::user()->name . '. Motivo: ' . $validated['nota_cierre'],
-        ]);
-
-        return to_route('casos.edit', $caso->id)
-            ->with('success', '¡Caso cerrado exitosamente!');
+        return back()->with('success', 'Actuación registrada.');
     }
 
-    /**
-     * Elimina una actuación específica.
-     */
+    public function updateActuacion(Request $request, Actuacion $actuacion)
+    {
+        $user = Auth::user();
+        if (!$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
+             abort(403, 'No autorizado para editar esta actuación.');
+        }
+        $validated = $request->validate([
+            'nota' => ['required', 'string', 'max:5000'],
+            'fecha_actuacion' => ['required', 'date', 'before_or_equal:today'],
+        ]);
+        $actuacion->update($validated);
+        return back(303)->with('success', 'Actuación actualizada.');
+    }
+
     public function destroyActuacion(Actuacion $actuacion)
     {
         $user = Auth::user();
         if (!$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
-             abort(403, 'No autorizado para eliminar esta actuación.');
+            abort(403, 'No autorizado para eliminar esta actuación.');
         }
-
         $actuacion->delete();
-
         return back(303)->with('success', 'Actuación eliminada.');
     }
-    // --- FIN: Métodos CRUD para Actuaciones de Casos ---
+    
+    public function unlock(Request $request, Caso $caso): RedirectResponse
+    {
+        $user = Auth::user();
+        if (!in_array($user->tipo_usuario, ['admin', 'abogado', 'gestor'])) {
+            return to_route('casos.show', $caso->id)->with('error', 'No tienes permiso para desbloquear este caso.');
+        }
+        $caso->update(['bloqueado' => false, 'motivo_bloqueo' => null]);
+        return to_route('casos.show', $caso->id)->with('success', '¡Caso desbloqueado exitosamente!');
+    }
+    
+    public function clonar(Caso $caso): Response
+    {
+        $this->authorize('create', Caso::class);
+        $this->authorize('view', $caso);
+        $caso->load('juzgado', 'codeudores', 'cooperativa', 'user', 'deudor');
+        
+        return Inertia::render('Casos/Create', [
+            'casoAClonar' => $caso,
+            'cooperativas' => Cooperativa::all(['id', 'nombre']),
+            'abogadosYGestores' => User::whereIn('tipo_usuario', ['abogado', 'gestor'])->select('id', 'name')->get(),
+            'personas' => Persona::select('id', 'nombre_completo', 'numero_documento')->get(),
+            'estructuraProcesal'  => EspecialidadJuridica::with([
+                                                'tiposProceso.subtipos.subprocesos' => fn($q) => $q->orderBy('nombre')
+                                            ])->orderBy('nombre')->get(),
+            'etapas_procesales' => DB::table('etapas_procesales')->orderBy('nombre')->pluck('nombre')->all(),
+        ]);
+    }
 
-
-    // --- INICIO: NUEVO MÉTODO PRIVADO PARA CODEUDORES (CON CORRECCIÓN) ---
-
-    /**
-     * Sincroniza los codeudores de un caso desde un array de datos.
-     * Usa la tabla 'codeudores' y la lógica 'updateOrCreate'
-     * basada en el 'numero_documento'.
-     */
     private function sincronizarCodeudores(Caso $caso, array $datosCodeudores): void
     {
-        // Usamos el namespace completo
-        $CodeudorModel = \App\Models\Codeudor::class; 
-
-        $idsCodeudores = []; // IDs de los codeudores que serán adjuntados
-
+        $idsCodeudores = [];
         foreach ($datosCodeudores as $datosPersona) {
-            
-            // 1. Crear o Actualizar el Codeudor en su propia tabla
-            $codeudor = $CodeudorModel::updateOrCreate(
-                // Llave de búsqueda:
+            $codeudor = Codeudor::updateOrCreate(
                 ['numero_documento' => $datosPersona['numero_documento']],
-                // Datos a insertar o actualizar:
                 [
                     'nombre_completo' => $datosPersona['nombre_completo'],
                     'tipo_documento' => $datosPersona['tipo_documento'] ?? 'CC',
                     'celular' => $datosPersona['celular'] ?? null,
-                    
-                    // ===== INICIO: CORRECIÓN =====
-                    // El formulario y el Request envían 'correo', no 'correo_electronico'
                     'correo' => $datosPersona['correo'] ?? null,
-                    // ===== FIN: CORRECIÓN =====
-                    
                     'addresses' => $datosPersona['addresses'] ?? null, 
                     'social_links' => $datosPersona['social_links'] ?? null,
                 ]
             );
             $idsCodeudores[] = $codeudor->id;
         }
-
-        // 2. Sincronizar la tabla pivote 'caso_codeudor'
-        // 'sync' adjunta los IDs del array, y quita los que ya no están.
         $caso->codeudores()->sync($idsCodeudores);
     }
-    // --- FIN: NUEVO MÉTODO PRIVADO ---
 }
-

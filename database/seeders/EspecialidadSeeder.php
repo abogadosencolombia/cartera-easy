@@ -13,8 +13,12 @@ class EspecialidadSeeder extends Seeder
      */
     public function run(): void
     {
-        // Vaciamos la tabla para evitar duplicados al re-ejecutar el seeder
-        DB::table('especialidades')->delete();
+        // 1. Vaciamos la tabla.
+        // En PostgreSQL, usamos CASCADE para que limpie también las referencias en la tabla pivote (especialidad_user)
+        // sin necesidad de desactivar las foreign keys globalmente.
+        DB::table('especialidades')->truncate(); 
+        // Si te sigue dando error, cambia la línea de arriba por:
+        // DB::statement('TRUNCATE TABLE especialidades CASCADE;');
 
         $especialidades = [
             // Derecho Público
@@ -67,8 +71,16 @@ class EspecialidadSeeder extends Seeder
             ['nombre' => 'DERECHO POLICIVO'],
         ];
 
-        // Usamos insert para mayor eficiencia con múltiples registros
-        Especialidad::insert($especialidades);
+        // 2. Agregamos timestamps
+        $now = now();
+        $dataWithTimestamps = array_map(function ($item) use ($now) {
+            return array_merge($item, [
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }, $especialidades);
+
+        // 3. Insertamos
+        Especialidad::insert($dataWithTimestamps);
     }
 }
-

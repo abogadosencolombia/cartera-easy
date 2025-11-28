@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\ProcesoRadicado;
 use App\Models\DocumentoProceso;
+use App\Models\AuditoriaEvento; // ✅ Auditoría
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Auth; // ✅ Auth
 use Illuminate\Support\Facades\Storage;
 
 class DocumentoProcesoController extends Controller
@@ -25,9 +27,19 @@ class DocumentoProcesoController extends Controller
         DocumentoProceso::create([
             'proceso_radicado_id' => $proceso->id,
             'user_id'             => $request->user()->id ?? null,
-            'descripcion'         => $data['nota'] ?? null, // ahora puede ser NULL
+            'descripcion'         => $data['nota'] ?? null,
             'file_name'           => $data['nombre'],
             'file_path'           => $path,
+        ]);
+
+        // ✅ AUDITORÍA GLOBAL
+        AuditoriaEvento::create([
+            'user_id' => Auth::id(),
+            'evento' => 'SUBIR_DOCUMENTO_PROCESO',
+            'descripcion_breve' => "Subido documento '{$data['nombre']}' al radicado {$proceso->radicado}",
+            'criticidad' => 'media',
+            'direccion_ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
         ]);
 
         return back()->with('success', 'Documento cargado correctamente.');
@@ -59,10 +71,24 @@ class DocumentoProcesoController extends Controller
         if ((int) $documento->proceso_radicado_id !== (int) $proceso->id) {
             abort(Response::HTTP_FORBIDDEN);
         }
+
+        $nombreDoc = $documento->file_name; // Guardar nombre para el log
+
         if ($documento->file_path && Storage::disk('public')->exists($documento->file_path)) {
             Storage::disk('public')->delete($documento->file_path);
         }
         $documento->delete();
+
+        // ✅ AUDITORÍA GLOBAL
+        AuditoriaEvento::create([
+            'user_id' => Auth::id(),
+            'evento' => 'ELIMINAR_DOCUMENTO_PROCESO',
+            'descripcion_breve' => "Eliminado documento '{$nombreDoc}' del radicado {$proceso->radicado}",
+            'criticidad' => 'alta',
+            'direccion_ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
         return back()->with('success', 'Documento eliminado.');
     }
 }

@@ -4,6 +4,10 @@ namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+// ===== INICIO DE LA MODIFICACIÓN (PASO 2 - FIX CONTADOR) =====
+// No necesitamos 'use Auth' porque ya estamos usando $request->user()
+// No necesitamos 'use NotificacionCaso' porque usas la relación $user->notificaciones()
+// ===== FIN DE LA MODIFICACIÓN =====
 
 class HandleInertiaRequests extends Middleware
 {
@@ -28,13 +32,31 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
+        
+        // ===== INICIO DE LA MODIFICACIÓN (PASO 2 - VERSIÓN CORRECTA) =====
+
+        // 1. Contador de notificaciones de CASOS (tu sistema original)
+        $countCasos = $user
+            ? $user->notificaciones()->where('leido', false)->where('fecha_envio', '<=', now())->count()
+            : 0;
+
+        // 2. Contador de notificaciones de TAREAS (nuevo sistema de Laravel)
+        //    ->unreadNotifications() es el método de Laravel para la tabla 'notifications'
+        $countTareas = $user
+            ? $user->unreadNotifications()->count()
+            : 0;
+
+        // ===== FIN DE LA MODIFICACIÓN =====
+
 
         return array_merge(parent::share($request), [
             'auth' => [
                 'user' => $user ? $user->only('id', 'name', 'email', 'tipo_usuario') : null,
-                'unreadNotifications' => $user
-                    ? $user->notificaciones()->where('leido', false)->where('fecha_envio', '<=', now())->count()
-                    : 0,
+                
+                // ===== INICIO DE LA MODIFICACIÓN (PASO 2 - VERSIÓN CORRECTA) =====
+                // 3. Sumamos los dos contadores
+                'unreadNotifications' => $countCasos + $countTareas,
+                // ===== FIN DE LA MODIFICACIÓN =====
             ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

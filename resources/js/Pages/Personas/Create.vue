@@ -9,7 +9,6 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import { PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 import { reactive } from 'vue';
 
-// Recibimos las listas de cooperativas y abogados desde el PersonaController
 const props = defineProps({
   allCooperativas: { type: Array, default: () => [] },
   allAbogados: { type: Array, default: () => [] },
@@ -20,6 +19,7 @@ const form = useForm({
   tipo_documento: 'CC',
   numero_documento: '',
   fecha_expedicion: '',
+  fecha_nacimiento: '', // <--- NUEVO CAMPO
   telefono_fijo: '',
   celular_1: '',
   celular_2: '',
@@ -30,13 +30,10 @@ const form = useForm({
   observaciones: '',
   social_links: [],
   addresses: [],
-  
-  // Nuevos campos para enviar los IDs seleccionados
   cooperativas_ids: [],
   abogados_ids: [],
 });
 
-// Lógica para redes sociales
 const addLinkRow = () => {
   form.social_links.push(reactive({ label: '', url: '' }));
 };
@@ -48,7 +45,6 @@ const normalizeUrl = (l) => {
   if (!/^https?:\/\//i.test(l.url)) l.url = `https://${l.url}`;
 };
 
-// Lógica para direcciones
 const addAddressRow = () => {
   form.addresses.push(reactive({ label: 'Casa', address: '', city: '' }));
 };
@@ -101,11 +97,19 @@ const submit = () => form.post(route('personas.store'));
                     <TextInput v-model="form.numero_documento" id="numero_documento" type="text" class="mt-1 block w-full" required />
                     <InputError :message="form.errors.numero_documento" class="mt-2" />
                   </div>
+                  
+                  <!-- FECHAS (Expedición y Nacimiento) -->
                   <div>
                     <InputLabel for="fecha_expedicion" value="Fecha de Expedición (Opcional)" />
                     <TextInput v-model="form.fecha_expedicion" id="fecha_expedicion" type="date" class="mt-1 block w-full" />
                     <InputError :message="form.errors.fecha_expedicion" class="mt-2" />
                   </div>
+                  <div>
+                    <InputLabel for="fecha_nacimiento" value="Fecha de Nacimiento (Opcional)" />
+                    <TextInput v-model="form.fecha_nacimiento" id="fecha_nacimiento" type="date" class="mt-1 block w-full" />
+                    <InputError :message="form.errors.fecha_nacimiento" class="mt-2" />
+                  </div>
+
                 </div>
               </section>
 
@@ -147,7 +151,6 @@ const submit = () => form.post(route('personas.store'));
                     <PlusIcon class="h-4 w-4" /> Agregar dirección
                   </button>
                 </div>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Añade las direcciones que necesites (Casa, Oficina, Trabajo, etc.).</p>
                 <div v-if="!form.addresses.length" class="rounded-md border border-dashed border-gray-300 dark:border-gray-600 p-4 text-center text-sm text-gray-500 dark:text-gray-400">
                   No hay direcciones todavía.
                 </div>
@@ -181,8 +184,8 @@ const submit = () => form.post(route('personas.store'));
               
               <!-- SECCIÓN 4: ADICIONAL -->
               <section>
-                 <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Información Adicional</h3>
-                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Información Adicional</h3>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <InputLabel for="empresa" value="Empresa (Opcional)" />
                       <TextInput v-model="form.empresa" id="empresa" type="text" class="mt-1 block w-full" />
@@ -195,15 +198,14 @@ const submit = () => form.post(route('personas.store'));
                       <InputLabel for="observaciones" value="Observaciones (Opcional)" />
                       <Textarea v-model="form.observaciones" id="observaciones" class="mt-1 block w-full" rows="3" />
                     </div>
-                 </div>
+                   </div>
               </section>
 
-              <!-- v-v- SECCIÓN NUEVA: COOPERATIVAS v-v- -->
+              <!-- SECCIÓN COOPERATIVAS -->
               <section>
                 <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Asignar Cooperativas</h3>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Selecciona las cooperativas a las que pertenece esta persona.</p>
                 
-                <!-- *** CORREGIDO AQUÍ: 'v->if' a 'v-if' *** -->
                 <div v-if="!props.allCooperativas.length" class="rounded-md border border-dashed border-gray-300 dark:border-gray-600 p-4 text-center text-sm text-gray-500 dark:text-gray-400">
                   No hay cooperativas para asignar.
                 </div>
@@ -221,15 +223,12 @@ const submit = () => form.post(route('personas.store'));
                 </div>
                 <InputError :message="form.errors.cooperativas_ids" class="mt-2" />
               </section>
-              <!-- ^-^- FIN SECCIÓN COOPERATIVAS -^-^ -->
 
-
-              <!-- v-v- SECCIÓN NUEVA: ABOGADOS v-v- -->
+              <!-- SECCIÓN ABOGADOS -->
               <section>
                 <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Asignar Abogados / Gestores</h3>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Selecciona los abogados o gestores que manejarán esta persona.</p>
                 
-                <!-- *** CORREGIDO AQUÍ: 'v->if' a 'v-if' *** -->
                 <div v-if="!props.allAbogados.length" class="rounded-md border border-dashed border-gray-300 dark:border-gray-600 p-4 text-center text-sm text-gray-500 dark:text-gray-400">
                   No hay abogados o gestores para asignar.
                 </div>
@@ -247,9 +246,8 @@ const submit = () => form.post(route('personas.store'));
                 </div>
                 <InputError :message="form.errors.abogados_ids" class="mt-2" />
               </section>
-              <!-- ^-^- FIN SECCIÓN ABOGADOS -^-^ -->
 
-              <!-- SECCIÓN 5: REDES SOCIALES -->
+              <!-- SECCIÓN REDES SOCIALES -->
               <section>
                 <div class="flex items-center justify-between mb-2">
                   <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Redes Sociales</h3>
@@ -257,7 +255,6 @@ const submit = () => form.post(route('personas.store'));
                     <PlusIcon class="h-4 w-4" /> Agregar enlace
                   </button>
                 </div>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Añade tantos enlaces como necesites (Facebook, Instagram, etc.).</p>
                 <div v-if="!form.social_links.length" class="rounded-md border border-dashed border-gray-300 dark:border-gray-600 p-4 text-center text-sm text-gray-500 dark:text-gray-400">
                   No hay enlaces todavía.
                 </div>
@@ -301,4 +298,3 @@ const submit = () => form.post(route('personas.store'));
     </div>
   </AuthenticatedLayout>
 </template>
-

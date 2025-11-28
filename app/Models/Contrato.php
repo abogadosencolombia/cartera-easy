@@ -6,37 +6,37 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphMany; // Asegúrate que esté importado
-use Carbon\Carbon; // Asegúrate que esté importado
-// --- INICIO: AÑADIR IMPORT REVISION DIARIA ---
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Carbon\Carbon;
 use App\Models\RevisionDiaria;
-// --- FIN: AÑADIR IMPORT REVISION DIARIA ---
-// --- INICIO: AÑADIR IMPORT ProcesoRadicado ---
-use App\Models\ProcesoRadicado; // <-- Importar ProcesoRadicado
-// --- FIN: AÑADIR IMPORT ProcesoRadicado ---
-
+use App\Models\ProcesoRadicado;
+use App\Models\Tarea;
+// ✅ IMPORTANTE: Importar los modelos hijos
+use App\Models\ContratoCuota; 
+use App\Models\ContratoCargo; 
+use App\Models\ContratoPago;  
 
 class Contrato extends Model
 {
     use HasFactory;
 
-    protected $table = 'contratos'; // Especificar tabla si no sigue convención
+    protected $table = 'contratos';
 
     protected $fillable = [
         'cliente_id',
         'monto_total',
         'anticipo',
         'porcentaje_litis',
-        'monto_base_litis', // Añadido
-        'litis_valor_ganado', // Añadido
+        'monto_base_litis',
+        'litis_valor_ganado',
         'modalidad',
         'estado',
         'inicio',
         'nota',
         'contrato_origen_id',
-        'documento_contrato', // Añadido
+        'documento_contrato',
         'proceso_id', 
-        'caso_id', // <--- AÑADE ESTA LÍNEA
+        'caso_id',
     ];
 
     protected $casts = [
@@ -44,99 +44,75 @@ class Contrato extends Model
         'monto_total' => 'decimal:2',
         'anticipo' => 'decimal:2',
         'porcentaje_litis' => 'decimal:2',
-        'monto_base_litis' => 'decimal:2', // Añadido
-        'litis_valor_ganado' => 'decimal:2', // Añadido
+        'monto_base_litis' => 'decimal:2',
+        'litis_valor_ganado' => 'decimal:2',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
 
-    /**
-     * Relación con el cliente (Persona).
-     */
     public function cliente(): BelongsTo
     {
-        // Asumiendo que existe el modelo Persona y la clave foránea es cliente_id
         return $this->belongsTo(Persona::class, 'cliente_id');
     }
 
-    /**
-     * Relación con el contrato original (si es una reestructuración).
-     */
     public function contratoOrigen(): BelongsTo
     {
         return $this->belongsTo(Contrato::class, 'contrato_origen_id');
     }
 
-    // --- INICIO: Relaciones comentadas (Modelos relacionados no existen) ---
-    /*
+    // =========================================================
+    // === 🔴 AQUÍ ESTABA EL PROBLEMA (YA ESTÁ CORREGIDO) ===
+    // =========================================================
+    
     /**
      * Relación con las cuotas del contrato.
-     *//*
+     */
     public function cuotas(): HasMany
     {
-        // Asume que existe un modelo App\Models\ContratoCuota
-        return $this->hasMany(ContratoCuota::class)->orderBy('numero');
+        // Ahora sí va a encontrar las cuotas para verificar la MORA
+        return $this->hasMany(ContratoCuota::class, 'contrato_id')->orderBy('numero');
     }
-    */
 
-    /*
     /**
      * Relación con los cargos adicionales del contrato.
-     *//*
+     */
     public function cargos(): HasMany
     {
-        // Asume que existe un modelo App\Models\ContratoCargo
-        return $this->hasMany(ContratoCargo::class)->orderByDesc('fecha_aplicado');
+        // Habilitado por si quieres alertar sobre cargos pendientes
+        return $this->hasMany(ContratoCargo::class, 'contrato_id')->orderByDesc('fecha_aplicado');
     }
-    */
 
-    /*
     /**
      * Relación con los pagos registrados para el contrato.
-     *//*
+     */
     public function pagos(): HasMany
     {
-        // Asume que existe un modelo App\Models\ContratoPago
-        return $this->hasMany(ContratoPago::class)->orderByDesc('fecha');
+        return $this->hasMany(ContratoPago::class, 'contrato_id')->orderByDesc('fecha');
     }
-    */
-    // --- FIN: Relaciones comentadas ---
+    // =========================================================
 
-
-    /**
-     * Relación polimórfica con las actuaciones.
-     */
     public function actuaciones(): MorphMany
     {
-        return $this->morphMany(Actuacion::class, 'actuable')->latest(); // Ordenar por más reciente
+        return $this->morphMany(Actuacion::class, 'actuable')->latest();
     }
 
-    // --- INICIO: AÑADIR RELACIÓN DE REVISIÓN DIARIA ---
-    /**
-     * Obtiene todas las revisiones diarias para este contrato.
-     */
     public function revisionesDiarias(): MorphMany
     {
         return $this->morphMany(RevisionDiaria::class, 'revisable');
     }
-    // --- FIN: AÑADIR RELACIÓN DE REVISIÓN DIARIA ---
 
-    // ===== NUEVA RELACIÓN =====
-    /**
-     * Obtiene el proceso radicado asociado a este contrato.
-     */
     public function proceso(): BelongsTo
     {
-        // Asume que la clave foránea en la tabla 'contratos' es 'proceso_id'
         return $this->belongsTo(ProcesoRadicado::class, 'proceso_id');
     }
-    // ==========================
 
-    /**
-     * Obtiene el caso de cobro asociado a este contrato.
-     */
     public function caso(): BelongsTo
     {
         return $this->belongsTo(Caso::class, 'caso_id');
+    }
+
+    public function tareas(): MorphMany
+    {
+        return $this->morphMany(Tarea::class, 'tarea');
     }
 }

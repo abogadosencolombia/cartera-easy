@@ -20,13 +20,12 @@ import ToastList from '@/Components/ToastList.vue';
 
 import {
     ChartBarIcon, FolderIcon, BellIcon, UsersIcon, ScaleIcon,
-    Cog6ToothIcon, ShieldCheckIcon, KeyIcon, DocumentTextIcon,
-    ListBulletIcon, ExclamationTriangleIcon, CircleStackIcon, GlobeAltIcon,
+    Cog6ToothIcon, DocumentTextIcon,
+    ListBulletIcon, GlobeAltIcon,
     BanknotesIcon,
-    // --- INICIO: CORRECCIÓN DE ERROR ---
-    // El icono se añade directamente a la lista de importación.
     ClipboardDocumentCheckIcon,
-    // --- FIN: CORRECCIÓN DE ERROR ---
+    ShieldCheckIcon, 
+    ExclamationTriangleIcon, 
 } from '@heroicons/vue/24/outline';
 
 
@@ -34,21 +33,7 @@ import {
 const NAV_ITEMS = [
     { type: 'link', label: 'Dashboard', href: route('dashboard'), active: 'dashboard', icon: ChartBarIcon, roles: ['admin', 'gestor', 'abogado'] },
     { type: 'link', label: 'Casos', href: route('casos.index'), active: 'casos.*', icon: FolderIcon, roles: ['admin', 'gestor', 'abogado'] },
-    { type: 'link', label: 'Reportes', href: route('reportes.index'), active: 'reportes.*', icon: ChartBarIcon, roles: ['admin', 'gestor', 'abogado'] },
-
-    { type: 'notification', label: 'Notificaciones', href: route('notificaciones.index'), active: 'notificaciones.*', icon: BellIcon, roles: ['admin', 'gestor', 'abogado'] },
-
-    // --- INICIO: AÑADIR REVISIÓN DIARIA ---
-    { 
-        type: 'link', 
-        label: 'Revisión Diaria', 
-        href: route('revision.index'), 
-        active: 'revision.*', 
-        icon: ClipboardDocumentCheckIcon, 
-        roles: ['admin', 'gestor', 'abogado'] 
-    },
-    // --- FIN: AÑADIR REVISIÓN DIARIA ---
-
+    { type: 'link', label: 'Abogados en Colombia', href: route('procesos.index'), active: 'procesos.*', roles: ['admin', 'gestor', 'abogado'] },
     {
         type: 'dropdown', label: 'Entidades', icon: UsersIcon,
         active: ['cooperativas.*', 'personas.*', 'admin.users.*', 'admin.gestores.*', 'procesos.*'],
@@ -59,7 +44,6 @@ const NAV_ITEMS = [
             { type: 'divider', roles: ['admin'] },
             { label: 'Usuarios del Sistema', href: route('admin.users.index'), active: 'admin.users.*', roles: ['admin'] },
             { label: 'Abogados/Gestores', href: route('admin.gestores.index'), active: 'admin.gestores.*', roles: ['admin'] },
-            { label: 'Radicados', href: route('procesos.index'), active: 'procesos.*', roles: ['admin', 'gestor', 'abogado'] },
         ],
     },
 
@@ -75,23 +59,32 @@ const NAV_ITEMS = [
     {
         type: 'dropdown', label: 'Configuración', icon: Cog6ToothIcon,
         active: [
-            'plantillas.*', 'requisitos.*', 'admin.incidentes-juridicos.*', 'admin.juridico.indicadores',
-            'admin.reglas-alerta.*', 'admin.auditoria.*', 'admin.tokens.*', 'integraciones.index', 'documentos-generados.*',
+            'plantillas.*', 'requisitos.*', 
             'admin.tasas.*',
+            'admin.tareas.*',
+            'revision.*',
+            'admin.auditoria.*',
+            'admin.reglas-alerta.*'
         ],
         roles: ['admin'],
         items: [
+            // --- FLUJO DE TRABAJO DIARIO ---
+            { label: 'Gestión de Tareas', href: route('admin.tareas.index'), active: 'admin.tareas.*', icon: ListBulletIcon, roles: ['admin'] },
+            { type: 'link', label: 'Revisión Diaria', href: route('revision.index'), active: 'revision.*', icon: ClipboardDocumentCheckIcon, roles: ['admin', 'gestor', 'abogado'] },     
+            
+            { type: 'divider', roles: ['admin'] },
+            
+            // --- PARAMETRIZACIÓN ---
             { label: 'Plantillas de Documentos', href: route('plantillas.index'), active: 'plantillas.*', icon: DocumentTextIcon, roles: ['admin'] },
             { label: 'Requisitos de Documentos', href: route('requisitos.index'), active: 'requisitos.*', icon: ListBulletIcon, roles: ['admin'] },
             { label: 'Tasas de Interés', href: route('admin.tasas.index'), active: 'admin.tasas.*', icon: BanknotesIcon, roles: ['admin'] },
-            { label: 'Gestión de Incidentes', href: route('admin.incidentes-juridicos.index'), active: 'admin.incidentes-juridicos.*', icon: ScaleIcon, roles: ['admin'] },
-            { label: 'Panel de Indicadores', href: route('admin.juridico.indicadores'), active: 'admin.juridico.indicadores', icon: ChartBarIcon, roles: ['admin'] },
+            
             { type: 'divider', roles: ['admin'] },
+            
+            // --- SEGURIDAD Y AUTOMATIZACIÓN ---
             { label: 'Reglas de Alerta', href: route('admin.reglas-alerta.index'), active: 'admin.reglas-alerta.*', icon: ExclamationTriangleIcon, roles: ['admin'] },
             { label: 'Auditoría Global', href: route('admin.auditoria.index'), active: 'admin.auditoria.index', icon: ShieldCheckIcon, roles: ['admin'] },
-            { label: 'Auditoría de Documentos', href: route('documentos-generados.index'), active: 'documentos-generados.*', icon: ShieldCheckIcon, roles: ['admin'] },
-            { label: 'Gestión de Credenciales', href: route('admin.tokens.index'), active: 'admin.tokens.*', icon: KeyIcon, roles: ['admin'] },
-            { label: 'Logs de Integraciones', href: route('integraciones.index'), active: 'integraciones.index', icon: CircleStackIcon, roles: ['admin'] },
+            { type: 'link', label: 'Reportes', href: route('reportes.index'), active: 'reportes.*', icon: ChartBarIcon, roles: ['admin', 'gestor', 'abogado'] },
         ],
     },
 
@@ -102,6 +95,7 @@ const NAV_ITEMS = [
         items: [
             { type: 'external', label: 'Consulta de procesos', href: 'https://consultaprocesos.ramajudicial.gov.co/procesos/Index', roles: ['admin', 'gestor', 'abogado'] },
             { type: 'external', label: 'Procesos rama judicial', href: 'https://procesos.ramajudicial.gov.co/procesoscs/ConsultaJusticias21.aspx?EntryId=1ND%2fT1QaEBFgDjwxVoCZ45pYS4g%3d', roles: ['admin', 'gestor', 'abogado'] },
+            { type: 'external', label: 'MonoLegal', href: 'https://nuevoexpedientedigital.monolegal.co/#/admin/default', roles: ['admin', 'gestor', 'abogado'] },
             { type: 'external', label: 'Publicaciones Procesales', href: 'https://publicacionesprocesales.ramajudicial.gov.co/', roles: ['admin', 'gestor', 'abogado'] },
             { type: 'external', label: 'Asistente ChatGPT', href: 'https://chatgpt.com/g/g-68360119b4d48191898d44cb97865146-abogado-civil-director-juridico-experto?model=gpt-5-pro', roles: ['admin', 'gestor', 'abogado'] },
             { type: 'external', label: 'Asistente Gemini', href: 'https://gemini.google.com/', roles: ['admin', 'gestor', 'abogado'] },
@@ -120,6 +114,7 @@ const unreadCount = computed(() => Number(page.props.auth?.unreadNotifications ?
 
 
 // 4. LÓGICA COMPUTADA ---------------------------------------------------------
+// Filtra los menús basándose en el rol del usuario
 const visibleMenu = computed(() =>
     NAV_ITEMS
         .filter((item) => item.roles.includes(userRole.value))
@@ -222,6 +217,16 @@ onMounted(() => {
 
                     <!-- Menú de Usuario (Escritorio) -->
                     <div class="hidden sm:flex sm:items-center sm:ms-6">
+                        <Link :href="route('notificaciones.index')" 
+                              class="relative p-2 mr-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none transition duration-150 ease-in-out" 
+                              title="Notificaciones">
+                            <BellIcon class="h-6 w-6" />
+                            <span v-if="unreadCount > 0" 
+                                  class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 transform translate-x-1/4 -translate-y-1/4 bg-red-600 rounded-full">
+                                {{ unreadCount }}
+                            </span>
+                        </Link>
+
                         <div class="ms-3 relative">
                             <Dropdown align="right" width="48">
                                 <template #trigger>
@@ -280,11 +285,9 @@ onMounted(() => {
             <div :class="{ block: showingNavigationDropdown, hidden: !showingNavigationDropdown }" class="sm:hidden">
                 <div class="pt-2 pb-3 space-y-1">
                     <template v-for="item in visibleMenu" :key="item.label">
-                         <!-- Items simples y de notificación -->
                         <ResponsiveNavLink v-if="item.type === 'link' || item.type === 'notification'" :href="item.href" :active="isRouteActive(item.active)">
                             <component :is="item.icon" class="h-5 w-5 mr-2 inline-block" /> {{ item.label }}
                         </ResponsiveNavLink>
-                        <!-- Items de menú desplegable -->
                         <template v-if="item.type === 'dropdown'">
                             <div class="px-4 pt-2 pb-1">
                                 <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">{{ item.label }}</span>
@@ -296,7 +299,6 @@ onMounted(() => {
                     </template>
                 </div>
 
-                <!-- Menú de Usuario (Móvil) -->
                 <div class="pt-4 pb-1 border-t border-gray-200 dark:border-gray-600">
                     <div class="px-4">
                         <div class="font-medium text-base text-gray-800 dark:text-gray-200">
@@ -326,8 +328,6 @@ onMounted(() => {
         </main>
 
         <ToastList />
-        <!-- ✅ NUEVO COMPONENTE DE CHAT GLOBAL -->
         <ChatPanel />
     </div>
 </template>
-

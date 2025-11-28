@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Caso;
 use App\Models\PagoCaso;
+use App\Models\AuditoriaEvento; // ✅ Auditoría
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -40,11 +41,21 @@ class PagoCasoController extends Controller
             'comprobante_path' => $path, // Guarda la ruta del archivo
         ]);
         
-        // Registra la actividad en la bitácora del caso
+        // Registra la actividad en la bitácora del caso (Local)
         $caso->bitacoras()->create([
             'user_id' => auth()->id(),
             'accion' => 'Registro de Pago',
             'comentario' => 'Se registró un pago de ' . number_format($validated['monto_pagado'], 2) . ' con fecha ' . $validated['fecha_pago']
+        ]);
+
+        // ✅ AUDITORÍA GLOBAL (CRÍTICO)
+        AuditoriaEvento::create([
+            'user_id' => Auth::id(),
+            'evento' => 'PAGO_CASO_DIRECTO',
+            'descripcion_breve' => "Pago directo al caso #{$caso->id} por $" . number_format($validated['monto_pagado'], 2),
+            'criticidad' => 'alta',
+            'direccion_ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
         ]);
 
         return back()->with('success', '¡Pago registrado exitosamente!');

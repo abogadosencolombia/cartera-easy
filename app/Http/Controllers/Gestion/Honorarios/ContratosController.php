@@ -17,6 +17,7 @@ use App\Models\Contrato;
 use App\Models\Persona;
 use App\Models\ProcesoRadicado;
 use App\Models\Actuacion;
+use App\Models\AuditoriaEvento; // ✅ IMPORTANTE: Modelo de Auditoría
 
 class ContratosController extends Controller
 {
@@ -30,8 +31,6 @@ class ContratosController extends Controller
             ->where('estado', '!=', 'REESTRUCTURADO')
             ->with([
                 'cliente:id,nombre_completo',
-                // ===== CORRECCIÓN 1 (INDEX) =====
-                // Cargamos el 'proceso' con 'id' y 'radicado'
                 'proceso:id,radicado',
                 'caso:id',
             ])
@@ -61,17 +60,14 @@ class ContratosController extends Controller
                 'created_at' => $contrato->created_at,
                 'modalidad' => $contrato->modalidad,
                 'caso_id' => $contrato->caso?->id,
-                // ===== CORRECCIÓN 2 (INDEX) =====
-                // Pasa la información del proceso formateada
                 'proceso' => $contrato->proceso ? [
                     'id' => $contrato->proceso->id,
-                    // Usamos la columna 'radicado'
                     'numero' => $contrato->proceso->radicado ?: $contrato->proceso->id, 
                 ] : null,
             ]);
 
         try {
-            $active = Contrato::whereIn('estado',['ACTIVO', 'PAGOS_PENDIENTES', 'EN_MORA']);
+            $active = Contrato::whereIn('estado',['ACTIVO', 'PAGOS_PENDIENTES', 'EN_MORA', 'PAGO_PARCIAL']);
             $stats['activeCount'] = (clone $active)->count();
             $stats['activeValue'] = (clone $active)->sum('monto_total');
             $stats['closedCount'] = Contrato::where('estado','CERRADO')->count();
@@ -95,43 +91,38 @@ class ContratosController extends Controller
 
         $proceso = null;
         $clienteSeleccionado = null;
-
-        // ===== INICIO: NUEVA LÓGICA PARA LEER EL CASO =====
         $datosCaso = null; 
+
         if ($request->has('caso_id')) {
-            // Buscamos el caso y cargamos su deudor (para preseleccionar al cliente)
             $caso = Caso::with('deudor:id,nombre_completo')->find($request->input('caso_id'));
 
             if ($caso) {
+                $monto_para_contrato = $caso->monto_total;
+                if ($request->has('monto')) {
+                    $monto_para_contrato = (float) $request->input('monto');
+                }
                 $datosCaso = [
                     'id' => $caso->id,
-                    'monto_total' => $caso->monto_total,
+                    'monto_total' => $monto_para_contrato, 
                 ];
-
-                // Pre-seleccionar el cliente si viene del caso
                 if ($caso->deudor) {
-                    // Lo creamos como objeto para que coincida con la estructura de $clienteSeleccionado
                     $clienteSeleccionado = (object) [
                         'id' => $caso->deudor->id,
                         'nombre_completo' => $caso->deudor->nombre_completo,
-                        'nombre' => $caso->deudor->nombre_completo, // Añadido para compatibilidad con el buscador
+                        'nombre' => $caso->deudor->nombre_completo,
                     ];
                 }
             }
         }
-        // ===== FIN: NUEVA LÓGICA PARA LEER EL CASO =====
 
         if ($request->has('proceso_id')) {
-            // Carga solo las columnas necesarias
             $proceso = ProcesoRadicado::select('id', 'demandante_id', 'radicado')->find($request->input('proceso_id'));
         }
 
         if ($request->has('cliente_id')) {
-            // Carga solo las columnas necesarias
             $clienteSeleccionado = Persona::select('id', 'nombre_completo')->find($request->input('cliente_id'));
         }
-        elseif ($proceso && $proceso->demandante_id && !$clienteSeleccionado) { // Evita sobreescribir si ya viene del caso
-            // Carga solo las columnas necesarias
+        elseif ($proceso && $proceso->demandante_id && !$clienteSeleccionado) {
             $clienteSeleccionado = Persona::select('id', 'nombre_completo')->find($proceso->demandante_id);
         }
 
@@ -139,30 +130,22 @@ class ContratosController extends Controller
         $modalidades = ['CUOTAS','PAGO_UNICO','LITIS','CUOTA_MIXTA'];
 
         try {
-            // Carga solo columnas necesarias con alias 'nombre' para el buscador
             if (class_exists(Persona::class)) {
-                $personas = Persona::select('id','nombre_completo as nombre')
-                                        ->orderBy('nombre_completo')
-                                        ->limit(500) // Considera aumentar si tienes muchos clientes
-                                        ->get();
+                $personas = Persona::select('id','nombre_completo as nombre')->orderBy('nombre_completo')->limit(500)->get();
             } else {
-                $personas = DB::table('personas')
-                    ->select('id','nombre_completo as nombre')
-                    ->orderBy('nombre_completo')
-                    ->limit(500)
-                    ->get();
+                $personas = DB::table('personas')->select('id','nombre_completo as nombre')->orderBy('nombre_completo')->limit(500)->get();
             }
         } catch (\Throwable $e) {
-            Log::error("Error cargando lista de personas para crear contrato: " . $e->getMessage());
+            Log::error("Error cargando lista de personas: " . $e->getMessage());
         }
 
         return Inertia::render('Gestion/Honorarios/Contratos/Create', [
-            'clientes'           => $personas,
-            'modalidades'        => $modalidades,
-            'plantilla'          => $plantilla ? $plantilla->toArray() : null,
-            'proceso'            => $proceso, // Pasar el objeto ProcesoRadicado o null
-            'clienteSeleccionado' => $clienteSeleccionado, // Pasar el objeto Persona o null
-            'datosCaso'          => $datosCaso, // <--- AÑADE ESTA LÍNEA
+            'clientes'        => $personas,
+            'modalidades'     => $modalidades,
+            'plantilla'       => $plantilla ? $plantilla->toArray() : null,
+            'proceso'         => $proceso,
+            'clienteSeleccionado' => $clienteSeleccionado,
+            'datosCaso'       => $datosCaso,
         ]);
     }
 
@@ -173,25 +156,24 @@ class ContratosController extends Controller
             'modalidad'  => ['required', 'in:CUOTAS,PAGO_UNICO,LITIS,CUOTA_MIXTA'],
             'inicio'     => ['required', 'date'],
             'anticipo'   => ['nullable', 'numeric', 'min:0'],
-            'nota'       => ['nullable', 'string', 'max:5000'], // Ajusta el max si es necesario
+            'nota'       => ['nullable', 'string', 'max:5000'],
             'contrato_origen_id' => ['nullable', 'integer', 'exists:contratos,id'],
-            'proceso_id' => ['nullable', 'integer', 'exists:proceso_radicados,id'], // Validar proceso_id
-            'caso_id' => ['nullable', 'integer', 'exists:casos,id', 'unique:contratos,caso_id'],
+            'proceso_id' => ['nullable', 'integer', 'exists:proceso_radicados,id'],
+            'caso_id'    => ['nullable', 'integer', 'exists:casos,id'], 
         ];
 
         $modalidad = $request->input('modalidad');
 
         if ($modalidad === 'CUOTAS' || $modalidad === 'PAGO_UNICO' || $modalidad === 'CUOTA_MIXTA') {
             $rules['monto_total'] = ['required', 'numeric', 'min:0'];
-            $rules['cuotas']      = ['required', 'integer', 'min:1', 'max:120']; // Max 10 años
+            $rules['cuotas']      = ['required', 'integer', 'min:1', 'max:120'];
         }
 
         if ($modalidad === 'LITIS' || $modalidad === 'CUOTA_MIXTA') {
             $rules['porcentaje_litis'] = ['required', 'numeric', 'min:0', 'max:100'];
         }
 
-        // Añadir mensajes personalizados si lo deseas
-        $validatedData = Validator::make($request->all(), $rules, ['caso_id.unique' => 'Este caso ya tiene un contrato asociado.'], ['cliente_id' => 'cliente'])->validate();
+        $validatedData = Validator::make($request->all(), $rules)->validate();
 
         $monto_total = round((float)($validatedData['monto_total'] ?? 0), 2);
         $anticipo    = round((float)($validatedData['anticipo'] ?? 0), 2);
@@ -211,33 +193,29 @@ class ContratosController extends Controller
                 }
 
                 $contrato = Contrato::create([
-                    'cliente_id'         => $validatedData['cliente_id'],
-                    'monto_total'        => $monto_total,
-                    'anticipo'           => $anticipo,
-                    'porcentaje_litis'   => $validatedData['porcentaje_litis'] ?? null,
-                    'monto_base_litis'   => null, // Se establece al resolver litis
-                    'modalidad'          => $modalidad,
-                    'estado'             => 'ACTIVO',
-                    'inicio'             => $validatedData['inicio'],
-                    'nota'               => $validatedData['nota'] ?? null,
+                    'cliente_id'        => $validatedData['cliente_id'],
+                    'monto_total'       => $monto_total,
+                    'anticipo'          => $anticipo,
+                    'porcentaje_litis'  => $validatedData['porcentaje_litis'] ?? null,
+                    'monto_base_litis'  => null,
+                    'modalidad'         => $modalidad,
+                    'estado'            => 'ACTIVO',
+                    'inicio'            => $validatedData['inicio'],
+                    'nota'              => $validatedData['nota'] ?? null,
                     'contrato_origen_id' => $contrato_origen_id,
-                    'proceso_id'         => $validatedData['proceso_id'] ?? null, // Guardar el ID del radicado
-                    'caso_id'            => $validatedData['caso_id'] ?? null,
+                    'proceso_id'        => $validatedData['proceso_id'] ?? null,
+                    'caso_id'           => $validatedData['caso_id'] ?? null,
                 ]);
 
-                // Generación de cuotas (solo si no es LITIS puro)
                 if ($modalidad !== 'LITIS') {
                     $neto = max(0, $monto_total - $anticipo);
                     $cuotasCount = ($modalidad === 'PAGO_UNICO') ? 1 : (int)($validatedData['cuotas'] ?? 1);
-                    if ($cuotasCount < 1) $cuotasCount = 1; // Mínimo 1 cuota
+                    if ($cuotasCount < 1) $cuotasCount = 1;
 
-                    // Si el neto es 0, solo PAGO_UNICO puede tener 1 cuota de 0, los demás no generan cuotas
-                    if ($neto == 0 && $modalidad !== 'PAGO_UNICO') {
-                       // No generar cuotas si el neto es 0 para CUOTAS o MIXTA
-                    } else {
+                    if ($neto > 0 || $modalidad === 'PAGO_UNICO') {
                         $netoCents  = (int) round($neto * 100);
                         $baseCents  = intdiv($netoCents, $cuotasCount);
-                        $restoCents = $netoCents % $cuotasCount; // Usar módulo para el resto
+                        $restoCents = $netoCents % $cuotasCount;
 
                         $cuotasData = [];
                         $fechaActual = Carbon::parse($validatedData['inicio']);
@@ -249,54 +227,51 @@ class ContratosController extends Controller
                             $cuotasData[] = [
                                 'contrato_id'       => $contrato->id,
                                 'numero'            => $i,
-                                // Clonar fechaActual antes de modificarla para la siguiente iteración
                                 'fecha_vencimiento' => $fechaActual->copy()->addMonthsNoOverflow($i - 1)->toDateString(),
                                 'valor'             => $valor,
-                                // Si el neto es 0 (solo en PAGO_UNICO), marcar como pagada
                                 'estado'            => $neto > 0 ? 'PENDIENTE' : 'PAGADA',
                                 'created_at'        => now(),
                                 'updated_at'        => now(),
                             ];
                         }
                         if (!empty($cuotasData)) {
-                             DB::table('contrato_cuotas')->insert($cuotasData);
+                            DB::table('contrato_cuotas')->where('contrato_id', $contrato->id)->delete();
+                            DB::table('contrato_cuotas')->insert($cuotasData);
                         }
                     }
                 }
+
+                // ✅ AUDITORÍA GLOBAL
+                AuditoriaEvento::create([
+                    'user_id' => Auth::id(),
+                    'evento' => 'CREAR_CONTRATO',
+                    'descripcion_breve' => "Creado contrato #{$contrato->id} ({$modalidad}) por $" . number_format($monto_total, 2),
+                    'criticidad' => 'media',
+                    'direccion_ip' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
+                ]);
             });
 
-            // --- INICIO: CORRECCIÓN ---
-            // Redirigir de vuelta al Caso SI se proveyó un caso_id.
-            // Esto fuerza al CasoController@show a recargar los datos,
-            // mostrando el botón "Ver Contrato" y el resumen financiero actualizado.
             if ($contrato->caso_id) {
                 return redirect()->route('casos.show', $contrato->caso_id)->with('success', 'Contrato creado y asociado al caso exitosamente.');
             }
 
-            // Si no hay caso_id, redirigir a la vista normal del contrato.
             return redirect()->route('honorarios.contratos.show', $contrato->id)->with('success', 'Contrato creado exitosamente.');
-            // --- FIN: CORRECCIÓN ---
 
         } catch (\Exception $e) {
             Log::error("Error al crear contrato: " . $e->getMessage());
-            // Considera retornar un error más específico o genérico
-            return back()->with('error', 'Ocurrió un error al crear el contrato. Por favor, inténtalo de nuevo.')->withInput();
+            return back()->with('error', 'Ocurrió un error al crear el contrato.')->withInput();
         }
     }
 
-
-    // --- El resto de tus métodos (show, reestructurar, pagar, etc.) ---
     public function show($id)
     {
-        // --- Usando Modelo con relaciones precargadas ---
         $contrato = Contrato::with([
                 'cliente:id,nombre_completo', 
                 'contratoOrigen:id,estado,monto_total,modalidad',
                 'actuaciones' => function ($query) {
                     $query->with('user:id,name')->orderBy('created_at', 'desc');
                 },
-                // ===== CORRECCIÓN 1 (SHOW) =====
-                // Cargamos la relación con el proceso
                 'proceso:id,radicado',
                 'caso:id',
             ])
@@ -311,16 +286,12 @@ class ContratosController extends Controller
 
         try {
             if (class_exists(Persona::class)) {
-                $clientes = Persona::select('id','nombre_completo as nombre')
-                                        ->orderBy('nombre_completo')
-                                        ->limit(500)
-                                        ->get();
+                $clientes = Persona::select('id','nombre_completo as nombre')->orderBy('nombre_completo')->limit(500)->get();
             } else {
                 $clientes = DB::table('personas')->select('id','nombre_completo as nombre')->orderBy('nombre_completo')->limit(500)->get();
             }
         } catch (\Throwable $e) {}
 
-        // --- Manteniendo DB::table para cuotas, cargos, pagos hasta confirmar modelos ---
         $total_cargos_valor = DB::table('contrato_cargos')->where('contrato_id', $id)->sum('monto');
         $total_pagos_valor  = DB::table('contrato_pagos')->where('contrato_id', $id)->sum('valor');
 
@@ -332,7 +303,7 @@ class ContratosController extends Controller
         $cargos = DB::table('contrato_cargos as c')
             ->leftJoin('contrato_pagos as p', 'c.pago_id', '=', 'p.id')
             ->where('c.contrato_id', $id)
-            ->select('c.*', 'p.fecha as fecha_pago_cargo', 'p.metodo as metodo_pago_cargo', 'p.nota as nota_pago_cargo', 'p.comprobante as comprobante_pago_cargo')
+            ->select('c.*', 'p.fecha as fecha_pago_cargo', 'p.metodo as metodo_pago_cargo', 'p.nota as nota_pago_cargo', 'p.comprobante as comprobante_pago_cargo', 'p.id as pago_id_del_cargo') 
             ->orderByDesc('c.fecha_aplicado')
             ->paginate(15, ['*'], 'cargosPage');
 
@@ -341,10 +312,8 @@ class ContratosController extends Controller
             ->orderByDesc('fecha')->orderByDesc('id')
             ->paginate(15, ['*'], 'pagosPage');
 
-        // --- INICIO: CORRECCIÓN - Pasar objetos Eloquent directamente ---
         return Inertia::render('Gestion/Honorarios/Contratos/Show', [
             'contrato' => $contrato,
-            // 'proceso' ya está incluido dentro de $contrato->proceso
             'contratoOrigen' => $contratoOrigen,
             'cliente' => $cliente,
             'cuotas' => $cuotas,
@@ -356,16 +325,24 @@ class ContratosController extends Controller
             'clientes' => $clientes,
             'modalidades' => $modalidades
         ]);
-        // --- FIN: CORRECCIÓN ---
     }
 
     public function reestructurar($id)
     {
-        // --- Usando Modelo ---
         $contrato = Contrato::find($id);
         if (!$contrato) {
             return redirect()->route('honorarios.contratos.index')->with('error', 'Contrato no encontrado.');
         }
+        
+        // ✅ AUDITORÍA GLOBAL
+        AuditoriaEvento::create([
+            'user_id' => Auth::id(),
+            'evento' => 'INICIO_REESTRUCTURACION',
+            'descripcion_breve' => "Usuario inició proceso de reestructuración para contrato #{$id}",
+            'criticidad' => 'media',
+            'direccion_ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
 
         return redirect()->route('honorarios.contratos.create', ['from' => $id]);
     }
@@ -381,9 +358,8 @@ class ContratosController extends Controller
             'comprobante' => ['nullable','file','mimes:pdf,jpg,jpeg,png,webp','max:5120'],
         ])->validate();
 
-        $contrato = Contrato::findOrFail($id); // --- Usando Modelo ---
+        $contrato = Contrato::with('caso')->findOrFail($id);
 
-        // --- Manteniendo DB::table para cuota hasta confirmar modelo ---
         $cuota = DB::table('contrato_cuotas')
             ->where('id', $validated['cuota_id'])
             ->where('contrato_id', $id)
@@ -391,19 +367,13 @@ class ContratosController extends Controller
         if (!$cuota) return back()->withErrors(['cuota_id'=>'Cuota no encontrada.']);
 
         $valor = round((float)$validated['valor'], 2);
-        // Incluir lógica de mora si es necesario aquí antes de comparar
-        $valorMinimo = (float)$cuota->valor; // + $cuota->intereses_mora_acumulados ?? 0;
-        if ($valor + 0.01 < $valorMinimo) {
-            return back()->withErrors(['valor'=>'Solo se admiten pagos iguales o superiores al valor pendiente de la cuota (incluyendo mora).']);
-        }
-
+        
         $path = null;
         if ($request->hasFile('comprobante')) {
             $path = $request->file('comprobante')->store("comprobantes/pagos/{$id}", 'public');
         }
 
-        DB::transaction(function () use ($id, $cuota, $validated, $valor, $path) {
-            // --- Manteniendo DB::table para pago hasta confirmar modelo ---
+        DB::transaction(function () use ($id, $contrato, $cuota, $validated, $valor, $path) {
             DB::table('contrato_pagos')->insert([
                 'contrato_id' => $id,
                 'cuota_id'    => $cuota->id,
@@ -417,30 +387,64 @@ class ContratosController extends Controller
                 'updated_at'  => now(),
             ]);
 
-            DB::table('contrato_cuotas')->where('id',$cuota->id)->update([
-                'estado'     => 'PAGADA',
-                'fecha_pago' => $validated['fecha'],
-                'updated_at' => now(),
-            ]);
+            $totalPagadoCuota = DB::table('contrato_pagos')->where('cuota_id', $cuota->id)->sum('valor');
+            $valorTotalCuota = (float)($cuota->valor ?? 0) + (float)($cuota->intereses_mora_acumulados ?? 0);
+
+            $epsilon = 0.001; 
+            if ($totalPagadoCuota >= ($valorTotalCuota - $epsilon)) {
+                DB::table('contrato_cuotas')->where('id',$cuota->id)->update([
+                    'estado'     => 'PAGADA',
+                    'fecha_pago' => $validated['fecha'],
+                    'updated_at' => now(),
+                ]);
+            } else {
+                 DB::table('contrato_cuotas')->where('id',$cuota->id)->update([
+                    'estado'     => 'PAGO_PARCIAL', 
+                    'updated_at' => now(),
+                ]);
+            }
 
             $this->checkAndCloseContract($id);
+
+            // Sincronización Caso
+            if ($contrato->caso) {
+                $nuevoTotalPagadoCaso = (float)$contrato->caso->monto_total_pagado + $valor;
+                $nuevaDeudaCaso = max(0, (float)$contrato->caso->monto_deuda_actual - $valor);
+                $contrato->caso->update([
+                    'monto_total_pagado' => $nuevoTotalPagadoCaso,
+                    'monto_deuda_actual' => $nuevaDeudaCaso,
+                ]);
+            }
+
+            // ✅ AUDITORÍA GLOBAL
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'REGISTRAR_PAGO_CUOTA',
+                'descripcion_breve' => "Pago de $" . number_format($valor, 2) . " a cuota #{$cuota->numero} del contrato #{$id}",
+                'criticidad' => 'alta', // Pagos son críticos
+                'direccion_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
         });
 
-        return back()->with('success','Pago registrado.');
+        return back()->with('success','Pago registrado y caso sincronizado.');
     }
 
     public function resolverLitis($id, Request $request)
     {
         $validated = Validator::make($request->all(), [
             'monto_base_litis' => ['required', 'numeric', 'min:0'],
-            'fecha_inicio_intereses' => ['nullable', 'date'], // Añadido
+            'fecha_inicio_intereses' => ['nullable', 'date'],
         ])->validate();
 
-        // --- Usando Modelo ---
         $contrato = Contrato::findOrFail($id);
 
         if ($contrato->modalidad !== 'LITIS' && $contrato->modalidad !== 'CUOTA_MIXTA') {
             return back()->with('error', 'Esta acción solo es válida para contratos de tipo Litis o Cuota Mixta.');
+        }
+        
+        if (!is_null($contrato->monto_base_litis)) {
+             return back()->with('error', 'Este caso de Litis ya fue resuelto y tiene un monto base asignado.');
         }
 
         $monto_base = round((float)$validated['monto_base_litis'], 2);
@@ -448,31 +452,45 @@ class ContratosController extends Controller
         $honorarios = round(($monto_base * $porcentaje) / 100, 2);
 
         DB::transaction(function () use ($contrato, $monto_base, $honorarios, $validated) {
-            $contrato->update(['monto_base_litis' => $monto_base]);
-
-            // --- Manteniendo DB::table para cargo hasta confirmar modelo ---
-            DB::table('contrato_cargos')->insert([
-                'contrato_id'            => $contrato->id,
-                'tipo'                   => 'LITIS',
-                'monto'                  => $honorarios,
-                'estado'                 => 'PENDIENTE',
-                'descripcion'            => "Honorarios del {$contrato->porcentaje_litis}% sobre un monto base de {$monto_base}.",
-                'fecha_aplicado'         => now()->toDateString(),
-                'fecha_inicio_intereses' => $validated['fecha_inicio_intereses'] ?? null, // Añadido
-                'created_at'             => now(),
-                'updated_at'             => now(),
+            $contrato->update([
+                'monto_base_litis' => $monto_base,
+                'litis_valor_ganado' => $honorarios
             ]);
-            // Forzar estado a Pagos Pendientes al resolver Litis si hay honorarios
-             if ($honorarios > 0 && $contrato->estado !== 'PAGOS_PENDIENTES') {
-                  $contrato->update(['estado' => 'PAGOS_PENDIENTES']);
-             }
-        });
 
+            if ($honorarios > 0) {
+                DB::table('contrato_cargos')->insert([
+                    'contrato_id'        => $contrato->id,
+                    'tipo'               => 'LITIS',
+                    'monto'              => $honorarios,
+                    'estado'             => 'PENDIENTE',
+                    'descripcion'        => "Honorarios del {$contrato->porcentaje_litis}% sobre un monto base de {$monto_base}.",
+                    'fecha_aplicado'     => now()->toDateString(),
+                    'fecha_inicio_intereses' => $validated['fecha_inicio_intereses'] ?? null,
+                    'created_at'         => now(),
+                    'updated_at'         => now(),
+                ]);
+                 if ($contrato->estado !== 'PAGOS_PENDIENTES') {
+                     $contrato->update(['estado' => 'PAGOS_PENDIENTES']);
+                 }
+            } else {
+                $this->checkAndCloseContract($contrato->id);
+            }
+
+            // ✅ AUDITORÍA GLOBAL
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'RESOLVER_LITIS',
+                'descripcion_breve' => "Litis resuelta contrato #{$contrato->id}. Base: ${monto_base}, Honorarios: ${honorarios}",
+                'criticidad' => 'alta',
+                'direccion_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+        });
 
         return back()->with('success', 'Resultado del caso registrado. Se ha generado el cargo por honorarios.');
     }
 
-    public function pagarCargo($contrato_id, Request $request) // Cambiado $id a $contrato_id por claridad
+    public function pagarCargo($contrato_id, Request $request)
     {
         $validated = Validator::make($request->all(), [
             'cargo_id'    => ['required','integer'],
@@ -483,26 +501,28 @@ class ContratosController extends Controller
             'comprobante' => ['required','file','mimes:pdf,jpg,jpeg,png,webp','max:5120'],
         ])->validate();
 
-        $contrato = Contrato::findOrFail($contrato_id); // --- Usando Modelo ---
+        $contrato = Contrato::with('caso')->findOrFail($contrato_id);
 
-        // --- Manteniendo DB::table para cargo hasta confirmar modelo ---
         $cargo = DB::table('contrato_cargos')
             ->where('id', $validated['cargo_id'])
             ->where('contrato_id', $contrato_id)
             ->first();
         if (!$cargo) return back()->withErrors(['cargo_id'=>'Cargo no encontrado.']);
+        
+        if ($cargo->estado === 'PAGADO' || !is_null($cargo->pago_id)) {
+            return back()->withErrors(['cargo_id'=>'Este cargo ya ha sido pagado.']);
+        }
 
         $valor = round((float)$validated['valor'], 2);
-        // Incluir lógica de mora si es necesario
-        $valorMinimo = (float)$cargo->monto; // + $cargo->intereses_mora_acumulados ?? 0;
+        $valorMinimo = (float)($cargo->monto ?? 0) + (float)($cargo->intereses_mora_acumulados ?? 0);
+        
         if ($valor + 0.01 < $valorMinimo) {
             return back()->withErrors(['valor'=>'El pago debe ser igual o superior al valor pendiente del cargo (incluyendo mora).']);
         }
 
         $path = $request->file('comprobante')->store("comprobantes/cargos_pagos/{$contrato_id}", 'public');
 
-        DB::transaction(function () use ($contrato_id, $cargo, $validated, $valor, $path) {
-            // --- Manteniendo DB::table para pago hasta confirmar modelo ---
+        DB::transaction(function () use ($contrato_id, $contrato, $cargo, $validated, $valor, $path) {
             $pagoId = DB::table('contrato_pagos')->insertGetId([
                 'contrato_id' => $contrato_id,
                 'cuota_id'    => null,
@@ -518,12 +538,32 @@ class ContratosController extends Controller
 
             DB::table('contrato_cargos')->where('id',$cargo->id)->update([
                 'estado'     => 'PAGADO',
-                'fecha_pago' => $validated['fecha'], // Fecha de pago del cargo
-                'pago_id'    => $pagoId, // ID del registro en contrato_pagos
+                'fecha_pago' => $validated['fecha'],
+                'pago_id'    => $pagoId,
                 'updated_at' => now(),
             ]);
 
             $this->checkAndCloseContract($contrato_id);
+
+            // Sincronización Caso
+            if ($contrato->caso) {
+                $nuevoTotalPagadoCaso = (float)$contrato->caso->monto_total_pagado + $valor;
+                $nuevaDeudaCaso = max(0, (float)$contrato->caso->monto_deuda_actual - $valor);
+                $contrato->caso->update([
+                    'monto_total_pagado' => $nuevoTotalPagadoCaso,
+                    'monto_deuda_actual' => $nuevaDeudaCaso,
+                ]);
+            }
+
+            // ✅ AUDITORÍA GLOBAL
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'PAGO_CARGO',
+                'descripcion_breve' => "Pago de cargo '{$cargo->descripcion}' en contrato #{$contrato_id} por $" . number_format($valor, 2),
+                'criticidad' => 'alta',
+                'direccion_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
         });
 
         return back()->with('success','Pago de cargo registrado.');
@@ -532,55 +572,77 @@ class ContratosController extends Controller
     public function agregarCargo($id, Request $request)
     {
         $validated = Validator::make($request->all(), [
-            'monto'                  => ['required','numeric','min:0.01'],
-            'descripcion'            => ['required','string','max:255'],
-            'fecha'                  => ['required','date'], // Cambiado a 'fecha' para consistencia
-            'comprobante'            => ['nullable','file','mimes:pdf,jpg,jpeg,png,webp','max:5120'],
+            'monto'              => ['required','numeric','min:0.01'],
+            'descripcion'        => ['required','string','max:255'],
+            'fecha'              => ['required','date'],
+            'comprobante'        => ['nullable','file','mimes:pdf,jpg,jpeg,png,webp','max:5120'],
             'fecha_inicio_intereses' => ['nullable', 'date', 'after_or_equal:fecha'],
         ])->validate();
 
-        $contrato = Contrato::findOrFail($id); // --- Usando Modelo ---
+        $contrato = Contrato::findOrFail($id);
+        
+        if ($contrato->estado === 'CERRADO') {
+             return back()->with('error', 'No se pueden añadir cargos a un contrato cerrado. Debe reabrirlo primero.');
+        }
 
         $path = null;
         if ($request->hasFile('comprobante')) {
             $path = $request->file('comprobante')->store("comprobantes/cargos/{$id}", 'public');
         }
 
-        // --- Manteniendo DB::table para cargo hasta confirmar modelo ---
         DB::table('contrato_cargos')->insert([
-            'contrato_id'            => $id,
-            'tipo'                   => 'GASTO', // O el tipo correspondiente
-            'monto'                  => $validated['monto'],
-            'estado'                 => 'PENDIENTE',
-            'descripcion'            => $validated['descripcion'],
-            'comprobante'            => $path,
-            'fecha_aplicado'         => $validated['fecha'], // Usar 'fecha' validada
+            'contrato_id'        => $id,
+            'tipo'               => 'GASTO', 
+            'monto'              => $validated['monto'],
+            'estado'             => 'PENDIENTE',
+            'descripcion'        => $validated['descripcion'],
+            'comprobante'        => $path,
+            'fecha_aplicado'     => $validated['fecha'], 
             'fecha_inicio_intereses' => $validated['fecha_inicio_intereses'] ?? null,
-            'created_at'             => now(),
-            'updated_at'             => now(),
+            'created_at'         => now(),
+            'updated_at'         => now(),
         ]);
 
-        // Opcional: Actualizar estado del contrato si aplica (Ej: si estaba ACTIVO y se añade un GASTO, pasa a PAGOS_PENDIENTES)
         if ($contrato->estado === 'ACTIVO') {
              $contrato->update(['estado' => 'PAGOS_PENDIENTES']);
         }
 
+        // ✅ AUDITORÍA GLOBAL
+        AuditoriaEvento::create([
+            'user_id' => Auth::id(),
+            'evento' => 'AGREGAR_CARGO',
+            'descripcion_breve' => "Cargo adicional agregado al contrato #{$id}: {$validated['descripcion']} ($" . number_format($validated['monto'], 2) . ")",
+            'criticidad' => 'media',
+            'direccion_ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
 
         return back()->with('success','Cargo añadido.');
     }
 
     public function activar($id)
     {
-        $contrato = Contrato::findOrFail($id); // --- Usando Modelo ---
+        $contrato = Contrato::findOrFail($id);
         $contrato->update(['estado'=>'ACTIVO']);
+        
+        // ✅ AUDITORÍA GLOBAL
+        AuditoriaEvento::create([
+            'user_id' => Auth::id(),
+            'evento' => 'ACTIVAR_CONTRATO',
+            'descripcion_breve' => "Contrato #{$id} reactivado manualmente",
+            'criticidad' => 'media',
+            'direccion_ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
         return back()->with('success','Contrato activado.');
     }
 
     public function cerrar($id, Request $request)
     {
         $validated = Validator::make($request->all(), [
-            'monto'                  => ['nullable','numeric','min:0'],
-            'descripcion'            => ['required_with:monto','nullable','string','max:255'], // Descripción requerida si hay monto
+            'monto'              => ['nullable','numeric','min:0'],
+            'descripcion'        => ['required_with:monto','nullable','string','max:255'],
             'fecha_inicio_intereses' => ['nullable', 'date'],
         ])->validate();
 
@@ -590,19 +652,29 @@ class ContratosController extends Controller
 
             if ($monto !== null && $monto > 0) {
                 DB::table('contrato_cargos')->insert([
-                    'contrato_id'            => $id,
-                    'tipo'                   => 'CIERRE_ATIPICO', // O el tipo adecuado
-                    'monto'                  => $monto,
-                    'estado'                 => 'PENDIENTE',
-                    'descripcion'            => $descripcion ?: 'Cargo por cierre manual.',
-                    'fecha_aplicado'         => now()->toDateString(),
+                    'contrato_id'        => $id,
+                    'tipo'               => 'CIERRE_ATIPICO', 
+                    'monto'              => $monto,
+                    'estado'             => 'PENDIENTE',
+                    'descripcion'        => $descripcion ?: 'Cargo por cierre manual.',
+                    'fecha_aplicado'     => now()->toDateString(),
                     'fecha_inicio_intereses' => $validated['fecha_inicio_intereses'] ?? null,
-                    'created_at'             => now(),
-                    'updated_at'             => now(),
+                    'created_at'         => now(),
+                    'updated_at'         => now(),
                 ]);
             }
 
-            $this->checkAndCloseContract($id, true); // Pasar true para forzar estado PAGOS_PENDIENTES si algo queda
+            $this->checkAndCloseContract($id, true); 
+
+            // ✅ AUDITORÍA GLOBAL
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'CERRAR_CONTRATO',
+                'descripcion_breve' => "Cierre manual del contrato #{$id}",
+                'criticidad' => 'media',
+                'direccion_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
         });
 
         return back()->with('success','Contrato actualizado.');
@@ -610,70 +682,94 @@ class ContratosController extends Controller
 
     public function saldarContrato($id)
     {
-        $contrato = Contrato::findOrFail($id); // --- Usando Modelo ---
-        // Añadir validación: Solo saldar si está en PAGOS_PENDIENTES y saldo es 0?
+        $contrato = Contrato::findOrFail($id); 
+        
+        $cuotasPendientes = DB::table('contrato_cuotas')->where('contrato_id',$id)->where('estado','!=','PAGADA')->count();
+        $cargosPendientes = DB::table('contrato_cargos')->where('contrato_id',$id)->where('estado','!=','PAGADO')->count();
+        
+        if ($cuotasPendientes > 0 || $cargosPendientes > 0) {
+            return back()->with('error', 'No se puede saldar. Aún existen deudas pendientes.');
+        }
+
         $contrato->update(['estado'=>'CERRADO']);
+
+        // ✅ AUDITORÍA GLOBAL
+        AuditoriaEvento::create([
+            'user_id' => Auth::id(),
+            'evento' => 'SALDAR_CONTRATO',
+            'descripcion_breve' => "Contrato #{$id} marcado como SALDADO y CERRADO",
+            'criticidad' => 'media',
+            'direccion_ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
         return back()->with('success','Contrato saldado y cerrado.');
     }
 
     public function reabrir($id)
     {
-        $contrato = Contrato::findOrFail($id); // --- Usando Modelo ---
-        $contrato->update(['estado'=>'ACTIVO']);
-        return back()->with('success','Contrato reabierto y activado.');
+        $contrato = Contrato::findOrFail($id); 
+        
+        $cuotasPendientes = DB::table('contrato_cuotas')->where('contrato_id',$id)->where('estado','!=','PAGADA')->count();
+        $cargosPendientes = DB::table('contrato_cargos')->where('contrato_id',$id)->where('estado','!=','PAGADO')->count();
+        
+        $nuevoEstado = ($cuotasPendientes > 0 || $cargosPendientes > 0) ? 'PAGOS_PENDIENTES' : 'ACTIVO';
+        
+        $contrato->update(['estado' => $nuevoEstado]);
+
+        // ✅ AUDITORÍA GLOBAL
+        AuditoriaEvento::create([
+            'user_id' => Auth::id(),
+            'evento' => 'REABRIR_CONTRATO',
+            'descripcion_breve' => "Contrato #{$id} reabierto a estado {$nuevoEstado}",
+            'criticidad' => 'media',
+            'direccion_ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        return back()->with('success',"Contrato reabierto. Estado actualizado a: {$nuevoEstado}.");
     }
 
-    // --- MANTENER DB::table HASTA CONFIRMAR MODELOS ---
     public function verComprobante($pago_id)
     {
         $pago = DB::table('contrato_pagos')->find($pago_id);
         if (!$pago || !$pago->comprobante) abort(404,'Comprobante no encontrado.');
-
         if (!Storage::disk('public')->exists($pago->comprobante)) abort(404,'Archivo no encontrado.');
-
         return Storage::disk('public')->response($pago->comprobante);
     }
 
-    // --- MANTENER DB::table HASTA CONFIRMAR MODELOS ---
     public function verCargoComprobante($cargo_id)
     {
         $cargo = DB::table('contrato_cargos')->find($cargo_id);
         if (!$cargo || !$cargo->comprobante) abort(404,'Comprobante no encontrado.');
-
         if (!Storage::disk('public')->exists($cargo->comprobante)) abort(404,'Archivo no encontrado.');
-
         return Storage::disk('public')->response($cargo->comprobante);
     }
 
-    // --- Refactorizado para usar Modelo ---
     public function pdfContrato($id)
     {
         $contrato = Contrato::with('cliente:id,nombre_completo')->findOrFail($id);
         $cliente = $contrato->cliente;
-        $cuotas = DB::table('contrato_cuotas')->where('contrato_id', $id)->orderBy('numero')->get(); // Mantener hasta confirmar modelo
+        $cuotas = DB::table('contrato_cuotas')->where('contrato_id', $id)->orderBy('numero')->get(); 
 
         $data = [
-            'contrato' => $contrato->toArray(),
-            'cliente' => $cliente ? $cliente->toArray() : null,
-            'cuotas' => $cuotas->toArray()
+            'contrato' => $contrato, 
+            'cliente' => $cliente, 
+            'cuotas' => $cuotas 
         ];
 
-        // Asumiendo que Barryvdh\DomPDF está instalado y configurado
         if (class_exists('\\Barryvdh\\DomPDF\\Facade\\Pdf')) {
-            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('honorarios.contrato', $data); // Asegúrate que la vista exista
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('honorarios.contrato', $data); 
             return $pdf->stream("contrato_{$id}.pdf");
         }
-        // Fallback si PDF no está disponible (o para debug)
         return response()->view('honorarios.contrato', $data);
     }
 
-    // --- Refactorizado para usar Modelo ---
     public function pdfLiquidacion($id)
     {
         $contrato = Contrato::with('cliente:id,nombre_completo')->findOrFail($id);
         $cliente = $contrato->cliente;
 
-        // --- Mantener DB::table hasta confirmar modelos ---
         $pagos = DB::table('contrato_pagos as p')
             ->leftJoin('contrato_cuotas as c', 'p.cuota_id', '=', 'c.id')
             ->where('p.contrato_id', $id)
@@ -688,47 +784,55 @@ class ContratosController extends Controller
             ->select('cg.*', 'p.fecha as fecha_pago_cargo', 'p.nota as nota_pago_cargo')
             ->get();
 
-        $totalCargosValor = DB::table('contrato_cargos')
-            ->where('contrato_id', $id)
-            ->sum('monto'); // Considerar sumar intereses de mora si aplica
+        $totalCargosValor = DB::table('contrato_cargos')->where('contrato_id', $id)->sum('monto');
+        $totalPagado = DB::table('contrato_pagos')->where('contrato_id', $id)->sum('valor');
+        $totalMoraPendiente = DB::table('contrato_cuotas')->where('contrato_id', $id)->where('estado', '!=', 'PAGADA')->sum('intereses_mora_acumulados');
+        $totalMoraCargos = DB::table('contrato_cargos')->where('contrato_id', $id)->where('estado', '!=', 'PAGADA')->sum('intereses_mora_acumulados');
+        $totalMora = $totalMoraPendiente + $totalMoraCargos;
+        $saldoPendiente = ($contrato->monto_total + $totalCargosValor + $totalMora) - $totalPagado;
 
-        $cuotasPendientes = DB::table('contrato_cuotas')
-            ->where('contrato_id', $id)
-            ->where('estado', 'PENDIENTE') // O estado != 'PAGADA'
-            ->orderBy('numero')
-            ->get();
+        $cuotasPendientes = DB::table('contrato_cuotas')->where('contrato_id', $id)->where('estado', '!=', 'PAGADA')->orderBy('numero')->get();
+        $cargosPendientes = DB::table('contrato_cargos')->where('contrato_id', $id)->where('estado', '!=', 'PAGADO')->orderBy('fecha_aplicado')->get();
 
-        // ===== INICIO: CORRECCIÓN DEL ERROR =====
-        // Dejamos de convertir a array y pasamos los objetos Eloquent/Colecciones.
         $data = [
-            'contrato' => $contrato, // <-- ANTES: $contrato->toArray()
-            'cliente' => $cliente, // <-- ANTES: $cliente ? $cliente->toArray() : null
-            'pagos' => $pagos, // <-- ANTES: $pagos->toArray()
-            'cargosPagados' => $cargosPagados, // <-- ANTES: $cargosPagados->toArray()
-            'totalCargosValor' => $totalCargosValor,
-            'cuotasPendientes' => $cuotasPendientes // <-- ANTES: $cuotasPendientes->toArray()
+            'contrato'      => $contrato,
+            'cliente'       => $cliente,
+            'pagos'         => $pagos,
+            'cargosPagados' => $cargosPagados,
+            'cuotasPendientes' => $cuotasPendientes,
+            'cargosPendientes' => $cargosPendientes,
+            'totalCargosValor' => $totalCargosValor, 
+            'totalPagado'      => $totalPagado,
+            'saldoPendiente'   => $saldoPendiente,
+            'granTotal'        => $contrato->monto_total + $totalCargosValor + $totalMora, 
+            'totalMora'        => $totalMora, 
         ];
-        // ===== FIN: CORRECCIÓN DEL ERROR =====
 
         if (class_exists('\\Barryvdh\\DomPDF\\Facade\\Pdf')) {
-            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('honorarios.liquidacion', $data); // Asegúrate que la vista exista
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('honorarios.liquidacion', $data);
             return $pdf->stream("liquidacion_{$id}.pdf");
         }
 
         return response()->view('honorarios.liquidacion', $data);
     }
 
-    // --- Refactorizado para usar Modelo ---
     private function checkAndCloseContract($contrato_id, $isManualClosure = false)
     {
-        // --- Mantener DB::table hasta confirmar modelos ---
         $cuotasPendientes = DB::table('contrato_cuotas')->where('contrato_id',$contrato_id)->where('estado','!=','PAGADA')->count();
-        $cargosPendientes = DB::table('contrato_cargos')->where('contrato_id',$contrato_id)->where('estado','!=','PAGADO')->count();
+        $cargosPendientes = DB::table('contrato_cargos')->where('contrato_id',$contrato_id)->where('estado','!=','PAGADA')->count();
 
         $contrato = Contrato::find($contrato_id);
-        if (!$contrato) return; // Contrato no encontrado
+        if (!$contrato) return; 
 
         if ($cuotasPendientes === 0 && $cargosPendientes === 0) {
+            if (in_array($contrato->modalidad, ['LITIS', 'CUOTA_MIXTA'])) {
+                if (is_null($contrato->monto_base_litis)) {
+                      if ($contrato->estado !== 'ACTIVO') {
+                          $contrato->update(['estado'=>'ACTIVO']);
+                      }
+                      return; 
+                }
+            }
             if ($contrato->estado !== 'CERRADO') {
                 $contrato->update(['estado'=>'CERRADO']);
             }
@@ -737,11 +841,8 @@ class ContratosController extends Controller
                 $contrato->update(['estado'=>'PAGOS_PENDIENTES']);
             }
         }
-        // Si no es cierre manual y quedan pendientes, el estado no cambia (se mantiene ACTIVO o EN_MORA etc.)
     }
 
-
-    // --- Refactorizado para usar Modelo ---
     public function subirDocumento($id, Request $request)
     {
         $validated = Validator::make($request->all(), [
@@ -751,98 +852,105 @@ class ContratosController extends Controller
         $contrato = Contrato::findOrFail($id);
 
         DB::transaction(function () use ($contrato, $request, $validated) {
-            // Eliminar documento anterior si existe
             if ($contrato->documento_contrato) {
                 Storage::disk('public')->delete($contrato->documento_contrato);
             }
 
-            // Subir nuevo documento
             $path = $request->file('documento')->store("documentos/contratos/{$contrato->id}", 'public');
-
-            // Actualizar registro
             $contrato->update(['documento_contrato' => $path]);
+
+            // ✅ AUDITORÍA GLOBAL
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'SUBIR_DOCUMENTO_CONTRATO',
+                'descripcion_breve' => "Se subió documento PDF al contrato #{$contrato->id}",
+                'criticidad' => 'media',
+                'direccion_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
         });
 
         return back()->with('success', 'Documento del contrato subido correctamente.');
     }
 
-    /**
-     * Ver/descargar documento del contrato
-     */
-    // --- Refactorizado para usar Modelo ---
     public function verDocumento($id)
     {
         $contrato = Contrato::findOrFail($id);
-        if (!$contrato->documento_contrato) {
-            abort(404, 'Documento no encontrado.');
-        }
-
-        if (!Storage::disk('public')->exists($contrato->documento_contrato)) {
-            // Opcional: intentar limpiar la referencia si el archivo no existe?
-            // $contrato->update(['documento_contrato' => null]);
-            abort(404, 'Archivo no encontrado en el disco.');
-        }
-
+        if (!$contrato->documento_contrato) abort(404, 'Documento no encontrado.');
+        if (!Storage::disk('public')->exists($contrato->documento_contrato)) abort(404, 'Archivo no encontrado en el disco.');
         return Storage::disk('public')->response($contrato->documento_contrato);
     }
 
-    /**
-     * Eliminar documento del contrato
-     */
-    // --- Refactorizado para usar Modelo ---
     public function eliminarDocumento($id)
     {
         $contrato = Contrato::findOrFail($id);
 
         if (!$contrato->documento_contrato) {
-            return back()->with('info', 'No hay documento para eliminar.'); // Usar 'info' o 'warning'
+            return back()->with('info', 'No hay documento para eliminar.');
         }
 
         DB::transaction(function () use ($contrato) {
-            // Eliminar archivo del storage
             Storage::disk('public')->delete($contrato->documento_contrato);
-
-            // Actualizar registro
             $contrato->update(['documento_contrato' => null]);
+
+            // ✅ AUDITORÍA GLOBAL
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'ELIMINAR_DOCUMENTO_CONTRATO',
+                'descripcion_breve' => "Se eliminó el documento PDF del contrato #{$contrato->id}",
+                'criticidad' => 'alta',
+                'direccion_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
         });
 
         return back()->with('success', 'Documento eliminado correctamente.');
     }
 
-    /**
-     * Eliminar permanentemente un contrato y sus relaciones.
-     */
-    // --- Refactorizado para usar Modelo ---
     public function destroy($id)
     {
-        $contrato = Contrato::findOrFail($id);
+        // --- SEGURIDAD: SOLO ADMINS PUEDEN BORRAR ---
+        if (Auth::user()->tipo_usuario !== 'admin') {
+            // ✅ AUDITORÍA: INTENTO FALLIDO
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'INTENTO_ELIMINAR_CONTRATO',
+                'descripcion_breve' => "Usuario no autorizado intentó eliminar contrato #{$id}",
+                'criticidad' => 'alta',
+                'direccion_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+            return back()->with('error', 'Acción no autorizada. Solo los administradores pueden eliminar contratos.');
+        }
 
-        DB::transaction(function () use ($contrato) {
-            // 1. Eliminar archivo del documento si existe
+        $contrato = Contrato::findOrFail($id);
+        
+        DB::transaction(function () use ($contrato, $id) {
             if ($contrato->documento_contrato) {
                 Storage::disk('public')->delete($contrato->documento_contrato);
             }
 
-            // 2. Eliminar registros relacionados (usando DB::table hasta confirmar modelos)
             DB::table('contrato_cuotas')->where('contrato_id', $contrato->id)->delete();
             DB::table('contrato_cargos')->where('contrato_id', $contrato->id)->delete();
             DB::table('contrato_pagos')->where('contrato_id', $contrato->id)->delete();
-            // Eliminar actuaciones asociadas
             Actuacion::where('actuable_type', Contrato::class)->where('actuable_id', $contrato->id)->delete();
 
-            // 3. Eliminar el contrato principal
             $contrato->delete();
 
-            // Opcional: Desvincular contratos REESTRUCTURADOS que apuntaban a este
-            // Contrato::where('contrato_origen_id', $contrato->id)->update(['contrato_origen_id' => null]);
+            // ✅ AUDITORÍA GLOBAL: ÉXITO
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'ELIMINAR_CONTRATO',
+                'descripcion_breve' => "Administrador eliminó permanentemente contrato #{$id} y sus registros asociados",
+                'criticidad' => 'alta',
+                'direccion_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
         });
 
         return redirect()->route('honorarios.contratos.index')->with('success', "Contrato #{$id} eliminado permanentemente.");
     }
 
-    /**
-     * Guarda una nueva actuación manual para un contrato.
-     */
     public function storeActuacion(Request $request, $id)
     {
         $validated = $request->validate([
@@ -858,16 +966,22 @@ class ContratosController extends Controller
             'user_id' => Auth::id(),
         ]);
 
-        return back()->with('success', 'Actuación registrada.');
+        // ✅ AUDITORÍA GLOBAL
+        AuditoriaEvento::create([
+            'user_id' => Auth::id(),
+            'evento' => 'ACTUACION_CONTRATO',
+            'descripcion_breve' => "Nueva actuación en contrato #{$id}",
+            'criticidad' => 'baja',
+            'direccion_ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        return back(303)->with('success', 'Actuación registrada.'); 
     }
 
-    /**
-     * Actualiza una actuación específica.
-     */
     public function updateActuacion(Request $request, Actuacion $actuacion)
     {
         $user = Auth::user();
-        // Verifica si la actuación pertenece a un contrato antes de verificar el rol
         if ($actuacion->actuable_type !== Contrato::class || !$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
              abort(403, 'No autorizado para editar esta actuación.');
         }
@@ -879,26 +993,41 @@ class ContratosController extends Controller
 
         $actuacion->update($validated);
 
+        // ✅ AUDITORÍA GLOBAL
+        if ($actuacion->actuable instanceof Contrato) {
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'EDITAR_ACTUACION_CONTRATO',
+                'descripcion_breve' => "Edición actuación en contrato #{$actuacion->actuable->id}",
+                'criticidad' => 'baja',
+                'direccion_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+        }
+
         return back(303)->with('success', 'Actuación actualizada.');
     }
 
-    /**
-     * Elimina una actuación específica.
-     */
     public function destroyActuacion(Actuacion $actuacion)
     {
         $user = Auth::user();
-         // Verifica si la actuación pertenece a un contrato antes de verificar el rol
         if ($actuacion->actuable_type !== Contrato::class || !$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
              abort(403, 'No autorizado para eliminar esta actuación.');
         }
 
+        $contratoId = $actuacion->actuable_id; // Guardar ID antes de borrar
         $actuacion->delete();
 
-        return back(303)->with('success', 'Actuación eliminada.');
+        // ✅ AUDITORÍA GLOBAL
+        AuditoriaEvento::create([
+            'user_id' => Auth::id(),
+            'evento' => 'ELIMINAR_ACTUACION_CONTRATO',
+            'descripcion_breve' => "Eliminada actuación del contrato #{$contratoId}",
+            'criticidad' => 'media',
+            'direccion_ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        return back(303)->with('success', 'Actuación eliminada.'); 
     }
-
-} // Fin de la clase ContratosController
-
-
-
+}

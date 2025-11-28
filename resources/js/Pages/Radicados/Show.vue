@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue';
-import { Head, Link, useForm, router } from '@inertiajs/vue3'; // router añadido
+import { Head, Link, useForm, router } from '@inertiajs/vue3'; 
 
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import Modal from '@/Components/Modal.vue';
@@ -15,45 +15,43 @@ import { useProcesos } from '@/composables/useProcesos';
 
 const props = defineProps({
     proceso: { type: Object, required: true },
-    // 'actuaciones' ya no se necesita como prop separada, vendrá dentro de 'proceso'
 });
 
 // Usamos la lógica centralizada desde nuestro composable
 const { formatDate, getRevisionStatus } = useProcesos();
 
-// --- INICIO: Helpers de Fecha (Puedes eliminarlos si los importas de useProcesos y son idénticos) ---
+// --- Helpers de Fecha Locales ---
 const fmtDateTime = (d) =>
     d ? new Date(String(d).replace(' ', 'T')).toLocaleString('es-CO', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'UTC' }) : 'N/A';
 
 const fmtDateSimple = (d) => {
      if (!d) return 'N/A';
-    const dateStr = String(d).replace(' ', 'T');
-    const dateObj = new Date(dateStr);
-    if (isNaN(dateObj.getTime())) {
-        const dateOnlyMatch = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
-        if (dateOnlyMatch) {
-            const [, year, month, day] = dateOnlyMatch;
-            const dateOnlyObj = new Date(Date.UTC(year, month - 1, day));
-             if (!isNaN(dateOnlyObj.getTime())) {
-                  return dateOnlyObj.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
-             }
-        }
-        return 'Fecha Inválida';
-    }
-    return dateObj.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+   const dateStr = String(d).replace(' ', 'T');
+   const dateObj = new Date(dateStr);
+   if (isNaN(dateObj.getTime())) {
+       const dateOnlyMatch = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+       if (dateOnlyMatch) {
+           const [, year, month, day] = dateOnlyMatch;
+           const dateOnlyObj = new Date(Date.UTC(year, month - 1, day));
+            if (!isNaN(dateOnlyObj.getTime())) {
+                return dateOnlyObj.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+            }
+       }
+       return 'Fecha Inválida';
+   }
+   return dateObj.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 };
 
 const today = new Date().toISOString().slice(0, 10);
-// --- FIN: Helpers de Fecha ---
 
 // Propiedad computada para saber si el caso está cerrado
 const isClosed = computed(() => props.proceso.estado === 'CERRADO');
 const files = computed(() => props.proceso?.documentos ?? []);
-// ===== NUEVA COMPUTADA =====
-// Verifica si el proceso tiene un contrato asociado (cargado desde el controller)
+
+// Verifica si el proceso tiene un contrato asociado
 const tieneContrato = computed(() => !!props.proceso?.contrato?.id);
-// ==========================
-const actuaciones = computed(() => props.proceso?.actuaciones ?? []); // Obtenemos actuaciones del proceso
+
+const actuaciones = computed(() => props.proceso?.actuaciones ?? []);
 const asText = (v) => v ?? '—';
 
 
@@ -114,7 +112,6 @@ const submitUpload = () => {
     onSuccess: () => {
       uploadForm.reset();
       if (fileInput.value) fileInput.value.value = '';
-      // Refrescar documentos después de subir
       router.reload({ only: ['proceso'], preserveState: true, preserveScroll: true });
     },
   });
@@ -133,14 +130,13 @@ const doDeleteDoc = () => {
         preserveScroll: true,
         onSuccess: () => {
             closeDeleteDoc();
-            // Refrescar documentos después de eliminar
             router.reload({ only: ['proceso'], preserveState: true, preserveScroll: true });
         }
     },
   );
 };
 
-// --- INICIO: Lógica para formulario de Actuaciones ---
+// --- Lógica Actuaciones ---
 const actuacionForm = useForm({
     nota: '',
     fecha_actuacion: today
@@ -152,7 +148,6 @@ const guardarActuacion = () => {
         onSuccess: () => {
             actuacionForm.reset()
             actuacionForm.fecha_actuacion = today
-            // Refrescar datos incluyendo el proceso (que contiene actuaciones)
             router.reload({ only: ['proceso'], preserveState: true })
         },
         onError: (errors) => {
@@ -160,9 +155,8 @@ const guardarActuacion = () => {
         }
     })
 }
-// --- FIN: Lógica para formulario de Actuaciones ---
 
-// --- INICIO: Lógica para Editar/Eliminar Actuación ---
+// --- Lógica Editar/Eliminar Actuación ---
 const editActuacionModalAbierto = ref(false)
 const actuacionEnEdicion = ref(null)
 
@@ -200,7 +194,6 @@ const actualizarActuacion = () => {
 }
 
 const eliminarActuacion = (actuacionId) => {
-    // Usar un modal de confirmación en lugar de confirm()
     if (confirm('¿Estás seguro de que quieres eliminar esta actuación? Esta acción no se puede deshacer.')) {
         router.delete(route('procesos.actuaciones.destroy', actuacionId), {
             preserveScroll: true,
@@ -209,13 +202,11 @@ const eliminarActuacion = (actuacionId) => {
             },
             onError: (errors) => {
                  console.error("Error al eliminar actuación:", errors);
-                 // Mostrar error en un componente de notificación/toast en lugar de alert()
                  alert("Error: No se pudo eliminar la actuación. Es posible que no tengas permiso.");
             }
         })
     }
 }
-// --- FIN: Lógica para Editar/Eliminar Actuación ---
 
 </script>
 
@@ -256,14 +247,14 @@ const eliminarActuacion = (actuacionId) => {
           </Link>
 
           <!-- ================================== -->
-          <!-- =====   BOTÓN CONDICIONAL AQUÍ ===== -->
+          <!-- =====    BOTÓN CONDICIONAL     ===== -->
           <!-- ================================== -->
           <!-- SI NO TIENE CONTRATO Y ESTÁ ACTIVO -->
           <Link
             v-if="!tieneContrato && !isClosed"
             :href="route('honorarios.contratos.create', {
               proceso_id: proceso.id,
-              cliente_id: proceso.demandante?.id // Pasa el ID del cliente si existe
+              cliente_id: proceso.demandantes?.[0]?.id 
             })"
           >
             <PrimaryButton
@@ -292,13 +283,16 @@ const eliminarActuacion = (actuacionId) => {
             </PrimaryButton>
           </Link>
           <!-- ================================== -->
-          <!-- ===== FIN BOTÓN CONDICIONAL  ===== -->
-          <!-- ================================== -->
 
           <DangerButton @click="openCloseModal" v-if="!isClosed">Cerrar</DangerButton>
           <PrimaryButton @click="openReopenModal" v-if="isClosed" class="!bg-blue-600 hover:!bg-blue-700 focus:!bg-blue-700 active:!bg-blue-800 focus:!ring-blue-500">Reabrir</PrimaryButton>
 
-          <DangerButton @click="askDelete" :disabled="isClosed">
+          <!-- BOTÓN DE ELIMINAR PROTEGIDO -->
+          <DangerButton 
+            v-if="$page.props.auth.user.tipo_usuario === 'admin'" 
+            @click="askDelete" 
+            :disabled="isClosed"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
             Eliminar
           </DangerButton>
@@ -354,10 +348,6 @@ const eliminarActuacion = (actuacionId) => {
                   <div>
                     <dt class="text-xs uppercase text-gray-500">Naturaleza</dt>
                     <dd class="text-gray-900 dark:text-gray-100 mt-1 break-words">{{ asText(proceso.naturaleza) }}</dd>
-                  </div>
-                  <div class="md:col-span-2">
-                    <dt class="text-xs uppercase text-gray-500">Última actuación</dt>
-                    <dd class="text-gray-900 dark:text-gray-100 mt-1 whitespace-pre-wrap break-words">{{ asText(proceso.ultima_actuacion) }}</dd>
                   </div>
                   <div class="md:col-span-2">
                     <dt class="text-xs uppercase text-gray-500">Observaciones</dt>
@@ -453,7 +443,7 @@ const eliminarActuacion = (actuacionId) => {
               </div>
             </fieldset>
 
-            <!-- --- INICIO: SECCIÓN DE ACTUACIONES --- -->
+            <!-- Actuaciones -->
             <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg" :class="{ 'opacity-60': isClosed }">
                 <div class="p-4 sm:p-6">
                     <fieldset :disabled="isClosed">
@@ -503,7 +493,6 @@ const eliminarActuacion = (actuacionId) => {
                                     Registrado por: {{ actuacion.user?.name ?? 'Usuario desconocido' }} el {{ fmtDateTime(actuacion.created_at) }}
                                     <span v-if="actuacion.fecha_actuacion"> | Fecha Actuación: {{ fmtDateSimple(actuacion.fecha_actuacion) }}</span>
                                 </span>
-                                <!-- $page.props.auth.user.tipo_usuario viene de AppServiceProvider -->
                                 <div v-if="$page.props.auth.user && ['admin', 'gestor', 'abogado'].includes($page.props.auth.user.tipo_usuario)" class="flex-shrink-0 flex items-center gap-2">
                                     <button @click="abrirModalEditar(actuacion)" type="button" class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300" title="Editar">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
@@ -517,13 +506,13 @@ const eliminarActuacion = (actuacionId) => {
                     </div>
                 </div>
             </div>
-            <!-- --- FIN: SECCIÓN DE ACTUACIONES --- -->
 
           </div>
 
           <!-- Columna Lateral -->
           <div class="lg:col-span-1">
             <div class="sticky top-8 space-y-6">
+              <!-- Seguimiento -->
               <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg p-6">
                 <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0h18" /></svg>
@@ -549,6 +538,7 @@ const eliminarActuacion = (actuacionId) => {
                 </dl>
               </div>
 
+              <!-- Partes y Responsables -->
               <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg p-6">
                 <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197" /></svg>
@@ -556,12 +546,22 @@ const eliminarActuacion = (actuacionId) => {
                 </h3>
                 <dl class="mt-4 space-y-4 text-sm">
                   <div>
-                    <dt class="text-xs uppercase text-gray-500">Demandante / Denunciante</dt>
-                    <dd class="text-gray-900 dark:text-gray-100 mt-1 break-words">{{ proceso.demandante?.nombre_completo || '—' }}</dd>
+                    <dt class="text-xs uppercase text-gray-500">Demandantes / Denunciantes</dt>
+                    <dd class="text-gray-900 dark:text-gray-100 mt-1 break-words">
+                        <ul v-if="proceso.demandantes && proceso.demandantes.length > 0" class="list-disc list-inside">
+                            <li v-for="persona in proceso.demandantes" :key="persona.id">{{ persona.nombre_completo }}</li>
+                        </ul>
+                        <span v-else>—</span>
+                    </dd>
                   </div>
                   <div>
-                    <dt class="text-xs uppercase text-gray-500">Demandado / Denunciado</dt>
-                    <dd class="text-gray-900 dark:text-gray-100 mt-1 break-words">{{ proceso.demandado?.nombre_completo || '—' }}</dd>
+                    <dt class="text-xs uppercase text-gray-500">Demandados / Denunciados</dt>
+                    <dd class="text-gray-900 dark:text-gray-100 mt-1 break-words">
+                        <ul v-if="proceso.demandados && proceso.demandados.length > 0" class="list-disc list-inside">
+                            <li v-for="persona in proceso.demandados" :key="persona.id">{{ persona.nombre_completo }}</li>
+                        </ul>
+                        <span v-else>—</span>
+                    </dd>
                   </div>
                   <div>
                     <dt class="text-xs uppercase text-gray-500">Abogado / Gestor</dt>
@@ -574,6 +574,7 @@ const eliminarActuacion = (actuacionId) => {
                 </dl>
               </div>
 
+              <!-- Enlaces y Contacto -->
               <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg p-6">
                 <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" /></svg>
@@ -603,7 +604,7 @@ const eliminarActuacion = (actuacionId) => {
                     <dd class="text-gray-900 dark:text-gray-100 mt-1 break-all">{{ asText(proceso.correo_radicacion) }}</dd>
                   </div>
                   <div>
-                    <dt class="text-xs uppercase text-gray-500">Correos del juzgado</dt>
+                    <dt class="text-xs uppercase text-gray-500">Correo del juzgado</dt>
                     <dd class="text-gray-900 dark:text-gray-100 mt-1 break-all">{{ asText(proceso.correos_juzgado) }}</dd>
                   </div>
                 </dl>
@@ -642,7 +643,6 @@ const eliminarActuacion = (actuacionId) => {
       </div>
     </Modal>
 
-    <!-- INICIO DE NUEVOS MODALES -->
     <Modal :show="showCloseModal" @close="showCloseModal = false">
         <div class="p-6">
             <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Cerrar Radicado</h2>
@@ -677,50 +677,46 @@ const eliminarActuacion = (actuacionId) => {
             </div>
         </div>
     </Modal>
-    <!-- FIN DE NUEVOS MODALES -->
 
-    <!-- --- INICIO: MODAL PARA EDITAR ACTUACIÓN --- -->
     <Modal :show="editActuacionModalAbierto" @close="cerrarModalEditar">
         <form @submit.prevent="actualizarActuacion" class="p-6">
              <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
                   Editar Actuación Manual
-            </h2>
+             </h2>
 
-            <div class="mt-6 space-y-4">
-                 <div>
-                    <InputLabel for="edit_actuacion_nota" value="Descripción de la Actuación" />
-                    <Textarea
-                        id="edit_actuacion_nota"
-                        v-model="editActuacionForm.nota"
-                        rows="4"
-                        class="mt-1 block w-full"
-                        required
-                    />
-                    <InputError class="mt-2" :message="editActuacionForm.errors.nota" />
-                </div>
-                <div>
-                    <InputLabel for="edit_fecha_actuacion" value="Fecha de Actuación" />
-                    <TextInput
-                        id="edit_fecha_actuacion"
-                        type="date"
-                        v-model="editActuacionForm.fecha_actuacion"
-                        class="mt-1 block w-full"
-                        required
-                    />
-                    <InputError class="mt-2" :message="editActuacionForm.errors.fecha_actuacion" />
-                </div>
-            </div>
+             <div class="mt-6 space-y-4">
+                  <div>
+                      <InputLabel for="edit_actuacion_nota" value="Descripción de la Actuación" />
+                      <Textarea
+                          id="edit_actuacion_nota"
+                          v-model="editActuacionForm.nota"
+                          rows="4"
+                          class="mt-1 block w-full"
+                          required
+                      />
+                      <InputError class="mt-2" :message="editActuacionForm.errors.nota" />
+                  </div>
+                  <div>
+                      <InputLabel for="edit_fecha_actuacion" value="Fecha de Actuación" />
+                      <TextInput
+                          id="edit_fecha_actuacion"
+                          type="date"
+                          v-model="editActuacionForm.fecha_actuacion"
+                          class="mt-1 block w-full"
+                          required
+                      />
+                      <InputError class="mt-2" :message="editActuacionForm.errors.fecha_actuacion" />
+                  </div>
+             </div>
 
-            <div class="mt-6 flex justify-end gap-3">
-                 <SecondaryButton type="button" @click="cerrarModalEditar"> Cancelar </SecondaryButton>
-                 <PrimaryButton type="submit" :disabled="editActuacionForm.processing">
+             <div class="mt-6 flex justify-end gap-3">
+                  <SecondaryButton type="button" @click="cerrarModalEditar"> Cancelar </SecondaryButton>
+                  <PrimaryButton type="submit" :disabled="editActuacionForm.processing">
                     {{ editActuacionForm.processing ? 'Guardando...' : 'Guardar Cambios' }}
-                </PrimaryButton>
-            </div>
+                  </PrimaryButton>
+             </div>
         </form>
     </Modal>
-    <!-- --- FIN: MODAL PARA EDITAR ACTUACIÓN --- -->
 
   </AuthenticatedLayout>
 </template>
-

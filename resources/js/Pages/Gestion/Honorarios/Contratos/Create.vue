@@ -10,7 +10,7 @@ const props = defineProps({
     plantilla: { type: Object, default: null },
     proceso: { type: Object, default: null },
     clienteSeleccionado: { type: Object, default: null },
-    datosCaso: { type: Object, default: null }, // <--- 1. AÑADIDO ESTE PROP
+    datosCaso: { type: Object, default: null },
 });
 
 const todayYmd = () => new Date().toISOString().slice(0, 10);
@@ -25,8 +25,8 @@ const form = useForm({
     nota: '',
     porcentaje_litis: null,
     contrato_origen_id: null,
-    proceso_id: null, // Para guardar el ID del radicado
-    caso_id: null, // <--- 2. AÑADIDO ESTE CAMPO
+    proceso_id: null,
+    caso_id: null,
 });
 
 // --- BÚSQUEDA DE CLIENTES ---
@@ -36,20 +36,17 @@ const isClientListOpen = ref(false);
 const clientDropdown = ref(null);
 
 const filteredClients = computed(() => {
-    // Asegúrate de que props.clientes existe y es un array antes de filtrar
     if (!props.clientes || !Array.isArray(props.clientes)) return [];
     if (!clienteSearch.value) return props.clientes.slice(0, 10);
     const searchTerm = clienteSearch.value.toLowerCase();
-    // Busca en la propiedad 'nombre' que viene del alias 'nombre_completo as nombre'
     return props.clientes.filter(c =>
         c.nombre && c.nombre.toLowerCase().includes(searchTerm)
     ).slice(0, 10);
 });
 
-// Función unificada para seleccionar cliente, maneja 'nombre' y 'nombre_completo'
 const selectClient = (client) => {
     if (client && client.id) {
-        const clientDisplayName = client.nombre || client.nombre_completo; // Usa el nombre disponible
+        const clientDisplayName = client.nombre || client.nombre_completo;
         if(clientDisplayName) {
             form.cliente_id = client.id;
             selectedClientName.value = clientDisplayName;
@@ -59,10 +56,7 @@ const selectClient = (client) => {
     }
 };
 
-
 watch(clienteSearch, (newVal) => {
-    // Solo resetea cliente_id si el texto NO coincide con el nombre seleccionado
-    // y si no estamos en el caso de cliente preseleccionado (para evitar borrarlo al inicio)
     if (newVal !== selectedClientName.value && !(props.clienteSeleccionado && newVal === props.clienteSeleccionado.nombre_completo)) {
         form.cliente_id = null;
     }
@@ -75,35 +69,36 @@ const fmtMoney = (n) => new Intl.NumberFormat('es-CO', { style: 'currency', curr
 
 const pageTitle = computed(() => {
     if (props.plantilla) return `Reestructurar Contrato #${props.plantilla.id}`;
-    
-    // --- Lógica de título actualizada ---
-    if (props.datosCaso) {
-        return `Contrato para Caso #${props.datosCaso.id}`;
-    }
+    if (props.datosCaso) return `Contrato para Caso #${props.datosCaso.id}`;
     if (props.proceso) {
         const radicadoNum = props.proceso.radicado || props.proceso.id;
         return `Contrato para Radicado #${radicadoNum}`;
     }
-    // --- Fin lógica ---
-
     return 'Crear Nuevo Contrato';
 });
 
+// --- CORRECCIÓN BUG LITIS (Recuperación inteligente de monto) ---
 watch(() => form.modalidad, (newModalidad) => {
     if (newModalidad === 'LITIS') {
         form.monto_total = null;
         form.cuotas = 1;
-    } else if (newModalidad === 'PAGO_UNICO') {
-        form.cuotas = 1;
-        form.porcentaje_litis = null;
-    } else if (newModalidad === 'CUOTAS') {
-        form.porcentaje_litis = null;
+    } else {
+        if (!form.monto_total && props.datosCaso && props.datosCaso.monto_total) {
+            form.monto_total = props.datosCaso.monto_total;
+        }
+
+        if (newModalidad === 'PAGO_UNICO') {
+            form.cuotas = 1;
+            form.porcentaje_litis = null;
+        } else if (newModalidad === 'CUOTAS') {
+            form.porcentaje_litis = null;
+        }
     }
 });
 
 onMounted(() => {
     if (props.plantilla) {
-        // Lógica de reestructuración
+        // Lógica de Reestructuración
         const clienteOriginal = props.clientes.find(c => c.id === props.plantilla.cliente_id);
         form.defaults({
             cliente_id: props.plantilla.cliente_id,
@@ -115,20 +110,19 @@ onMounted(() => {
             nota: `Reestructuración del contrato #${props.plantilla.id}.`,
             porcentaje_litis: props.plantilla.porcentaje_litis,
             contrato_origen_id: props.plantilla.id,
-            proceso_id: null,
-            caso_id: null, // Una reestructuración no se vincula a un caso
+            proceso_id: props.plantilla.proceso_id, // Heredar proceso si existe
+            // ===============================================================
+            // --- FIX CRÍTICO: HEREDAR EL CASO ID ---
+            // ===============================================================
+            caso_id: props.plantilla.caso_id, // Ahora SÍ vinculamos el nuevo contrato al caso original
         });
         form.reset();
-        if (clienteOriginal) {
-            selectClient(clienteOriginal); // Usa la función unificada
-        }
+        if (clienteOriginal) selectClient(clienteOriginal);
     
-    // <--- 3. AÑADIDO ESTE BLOQUE 'ELSE IF' ---
     } else if (props.datosCaso) {
-        // Lógica para pre-llenar desde un Caso de Cobro
         form.defaults({
             cliente_id: props.clienteSeleccionado?.id || null,
-            monto_total: props.datosCaso.monto_total, // <--- LLENA EL MONTO
+            monto_total: props.datosCaso.monto_total,
             anticipo: 0,
             modalidad: 'CUOTAS',
             cuotas: 12,
@@ -136,18 +130,13 @@ onMounted(() => {
             nota: `Contrato generado desde el Caso de cobro #${props.datosCaso.id}.`,
             porcentaje_litis: null,
             contrato_origen_id: null,
-            proceso_id: null, // El caso ya tiene la info, no se vincula a radicado por aquí
-            caso_id: props.datosCaso.id, // <--- GUARDA EL ID DEL CASO
+            proceso_id: null,
+            caso_id: props.datosCaso.id,
         });
         form.reset();
-        // Pre-seleccionar el cliente (que ya viene en clienteSeleccionado)
-        if (props.clienteSeleccionado) {
-            selectClient(props.clienteSeleccionado);
-        }
-    // <--- FIN DEL BLOQUE AÑADIDO ---
+        if (props.clienteSeleccionado) selectClient(props.clienteSeleccionado);
 
     } else if (props.clienteSeleccionado && props.proceso) {
-        // Lógica para radicado
         const radicadoNum = props.proceso.radicado || props.proceso.id;
         form.defaults({
             cliente_id: props.clienteSeleccionado.id,
@@ -160,10 +149,9 @@ onMounted(() => {
             inicio: todayYmd(),
             porcentaje_litis: null,
             contrato_origen_id: null,
-            caso_id: null, // No viene de un caso
+            caso_id: null,
         });
         form.reset();
-        // Usa la función unificada pasando el objeto clienteSeleccionado
         selectClient(props.clienteSeleccionado);
     }
 });
@@ -275,7 +263,7 @@ const submit = () => {
                     </div>
                 </div>
                 
-                <!-- ===== 4. INICIO: NUEVA ALERTA DE CASO ===== -->
+                <!-- Alerta de Caso de Cobro (NUEVO) -->
                 <div v-if="props.datosCaso" class="bg-green-50 dark:bg-green-900/20 border-l-4 border-green-400 p-4 rounded-md shadow-sm">
                     <div class="flex">
                         <div class="flex-shrink-0">
@@ -289,7 +277,6 @@ const submit = () => {
                         </div>
                     </div>
                 </div>
-                <!-- ===== FIN: NUEVA ALERTA DE CASO ===== -->
 
 
                 <!-- Card 1: Información Principal -->
@@ -312,7 +299,7 @@ const submit = () => {
                                         <li v-if="filteredClients.length === 0" class="px-4 py-2 text-sm text-gray-500">No hay coincidencias</li>
                                         <li v-for="client in filteredClients" :key="client.id" @click="selectClient(client)"
                                             class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-indigo-500 hover:text-white dark:hover:bg-indigo-600 cursor-pointer">
-                                            {{ client.nombre }} <!-- Muestra el alias 'nombre' -->
+                                            {{ client.nombre }}
                                         </li>
                                     </ul>
                                 </div>
@@ -362,8 +349,6 @@ const submit = () => {
                                 </label>
                                 <div class="relative mt-1">
                                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">COP</div>
-                                    
-                                    <!-- ===== 5. CAMPO DE MONTO TOTAL MODIFICADO ===== -->
                                     <input type="number" v-model.number="form.monto_total" 
                                            :disabled="!!props.datosCaso" 
                                            placeholder="5000000" 

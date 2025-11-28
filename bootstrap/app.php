@@ -4,6 +4,13 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\TrustProxies;
+// --- IMPORTACIONES AÑADIDAS PARA INERTIA ---
+use Illuminate\Auth\AuthenticationException;
+use Inertia\Inertia;
+// ===== INICIO DE LA NUEVA CORRECCIÓN =====
+// Importamos la excepción de Conflicto (Error 409)
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+// ===== FIN DE LA NUEVA CORRECCIÓN =====
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -31,6 +38,32 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->timezone(config('app.timezone'));
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        
+        // --- MANEJADOR DE SESIÓN EXPIRADA ---
+        $exceptions->renderable(function (AuthenticationException $e, $request) {
+            if ($request->header('X-Inertia')) {
+                return Inertia::location(route('login'));
+            }
+            return redirect()->guest(route('login'));
+        });
+
+        // ===== INICIO DE LA NUEVA CORRECCIÓN (MANEJAR ERROR 409) =====
+        /**
+         * Esto maneja el error '409 Conflict' (Asset Mismatch).
+         * Ocurre cuando corres 'npm run build' y el usuario tiene una
+         * versión vieja de la app en su navegador.
+         * Forzamos una recarga completa.
+         */
+        $exceptions->renderable(function (ConflictHttpException $e, $request) {
+            if ($request->header('X-Inertia')) {
+                // Le dice a Inertia que la URL ha cambiado a la URL actual,
+                // forzando una recarga de página completa.
+                return Inertia::location($request->url());
+            }
+
+            return response()->view('errors.409', [], 409); // Fallback
+        });
+        // ===== FIN DE LA NUEVA CORRECCIÓN =====
+
     })
     ->create();

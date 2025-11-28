@@ -5,24 +5,43 @@ import DangerButton from '@/Components/DangerButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
-import { TrashIcon, MagnifyingGlassIcon, InboxIcon, EyeIcon } from '@heroicons/vue/24/outline'; // EyeIcon añadido
+import { ref, watch, reactive } from 'vue';
+import { TrashIcon, MagnifyingGlassIcon, InboxIcon, EyeIcon, ArrowDownTrayIcon, FunnelIcon } from '@heroicons/vue/24/outline'; 
 import { debounce } from 'lodash';
 
 const props = defineProps({
     casos: Object,
     can: Object,
     filters: Object,
+    abogados: Array, // <--- Nueva prop recibida del backend
 });
 
-// --- Lógica de Búsqueda ---
-const search = ref(props.filters?.search ?? '');
-watch(search, debounce((value) => {
-    router.get(route('casos.index'), { search: value }, {
-        preserveState: true,
-        replace: true,
-    });
+// --- Lógica de Búsqueda y Filtros Combinada ---
+const filterForm = reactive({
+    search: props.filters?.search ?? '',
+    abogado_id: props.filters?.abogado_id ?? '',
+});
+
+watch(filterForm, debounce(() => {
+    router.get(route('casos.index'), 
+        { 
+            search: filterForm.search, 
+            abogado_id: filterForm.abogado_id 
+        }, 
+        {
+            preserveState: true,
+            replace: true,
+        }
+    );
 }, 300));
+
+// --- Lógica de Exportación ---
+const exportarExcel = () => {
+    window.location.href = route('casos.export', { 
+        search: filterForm.search,
+        abogado_id: filterForm.abogado_id
+    });
+};
 
 // --- Lógica de Eliminación ---
 const confirmingCaseDeletion = ref(false);
@@ -51,6 +70,7 @@ const statusProcessoClasses = {
     'sentencia': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
     'cerrado': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
     'default': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+    'DEMANDA PRESENTADA': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
 };
 
 const formatDate = (dateString) => {
@@ -66,14 +86,14 @@ const formatDate = (dateString) => {
     });
 };
 
-/**
- * Función helper para limpiar los nombres (ej. 'en ejecución' -> 'En Ejecución')
- */
 const formatLabel = (text) => {
     if (!text) return 'N/A';
+    if (text.indexOf('_') === -1) {
+        return text;
+    }
     return text.replace(/_/g, ' ')
-               .toLowerCase()
-               .replace(/\b\w/g, char => char.toUpperCase());
+            .toLowerCase()
+            .replace(/\b\w/g, char => char.toUpperCase());
 };
 </script>
 
@@ -84,18 +104,35 @@ const formatLabel = (text) => {
         <div class="py-12">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
                 
-                <!-- Título y Controles -->
                 <div class="flex flex-col md:flex-row justify-between items-center gap-4 px-4 sm:px-0">
                     <h2 class="font-semibold text-2xl text-gray-800 dark:text-gray-200 leading-tight">
                         Gestión de Casos
                     </h2>
-                    <div class="flex items-center gap-4 w-full md:w-auto">
+                    <div class="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+                        
+                        <!-- NUEVO: Filtro por Abogado -->
+                        <div class="relative w-full md:w-64" v-if="abogados && abogados.length > 0">
+                            <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
+                                <FunnelIcon class="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                            </div>
+                            <select
+                                v-model="filterForm.abogado_id"
+                                class="block w-full p-2.5 ps-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none"
+                            >
+                                <option value="">Todos los abogados</option>
+                                <option v-for="abogado in abogados" :key="abogado.id" :value="abogado.id">
+                                    {{ abogado.name }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <!-- Buscador -->
                         <div class="relative w-full md:w-72">
                             <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
                                 <MagnifyingGlassIcon class="w-5 h-5 text-gray-500 dark:text-gray-400" />
                             </div>
                             <input
-                                v-model="search"
+                                v-model="filterForm.search"
                                 type="text"
                                 name="search"
                                 class="block w-full p-2.5 ps-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
@@ -103,20 +140,30 @@ const formatLabel = (text) => {
                                 autocomplete="off"
                             />
                         </div>
-                        <Link
-                            :href="route('casos.create')"
-                            class="inline-flex items-center px-4 py-2.5 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150 flex-shrink-0"
-                        >
-                            Registrar Nuevo Caso
-                        </Link>
+                        
+                        <div class="flex gap-2 w-full sm:w-auto">
+                            <SecondaryButton 
+                                @click="exportarExcel" 
+                                class="justify-center flex-1 sm:flex-none" 
+                                title="Descargar Excel filtrado"
+                            >
+                                <ArrowDownTrayIcon class="w-5 h-5 sm:mr-2" />
+                                <span class="hidden sm:inline">Exportar</span>
+                            </SecondaryButton>
+
+                            <Link
+                                :href="route('casos.create')"
+                                class="inline-flex items-center justify-center px-4 py-2.5 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150 flex-1 sm:flex-none"
+                            >
+                                Registrar Caso
+                            </Link>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Contenedor de la Tabla -->
                 <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <!-- Cabecera de la Tabla -->
                             <thead class="bg-gray-50 dark:bg-gray-700/50">
                                 <tr>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -140,9 +187,8 @@ const formatLabel = (text) => {
                                 </tr>
                             </thead>
                             
-                            <!-- Cuerpo de la Tabla -->
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                <tr v-if="!casos.data || casos.data.length === 0">
+                                <tr v-if="!casos || !casos.data || casos.data.length === 0">
                                     <td colspan="6" class="px-6 py-16 text-center">
                                         <div class="flex flex-col items-center">
                                             <InboxIcon class="h-12 w-12 text-gray-400" />
@@ -155,7 +201,7 @@ const formatLabel = (text) => {
                                     </td>
                                 </tr>
                                 
-                                <tr v-for="caso in casos.data" :key="caso.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150">
+                                <tr v-else v-for="caso in casos.data" :key="caso.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150">
                                     <td class="px-6 py-5 whitespace-nowrap">
                                         <Link :href="route('casos.show', caso.id)" class="text-indigo-600 dark:text-indigo-400 font-bold truncate hover:underline text-sm">
                                             {{ caso.deudor?.nombre_completo ?? 'Sin deudor' }}
@@ -168,15 +214,17 @@ const formatLabel = (text) => {
                                             (Clonado del #{{ caso.clonado_de_id }})
                                         </span>
                                     </td>
+
                                     <td class="px-6 py-5 whitespace-nowrap">
                                         <span
-                                            v-if="caso.estado_proceso"
-                                            class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full capitalize"
-                                            :class="statusProcessoClasses[caso.estado_proceso] || statusProcessoClasses['default']"
+                                            v-if="caso.etapa_procesal || caso.estado_proceso"
+                                            class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                            :class="statusProcessoClasses[caso.etapa_procesal || caso.estado_proceso] || statusProcessoClasses['default']"
                                         >
-                                            {{ formatLabel(caso.estado_proceso) }}
+                                            {{ formatLabel(caso.etapa_procesal || caso.estado_proceso) }}
                                         </span>
                                     </td>
+
                                     <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                         {{ caso.user ? caso.user.name : 'N/A' }}
                                     </td>
@@ -193,8 +241,9 @@ const formatLabel = (text) => {
                                                 <span class="sr-only">Ver</span>
                                                 <EyeIcon class="h-5 w-5" />
                                             </Link>
+                                            
                                             <button
-                                                v-if="can.delete_cases"
+                                                v-if="$page.props.auth.user.tipo_usuario === 'admin'"
                                                 @click="confirmCaseDeletion(caso)"
                                                 class="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition"
                                                 title="Eliminar caso"
@@ -209,8 +258,7 @@ const formatLabel = (text) => {
                         </table>
                     </div>
 
-                    <!-- Paginación -->
-                    <div v-if="casos.links?.length > 1" class="p-4 flex flex-wrap justify-center gap-2 border-t dark:border-gray-700">
+                    <div v-if="casos && casos.links?.length > 1" class="p-4 flex flex-wrap justify-center gap-2 border-t dark:border-gray-700">
                         <Link
                             v-for="(link, idx) in casos.links"
                             :key="idx"
@@ -229,7 +277,6 @@ const formatLabel = (text) => {
             </div>
         </div>
 
-        <!-- Modal de Eliminación -->
         <Modal :show="confirmingCaseDeletion" @close="closeModal">
             <div class="p-6">
                 <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
@@ -249,4 +296,3 @@ const formatLabel = (text) => {
         </Modal>
     </AuthenticatedLayout>
 </template>
-

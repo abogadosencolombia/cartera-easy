@@ -1,13 +1,14 @@
 @php
-    // --- PREPARACIÓN DE DATOS (Lógica CORREGIDA) ---
-    // $cliente y $contrato AHORA SON OBJETOS Eloquent
+    // --- PREPARACIÓN DE DATOS PARA LA VISTA ---
+    // $cliente y $contrato son objetos Eloquent pasados desde el controlador
     $clienteNombre = $cliente->nombre_completo ?? 'ID ' . $contrato->cliente_id;
 
     // 1. Crear una colección unificada de todas las transacciones (pagos y cargos pagados)
+    //    Esto es solo para mostrar la tabla del historial cronológico.
     $transacciones = collect();
 
-    // 2. Añadir los pagos normales ($pagos AHORA ES UNA COLECCIÓN de stdClass)
-    foreach ($pagos as $pago) { // $pago es un objeto stdClass
+    // 2. Añadir los pagos normales
+    foreach ($pagos as $pago) {
         $transacciones->push([
             'fecha' => \Illuminate\Support\Carbon::parse($pago->fecha),
             'concepto' => $pago->cuota_id ? 'Pago Cuota #'.$pago->cuota_numero : 'Abono General',
@@ -16,8 +17,8 @@
         ]);
     }
 
-    // 3. Añadir los cargos que ya han sido pagados ($cargosPagados AHORA ES UNA COLECCIÓN de stdClass)
-    foreach ($cargosPagados as $cargo) { // $cargo es un objeto stdClass
+    // 3. Añadir los cargos que ya han sido pagados
+    foreach ($cargosPagados as $cargo) {
         $conceptoCargo = '';
         $tipoCargo = '';
         switch ($cargo->tipo) {
@@ -43,14 +44,11 @@
         ]);
     }
 
-    // 4. Ordenar todas las transacciones por fecha
+    // 4. Ordenar todas las transacciones por fecha para el historial
     $transacciones = $transacciones->sortBy('fecha');
 
-    // 5. Calcular totales para el resumen final
-    $totalPagado = $transacciones->sum('valor');
-    $deudaTotal = $contrato->monto_total + $totalCargosValor;
-    $saldoPendiente = $deudaTotal - $totalPagado;
-
+    // NOTA: Ya no calculamos totales aquí. Usamos las variables pasadas por el controlador:
+    // $totalCargosValor, $totalPagado, $saldoPendiente, $granTotal, $totalMora
 @endphp
 <!doctype html>
 <html lang="es">
@@ -62,6 +60,10 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
+        /* Estilos adicionales para impresión si es necesario */
+        @media print {
+            body { -webkit-print-color-adjust: exact; }
+        }
     </style>
 </head>
 <body class="bg-gray-100 p-4 md:p-8">
@@ -72,6 +74,7 @@
         <header class="flex justify-between items-start pb-8 border-b border-gray-200">
             <!-- Logo y Nombre de la Empresa -->
             <div class="flex items-center gap-4">
+                <!-- SVG Placeholder Logo -->
                 <svg class="h-10 w-10 text-slate-800" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
                 </svg>
@@ -99,7 +102,6 @@
                 <p class="text-lg font-medium text-gray-800">{{ str_replace('_', ' ', $contrato->modalidad) }}</p>
             </div>
         </div>
-
 
         <!-- SECCIÓN 3: Historial de Transacciones Pagadas -->
         <div class="mb-10">
@@ -142,7 +144,7 @@
             </div>
         </div>
 
-        <!-- SECCIÓN 4: Detalle de Cuotas Pendientes -->
+        <!-- SECCIÓN 4: Detalle de Cuotas Pendientes (Si existen) -->
         @if(!$cuotasPendientes->isEmpty())
             <div class="mb-12">
                 <h2 class="text-lg font-semibold text-gray-800 mb-4">Detalle de Cuotas Pendientes</h2>
@@ -172,14 +174,6 @@
                                 </tr>
                             @endforeach
                         </tbody>
-                        <tfoot class="bg-gray-100 border-t-2 border-gray-300">
-                            <tr>
-                                <td colspan="4" class="px-6 py-3 text-right text-sm font-bold text-gray-700 uppercase">Total Pendiente en Cuotas</td>
-                                <td class="px-6 py-3 text-right text-base font-bold text-gray-900">
-                                    $ {{ number_format($cuotasPendientes->sum(fn($c) => $c->valor + ($c->intereses_mora_acumulados ?? 0)), 0, ',', '.') }}
-                                </td>
-                            </tr>
-                        </tfoot>
                     </table>
                 </div>
             </div>
@@ -198,24 +192,33 @@
                 <!-- Columna para el resumen de totales -->
                 <div class="space-y-3">
                     <div class="flex justify-between items-center text-sm">
-                        <span class="text-gray-600">Monto Fijo Contrato:</span>
+                        <span class="text-gray-600">Monto Base Contrato:</span>
                         <span class="font-medium text-gray-900">$ {{ number_format($contrato->monto_total, 0, ',', '.') }}</span>
                     </div>
                     <div class="flex justify-between items-center text-sm">
                         <span class="text-gray-600">(+) Total Cargos Adicionales:</span>
                         <span class="font-medium text-gray-900">$ {{ number_format($totalCargosValor, 0, ',', '.') }}</span>
                     </div>
+                    <!-- NUEVA LÍNEA DE MORA -->
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-600">(+) Intereses de Mora:</span>
+                        <span class="font-medium text-red-600">$ {{ number_format($totalMora ?? 0, 0, ',', '.') }}</span>
+                    </div>
+
                      <div class="flex justify-between items-center text-sm pt-2 border-t border-gray-200">
-                        <span class="font-semibold text-gray-700">Deuda Total:</span>
-                        <span class="font-bold text-gray-900">$ {{ number_format($deudaTotal, 0, ',', '.') }}</span>
+                        <span class="font-semibold text-gray-700">Deuda Total (Base + Cargos + Mora):</span>
+                        <!-- Usamos $granTotal calculado en el controlador -->
+                        <span class="font-bold text-gray-900">$ {{ number_format($granTotal, 0, ',', '.') }}</span>
                     </div>
                     <div class="flex justify-between items-center text-sm text-emerald-600">
                         <span class="font-medium">(-) Total Pagado:</span>
+                        <!-- Usamos $totalPagado calculado en el controlador -->
                         <span class="font-medium">-$ {{ number_format($totalPagado, 0, ',', '.') }}</span>
                     </div>
                     <!-- Saldo Pendiente Total - Más destacado -->
                     <div class="flex justify-between items-center p-4 bg-red-50 border-red-200 border rounded-lg mt-4">
                         <span class="text-lg font-bold text-red-700">Saldo Pendiente Total:</span>
+                        <!-- Usamos $saldoPendiente calculado en el controlador -->
                         <span class="text-2xl font-bold text-red-700">$ {{ number_format($saldoPendiente, 0, ',', '.') }}</span>
                     </div>
                 </div>
@@ -230,5 +233,3 @@
     </div>
 </body>
 </html>
-
-

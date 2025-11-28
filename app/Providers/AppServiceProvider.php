@@ -18,6 +18,11 @@ use App\Policies\PlantillaPolicy;
 use App\Policies\ReportPolicy;
 use App\Policies\UserPolicy;
 
+// ===== INICIO DE LA MODIFICACIÓN (MÓDULO DE TAREAS) =====
+use App\Models\Tarea;
+use App\Policies\TareaPolicy;
+// ===== FIN DE LA MODIFICACIÓN =====
+
 // --- 1. IMPORTAMOS EL OBSERVER ---
 use App\Observers\CasoObserver;
 
@@ -42,6 +47,12 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Persona::class, PersonaPolicy::class);
         Gate::policy(PlantillaDocumento::class, PlantillaPolicy::class);
         Gate::policy(User::class, UserPolicy::class);
+
+        // ===== INICIO DE LA MODIFICACIÓN (MÓDULO DE TAREAS) =====
+        // Aquí le decimos a Laravel que use TareaPolicy para el modelo Tarea
+        Gate::policy(Tarea::class, TareaPolicy::class);
+        // ===== FIN DE LA MODIFICACIÓN =====
+
 
         // --- REGISTRO DEL NUEVO PROTOCOLO DE SEGURIDAD ---
         Gate::define('view-reports', [ReportPolicy::class, 'viewDashboard']);

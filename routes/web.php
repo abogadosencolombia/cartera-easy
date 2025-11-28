@@ -59,10 +59,14 @@ use App\Http\Controllers\DocumentoProcesoController;
 use App\Http\Controllers\RevisionDiariaController;
 // --- FIN: NUEVO CONTROLADOR REVISIÓN DIARIA ---
 
+// ===== INICIO DE LA MODIFICACIÓN (Añadir Controlador de Tareas) =====
+use App\Http\Controllers\TareaController;
+// ===== FIN DE LA MODIFICACIÓN =====
+
 // =======================================================
 // ===== NUEVAS DECLARACIONES PARA EL CHATBOT ============
 // =======================================================
-use Illuminate\Http\Request;
+use Illuminate\Http\Request; // <-- YA EXISTE, PERO LO NECESITAMOS
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use App\Models\Message;
@@ -170,6 +174,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ===== BLOQUE DE RUTAS PARA RADICADOS (PROCESOS) =================
     // =================================================================
     Route::get('procesos', [ProcesoRadicadoController::class, 'index'])->name('procesos.index');
+    // Ruta para exportar
+    Route::get('procesos/exportar', [ProcesoRadicadoController::class, 'exportarExcel'])->name('procesos.exportar');
+    // ===== FIN DE LA MODIFICACIÓN =====
     Route::get('procesos/create', [ProcesoRadicadoController::class, 'create'])->name('procesos.create');
     Route::post('procesos', [ProcesoRadicadoController::class, 'store'])->name('procesos.store');
     Route::get('procesos/{proceso}', [ProcesoRadicadoController::class, 'show'])->name('procesos.show');
@@ -204,6 +211,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // --- RUTAS PARA GESTORES Y ABOGADOS (Y ADMINS) ---
     Route::middleware('role:admin,gestor,abogado')->group(function() {
+
+        // --- INICIO: MODIFICACIÓN EXPORTAR CASOS ---
+        // Esta ruta DEBE ir antes del resource 'casos'
+        Route::get('casos/exportar', [CasoController::class, 'export'])->name('casos.export');
+        // --- FIN: MODIFICACIÓN EXPORTAR CASOS ---
+        
         Route::resource('casos', CasoController::class);
         Route::patch('/casos/{caso}/unlock', [CasoController::class, 'unlock'])->name('casos.unlock');
 
@@ -211,7 +224,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/casos/{caso}/reopen', [CasoController::class, 'reopen'])->name('casos.reopen');
         // --- FIN: RUTA AÑADIDA ---
 
-        Route::patch('/casos/{caso}/reopen', [CasoController::class, 'reopen'])->name('casos.reopen');
+        // Route::patch('/casos/{caso}/reopen', [CasoController::class, 'reopen'])->name('casos.reopen'); // <-- ESTA LÍNEA ESTABA DUPLICADA, LA DEJAMOS UNA VEZ
         Route::patch('/casos/{caso}/close', [CasoController::class, 'close'])->name('casos.close'); // <-- AÑADIDA ESTA LÍNEA
 
         // --- INICIO: Rutas CRUD Actuaciones para Casos ---
@@ -322,7 +335,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Rutas para documentos generales del usuario
         Route::post('users/{user}/documents', [UserController::class, 'storeDocument'])->name('users.documents.store');
         Route::delete('users/documents/{document}', [UserController::class, 'destroyDocument'])->name('users.documents.destroy');
-       });
+        
+        // ===== INICIO DE LA MODIFICACIÓN (Añadir rutas de Tareas Admin) =====
+        Route::get('/tareas', [TareaController::class, 'index'])->name('tareas.index');
+        Route::post('/tareas', [TareaController::class, 'store'])->name('tareas.store');
+        Route::delete('/tareas/{tarea}', [TareaController::class, 'destroy'])->name('tareas.destroy');
+        
+        // --- INICIO: RUTAS DE BÚSQUEDA SEPARADAS (PARA EL NUEVO MODAL) ---
+        Route::get('/tareas/buscar/procesos', [TareaController::class, 'buscarProcesos'])->name('tareas.buscar.procesos');
+        Route::get('/tareas/buscar/casos', [TareaController::class, 'buscarCasos'])->name('tareas.buscar.casos');
+        Route::get('/tareas/buscar/contratos', [TareaController::class, 'buscarContratos'])->name('tareas.buscar.contratos');
+        // --- FIN: RUTAS DE BÚSQUEDA SEPARADAS ---
+
+        // ===== FIN DE LA MODIFICACIÓN =====
+    });
 
     Route::middleware(['role:admin'])->group(function() {
         Route::get('requisitos', [RequisitoDocumentoController::class, 'index'])->name('requisitos.index');
@@ -382,6 +408,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ===== FIN: RUTA DE ENVÍO DEL CHATBOT ============================
     // =================================================================
 
+    // ===== INICIO DE LA MODIFICACIÓN (Añadir ruta para completar tarea) =====
+    // Esta ruta debe estar fuera del middleware 'admin' porque la usan los abogados/gestores
+    Route::patch('/tareas/{tarea}/completar', [TareaController::class, 'marcarComoCompletada'])->name('tareas.completar');
+    // ===== FIN DE LA MODIFICACIÓN =====
+
 }); // Fin del grupo principal de middleware
 
 // =================================================================
@@ -426,3 +457,9 @@ Route::get('documentos-proceso/{documento}/descargar', [DocumentoProcesoControll
 // Archivo de rutas de autenticación (login, registro, etc.)
 require __DIR__.'/auth.php';
 
+// =================================================================
+// ===== INICIO: RUTA PARA REFRESCAR EL TOKEN CSRF (LA SOLUCIÓN) =====
+// =================================================================
+Route::get('/csrf-token', function (Request $request) {
+    return response()->json(['csrf_token' => csrf_token()]);
+})->middleware('web');

@@ -5,11 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Caso;
 use App\Models\DocumentoGenerado;
 use App\Models\PlantillaDocumento;
-use App\Models\User; // Asegúrate que este 'use' esté presente
+use App\Models\User;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log; // Importante para el diagnóstico
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpWord\TemplateProcessor;
 use Illuminate\Http\RedirectResponse;
@@ -23,6 +23,7 @@ class GeneradorDocumentoController extends Controller
 {
     public function generar(Request $request): RedirectResponse
     {
+        // 1. Validación estricta de entrada
         $validatedData = $request->validate([
             'plantilla_id' => ['required', Rule::exists(PlantillaDocumento::class, 'id')],
             'caso_id' => 'required|exists:casos,id',
@@ -31,340 +32,253 @@ class GeneradorDocumentoController extends Controller
         ]);
 
         try {
+            // 2. Carga de datos
             $plantilla = PlantillaDocumento::findOrFail($validatedData['plantilla_id']);
             $caso = Caso::with([
-                'deudor', 'cooperativa', 'user', 'documentos', 'codeudor1', 'codeudor2'
+                'deudor', 
+                'cooperativa', 
+                'user',          
+                'documentos',    
+                'codeudores'     
             ])->findOrFail($validatedData['caso_id']);
-            $user = Auth::user(); // Usuario que genera
+            
+            $user = Auth::user();
 
+            // 3. Verificación física
             if (!$plantilla->archivo || !Storage::disk('local')->exists($plantilla->archivo)) {
-                throw new Exception("El archivo de la plantilla base (.docx) no fue encontrado.");
+                throw new Exception("El archivo físico de la plantilla (.docx) no existe en el servidor.");
             }
 
             setlocale(LC_TIME, 'es_ES.UTF-8');
             Carbon::setLocale('es');
 
+            // 4. Inicializar procesador
             $templateProcessor = new TemplateProcessor(Storage::disk('local')->path($plantilla->archivo));
 
-            // Diagnóstico: Ver qué variables detecta PHPWord
-            $variablesDetectadas = $templateProcessor->getVariables();
-            Log::info("Variables detectadas en plantilla:", $variablesDetectadas); // Usar Log::info
+            // === MOTOR DE REEMPLAZO DE VARIABLES ===
 
-            // 1. Reemplazo de variables simples
-            $this->reemplazarVariablesSimples($templateProcessor, $caso);
+            // A. Variables Simples
+            $this->procesarVariablesSimples($templateProcessor, $caso);
 
-            // 2. Procesamiento de bloques con diagnóstico mejorado
-            $this->procesarBloqueCodeudorMejorado($templateProcessor, 'bloque_codeudor1', $caso->codeudor1, 'codeudor1');
-            $this->procesarBloqueCodeudorMejorado($templateProcessor, 'bloque_codeudor2', $caso->codeudor2, 'codeudor2');
-            $this->procesarBloqueDocumentosMejorado($templateProcessor, $caso->documentos);
+            // B. Codeudores (Lista)
+            $textoCodeudores = "No hay codeudores vinculados a este caso.";
+            if ($caso->codeudores->count() > 0) {
+                $lista = [];
+                foreach ($caso->codeudores as $index => $codeudor) {
+                    $num = $index + 1;
+                    $doc = $codeudor->numero_documento ?? 'S/N';
+                    $tel = $codeudor->celular ?? 'S/N';
+                    $lista[] = "{$num}. {$codeudor->nombre_completo} (Doc: {$doc}) - Tel: {$tel}";
+                }
+                $textoCodeudores = implode("\n", $lista); 
+            }
+            $templateProcessor->setValue('texto_codeudores', $textoCodeudores);
 
-            // 3. Guardar archivos
-            $nombreBase = Str::slug(($caso->deudor->nombre_completo ?? ('caso-' . $caso->id)) . '-' . ($plantilla->nombre ?? 'plantilla-' . $plantilla->id) . '-' . time());
+            // C. Documentos Adjuntos (Lista)
+            $textoDocumentos = "No hay documentos adjuntos en el expediente.";
+            if ($caso->documentos->count() > 0) {
+                $lista = [];
+                foreach ($caso->documentos as $doc) {
+                    $fecha = $doc->fecha_carga ? Carbon::parse($doc->fecha_carga)->format('d/m/Y') : 'N/A';
+                    $tipo = $doc->tipo_documento ?? 'Documento';
+                    $nombre = $doc->archivo_nombre_original ?? 'Archivo';
+                    $lista[] = "• {$tipo}: {$nombre} (Cargado: {$fecha})";
+                }
+                $textoDocumentos = implode("\n", $lista);
+            }
+            $templateProcessor->setValue('texto_documentos', $textoDocumentos);
+
+            // === FIN MOTOR ===
+
+            // 5. Rutas y Nombres
+            $nombreDeudorClean = Str::slug($caso->deudor->nombre_completo ?? "caso-{$caso->id}");
+            $nombrePlantillaClean = Str::slug($plantilla->nombre ?? "plantilla");
+            $timestamp = time();
+            
+            $nombreBase = "{$nombreDeudorClean}-{$nombrePlantillaClean}-{$timestamp}";
             $rutaDirectorioDestino = "private/documentos_generados/caso_{$caso->id}";
-            Storage::disk('local')->makeDirectory($rutaDirectorioDestino);
+            
+            if (!Storage::disk('local')->exists($rutaDirectorioDestino)) {
+                Storage::disk('local')->makeDirectory($rutaDirectorioDestino);
+            }
 
             $rutaDocx = "{$rutaDirectorioDestino}/{$nombreBase}.docx";
             $outputPath = Storage::disk('local')->path($rutaDocx);
 
-            if (!is_writable(dirname($outputPath))) {
-                throw new Exception("El directorio de destino '{$rutaDirectorioDestino}' no tiene permisos de escritura.");
-            }
-
+            // 6. Guardar DOCX
             $templateProcessor->saveAs($outputPath);
 
-            $rutaPdf = '';
-            if (Storage::disk('local')->exists($rutaDocx)) {
-                $rutaPdf = $this->generarPdfDesdeDocx($rutaDocx, $rutaDirectorioDestino, $nombreBase);
-            } else {
-                 Log::warning("No se pudo guardar el archivo DOCX en: " . $outputPath);
-             }
+            // 7. Generar PDF
+            $rutaPdf = null; // Inicializar como null explícitamente
+            try {
+                if (Storage::disk('local')->exists($rutaDocx)) {
+                    $rutaPdf = $this->convertirDocxAPdf($rutaDocx, $rutaDirectorioDestino, $nombreBase);
+                }
+            } catch (\Exception $e) {
+                Log::warning("No se pudo generar el PDF automático: " . $e->getMessage());
+            }
 
-
+            // 8. Registrar BD
             DocumentoGenerado::create([
                 'caso_id' => $caso->id,
                 'plantilla_documento_id' => $plantilla->id,
                 'user_id' => $user->id,
                 'nombre_base' => $nombreBase,
                 'ruta_archivo_docx' => $rutaDocx,
-                'ruta_archivo_pdf' => $rutaPdf,
-                'version_plantilla' => $plantilla->version ?? 'N/A',
+                'ruta_archivo_pdf' => $rutaPdf, // Puede ser null
+                'version_plantilla' => $plantilla->version ?? '1.0',
                 'observaciones' => $validatedData['observaciones'],
                 'es_confidencial' => $validatedData['es_confidencial'],
-                'metadatos' => ['ip_origen' => $request->ip()]
+                'metadatos' => [
+                    'ip_origen' => $request->ip(),
+                    'navegador' => $request->userAgent(),
+                    'fecha_generacion' => now()->toIso8601String()
+                ]
             ]);
 
-            return back()->with('success', '¡Documento(s) generados con éxito!');
+            return back()->with('success', '¡Documento generado exitosamente! Puedes descargarlo abajo.');
 
         } catch (Exception $e) {
-            report($e); // Loguear el error completo
-            $userMessage = 'Error al generar el documento. ';
-
-            // Mensaje de error más específico basado en la excepción
-            if (Str::contains($e->getMessage(), ['XML', 'cloneBlock', 'Cannot find block'])) {
-                $userMessage .= 'PROBLEMA EN LA PLANTILLA: Los tags ${bloque_...} están mal formateados. Solución: Abre el archivo .docx, BORRA los tags ${bloque_codeudor1}, ${/bloque_codeudor1}, ${bloque_codeudor2}, ${/bloque_codeudor2}, ${bloque_documentos}, ${/bloque_documentos} y REESCRÍBELOS manualmente (no copies/pegues). Guarda y vuelve a subir la plantilla.';
-            } else if (Str::contains($e->getMessage(), ['permisos', 'escribible'])) {
-                $userMessage .= 'Problema de permisos en el servidor.';
-            } else {
-                $userMessage .= 'Error: ' . $e->getMessage();
-            }
-
-            return back()->with('error', $userMessage);
+            Log::error("Error crítico generando documento: " . $e->getMessage());
+            return back()->with('error', 'Error del sistema: ' . $e->getMessage());
         }
     }
 
-    private function reemplazarVariablesSimples(TemplateProcessor $templateProcessor, Caso $caso): void
+    private function procesarVariablesSimples(TemplateProcessor $templateProcessor, Caso $caso): void
     {
-        $abogado = $caso->user;
         $deudor = $caso->deudor;
         $cooperativa = $caso->cooperativa;
+        $abogado = $caso->user;
 
-        $templateProcessor->setValues([
-            // Deudor
+        $valores = [
+            'fecha_actual' => Carbon::now()->isoFormat('D [de] MMMM [de] YYYY'),
+            'fecha_actual_corta' => Carbon::now()->format('d/m/Y'),
+            'anio_actual' => Carbon::now()->format('Y'),
+            'caso_radicado' => $caso->radicado ?? 'S/R',
+            'caso_id' => $caso->id,
+            'caso_referencia' => $caso->referencia_credito ?? 'S/R',
+            'caso_monto_total' => '$' . number_format($caso->monto_total ?? 0, 0, ',', '.'),
+            'caso_deuda_actual' => '$' . number_format($caso->monto_deuda_actual ?? 0, 0, ',', '.'),
+            'caso_tipo_proceso' => $caso->tipo_proceso ?? 'No especificado',
+            'caso_estado' => $caso->estado_proceso ?? $caso->etapa_procesal ?? 'Activo',
+            'caso_garantia' => $caso->tipo_garantia_asociada ?? 'No especificada',
+            'caso_juzgado' => $caso->juzgado ? $caso->juzgado->nombre : 'No asignado',
+            'caso_fecha_apertura' => $caso->fecha_apertura ? Carbon::parse($caso->fecha_apertura)->format('d/m/Y') : 'N/A',
+            'deudor_nombre' => $deudor->nombre_completo ?? 'N/A',
+            'deudor_documento' => $deudor->numero_documento ?? 'N/A',
+            'deudor_tipo_doc' => $deudor->tipo_documento ?? 'CC',
+            'deudor_direccion' => $deudor->direccion1 ?? 'Sin dirección',
+            'deudor_ciudad' => $deudor->ciudad1 ?? '',
+            'deudor_telefono' => $deudor->celular_1 ?? 'Sin teléfono',
+            'deudor_email' => $deudor->email_1 ?? 'Sin email',
+            'coop_nombre' => $cooperativa->nombre ?? 'N/A',
+            'coop_nit' => $cooperativa->NIT ?? 'N/A',
+            'coop_representante' => $cooperativa->representante_legal ?? 'N/A',
+            'coop_email' => $cooperativa->email_notificacion_judicial ?? '',
+            'coop_direccion' => $cooperativa->direccion ?? '',
+            'abogado_nombre' => $abogado->name ?? 'N/A',
+            'abogado_email' => $abogado->email ?? 'N/A',
+            'abogado_telefono' => $abogado->telefono ?? '',
+            
             'deudor_nombre_completo' => $deudor->nombre_completo ?? '',
-            'deudor_tipo_documento' => $deudor->tipo_documento_texto ?? '',
             'deudor_numero_documento' => $deudor->numero_documento ?? '',
-            'deudor_direccion1' => $deudor->direccion1 ?? '',
-            'deudor_ciudad1' => $deudor->ciudad1 ?? '',
             'deudor_celular_1' => $deudor->celular_1 ?? '',
             'deudor_email_1' => $deudor->email_1 ?? '',
-
-            // Cooperativa
             'cooperativa_nombre' => $cooperativa->nombre ?? '',
             'cooperativa_nit' => $cooperativa->NIT ?? '',
             'cooperativa_rep_legal' => $cooperativa->representante_legal ?? '',
-            'cooperativa_email_judicial' => $cooperativa->email_notificacion_judicial ?? '',
-
-            // Abogado
-            'abogado_nombre' => $abogado->name ?? '',
-            'abogado_email' => $abogado->email ?? '',
-
-            // Caso
-            'fecha_actual' => Carbon::now()->isoFormat('D [de] MMMM [de] YYYY'),
-            'caso_referencia_credito' => $caso->referencia_credito ?? '',
             'caso_radicado_interno' => $caso->id,
+            'caso_referencia_credito' => $caso->referencia_credito ?? '',
             'caso_origen_documental' => $caso->tipo_garantia_asociada ?? '',
-            'caso_fecha_apertura' => $caso->fecha_apertura ? Carbon::parse($caso->fecha_apertura)->isoFormat('LL') : '',
-            'caso_monto_total' => '$' . number_format($caso->monto_total ?? 0, 0, ',', '.'),
-            'caso_estado_proceso' => $caso->estado_proceso ?? $caso->etapa_procesal ?? '',
-            'caso_tasa_mora' => $caso->tasa_mora ?? '',
-            'caso_tipo_proceso' => $caso->tipo_proceso ?? '',
-        ]);
-    }
-
-    /**
-     * Versión mejorada con mejor diagnóstico y manejo de errores
-     */
-    private function procesarBloqueCodeudorMejorado(
-        TemplateProcessor $templateProcessor,
-        string $blockName,
-        $codeudor,
-        string $prefix // 'codeudor1' o 'codeudor2'
-    ): void {
-        $variables = $templateProcessor->getVariables();
-        // PHPWord espera los tags sin ${} y sin / para getVariables
-        $startTag = $blockName; // 'bloque_codeudor1'
-        $endTag = '/' . $blockName; // '/bloque_codeudor1'
-        $bloqueExiste = in_array($startTag, $variables) && in_array($endTag, $variables);
-
-        Log::info("Procesando bloque '{$blockName}': Existe=" . ($bloqueExiste ? 'SÍ' : 'NO')); // Usar Log::info
-
-        if (!$bloqueExiste) {
-            Log::warning("ADVERTENCIA: Tags del bloque '{$blockName}' NO detectados en la plantilla. Verifica que estén escritos correctamente: \${{$blockName}} y \${/{$blockName}}"); // Usar Log::warning
-            return; // No intentar procesar si no se detectan los tags
-        }
-
-        try {
-            if ($codeudor) {
-                // Clonar bloque una vez
-                $templateProcessor->cloneBlock($blockName, 1, true, false); // El false al final es importante para bloques simples
-
-                // Rellenar valores DENTRO del bloque clonado (usando setValue simple)
-                $templateProcessor->setValue("{$prefix}_nombre_completo", $codeudor->nombre_completo ?? '');
-                $templateProcessor->setValue("{$prefix}_numero_documento", $codeudor->numero_documento ?? '');
-
-                Log::info("Bloque '{$blockName}' clonado y rellenado exitosamente"); // Usar Log::info
-            } else {
-                // Eliminar bloque si no hay codeudor (usando cloneBlock con 0)
-                $templateProcessor->cloneBlock($blockName, 0);
-                Log::info("Bloque '{$blockName}' eliminado (no hay datos de codeudor)"); // Usar Log::info
-            }
-        } catch (\Exception $e) {
-            // Capturar error específico de cloneBlock
-            Log::error("ERROR al procesar bloque '{$blockName}': " . $e->getMessage()); // Usar Log::error
-            // Lanzar una nueva excepción con mensaje claro para el usuario
-            throw new Exception(
-                "Error al procesar el bloque '{$blockName}'. El XML de la plantilla está corrupto. " .
-                "Solución: Abre el .docx, borra los tags \${{$blockName}} y \${/{$blockName}} " .
-                "y reescríbelos manualmente.",
-                0, // Código de error
-                $e  // Excepción original
-            );
+            'caso_estado_proceso' => $caso->estado_proceso ?? '',
+        ];
+        
+        foreach($valores as $key => $val) {
+             $templateProcessor->setValue($key, (string)($val ?? ''));
         }
     }
 
-    /**
-     * Versión mejorada del procesamiento de documentos con diagnóstico
-     */
-    private function procesarBloqueDocumentosMejorado(TemplateProcessor $templateProcessor, $documentos): void
+    private function convertirDocxAPdf(string $rutaDocxRelativa, string $directorioDestino, string $nombreBase): string
     {
-        $blockName = 'bloque_documentos';
-        $variables = $templateProcessor->getVariables();
-        $startTag = $blockName;
-        $endTag = '/' . $blockName;
-        $bloqueExiste = in_array($startTag, $variables) && in_array($endTag, $variables);
-
-        Log::info("Procesando bloque '{$blockName}': Existe=" . ($bloqueExiste ? 'SÍ' : 'NO') . ", Documentos=" . ($documentos ? $documentos->count() : 0)); // Usar Log::info
-
-        if (!$bloqueExiste) {
-            Log::warning("Tags del bloque '{$blockName}' NO detectados. Verifica: \${{{$blockName}}} y \${/{$blockName}}"); // Usar Log::warning
-            return;
-        }
-
-        $count = $documentos ? $documentos->count() : 0;
+        $docxFullPath = Storage::disk('local')->path($rutaDocxRelativa);
+        
+        if (!file_exists($docxFullPath)) return '';
 
         try {
-            if ($count > 0) {
-                // Clonar el bloque tantas veces como documentos
-                $templateProcessor->cloneBlock($blockName, $count, true, true); // true, true para bloques con múltiples variables internas
-
-                // Rellenar cada iteración
-                foreach ($documentos as $index => $doc) {
-                    $itemIndex = $index + 1;
-                    // PHPWord añade #index a las variables dentro de bloques clonados
-                    $templateProcessor->setValue("doc_item_tipo#{$itemIndex}", $doc->tipo_documento ?? '');
-                    $templateProcessor->setValue("doc_item_nombre#{$itemIndex}", $doc->archivo_nombre_original ?? '');
-                    $templateProcessor->setValue("doc_item_fecha#{$itemIndex}",
-                        $doc->fecha_carga ? Carbon::parse($doc->fecha_carga)->format('d/m/Y') : ''
-                    );
-                }
-
-                Log::info("Bloque '{$blockName}' clonado {$count} veces y rellenado"); // Usar Log::info
-            } else {
-                // Sin documentos, eliminar el bloque
-                $templateProcessor->cloneBlock($blockName, 0);
-                Log::info("Bloque '{$blockName}' eliminado (sin documentos)"); // Usar Log::info
-            }
-        } catch (\Exception $e) {
-            Log::error("ERROR al procesar bloque '{$blockName}': " . $e->getMessage()); // Usar Log::error
-            throw new Exception(
-                "Error procesando el bloque '{$blockName}'. Verifica el XML de la plantilla.",
-                0,
-                $e
-            );
-        }
-    }
-
-
-    private function generarPdfDesdeDocx(string $rutaDocxProcesado, string $directorio, string $nombreBase): string
-    {
-        $docxPath = Storage::disk('local')->path($rutaDocxProcesado);
-        if (!file_exists($docxPath)) {
-            Log::error("El archivo DOCX para generar PDF no existe: {$docxPath}"); // Usar Log::error
-            return '';
-        }
-
-        try {
-            if (!is_writable(sys_get_temp_dir())) {
-                throw new Exception("El directorio temporal del sistema no es escribible.");
-            }
-
-            $phpWord = IOFactory::load($docxPath);
+            $phpWord = IOFactory::load($docxFullPath);
             $htmlWriter = IOFactory::createWriter($phpWord, 'HTML');
+            
+            $tempHtmlFile = tempnam(sys_get_temp_dir(), 'docx2pdf');
+            $htmlWriter->save($tempHtmlFile);
+            
+            $htmlContent = file_get_contents($tempHtmlFile);
+            unlink($tempHtmlFile);
 
-            $tempHtmlPath = tempnam(sys_get_temp_dir(), 'phpwordhtml_') . '.html';
-            if ($tempHtmlPath === false) {
-                throw new Exception("No se pudo crear el archivo HTML temporal.");
-            }
+            if (empty(trim($htmlContent))) return '';
 
-            $htmlWriter->save($tempHtmlPath);
-            $htmlContent = file_get_contents($tempHtmlPath);
-            unlink($tempHtmlPath);
+            // Limpieza CSS para PDF
+            $htmlContent = preg_replace('/<style\b[^>]*>(.*?)<\/style>/is', "", $htmlContent);
+            $htmlContent = preg_replace('/<script\b[^>]*>(.*?)<\/script>/is', "", $htmlContent);
+            preg_match("/<body[^>]*>(.*?)<\/body>/is", $htmlContent, $matches);
+            $bodyContent = $matches[1] ?? $htmlContent;
+            $bodyContent = strip_tags($bodyContent, '<div><p><span><table><thead><tbody><tr><td><th><img><b><i><u><br><h1><h2><h3><h4><ul><ol><li><strong><em>');
+            
+            $css = '<style>body{font-family:"Helvetica",sans-serif;font-size:11pt;line-height:1.4}table{width:100%;border-collapse:collapse;margin:10px 0}th,td{border:1px solid #ccc;padding:5px}p{margin-bottom:8px;text-align:justify}</style>';
+            $finalHtml = "<html><head><meta charset='utf-8'>{$css}</head><body>{$bodyContent}</body></html>";
 
-            if (empty(trim($htmlContent))) {
-                Log::warning("Conversión DOCX→HTML resultó vacía para: {$rutaDocxProcesado}"); // Usar Log::warning
-            }
+            $pdf = Pdf::loadHTML($finalHtml)->setPaper('letter', 'portrait');
+            
+            $rutaPdfRelativa = "{$directorioDestino}/{$nombreBase}.pdf";
+            Storage::disk('local')->put($rutaPdfRelativa, $pdf->output());
 
-            $styledHtml = '<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>'
-                        . '<style>body{font-family:DejaVu Sans,sans-serif;font-size:11px}table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:4px;border:1px solid #ddd}img{max-width:100%;height:auto}</style>'
-                        . '</head><body>' . $htmlContent . '</body></html>';
-
-            $pdf = Pdf::loadHTML($styledHtml);
-            $rutaCompletaPdf = "{$directorio}/{$nombreBase}.pdf";
-            $pdfOutputPath = Storage::disk('local')->path($rutaCompletaPdf);
-
-            if (!is_writable(dirname($pdfOutputPath))) {
-                throw new Exception("El directorio para PDF '{$directorio}' no es escribible.");
-            }
-
-            Storage::disk('local')->put($rutaCompletaPdf, $pdf->output());
-
-            if (!Storage::disk('local')->exists($rutaCompletaPdf)) {
-                throw new Exception("No se pudo guardar el PDF en: {$rutaCompletaPdf}");
-            }
-
-            return $rutaCompletaPdf;
+            return $rutaPdfRelativa;
 
         } catch (Exception $e) {
-            report($e); // Loguear el error completo
-            return ''; // Retornar vacío si falla la generación de PDF
+            Log::error("Fallo en conversión PDF: " . $e->getMessage());
+            return '';
         }
     }
 
-    // Métodos de descarga sin cambios (asegúrate que verificarAcceso esté bien)
     public function descargarDocx(DocumentoGenerado $documento)
     {
         $this->verificarAcceso($documento);
-        if (empty($documento->ruta_archivo_docx) || !Storage::disk('local')->exists($documento->ruta_archivo_docx)) {
-            return back()->with('error', 'El archivo DOCX no se encuentra.');
+
+        if (!Storage::disk('local')->exists($documento->ruta_archivo_docx)) {
+            return back()->with('error', 'El archivo original no se encuentra en el servidor.');
         }
         return Storage::disk('local')->download($documento->ruta_archivo_docx, $documento->nombre_base . '.docx');
     }
 
+    // ✅ CORRECCIÓN CLAVE AQUÍ
     public function descargarPdf(DocumentoGenerado $documento)
     {
         $this->verificarAcceso($documento);
-        if (empty($documento->ruta_archivo_pdf) || !Storage::disk('local')->exists($documento->ruta_archivo_pdf)) {
-            // Fallback opcional si el PDF no existe pero el DOCX sí
-            if (!empty($documento->ruta_archivo_docx) && Storage::disk('local')->exists($documento->ruta_archivo_docx)) {
-                 return back()->with('warning', 'El archivo PDF no está disponible. Intenta descargar el archivo DOCX.');
-                 // O redirigir a la descarga DOCX: return $this->descargarDocx($documento);
-            }
-            return back()->with('error', 'El archivo PDF no se encuentra o no se pudo generar.');
+
+        // 1. Verificar si la ruta es NULL o vacía
+        if (empty($documento->ruta_archivo_pdf)) {
+             // Opción A: Redirigir a descargar DOCX automáticamente
+             return back()->with('warning', 'El PDF no se pudo generar automáticamente. Descargue la versión DOCX.');
         }
+
+        // 2. Verificar si el archivo físico existe
+        if (!Storage::disk('local')->exists($documento->ruta_archivo_pdf)) {
+            return back()->with('error', 'El archivo PDF físico no se encuentra en el servidor.');
+        }
+
         return Storage::disk('local')->download($documento->ruta_archivo_pdf, $documento->nombre_base . '.pdf');
     }
 
-    // Asegúrate que esta función refleje tu lógica de permisos real
     private function verificarAcceso(DocumentoGenerado $documento)
     {
         $user = Auth::user();
-        // Admins, gestores, abogados ven todo?
         if (in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
-            return;
+            return true;
         }
-
-        // Clientes no ven confidenciales
-        if ($documento->es_confidencial && $user->tipo_usuario === 'cli') {
-            abort(403, 'Acceso denegado a documento confidencial.');
-        }
-
-        // Clientes solo ven documentos de sus casos? (Asegúrate que $user->persona_id existe y es correcto)
         if ($user->tipo_usuario === 'cli') {
-            // Cargar la relación 'caso' si no está ya cargada
-            $documento->loadMissing('caso');
-            $casoDelDocumento = $documento->caso;
-            // Verificar si el usuario está relacionado al caso (como deudor, codeudor, etc.)
-            if (!$casoDelDocumento || (
-                    $casoDelDocumento->deudor_id !== $user->persona_id &&
-                    $casoDelDocumento->codeudor1_id !== $user->persona_id && // Añadir si aplica
-                    $casoDelDocumento->codeudor2_id !== $user->persona_id    // Añadir si aplica
-                )) {
-                abort(403, 'No tienes permiso para acceder a documentos de este caso.');
-            }
-        } else {
-             // Si hay otros tipos de usuario, definir sus permisos aquí o denegar por defecto
-             // abort(403, 'Tipo de usuario no autorizado para ver este documento.');
+            if ($documento->es_confidencial) abort(403);
+            $caso = $documento->caso;
+            if ($caso->deudor_id !== $user->persona_id) abort(403);
         }
+        return true;
     }
 }
-
