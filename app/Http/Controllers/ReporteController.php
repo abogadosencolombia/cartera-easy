@@ -8,7 +8,7 @@ use App\Models\Cooperativa;
 use App\Exports\CasosReportExport;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Models\PagoCaso;
-use App\Models\GestionPagoContrato; // Importa el modelo (ya lo tenías)
+use App\Models\GestionPagoContrato;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +20,6 @@ use PDF;
 use App\Models\NotificacionCaso;
 use App\Models\ValidacionLegal;
 use App\Exports\CumplimientoReportExport;
-
 
 class ReporteController extends Controller
 {
@@ -41,85 +40,81 @@ class ReporteController extends Controller
         $casosQuery->when($request->filled('cooperativa_id'), fn($q) => $q->where('cooperativa_id', $request->input('cooperativa_id')));
         $casosQuery->when($request->filled('user_id'), fn($q) => $q->where('user_id', $request->input('user_id')));
         $casosQuery->when($request->filled('tipo_proceso'), fn($q) => $q->where('tipo_proceso', $request->input('tipo_proceso')));
-        $casosQuery->when($request->filled('estado_proceso'), fn($q) => $q->where('estado_proceso', $request->input('estado_proceso')));
+        // ELIMINADO: Filtro estado_proceso
         $casosQuery->when($request->filled('fecha_desde'), fn($q) => $q->whereDate('created_at', '>=', $request->input('fecha_desde')));
         $casosQuery->when($request->filled('fecha_hasta'), fn($q) => $q->whereDate('created_at', '<=', $request->input('fecha_hasta')));
 
-        // --- NUEVO: Definir consultas de pago filtradas por los casos ---
-
-        // 1. Pagos de Casos (Sistema Antiguo)
+        // --- DEFINIR CONSULTAS DE PAGO ---
         $pagosCasoQuery = PagoCaso::query()->whereHas('caso', function ($q) use ($casosQuery) {
             $q->whereIn('id', (clone $casosQuery)->pluck('id'));
         });
 
-        // 2. Pagos de Honorarios (Sistema Nuevo)
-        // Esta consulta funciona porque 'caso_id' SÍ existe en 'contratos'
         $pagosContratoQuery = GestionPagoContrato::query()->whereHas('contrato.caso', function ($q) use ($casosQuery) {
             $q->whereIn('id', (clone $casosQuery)->pluck('id'));
         });
 
-
         // --- CÁLCULO DE KPIs ESTRATÉGICOS ---
-        $casosPorEstado = (clone $casosQuery)->select('estado_proceso', DB::raw('count(*) as total'))->groupBy('estado_proceso')->get()->pluck('total', 'estado_proceso');
-        $totalCasosActivos = $casosPorEstado->sum() - ($casosPorEstado['cerrado'] ?? 0);
-        $carteraEnMora = (clone $casosQuery)->where('fecha_vencimiento', '<', now())->where('estado_proceso', '!=', 'cerrado')->sum('monto_total');
+        // ELIMINADO: $casosPorEstado
         
-        // --- MODIFICADO: Calcular Total Recuperado de AMBAS fuentes ---
-        // (Usando 'valor' de contrato_pagos y 'monto_pagado' de pagos_caso)
+        // CORRECCIÓN: Contamos casos activos simplemente si no están archivados/cerrados o simplemente el total si ya no usas estado
+        // Asumiendo que "cerrado" se manejará de otra forma o simplemente contamos el total de la consulta
+        $totalCasosActivos = (clone $casosQuery)->count(); 
+        
+        $carteraEnMora = (clone $casosQuery)
+            ->where('fecha_vencimiento', '<', now())
+            ->sum('monto_total');
+        
         $totalRecuperado = (clone $pagosCasoQuery)->sum('monto_pagado') + (clone $pagosContratoQuery)->sum('valor');
         
-        $promedioDiasRecuperacion = (clone $casosQuery)->where('estado_proceso', 'cerrado')
-            ->whereNotNull('fecha_ultimo_pago')
-            ->select(DB::raw('AVG(fecha_ultimo_pago::date - created_at::date) as promedio'))
-            ->value('promedio');
+        // ELIMINADO: Cálculo de promedio días basado en estado 'cerrado' antiguo
+        // Si tienes otro campo para saber si finalizó (ej. fecha_fin), úsalo aquí. 
+        // Por ahora lo dejamos en 0 para no romper el frontend.
+        $promedioDiasRecuperacion = 0;
 
-        $casosActivosQuery = (clone $casosQuery)->where('estado_proceso', '!=', 'cerrado');
+        $casosActivosQuery = (clone $casosQuery); // Ya no filtramos por estado != cerrado
         $casosSinPagare = (clone $casosActivosQuery)->whereDoesntHave('documentos', fn ($q) => $q->where('tipo_documento', 'pagaré'))->count();
         $porcentajeSinPagare = ($totalCasosActivos > 0) ? ($casosSinPagare / $totalCasosActivos) * 100 : 0;
         $casosInactivos = (clone $casosActivosQuery)->where('updated_at', '<', Carbon::now()->subDays(60))->count();
+        
         $casosConDocumentosFaltantes = (clone $casosActivosQuery)
-        ->whereHas('validacionesLegales', function ($query) {
-            $query->where('tipo', 'documento_requerido')->where('estado', 'incumple');
-        })->count();
+            ->whereHas('validacionesLegales', function ($query) {
+                $query->where('tipo', 'documento_requerido')->where('estado', 'incumple');
+            })->count();
+            
         $casosLongevos = (clone $casosActivosQuery)->where('fecha_apertura', '<', Carbon::now()->subYear())->count();
         $notificacionesQuery = NotificacionCaso::whereHas('caso', function ($q) use ($casosQuery) { $q->whereIn('id', (clone $casosQuery)->pluck('id')); });
         $alertasPorTipo = (clone $notificacionesQuery)->whereNull('atendida_en')->groupBy('tipo')->select('tipo', DB::raw('count(*) as total'))->pluck('total', 'tipo');
         $alertasVencidas = (clone $notificacionesQuery)->whereNull('atendida_en')->where('created_at', '<', now()->subDays(7))->count();
         $totalAlertasActivas = (clone $notificacionesQuery)->whereNull('atendida_en')->count();
         $tendenciaSemanalAlertas = (clone $notificacionesQuery)->where('created_at', '>=', now()->subDays(7))->groupBy('date')->orderBy('date', 'ASC')->get([ DB::raw('DATE(created_at) as date'), DB::raw('count(*) as total') ]);
-        $consolidadoCooperativa = null;
         
+        $consolidadoCooperativa = null;
         if ($request->filled('cooperativa_id')) {
             $coopId = $request->input('cooperativa_id');
             $cooperativaSeleccionada = Cooperativa::find($coopId);
             if ($cooperativaSeleccionada) {
-                $casosPorEstadoCoop = (clone $casosQuery)->select('estado_proceso', DB::raw('count(*) as total'))->groupBy('estado_proceso')->get()->pluck('total', 'estado_proceso');
                 $consolidadoCooperativa = [ 
                     'nombre' => $cooperativaSeleccionada->nombre, 
-                    'casos_activos' => $casosPorEstadoCoop->sum() - ($casosPorEstadoCoop['cerrado'] ?? 0), 
-                    'cartera_en_mora' => (clone $casosQuery)->where('fecha_vencimiento', '<', now())->where('estado_proceso', '!=', 'cerrado')->sum('monto_total'), 
+                    'casos_activos' => (clone $casosQuery)->count(), 
+                    'cartera_en_mora' => (clone $casosQuery)->where('fecha_vencimiento', '<', now())->sum('monto_total'), 
                     'total_recuperado' => $totalRecuperado, 
                 ];
             }
         }
 
-        // --- MODIFICADO: Unir Pagos Mensuales de AMBAS fuentes ---
+        // --- UNIÓN DE PAGOS MENSUALES ---
         $pagosCasoMensuales = (clone $pagosCasoQuery)
             ->select(DB::raw('EXTRACT(YEAR FROM fecha_pago) as anio, EXTRACT(MONTH FROM fecha_pago) as mes, SUM(monto_pagado) as total'))
             ->where('fecha_pago', '>=', Carbon::now()->subYear())
             ->groupBy('anio', 'mes');
 
-        // ===================================================================
-        // CORRECCIÓN: Usamos 'fecha' y 'valor' (los nombres reales de contrato_pagos)
-        // ===================================================================
         $pagosContratoUnidos = (clone $pagosContratoQuery)
             ->select(DB::raw('EXTRACT(YEAR FROM fecha) as anio, EXTRACT(MONTH FROM fecha) as mes, SUM(valor) as total'))
-            ->where('fecha', '>=', Carbon::now()->subYear()) // <-- ¡CORRECCIÓN DEFINITIVA!
+            ->where('fecha', '>=', Carbon::now()->subYear())
             ->groupBy('anio', 'mes')
             ->union($pagosCasoMensuales)
             ->get();
             
-        // Agrupar resultados de la unión en PHP
         $pagosMensuales = $pagosContratoUnidos->groupBy(function($item) {
             return $item->anio . '-' . $item->mes;
         })->map(function($group) {
@@ -133,10 +128,18 @@ class ReporteController extends Controller
         })->values();
 
 
-        $carteraPorEdad = (clone $casosQuery)->where('fecha_vencimiento', '<', now())->where('estado_proceso', '!=', 'cerrado')->select(DB::raw("CASE WHEN (CURRENT_DATE - fecha_vencimiento::date) BETWEEN 31 AND 60 THEN '31-60 días' WHEN (CURRENT_DATE - fecha_vencimiento::date) BETWEEN 61 AND 90 THEN '61-90 días' WHEN (CURRENT_DATE - fecha_vencimiento::date) BETWEEN 91 AND 120 THEN '91-120 días' WHEN (CURRENT_DATE - fecha_vencimiento::date) > 120 THEN '>120 días' ELSE '1-30 días' END as rango_mora, SUM(monto_total) as total"))->groupBy('rango_mora')->get()->pluck('total', 'rango_mora');
-        $moraMensual = (clone $casosQuery)->select(DB::raw('EXTRACT(YEAR FROM fecha_vencimiento) as anio, EXTRACT(MONTH FROM fecha_vencimiento) as mes, SUM(monto_total) as total'))->where('fecha_vencimiento', '>=', Carbon::now()->subYear())->groupBy('anio', 'mes')->orderBy('anio', 'asc')->orderBy('mes', 'asc')->get();
+        // --- GRÁFICAS ---
+        $carteraPorEdad = (clone $casosQuery)->where('fecha_vencimiento', '<', now())->select(DB::raw("CASE WHEN (CURRENT_DATE - fecha_vencimiento::date) BETWEEN 31 AND 60 THEN '31-60 días' WHEN (CURRENT_DATE - fecha_vencimiento::date) BETWEEN 61 AND 90 THEN '61-90 días' WHEN (CURRENT_DATE - fecha_vencimiento::date) BETWEEN 91 AND 120 THEN '91-120 días' WHEN (CURRENT_DATE - fecha_vencimiento::date) > 120 THEN '>120 días' ELSE '1-30 días' END as rango_mora, SUM(monto_total) as total"))->groupBy('rango_mora')->get()->pluck('total', 'rango_mora');
         
-        // --- MODIFICADO: Recalcular Ranking de Abogados de AMBAS fuentes ---
+        $vencimientosMensuales = (clone $casosQuery)
+            ->select(DB::raw('EXTRACT(YEAR FROM fecha_vencimiento) as anio, EXTRACT(MONTH FROM fecha_vencimiento) as mes, SUM(monto_total) as total'))
+            ->where('fecha_vencimiento', '>=', Carbon::now()->subYear())
+            ->groupBy('anio', 'mes')
+            ->orderBy('anio', 'asc')
+            ->orderBy('mes', 'asc')
+            ->get();
+        
+        // --- RANKING DE ABOGADOS ---
         $rankingAbogados = User::whereIn('tipo_usuario', ['abogado', 'gestor'])
             ->withCount(['casos as casos_count' => fn($q) => $q->whereIn('casos.id', (clone $casosQuery)->pluck('id'))])
             ->get();
@@ -146,11 +149,6 @@ class ReporteController extends Controller
             ->select('user_id', DB::raw('SUM(monto_pagado) as total_pagado'))
             ->pluck('total_pagado', 'user_id');
 
-        // ===================================================================
-        // CORRECCIÓN: 
-        // 1. Usamos JOINS para buscar el 'casos.user_id' (Ahora funciona)
-        // 2. Usamos 'contrato_pagos.valor' para sumar
-        // ===================================================================
         $pagosSumaContratos = (clone $pagosContratoQuery)
             ->join('contratos', 'contrato_pagos.contrato_id', '=', 'contratos.id')
             ->join('casos', 'contratos.caso_id', '=', 'casos.id')
@@ -166,6 +164,7 @@ class ReporteController extends Controller
 
         $rankingAbogados = $rankingAbogados->sortByDesc('pagos_sum_monto_pagado')->take(10)->values();
 
+        // --- DATOS COMPLEMENTARIOS ---
         $cooperativas = ($user->tipo_usuario === 'admin') ? Cooperativa::all(['id', 'nombre']) : $user->cooperativas;
         $abogadosYGestores = User::whereIn('tipo_usuario', ['abogado', 'gestor'])->get(['id', 'name']);
         
@@ -180,7 +179,7 @@ class ReporteController extends Controller
                 'casos_activos' => $totalCasosActivos, 
                 'total_recuperado' => (float) $totalRecuperado, 
                 'cartera_en_mora' => (float) $carteraEnMora, 
-                'promedio_dias_recuperacion' => ($promedioDiasRecuperacion !== null) ? round($promedioDiasRecuperacion) : null,
+                'promedio_dias_recuperacion' => ($promedioDiasRecuperacion !== null) ? round($promedioDiasRecuperacion) : 0,
                 'casos_sin_pagare' => $casosSinPagare, 
                 'porcentaje_sin_pagare' => round($porcentajeSinPagare, 2), 
                 'casos_inactivos' => $casosInactivos, 
@@ -191,9 +190,9 @@ class ReporteController extends Controller
             ],
             'graficas' => [
                 'pagos_mensuales' => $pagosMensuales, 
-                'casos_por_estado' => $casosPorEstado, 
+                // ELIMINADO: casos_por_estado
                 'cartera_por_edad' => $carteraPorEdad, 
-                'mora_mensual' => $moraMensual, 
+                'vencimientos_mensuales' => $vencimientosMensuales, 
                 'alertas_por_tipo' => $alertasPorTipo, 
                 'tendencia_semanal_alertas' => $tendenciaSemanalAlertas,
             ],
@@ -201,7 +200,8 @@ class ReporteController extends Controller
             'consolidadoCooperativa' => $consolidadoCooperativa, 
             'cooperativas' => $cooperativas,
             'abogadosYGestores' => $abogadosYGestores,
-            'filtros' => $request->only(['cooperativa_id', 'user_id', 'tipo_proceso', 'estado_proceso', 'fecha_desde', 'fecha_hasta']),
+            // ELIMINADO: estado_proceso de los filtros devueltos
+            'filtros' => $request->only(['cooperativa_id', 'user_id', 'tipo_proceso', 'fecha_desde', 'fecha_hasta']),
             
             'statsCumplimiento' => [
                 'totalFallasActivas' => $totalFallasActivas,
@@ -223,7 +223,8 @@ class ReporteController extends Controller
 
         $casosQuery = Caso::with(['cooperativa', 'deudor', 'user']);
 
-        $filtros = $request->only(['cooperativa_id', 'user_id', 'tipo_proceso', 'estado_proceso', 'fecha_desde', 'fecha_hasta']);
+        // ELIMINADO: estado_proceso
+        $filtros = $request->only(['cooperativa_id', 'user_id', 'tipo_proceso', 'fecha_desde', 'fecha_hasta']);
 
         if ($user->tipo_usuario !== 'admin') {
             $cooperativaIds = $user->cooperativas->pluck('id');
@@ -233,7 +234,7 @@ class ReporteController extends Controller
         $casosQuery->when($request->filled('cooperativa_id'), fn($q) => $q->where('cooperativa_id', $request->input('cooperativa_id')));
         $casosQuery->when($request->filled('user_id'), fn($q) => $q->where('user_id', $request->input('user_id')));
         $casosQuery->when($request->filled('tipo_proceso'), fn($q) => $q->where('tipo_proceso', 'Ilike', '%' . $request->input('tipo_proceso') . '%'));
-        $casosQuery->when($request->filled('estado_proceso'), fn($q) => $q->where('estado_proceso', 'Ilike', '%' . $request->input('estado_proceso') . '%'));
+        // ELIMINADO: Filtro estado_proceso
         $casosQuery->when($request->filled('fecha_desde'), fn($q) => $q->whereDate('created_at', '>=', $request->input('fecha_desde')));
         $casosQuery->when($request->filled('fecha_hasta'), fn($q) => $q->whereDate('created_at', '<=', $request->input('fecha_hasta')));
 
@@ -268,7 +269,7 @@ class ReporteController extends Controller
         $casosQuery->when($request->filled('cooperativa_id'), fn($q) => $q->where('cooperativa_id', $request->input('cooperativa_id')));
         $casosQuery->when($request->filled('user_id'), fn($q) => $q->where('user_id', $request->input('user_id')));
         $casosQuery->when($request->filled('tipo_proceso'), fn($q) => $q->where('tipo_proceso', $request->input('tipo_proceso')));
-        $casosQuery->when($request->filled('estado_proceso'), fn($q) => $q->where('estado_proceso', $request->input('estado_proceso')));
+        // ELIMINADO: Filtro estado_proceso
         $casosQuery->when($request->filled('fecha_desde'), fn($q) => $q->whereDate('created_at', '>=', $request->input('fecha_desde')));
         $casosQuery->when($request->filled('fecha_hasta'), fn($q) => $q->whereDate('created_at', '<=', $request->input('fecha_hasta')));
 

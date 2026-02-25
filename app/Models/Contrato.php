@@ -30,6 +30,7 @@ class Contrato extends Model
         'monto_base_litis',
         'litis_valor_ganado',
         'modalidad',
+        'frecuencia_pago', // <--- NUEVO CAMPO AÑADIDO
         'estado',
         'inicio',
         'nota',
@@ -60,16 +61,11 @@ class Contrato extends Model
         return $this->belongsTo(Contrato::class, 'contrato_origen_id');
     }
 
-    // =========================================================
-    // === 🔴 AQUÍ ESTABA EL PROBLEMA (YA ESTÁ CORREGIDO) ===
-    // =========================================================
-    
     /**
      * Relación con las cuotas del contrato.
      */
     public function cuotas(): HasMany
     {
-        // Ahora sí va a encontrar las cuotas para verificar la MORA
         return $this->hasMany(ContratoCuota::class, 'contrato_id')->orderBy('numero');
     }
 
@@ -78,7 +74,6 @@ class Contrato extends Model
      */
     public function cargos(): HasMany
     {
-        // Habilitado por si quieres alertar sobre cargos pendientes
         return $this->hasMany(ContratoCargo::class, 'contrato_id')->orderByDesc('fecha_aplicado');
     }
 
@@ -89,7 +84,6 @@ class Contrato extends Model
     {
         return $this->hasMany(ContratoPago::class, 'contrato_id')->orderByDesc('fecha');
     }
-    // =========================================================
 
     public function actuaciones(): MorphMany
     {

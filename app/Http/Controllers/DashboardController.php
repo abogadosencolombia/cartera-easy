@@ -4,9 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Caso;
 use App\Models\Cooperativa;
-use App\Models\IncidenteJuridico;
 use App\Models\User;
-use App\Models\ValidacionLegal;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -17,13 +15,10 @@ use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
-    /**
-     * Muestra el dashboard apropiado según el rol del usuario.
-     */
     public function index(Request $request): Response
     {
         $user = Auth::user();
-        $props = []; // Inicializa props
+        $props = [];
 
         try {
             if ($user->tipo_usuario === 'cliente' && $user->persona_id) {
@@ -33,8 +28,6 @@ class DashboardController extends Controller
             }
         } catch (\Exception $e) {
             report($e);
-            
-            // Este bloque 'catch' ahora enviará todas las props que Vue espera
             return Inertia::render('Dashboard/Index', [
                 'kpis' => null,
                 'chartData' => null,
@@ -42,53 +35,48 @@ class DashboardController extends Controller
                 'cooperativas' => Cooperativa::orderBy('nombre')->get(['id', 'nombre']),
                 'filters' => $request->only(['cooperativa_id', 'fecha_desde', 'fecha_hasta']),
                 'userRole' => $user->tipo_usuario,
-                'serverError' => 'Ocurrió un error al cargar los datos del dashboard. El equipo técnico ha sido notificado.'
+                'serverError' => 'Error de cálculo: ' . $e->getMessage()
             ]);
         }
 
-        // Asegurarse de que serverError no se envíe si todo fue bien
         $props['serverError'] = null;
         return Inertia::render('Dashboard/Index', $props);
     }
 
-    /**
-     * Prepara los datos para el dashboard de Administradores, Gestores y Abogados.
-     */
     private function getAdminDashboardData(User $user, Request $request): array
     {
         $cfg = config('cartera', []);
-        $T_PAGOS = $cfg['recoveries_table'] ?? 'pago_casos';
-        $Col_MONTO_PAGO = $this->pickColumn($T_PAGOS, $cfg['recovery_amount_candidates'] ?? [], 'monto_pagado');
-        $Col_FECHA_PAGO = $this->pickColumn($T_PAGOS, $cfg['recovery_date_candidates'] ?? [], 'fecha_pago');
-        $Fk_CASO_EN_PAGO = $this->pickColumn($T_PAGOS, $cfg['recovery_case_fk_candidates'] ?? [], 'caso_id');
+        
+        $T_PAGOS_CASO = $cfg['recoveries_table'] ?? 'pago_casos';
+        $Col_MONTO_CASO = $this->pickColumn($T_PAGOS_CASO, $cfg['recovery_amount_candidates'] ?? [], 'monto_pagado');
+        $Col_FECHA_CASO = $this->pickColumn($T_PAGOS_CASO, $cfg['recovery_date_candidates'] ?? [], 'fecha_pago');
+        $Fk_CASO = $this->pickColumn($T_PAGOS_CASO, $cfg['recovery_case_fk_candidates'] ?? [], 'caso_id');
+
+        $T_PAGOS_CONTRATO = 'contrato_pagos';
+        $Col_MONTO_CONTRATO = $this->pickColumn($T_PAGOS_CONTRATO, ['monto', 'valor', 'total', 'cantidad', 'pago'], 'monto');
+        $Col_FECHA_CONTRATO = $this->pickColumn($T_PAGOS_CONTRATO, ['fecha_pago', 'fecha', 'created_at'], 'created_at');
+        
+        $dbConfig = [
+            'caso' => ['table' => $T_PAGOS_CASO, 'amount' => $Col_MONTO_CASO, 'date' => $Col_FECHA_CASO, 'fk' => $Fk_CASO],
+            'contrato' => ['table' => $T_PAGOS_CONTRATO, 'amount' => $Col_MONTO_CONTRATO, 'date' => $Col_FECHA_CONTRATO]
+        ];
 
         $currentPeriod = $this->getPeriodFromRequest($request, 'current');
         $previousPeriod = $this->getPeriodFromRequest($request, 'previous');
 
-        $currentKpis = $this->calculateAdminKpisForPeriod($currentPeriod, $request->input('cooperativa_id'), $T_PAGOS, $Fk_CASO_EN_PAGO, $Col_MONTO_PAGO);
-        $previousKpis = $this->calculateAdminKpisForPeriod($previousPeriod, $request->input('cooperativa_id'), $T_PAGOS, $Fk_CASO_EN_PAGO, $Col_MONTO_PAGO);
+        $currentStats = $this->calculateKpis($currentPeriod, $request->input('cooperativa_id'), $dbConfig);
+        $previousStats = $this->calculateKpis($previousPeriod, $request->input('cooperativa_id'), $dbConfig, true);
         
         $kpis = [
-            'saldo_total_activo' => $this->formatKpiWithTrend($currentKpis['saldo_total_activo'], $previousKpis['saldo_total_activo']),
-            'tasa_recuperacion'  => $this->formatKpiWithTrend($currentKpis['tasa_recuperacion'], $previousKpis['tasa_recuperacion']),
-            'casos_activos'      => $this->formatKpiWithTrend($currentKpis['casos_activos'], $previousKpis['casos_activos']),
-            'casos_cerrados'     => $this->formatKpiWithTrend($currentKpis['casos_cerrados'], $previousKpis['casos_cerrados']),
+            'saldo_total_activo' => $this->formatKpiWithTrend($currentStats['saldo_total_activo'], $previousStats['saldo_total_activo']),
+            'tasa_recuperacion'  => $this->formatKpiWithTrend($currentStats['tasa_recuperacion'], $previousStats['tasa_recuperacion']),
+            'casos_activos'      => $this->formatKpiWithTrend($currentStats['casos_activos'], $previousStats['casos_activos']),
+            'casos_cerrados'     => $this->formatKpiWithTrend($currentStats['casos_cerrados'], $previousStats['casos_cerrados']),
         ];
 
-        $chartData = $this->getChartData($currentPeriod, $request->input('cooperativa_id'), $T_PAGOS, $Fk_CASO_EN_PAGO, $Col_MONTO_PAGO, $Col_FECHA_PAGO);
-        
-        $ranking = User::query()
-            ->select('users.id', 'users.name', DB::raw("SUM({$T_PAGOS}.{$Col_MONTO_PAGO}) as total_recuperado"))
-            ->join('casos', 'users.id', '=', 'casos.user_id')
-            ->join($T_PAGOS, 'casos.id', '=', "{$T_PAGOS}.{$Fk_CASO_EN_PAGO}")
-            ->whereIn('users.tipo_usuario', ['abogado', 'gestor', 'admin'])
-            ->whereBetween("{$T_PAGOS}.{$Col_FECHA_PAGO}", [$currentPeriod['start'], $currentPeriod['end']])
-            ->when($request->filled('cooperativa_id'), fn ($q) => $q->where('casos.cooperativa_id', $request->input('cooperativa_id')))
-            ->groupBy('users.id', 'users.name')
-            ->orderByDesc('total_recuperado')
-            ->limit(3)
-            ->get();
-            
+        $chartData = $this->getUnifiedChartData($currentPeriod, $request->input('cooperativa_id'), $dbConfig);
+        $ranking = $this->getUnifiedRanking($currentPeriod, $request->input('cooperativa_id'), $dbConfig);
+
         return [
             'kpis' => $kpis,
             'chartData' => $chartData,
@@ -99,156 +87,252 @@ class DashboardController extends Controller
         ];
     }
 
-    /**
-     * Prepara los datos para el dashboard de Clientes.
-     * * ¡CORREGIDO! Esta función ahora consulta la tabla pivote 'caso_codeudor'
-     * para encontrar los casos del cliente.
-     */
+    private function calculateKpis(array $period, ?int $cooperativaId, array $config, bool $isHistorical = false): array
+    {
+        $baseQuery = Caso::query()
+            ->when($cooperativaId, fn($q) => $q->where('cooperativa_id', $cooperativaId));
+
+        if ($isHistorical) {
+            $baseQuery->where('fecha_apertura', '<=', $period['end']);
+        }
+
+        // --- LÓGICA DE ESTADO (CRÍTICA) ---
+        // Activos: NO tienen nota de cierre.
+        // Cerrados: SI tienen nota de cierre.
+        
+        $casosActivosQuery = clone $baseQuery;
+        $casosCerradosTotalQuery = clone $baseQuery;
+
+        // 1. Activos: Excluir estrictamente los que tienen nota de cierre
+        $casosActivosQuery->whereNull('nota_cierre'); 
+        
+        // Adicionalmente, si la etapa dice "Cerrado", también lo sacamos de activos
+        if (Schema::hasColumn('casos', 'etapa_procesal')) {
+             $casosActivosQuery->where(function($q) {
+                 $q->where('etapa_procesal', 'not ilike', '%cerrado%')
+                   ->where('etapa_procesal', 'not ilike', '%terminado%')
+                   ->where('etapa_procesal', 'not ilike', '%archivado%')
+                   ->orWhereNull('etapa_procesal');
+             });
+        }
+
+        // 2. Cerrados: Incluir los que tienen nota de cierre
+        $casosCerradosTotalQuery->where(function($q) {
+             $q->whereNotNull('nota_cierre'); // El cierre manual manda
+             
+             if (Schema::hasColumn('casos', 'etapa_procesal')) {
+                 $q->orWhere(function($sub) {
+                     $sub->where('etapa_procesal', 'ilike', '%cerrado%')
+                         ->orWhere('etapa_procesal', 'ilike', '%terminado%')
+                         ->orWhere('etapa_procesal', 'ilike', '%archivado%');
+                 });
+             }
+        });
+
+        $countActivos = $casosActivosQuery->count();
+        $montoTotalDeudaActiva = $casosActivosQuery->sum('monto_total');
+        $countCerradosTotal = $casosCerradosTotalQuery->count();
+
+        // --- CÁLCULO DE FLUJO (Sin cambios) ---
+        $totalRecuperado = 0;
+
+        $cfgCaso = $config['caso'];
+        if (Schema::hasTable($cfgCaso['table'])) {
+            $q = DB::table($cfgCaso['table'])
+                ->whereBetween($cfgCaso['date'], [$period['start'], $period['end']]);
+            if ($cooperativaId) {
+                $q->join('casos', $cfgCaso['table'].'.'.$cfgCaso['fk'], '=', 'casos.id')
+                  ->where('casos.cooperativa_id', $cooperativaId);
+            }
+            $totalRecuperado += $q->sum($cfgCaso['amount']);
+        }
+
+        $cfgContrato = $config['contrato'];
+        if (Schema::hasTable($cfgContrato['table']) && Schema::hasTable('contratos')) {
+             $q = DB::table($cfgContrato['table'])
+                ->whereBetween($cfgContrato['table'].'.'.$cfgContrato['date'], [$period['start'], $period['end']]);
+             if ($cooperativaId) {
+                 $q->join('contratos', $cfgContrato['table'].'.contrato_id', '=', 'contratos.id')
+                   ->join('casos', 'contratos.caso_id', '=', 'casos.id')
+                   ->where('casos.cooperativa_id', $cooperativaId);
+             }
+             $totalRecuperado += $q->sum($cfgContrato['table'].'.'.$cfgContrato['amount']);
+        }
+
+        $tasaRecuperacion = ($montoTotalDeudaActiva > 0) ? round(($totalRecuperado / $montoTotalDeudaActiva) * 100, 2) : 0;
+
+        return [
+            'casos_activos' => $countActivos,
+            'saldo_total_activo' => $montoTotalDeudaActiva,
+            'tasa_recuperacion' => $tasaRecuperacion, 
+            'casos_cerrados' => $countCerradosTotal, 
+        ];
+    }
+
+    private function getUnifiedChartData(array $period, ?int $cooperativaId, array $config): array
+    {
+        $baseQuery = Caso::query()
+            ->whereBetween('fecha_apertura', [$period['start'], $period['end']])
+            ->when($cooperativaId, fn($q) => $q->where('cooperativa_id', $cooperativaId));
+
+        $casosPorEstado = [];
+        if (Schema::hasColumn('casos', 'etapa_procesal')) {
+            $casosPorEstado = (clone $baseQuery)
+                ->select('etapa_procesal', DB::raw('count(*) as total'))
+                ->reorder()
+                ->groupBy('etapa_procesal')
+                ->orderByDesc('total')
+                ->get()
+                ->mapWithKeys(fn($item) => [$item->etapa_procesal ?: 'Sin Etapa' => $item->total]);
+        } else {
+            $casosPorEstado = ['Total' => (clone $baseQuery)->count()];
+        }
+
+        $recuperacionCasos = collect([]);
+        $recuperacionContratos = collect([]);
+
+        $cfgCaso = $config['caso'];
+        if (Schema::hasTable($cfgCaso['table'])) {
+            $recuperacionCasos = Caso::query()
+                ->join($cfgCaso['table'], 'casos.id', '=', "{$cfgCaso['table']}.{$cfgCaso['fk']}")
+                ->select(DB::raw("TO_CHAR({$cfgCaso['table']}.{$cfgCaso['date']}, 'YYYY-MM') as mes"), DB::raw("SUM({$cfgCaso['table']}.{$cfgCaso['amount']}) as total"))
+                ->where("{$cfgCaso['table']}.{$cfgCaso['date']}", '>=', Carbon::now()->subYear())
+                ->when($cooperativaId, fn($q) => $q->where('casos.cooperativa_id', $cooperativaId))
+                ->reorder()->groupBy('mes')->orderBy('mes')->get()->pluck('total', 'mes');
+        }
+
+        $cfgContrato = $config['contrato'];
+        if (Schema::hasTable($cfgContrato['table']) && Schema::hasTable('contratos')) {
+             $recuperacionContratos = DB::table($cfgContrato['table'])
+                ->join('contratos', "{$cfgContrato['table']}.contrato_id", '=', 'contratos.id')
+                ->join('casos', 'contratos.caso_id', '=', 'casos.id')
+                ->select(DB::raw("TO_CHAR({$cfgContrato['table']}.{$cfgContrato['date']}, 'YYYY-MM') as mes"), DB::raw("SUM({$cfgContrato['table']}.{$cfgContrato['amount']}) as total"))
+                ->where("{$cfgContrato['table']}.{$cfgContrato['date']}", '>=', Carbon::now()->subYear())
+                ->when($cooperativaId, fn($q) => $q->where('casos.cooperativa_id', $cooperativaId))
+                ->groupBy('mes')->orderBy('mes')->get()->pluck('total', 'mes');
+        }
+
+        $todosLosMeses = $recuperacionCasos->keys()->merge($recuperacionContratos->keys())->unique()->sort();
+        $recuperacionTotal = $todosLosMeses->mapWithKeys(function($mes) use ($recuperacionCasos, $recuperacionContratos) {
+            return [$mes => $recuperacionCasos->get($mes, 0) + $recuperacionContratos->get($mes, 0)];
+        });
+
+        return [
+            'casosPorEstado' => $casosPorEstado,
+            'recuperacionPorMes' => $recuperacionTotal,
+        ];
+    }
+
+    private function getUnifiedRanking(array $period, ?int $cooperativaId, array $config)
+    {
+        $usersStats = [];
+
+        $cfgCaso = $config['caso'];
+        if (Schema::hasTable($cfgCaso['table'])) {
+            $rankingCasos = User::query()
+                ->select('users.id', 'users.name', DB::raw("SUM({$cfgCaso['table']}.{$cfgCaso['amount']}) as total"))
+                ->join('casos', 'users.id', '=', 'casos.user_id')
+                ->join($cfgCaso['table'], 'casos.id', '=', "{$cfgCaso['table']}.{$cfgCaso['fk']}")
+                ->whereBetween("{$cfgCaso['table']}.{$cfgCaso['date']}", [$period['start'], $period['end']])
+                ->when($cooperativaId, fn($q) => $q->where('casos.cooperativa_id', $cooperativaId))
+                ->reorder()->groupBy('users.id', 'users.name')->get();
+
+            foreach ($rankingCasos as $r) {
+                if (!isset($usersStats[$r->id])) $usersStats[$r->id] = ['id' => $r->id, 'name' => $r->name, 'total_recuperado' => 0];
+                $usersStats[$r->id]['total_recuperado'] += $r->total;
+            }
+        }
+
+        $cfgContrato = $config['contrato'];
+        if (Schema::hasTable($cfgContrato['table']) && Schema::hasTable('contratos')) {
+             $rankingContratos = User::query()
+                ->select('users.id', 'users.name', DB::raw("SUM({$cfgContrato['table']}.{$cfgContrato['amount']}) as total"))
+                ->join('casos', 'users.id', '=', 'casos.user_id')
+                ->join('contratos', 'casos.id', '=', 'contratos.caso_id')
+                ->join($cfgContrato['table'], 'contratos.id', '=', "{$cfgContrato['table']}.contrato_id")
+                ->whereBetween("{$cfgContrato['table']}.{$cfgContrato['date']}", [$period['start'], $period['end']])
+                ->when($cooperativaId, fn($q) => $q->where('casos.cooperativa_id', $cooperativaId))
+                ->reorder()->groupBy('users.id', 'users.name')->get();
+
+            foreach ($rankingContratos as $r) {
+                if (!isset($usersStats[$r->id])) $usersStats[$r->id] = ['id' => $r->id, 'name' => $r->name, 'total_recuperado' => 0];
+                $usersStats[$r->id]['total_recuperado'] += $r->total;
+            }
+        }
+
+        return collect($usersStats)->sortByDesc('total_recuperado')->take(3)->values()->all();
+    }
+
     private function getClientDashboardData(User $user): array
     {
         $cfg = config('cartera', []);
         $T_PAGOS = $cfg['recoveries_table'] ?? 'pago_casos';
-        $Col_MONTO_PAGO = $this->pickColumn($T_PAGOS, $cfg['recovery_amount_candidates'] ?? [], 'monto_pagado');
-        $Fk_CASO_EN_PAGO = $this->pickColumn($T_PAGOS, $cfg['recovery_case_fk_candidates'] ?? [], 'caso_id');
+        $Col_MONTO = $this->pickColumn($T_PAGOS, $cfg['recovery_amount_candidates'] ?? [], 'monto_pagado');
+        $Fk_CASO = $this->pickColumn($T_PAGOS, $cfg['recovery_case_fk_candidates'] ?? [], 'caso_id');
 
-        // === INICIO DE LA CORRECCIÓN ===
-        
-        // 1. Obtener los IDs de los casos donde el usuario es un CODEUDOR
-        //    usando la tabla pivote 'caso_codeudor'.
-        $casosComoCodeudorIds = DB::table('caso_codeudor')
-                                  ->where('codeudor_id', $user->persona_id)
-                                  ->pluck('caso_id');
+        $casosComoCodeudorIds = collect([]);
+        if (Schema::hasTable('caso_codeudor')) {
+            $casosComoCodeudorIds = DB::table('caso_codeudor')->where('codeudor_id', $user->persona_id)->pluck('caso_id');
+        }
 
-        // 2. Crear la consulta principal
-        // --- AQUÍ ESTÁ LA CORRECCIÓN DE SINTAXIS ---
-        // Se cambió `fn ($q) use (...) =>` por `function ($q) use (...) { ... }`
         $casosQuery = Caso::query()->where(function ($q) use ($user, $casosComoCodeudorIds) {
-            // Condición 1: El usuario es el DEUDOR principal en la tabla 'casos'
-            $q->where('deudor_id', $user->persona_id)
-            // Condición 2: O el ID del caso está en la lista que obtuvimos de la tabla pivote
-              ->orWhereIn('id', $casosComoCodeudorIds);
+            $q->where('deudor_id', $user->persona_id);
+            if ($casosComoCodeudorIds->isNotEmpty()) $q->orWhereIn('id', $casosComoCodeudorIds);
         });
         
-        // === FIN DE LA CORRECCIÓN ===
+        $casosActivosQuery = clone $casosQuery;
+        // Cliente también ve si tiene nota de cierre
+        $casosActivosQuery->whereNull('nota_cierre');
 
-        // Se considera activo cualquier caso que no esté 'cerrado' para el cliente.
-        $casosActivosQuery = (clone $casosQuery)->where('estado_proceso', '!=', 'cerrado');
+        if (Schema::hasColumn('casos', 'etapa_procesal')) {
+             $casosActivosQuery->where(function($q) {
+                 $q->where('etapa_procesal', 'not ilike', '%cerrado%')
+                   ->where('etapa_procesal', 'not ilike', '%terminado%')
+                   ->orWhereNull('etapa_procesal');
+             });
+        }
+        
         $casosActivosIds = (clone $casosActivosQuery)->pluck('id');
         $montoTotalDeuda = (clone $casosActivosQuery)->sum('monto_total');
         
-        $totalPagado = $casosActivosIds->isEmpty() ? 0 : DB::table($T_PAGOS)->whereIn($Fk_CASO_EN_PAGO, $casosActivosIds)->sum($Col_MONTO_PAGO);
+        $totalPagado = 0;
+        if (Schema::hasTable($T_PAGOS)) {
+            $totalPagado = DB::table($T_PAGOS)->whereIn($Fk_CASO, $casosActivosIds)->sum($Col_MONTO);
+        }
         
-        // Devuelve todas las props que Index.vue espera
         return [
             'kpis' => [
                 'saldo_total_pendiente' => $montoTotalDeuda - $totalPagado,
                 'casos_activos' => $casosActivosIds->count(),
             ],
             'userRole' => 'cliente',
-            
-            // Props añadidas para consistencia
-            'chartData'    => null, 
-            'ranking'      => [],
-            'cooperativas' => [],
-            'filters'      => null,
-        ];
-    }
-
-    private function calculateAdminKpisForPeriod(array $period, ?int $cooperativaId, string $tablaPagos, string $fkCasoEnPago, string $colMontoPago): array
-    {
-        $baseQuery = Caso::query()
-            ->whereBetween('fecha_apertura', [$period['start'], $period['end']])
-            ->when($cooperativaId, fn($q) => $q->where('cooperativa_id', $cooperativaId));
-        
-        // Ahora, "casos activos" incluye CUALQUIER estado que NO SEA 'cerrado'.
-        $casosActivosQuery = (clone $baseQuery)->whereNotIn('estado_proceso', ['cerrado']);
-        
-        $casosActivosIds = $casosActivosQuery->pluck('id');
-        $casosCerradosCount = (clone $baseQuery)->where('estado_proceso', 'cerrado')->count();
-
-        if ($casosActivosIds->isEmpty()) {
-             return [
-                'casos_activos' => 0,
-                'saldo_total_activo' => 0,
-                'tasa_recuperacion' => 0,
-                'casos_cerrados' => $casosCerradosCount,
-            ];
-        }
-
-        $montoTotalDeudas = (clone $casosActivosQuery)->sum('monto_total');
-        $totalPagado = DB::table($tablaPagos)->whereIn($fkCasoEnPago, $casosActivosIds)->sum($colMontoPago);
-        
-        // --- CORRECCIÓN DE LA ERRATA AQUÍ ---
-        // Se eliminó la 'D' mayúscula que causaba el error de sintaxis.
-        $tasaRecuperacion = ($montoTotalDeudas > 0) ? round(($totalPagado / $montoTotalDeudas) * 100, 1) : 0;
-
-        return [
-            'casos_activos' => $casosActivosIds->count(),
-            'saldo_total_activo' => $montoTotalDeudas - $totalPagado,
-            'tasa_recuperacion' => $tasaRecuperacion,
-            'casos_cerrados' => $casosCerradosCount,
-        ];
-    }
-
-    private function getChartData(array $period, ?int $cooperativaId, string $tablaPagos, string $fkCasoEnPago, string $colMontoPago, string $colFechaPago): array
-    {
-        $baseQuery = Caso::query()
-            ->whereBetween('fecha_apertura', [$period['start'], $period['end']])
-            ->when($cooperativaId, fn($q) => $q->where('cooperativa_id', $cooperativaId));
-
-        return [
-            'casosPorEstado' => (clone $baseQuery)
-                ->select('estado_proceso', DB::raw('count(*) as total'))
-                ->groupBy('estado_proceso')->get()->pluck('total', 'estado_proceso'),
-            'incidentesPorMes' => IncidenteJuridico::query()
-                ->select(DB::raw("TO_CHAR(fecha_registro, 'YYYY-MM') as mes"), DB::raw('count(*) as total'))
-                ->where('fecha_registro', '>=', Carbon::now()->subYear())
-                ->groupBy('mes')->orderBy('mes')->get()->pluck('total', 'mes'),
-            'recuperacionPorMes' => Caso::query()
-                ->join($tablaPagos, 'casos.id', '=', "{$tablaPagos}.{$fkCasoEnPago}")
-                ->select(DB::raw("TO_CHAR({$tablaPagos}.{$colFechaPago}, 'YYYY-MM') as mes"), DB::raw("SUM({$tablaPagos}.{$colMontoPago}) as total"))
-                ->where("{$tablaPagos}.{$colFechaPago}", '>=', Carbon::now()->subYear())
-                ->when($cooperativaId, fn($q) => $q->where('casos.cooperativa_id', $cooperativaId))
-                ->groupBy('mes')->orderBy('mes')->get()->pluck('total', 'mes'),
+            'chartData' => null, 'ranking' => [], 'cooperativas' => [], 'filters' => null,
         ];
     }
 
     private function getPeriodFromRequest(Request $request, string $type): array
     {
-        $from = $request->filled('fecha_desde') ? Carbon::parse($request->input('fecha_desde')) : Carbon::now()->subDays(29);
+        $from = $request->filled('fecha_desde') ? Carbon::parse($request->input('fecha_desde')) : Carbon::now()->subDays(365);
         $to = $request->filled('fecha_hasta') ? Carbon::parse($request->input('fecha_hasta')) : Carbon::now();
 
-        if ($type === 'current') {
-            return ['start' => $from->copy()->startOfDay(), 'end' => $to->copy()->endOfDay()];
-        }
+        if ($type === 'current') return ['start' => $from->copy()->startOfDay(), 'end' => $to->copy()->endOfDay()];
         
-        $durationInDays = $to->diffInDays($from);
-        $prevEnd = $from->copy()->subDay();
-        $prevStart = $prevEnd->copy()->subDays($durationInDays);
-        return ['start' => $prevStart->startOfDay(), 'end' => $prevEnd->endOfDay()];
+        $days = $to->diffInDays($from);
+        return ['start' => $from->copy()->subDays($days)->startOfDay(), 'end' => $from->copy()->subDay()->endOfDay()];
     }
 
-    private function formatKpiWithTrend($currentValue, $previousValue): array
+    private function formatKpiWithTrend($curr, $prev): array
     {
-        if (is_null($previousValue) || $previousValue == 0) {
-            $trend = $currentValue > 0 ? 100.0 : 0.0;
-        } else {
-            $trend = round((($currentValue - $previousValue) / abs($previousValue)) * 100, 1);
-        }
-
-        return ['value' => $currentValue, 'trend' => $trend, 'direction' => $trend >= 0 ? 'up' : 'down'];
+        $trend = ($prev && $prev > 0) ? round((($curr - $prev) / abs($prev)) * 100, 1) : ($curr > 0 ? 100 : 0);
+        return ['value' => $curr, 'trend' => $trend, 'direction' => $trend >= 0 ? 'up' : 'down'];
     }
     
     private function pickColumn(string $table, array $candidates, ?string $fallback = null): string
     {
-        if (!Schema::hasTable($table)) {
-            return $fallback ?? $candidates[0] ?? 'id';
-        }
+        if (!Schema::hasTable($table)) return $fallback ?? $candidates[0] ?? 'id';
         foreach ($candidates as $col) {
             if (Schema::hasColumn($table, $col)) return $col;
         }
-        if ($fallback) return $fallback;
-        
-        return $candidates[0] ?? $fallback ?? 'id';
+        return $fallback ?? $candidates[0] ?? 'id';
     }
 }

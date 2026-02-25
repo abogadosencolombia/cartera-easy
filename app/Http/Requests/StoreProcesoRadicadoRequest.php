@@ -36,7 +36,7 @@ class StoreProcesoRadicadoRequest extends FormRequest
             // --- CAMBIO: AHORA SON ARRAYS ---
             'demandantes'             => ['required', 'array', 'min:1'],
             'demandantes.*'           => ['exists:personas,id'],
-            'demandados'              => ['required', 'array', 'min:1'],
+            'demandados'              => ['nullable', 'array'],
             'demandados.*'            => ['exists:personas,id'],
         ];
     }

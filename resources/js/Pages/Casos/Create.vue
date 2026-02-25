@@ -115,7 +115,7 @@ const form = useForm({
     subproceso: props.casoAClonar?.subproceso || null,
     
     etapa_procesal: props.casoAClonar?.etapa_procesal || null,
-    estado_proceso: 'prejurídico',
+    // ELIMINADO: estado_proceso
     tipo_garantia_asociada: props.casoAClonar?.tipo_garantia_asociada || 'codeudor',
     
     fecha_apertura: new Date().toISOString().slice(0, 10),
@@ -251,7 +251,6 @@ const headerTitle = computed(() => props.casoAClonar ? `Clonando Caso #${props.c
 const submitButtonText = computed(() => props.casoAClonar ? 'Crear Copia del Caso' : 'Guardar Nuevo Caso');
 
 const submit = () => {
-    // CORRECCIÓN: Enviamos los codeudores tal cual (arrays), sin stringify manual
     form.transform(data => ({
         ...data,
         codeudores: data.codeudores.map(c => ({
@@ -472,14 +471,22 @@ const submit = () => {
                                     <div>
                                         <InputLabel for="tipo_garantia_asociada" value="Tipo de Garantía *" />
                                         <select v-model="form.tipo_garantia_asociada" id="tipo_garantia_asociada" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
-                                            <option value="codeudor">Codeudor</option><option value="hipotecaria">Hipotecaria</option><option value="prendaria">Prendaria</option><option value="sin garantía">Sin Garantía</option>
+                                            <option :value="null">-- Sin especificar --</option>
+                                            <option value="codeudor">Codeudor</option>
+                                            <option value="hipotecaria">Hipotecaria</option>
+                                            <option value="prendaria">Prendaria</option>
+                                            <option value="sin garantía">Sin Garantía</option>
                                         </select>
                                         <InputError :message="form.errors.tipo_garantia_asociada" class="mt-2" />
                                     </div>
                                     <div class="md:col-span-1">
                                         <InputLabel for="origen_documental" value="Origen Documental *" />
                                         <select v-model="form.origen_documental" id="origen_documental" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
-                                            <option value="pagaré">Pagaré</option><option value="libranza">Libranza</option><option value="contrato">Contrato</option><option value="otro">Otro</option>
+                                            <option :value="null">-- Sin especificar --</option>
+                                            <option value="pagaré">Pagaré</option>
+                                            <option value="libranza">Libranza</option>
+                                            <option value="contrato">Contrato</option>
+                                            <option value="otro">Otro</option>
                                         </select>
                                         <InputError :message="form.errors.origen_documental" class="mt-2" />
                                     </div>

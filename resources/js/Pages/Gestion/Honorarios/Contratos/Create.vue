@@ -3,6 +3,7 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import { computed, ref, watch, onMounted } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { onClickOutside } from '@vueuse/core';
+import { PlusIcon, TrashIcon, ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     clientes: { type: Array, default: () => [] },
@@ -20,6 +21,7 @@ const form = useForm({
     monto_total: null,
     anticipo: 0,
     modalidad: 'CUOTAS',
+    frecuencia_pago: 'MENSUAL', // NUEVO CAMPO
     cuotas: 12,
     inicio: todayYmd(),
     nota: '',
@@ -27,9 +29,25 @@ const form = useForm({
     contrato_origen_id: null,
     proceso_id: null,
     caso_id: null,
+    // Enviamos las cuotas manuales al backend
+    manual_cuotas: [], 
 });
 
-// --- BÚSQUEDA DE CLIENTES ---
+// Opciones de Frecuencia
+const frecuencias = [
+    { value: 'DIARIO', label: 'Diario' },
+    { value: 'SEMANAL', label: 'Semanal' },
+    { value: 'QUINCENAL', label: 'Quincenal (15 días)' },
+    { value: 'MENSUAL', label: 'Mensual' },
+    // ✅ CAMBIO REALIZADO: Nueva opción agregada
+    { value: 'AL_FINALIZAR', label: 'Al Finalizar el Proceso' },
+];
+
+// --- ESTADO PARA CUOTAS MANUALES ---
+const manualCuotas = ref([]);
+const isManualMode = ref(false); // Si true, el usuario ha editado manualmente y dejamos de auto-calcular
+
+// --- BÚSQUEDA DE CLIENTES (Mismo código anterior) ---
 const clienteSearch = ref('');
 const selectedClientName = ref('');
 const isClientListOpen = ref(false);
@@ -61,10 +79,9 @@ watch(clienteSearch, (newVal) => {
         form.cliente_id = null;
     }
 });
-
 onClickOutside(clientDropdown, () => isClientListOpen.value = false);
 
-// --- LÓGICA DEL FORMULARIO ---
+// --- LÓGICA DE NEGOCIO ---
 const fmtMoney = (n) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(n || 0));
 
 const pageTitle = computed(() => {
@@ -77,64 +94,221 @@ const pageTitle = computed(() => {
     return 'Crear Nuevo Contrato';
 });
 
-// --- CORRECCIÓN BUG LITIS (Recuperación inteligente de monto) ---
-watch(() => form.modalidad, (newModalidad) => {
-    if (newModalidad === 'LITIS') {
-        form.monto_total = null;
-        form.cuotas = 1;
-    } else {
-        if (!form.monto_total && props.datosCaso && props.datosCaso.monto_total) {
-            form.monto_total = props.datosCaso.monto_total;
-        }
+// --- GENERADOR DE CUOTAS "INTELIGENTE" ACTUALIZADO ---
 
-        if (newModalidad === 'PAGO_UNICO') {
+// Función auxiliar para sumar meses sin desbordamiento (ej: 31 Ene + 1 mes = 28 Feb)
+const addMonthsNoOverflow = (dateObj, monthsToAdd) => {
+    const day = dateObj.getDate();
+    const tmp = new Date(dateObj);
+    tmp.setMonth(dateObj.getMonth() + monthsToAdd);
+    const lastDayOfMonth = new Date(tmp.getFullYear(), tmp.getMonth() + 1, 0).getDate();
+    tmp.setDate(Math.min(day, lastDayOfMonth));
+    return tmp;
+};
+
+// Nueva función centralizada para calcular fechas según frecuencia
+const calcularFechaVencimiento = (fechaInicioYmd, indiceCuota, frecuencia) => {
+    if (!fechaInicioYmd) return '';
+    // Crear fecha base asegurando zona horaria correcta
+    const fechaBase = new Date(fechaInicioYmd.replace(/-/g, '/')); 
+    let nuevaFecha = new Date(fechaBase);
+
+    // El índice 0 es la primera cuota (fecha inicial), índice 1 es la segunda, etc.
+    if (indiceCuota === 0) return fechaInicioYmd;
+
+    switch (frecuencia) {
+        case 'DIARIO':
+            nuevaFecha.setDate(fechaBase.getDate() + indiceCuota);
+            break;
+        case 'SEMANAL':
+            nuevaFecha.setDate(fechaBase.getDate() + (7 * indiceCuota));
+            break;
+        case 'QUINCENAL':
+            nuevaFecha.setDate(fechaBase.getDate() + (15 * indiceCuota));
+            break;
+        case 'MENSUAL':
+        case 'AL_FINALIZAR': // Tratamos igual que mensual por defecto para cálculo, el usuario puede editar
+        default:
+            nuevaFecha = addMonthsNoOverflow(fechaBase, indiceCuota);
+            break;
+    }
+
+    // Formatear a YYYY-MM-DD
+    const yyyy = nuevaFecha.getFullYear();
+    const mm = String(nuevaFecha.getMonth() + 1).padStart(2, '0');
+    const dd = String(nuevaFecha.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+};
+
+const generarCuotasAutomaticas = () => {
+    // Si estamos en modo manual (el usuario editó algo), NO sobrescribimos automáticamente
+    // a menos que cambien parámetros drásticos como modalidad.
+    
+    const total = Number(form.monto_total || 0);
+    const anticipo = Number(form.anticipo || 0);
+    const neto = Math.max(0, total - anticipo);
+    const numCuotas = Math.max(1, parseInt(form.cuotas || 1, 10));
+
+    if (!form.inicio || neto <= 0 || !form.monto_total || form.modalidad === 'LITIS') {
+        manualCuotas.value = [];
+        return;
+    }
+
+    if (form.modalidad === 'PAGO_UNICO') {
+        manualCuotas.value = [{ numero: 1, fecha: form.inicio, valor: neto }];
+        return;
+    }
+
+    // Algoritmo de distribución equitativa (manejo de centavos/pesos)
+    const netoCents = Math.round(neto * 100); // Trabajamos en base 100 para precisión
+    const base = Math.floor(netoCents / numCuotas);
+    const resto = netoCents - base * numCuotas;
+
+    manualCuotas.value = Array.from({ length: numCuotas }, (_, i) => {
+        const numero = i + 1;
+        const cents = base + (numero <= resto ? 1 : 0);
+        const valor = cents / 100; // Volvemos a decimales
+        
+        // USAMOS LA NUEVA LÓGICA DE FRECUENCIA
+        const fecha = calcularFechaVencimiento(form.inicio, i, form.frecuencia_pago);
+        
+        return { numero, fecha, valor };
+    });
+    
+    isManualMode.value = false; // Reset manual flag
+};
+
+// --- OBSERVADORES ---
+// Agregamos form.frecuencia_pago a los watchers para regenerar si cambia
+watch(
+    [
+        () => form.monto_total, 
+        () => form.anticipo, 
+        () => form.cuotas, 
+        () => form.inicio, 
+        () => form.modalidad,
+        () => form.frecuencia_pago // <-- Nuevo watcher
+    ],
+    () => {
+        if (form.modalidad === 'LITIS') {
+            form.monto_total = null;
             form.cuotas = 1;
-            form.porcentaje_litis = null;
-        } else if (newModalidad === 'CUOTAS') {
-            form.porcentaje_litis = null;
+            manualCuotas.value = [];
+        } else {
+            if (form.modalidad === 'PAGO_UNICO') form.cuotas = 1;
+            // Regeneramos siempre para asegurar coherencia matemática
+            generarCuotasAutomaticas(); 
         }
+    }
+);
+
+// --- VALIDACIÓN MATEMÁTICA EN TIEMPO REAL ---
+const validationStatus = computed(() => {
+    if (form.modalidad === 'LITIS') return { valid: true, diff: 0, message: 'Modalidad Litis no requiere cronograma fijo.' };
+
+    const total = Number(form.monto_total || 0);
+    const anticipo = Number(form.anticipo || 0);
+    const objetivo = Math.max(0, total - anticipo);
+    
+    const sumaActual = manualCuotas.value.reduce((acc, row) => acc + Number(row.valor || 0), 0);
+    
+    // Usamos pequeña tolerancia para punto flotante
+    const diff = objetivo - sumaActual;
+    const isExact = Math.abs(diff) < 0.01;
+
+    if (isExact) {
+        return { valid: true, diff: 0, message: '¡Perfecto! La suma coincide.', color: 'green' };
+    } else if (diff > 0) {
+        return { valid: false, diff, message: `Faltan distribuir ${fmtMoney(diff)}`, color: 'amber' };
+    } else {
+        return { valid: false, diff, message: `Te has pasado por ${fmtMoney(Math.abs(diff))}`, color: 'red' };
     }
 });
 
+// --- ACCIONES MANUALES ---
+const addManualRow = () => {
+    isManualMode.value = true;
+    
+    // Obtener última fecha para calcular la siguiente según frecuencia
+    let nextDate = form.inicio;
+    if (manualCuotas.value.length > 0) {
+        const lastDate = manualCuotas.value[manualCuotas.value.length - 1].fecha;
+        // Calculamos la siguiente fecha como si fuera la cuota #1 relativa a la anterior
+        nextDate = calcularFechaVencimiento(lastDate, 1, form.frecuencia_pago);
+    }
+    
+    // Sugerencia inteligente: Agrega lo que falta para completar el monto, o 0 si ya se pasó
+    const remaining = validationStatus.value.diff > 0 ? validationStatus.value.diff : 0;
+
+    manualCuotas.value.push({
+        numero: manualCuotas.value.length + 1,
+        fecha: nextDate,
+        valor: parseFloat(remaining.toFixed(2)) // Sugerimos el remanente
+    });
+    // Actualizamos el contador visual de cuotas del form
+    form.cuotas = manualCuotas.value.length;
+};
+
+const removeManualRow = (index) => {
+    isManualMode.value = true;
+    manualCuotas.value.splice(index, 1);
+    // Renumerar
+    manualCuotas.value.forEach((row, i) => row.numero = i + 1);
+    form.cuotas = manualCuotas.value.length;
+};
+
+const resetToAuto = () => {
+    if(confirm('¿Estás seguro? Se borrarán tus ediciones manuales y se distribuirá el monto equitativamente.')){
+        generarCuotasAutomaticas();
+    }
+};
+
+// --- ENVÍO ---
+const submit = () => {
+    // Inyectamos las cuotas manuales al form antes de enviar
+    form.manual_cuotas = manualCuotas.value;
+    form.post(route('honorarios.contratos.store'), {
+        preserveScroll: true,
+    });
+};
+
 onMounted(() => {
+    // Inicialización de datos (igual que antes)
     if (props.plantilla) {
-        // Lógica de Reestructuración
         const clienteOriginal = props.clientes.find(c => c.id === props.plantilla.cliente_id);
         form.defaults({
             cliente_id: props.plantilla.cliente_id,
             monto_total: props.plantilla.monto_total,
             anticipo: props.plantilla.anticipo,
             modalidad: props.plantilla.modalidad,
+            frecuencia_pago: props.plantilla.frecuencia_pago || 'MENSUAL', // Cargar frecuencia si existe en plantilla
             cuotas: 12,
             inicio: todayYmd(),
             nota: `Reestructuración del contrato #${props.plantilla.id}.`,
             porcentaje_litis: props.plantilla.porcentaje_litis,
             contrato_origen_id: props.plantilla.id,
-            proceso_id: props.plantilla.proceso_id, // Heredar proceso si existe
-            // ===============================================================
-            // --- FIX CRÍTICO: HEREDAR EL CASO ID ---
-            // ===============================================================
-            caso_id: props.plantilla.caso_id, // Ahora SÍ vinculamos el nuevo contrato al caso original
+            proceso_id: props.plantilla.proceso_id,
+            caso_id: props.plantilla.caso_id,
         });
         form.reset();
         if (clienteOriginal) selectClient(clienteOriginal);
-    
+        setTimeout(generarCuotasAutomaticas, 100);
+
     } else if (props.datosCaso) {
         form.defaults({
             cliente_id: props.clienteSeleccionado?.id || null,
             monto_total: props.datosCaso.monto_total,
             anticipo: 0,
             modalidad: 'CUOTAS',
+            frecuencia_pago: 'MENSUAL',
             cuotas: 12,
             inicio: todayYmd(),
             nota: `Contrato generado desde el Caso de cobro #${props.datosCaso.id}.`,
-            porcentaje_litis: null,
-            contrato_origen_id: null,
-            proceso_id: null,
             caso_id: props.datosCaso.id,
         });
         form.reset();
         if (props.clienteSeleccionado) selectClient(props.clienteSeleccionado);
+        setTimeout(generarCuotasAutomaticas, 100);
 
     } else if (props.clienteSeleccionado && props.proceso) {
         const radicadoNum = props.proceso.radicado || props.proceso.id;
@@ -145,66 +319,14 @@ onMounted(() => {
             monto_total: null,
             anticipo: 0,
             modalidad: 'CUOTAS',
+            frecuencia_pago: 'MENSUAL',
             cuotas: 12,
             inicio: todayYmd(),
-            porcentaje_litis: null,
-            contrato_origen_id: null,
-            caso_id: null,
         });
         form.reset();
         selectClient(props.clienteSeleccionado);
     }
 });
-
-const addMonthsNoOverflow = (ymd, add) => {
-    if (!ymd) return '';
-    const src = new Date(ymd.replace(/-/g, '/'));
-    const day = src.getDate();
-    const tmp = new Date(src);
-    tmp.setMonth(src.getMonth() + add);
-    const last = new Date(tmp.getFullYear(), tmp.getMonth() + 1, 0).getDate();
-    tmp.setDate(Math.min(day, last));
-    const mm = String(tmp.getMonth() + 1).padStart(2, '0');
-    const dd = String(tmp.getDate()).padStart(2, '0');
-    return `${tmp.getFullYear()}-${mm}-${dd}`;
-};
-
-const cronograma = computed(() => {
-    const total = Number(form.monto_total || 0);
-    const anticipo = Number(form.anticipo || 0);
-    const neto = Math.max(0, total - anticipo);
-    const cuotas = Math.max(1, parseInt(form.cuotas || 1, 10));
-
-    if (!form.inicio || neto <= 0 || !form.monto_total) {
-        return { neto, cuotas, filas: [], totalCuotas: 0 };
-    }
-
-    if (form.modalidad === 'PAGO_UNICO') {
-        return { neto, cuotas: 1, filas: [{ numero: 1, fecha: form.inicio, valor: neto }], totalCuotas: neto };
-    }
-
-    const netoCents = Math.round(neto * 100);
-    const base = Math.floor(netoCents / cuotas);
-    const resto = netoCents - base * cuotas;
-
-    const filas = Array.from({ length: cuotas }, (_, i) => {
-        const numero = i + 1;
-        const cents = base + (numero <= resto ? 1 : 0);
-        const valor = cents / 100;
-        const fecha = addMonthsNoOverflow(form.inicio, i);
-        return { numero, fecha, valor };
-    });
-
-    const totalCuotas = filas.reduce((sum, fila) => sum + fila.valor, 0);
-
-    return { neto, cuotas, filas, totalCuotas };
-});
-
-const submit = () => {
-    form.post(route('honorarios.contratos.store'), {
-        preserveScroll: true,
-    });
-};
 </script>
 
 <template>
@@ -218,13 +340,20 @@ const submit = () => {
                 </h2>
                 <div class="flex items-center gap-4">
                     <Link :href="route('honorarios.contratos.index')" class="text-sm px-3 py-2 rounded-md bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                         Volver
                     </Link>
-                    <button @click="submit" :disabled="form.processing"
-                            class="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-                        Guardar Contrato
+                    <!-- BOTÓN GUARDAR INTELIGENTE -->
+                    <button @click="submit" 
+                            :disabled="form.processing || (form.modalidad !== 'LITIS' && !validationStatus.valid)"
+                            :class="[
+                                'inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white transition-colors',
+                                (form.modalidad !== 'LITIS' && !validationStatus.valid) 
+                                    ? 'bg-gray-400 cursor-not-allowed opacity-70' 
+                                    : 'bg-indigo-600 hover:bg-indigo-700'
+                            ]">
+                        <CheckCircleIcon v-if="validationStatus.valid" class="h-5 w-5" />
+                        <ExclamationTriangleIcon v-else class="h-5 w-5" />
+                        {{ (form.modalidad !== 'LITIS' && !validationStatus.valid) ? 'Corrige los montos' : 'Guardar Contrato' }}
                     </button>
                 </div>
             </div>
@@ -232,52 +361,6 @@ const submit = () => {
 
         <div class="py-8">
             <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-6">
-
-                <!-- Alerta de reestructuración -->
-                <div v-if="props.plantilla" class="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-4 rounded-md shadow-sm">
-                    <div class="flex">
-                        <div class="flex-shrink-0">
-                            <svg class="h-5 w-5 text-amber-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
-                        </div>
-                        <div class="ml-3">
-                            <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">Modo Reestructuración</p>
-                            <p class="mt-1 text-sm text-amber-700 dark:text-amber-400">
-                                Estás creando un nuevo contrato basado en el <strong>#{{ props.plantilla.id }}</strong>. Ajusta los valores y la modalidad según sea necesario.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Alerta de Radicado -->
-                <div v-if="props.proceso" class="bg-indigo-50 dark:bg-indigo-900/20 border-l-4 border-indigo-400 p-4 rounded-md shadow-sm">
-                    <div class="flex">
-                        <div class="flex-shrink-0">
-                            <svg class="h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
-                        </div>
-                        <div class="ml-3">
-                            <p class="text-sm font-semibold text-indigo-800 dark:text-indigo-300">Creación desde Radicado</p>
-                            <p class="mt-1 text-sm text-indigo-700 dark:text-indigo-400">
-                                Se vinculará este contrato al radicado <strong>#{{ props.proceso.radicado || props.proceso.id }}</strong>. El cliente ha sido pre-seleccionado.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Alerta de Caso de Cobro (NUEVO) -->
-                <div v-if="props.datosCaso" class="bg-green-50 dark:bg-green-900/20 border-l-4 border-green-400 p-4 rounded-md shadow-sm">
-                    <div class="flex">
-                        <div class="flex-shrink-0">
-                            <svg class="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
-                        </div>
-                        <div class="ml-3">
-                            <p class="text-sm font-semibold text-green-800 dark:text-green-300">Creación desde Caso de Cobro</p>
-                            <p class="mt-1 text-sm text-green-700 dark:text-green-400">
-                                Se vinculará este contrato al Caso <strong>#{{ props.datosCaso.id }}</strong>. El cliente y el monto total han sido pre-seleccionados.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
 
                 <!-- Card 1: Información Principal -->
                 <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
@@ -293,6 +376,8 @@ const submit = () => {
                                    placeholder="Escribe para buscar un cliente..."
                                    class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 dark:disabled:bg-gray-800/50" />
                             <p v-if="form.errors.cliente_id" class="mt-1 text-sm text-red-600">{{ form.errors.cliente_id }}</p>
+                            
+                            <!-- Dropdown Cliente -->
                             <transition enter-active-class="transition ease-out duration-100" enter-from-class="transform opacity-0 scale-95" enter-to-class="transform opacity-100 scale-100" leave-active-class="transition ease-in duration-75" leave-from-class="transform opacity-100 scale-100" leave-to-class="transform opacity-0 scale-95">
                                 <div v-if="isClientListOpen && !props.plantilla && !props.clienteSeleccionado" class="absolute z-10 mt-1 w-full bg-white dark:bg-gray-900 shadow-lg rounded-md border dark:border-gray-700 max-h-60 overflow-y-auto">
                                     <ul class="py-1">
@@ -358,9 +443,17 @@ const submit = () => {
                             </div>
 
                             <div v-if="form.modalidad === 'CUOTAS' || form.modalidad === 'CUOTA_MIXTA'">
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Número de Cuotas *</label>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Número de Cuotas Base *</label>
                                 <input type="number" v-model.number="form.cuotas" min="1" max="120" step="1" class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
-                                <p v-if="form.errors.cuotas" class="mt-1 text-sm text-red-600">{{ form.errors.cuotas }}</p>
+                                <p class="text-xs text-gray-500 mt-1">Si editas la tabla inferior manualmente, este número se actualizará.</p>
+                            </div>
+
+                            <!-- NUEVO: SELECTOR DE FRECUENCIA -->
+                            <div v-if="form.modalidad === 'CUOTAS' || form.modalidad === 'CUOTA_MIXTA'">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Frecuencia de Pago *</label>
+                                <select v-model="form.frecuencia_pago" class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                    <option v-for="freq in frecuencias" :key="freq.value" :value="freq.value">{{ freq.label }}</option>
+                                </select>
                             </div>
 
                             <div v-if="form.modalidad === 'LITIS' || form.modalidad === 'CUOTA_MIXTA'">
@@ -369,65 +462,121 @@ const submit = () => {
                                     <input type="number" v-model.number="form.porcentaje_litis" placeholder="30" class="pr-8 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
                                     <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-500">%</div>
                                 </div>
-                                <p v-if="form.errors.porcentaje_litis" class="mt-1 text-sm text-red-600">{{ form.errors.porcentaje_litis }}</p>
                             </div>
                         </div>
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nota (Opcional)</label>
                             <textarea v-model="form.nota" rows="3" class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></textarea>
-                            <p v-if="form.errors.nota" class="mt-1 text-sm text-red-600">{{ form.errors.nota }}</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Card 3: Cronograma de Pagos -->
-                <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
-                    <div class="p-6 border-b dark:border-gray-700">
-                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">Vista Previa del Cronograma</h3>
-                        <p class="text-sm text-gray-500 mt-1">
-                            <span v-if="form.modalidad !== 'LITIS'">Así se generarán las cuotas para la parte fija del contrato.</span>
-                            <span v-else>No se genera cronograma inicial para la modalidad LITIS.</span>
-                        </p>
+                <!-- Card 3: Cronograma de Pagos EDITABLE -->
+                <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg overflow-hidden">
+                    <div class="p-6 border-b dark:border-gray-700 flex justify-between items-center">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">Cronograma de Pagos</h3>
+                            <p class="text-sm text-gray-500 mt-1">
+                                <span v-if="form.modalidad !== 'LITIS'">
+                                    Modifica las fechas o valores si es necesario. <strong class="text-indigo-600">La suma debe ser exacta.</strong>
+                                </span>
+                                <span v-else>No se genera cronograma inicial para la modalidad LITIS.</span>
+                            </p>
+                        </div>
+                        <div v-if="form.modalidad !== 'LITIS'">
+                            <button type="button" @click="resetToAuto" class="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 border border-indigo-200 px-2 py-1 rounded bg-indigo-50">
+                                <ArrowPathIcon class="w-3 h-3" />
+                                Recalcular Automático
+                            </button>
+                        </div>
                     </div>
 
                     <template v-if="form.modalidad !== 'LITIS'">
-                        <div class="p-6 space-y-4 text-sm bg-gray-50/50 dark:bg-gray-900/20">
-                            <div class="flex justify-between font-bold text-lg">
-                                <span class="text-gray-600 dark:text-gray-300">Neto a Cobrar (Parte Fija)</span>
-                                <span class="text-emerald-600 dark:text-emerald-400">{{ fmtMoney(cronograma.neto) }}</span>
-                            </div>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full">
-                                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                        
+                        <!-- TABLA DE CUOTAS EDITABLE -->
+                        <div class="overflow-x-auto max-h-[500px] overflow-y-auto">
+                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead class="bg-gray-50 dark:bg-gray-700/50 sticky top-0 z-10">
                                     <tr>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fecha Vencimiento</th>
-                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor Cuota</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-12">#</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha Vencimiento</th>
+                                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Valor Cuota</th>
+                                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-10">Acción</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                                    <tr v-if="cronograma.filas.length === 0">
-                                        <td colspan="3" class="px-4 py-10 text-center text-gray-500">
-                                            <p class="font-medium">Esperando datos...</p>
-                                            <p class="text-xs">Ingresa monto, anticipo e inicio para ver el cronograma.</p>
+                                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                    <tr v-for="(fila, idx) in manualCuotas" :key="idx">
+                                        <td class="px-4 py-2 text-sm font-mono text-gray-500">{{ idx + 1 }}</td>
+                                        <td class="px-4 py-2">
+                                            <input type="date" v-model="fila.fecha" 
+                                                   class="text-sm rounded border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-1 px-2 w-full focus:ring-1 focus:ring-indigo-500" />
+                                        </td>
+                                        <td class="px-4 py-2">
+                                            <div class="relative">
+                                                <div class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none text-gray-400 text-xs">$</div>
+                                                <input type="number" v-model.number="fila.valor"
+                                                       class="text-sm text-right font-mono rounded border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-1 px-2 w-full focus:ring-1 focus:ring-indigo-500" />
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-2 text-center">
+                                            <button type="button" @click="removeManualRow(idx)" class="text-gray-400 hover:text-red-500 transition">
+                                                <TrashIcon class="w-5 h-5" />
+                                            </button>
                                         </td>
                                     </tr>
-                                    <tr v-for="fila in cronograma.filas" :key="fila.numero">
-                                        <td class="px-4 py-2 text-sm font-mono text-gray-500">{{ fila.numero }}</td>
-                                        <td class="px-4 py-2 text-sm">{{ fila.fecha }}</td>
-                                        <td class="px-4 py-2 text-sm text-right font-mono">{{ fmtMoney(fila.valor) }}</td>
+                                    <!-- Botón agregar fila -->
+                                    <tr>
+                                        <td colspan="4" class="px-4 py-3 text-center border-t dark:border-gray-700">
+                                            <button type="button" @click="addManualRow" class="inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800 font-medium">
+                                                <PlusIcon class="w-4 h-4" />
+                                                Agregar Cuota Manual
+                                            </button>
+                                        </td>
                                     </tr>
                                 </tbody>
-                                <tfoot v-if="cronograma.filas.length > 0" class="bg-gray-100 dark:bg-gray-700">
-                                    <tr>
-                                        <th colspan="2" class="px-4 py-2 text-right text-sm font-semibold">Total a Financiar</th>
-                                        <th class="px-4 py-2 text-right text-sm font-semibold font-mono">{{ fmtMoney(cronograma.totalCuotas) }}</th>
-                                    </tr>
-                                </tfoot>
                             </table>
                         </div>
+
+                        <!-- BARRA DE VALIDACIÓN (A PRUEBA DE TONTOS) -->
+                        <div class="p-4 border-t dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4"
+                             :class="{
+                                 'bg-green-50 dark:bg-green-900/20': validationStatus.valid,
+                                 'bg-red-50 dark:bg-red-900/20': !validationStatus.valid && validationStatus.diff < 0,
+                                 'bg-amber-50 dark:bg-amber-900/20': !validationStatus.valid && validationStatus.diff > 0
+                             }">
+                            
+                            <div class="text-sm font-medium flex items-center gap-2">
+                                <span v-if="validationStatus.valid" class="text-green-700 dark:text-green-400 flex items-center gap-2">
+                                    <CheckCircleIcon class="w-5 h-5" />
+                                    {{ validationStatus.message }}
+                                </span>
+                                <span v-else-if="validationStatus.diff > 0" class="text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                                    <ExclamationTriangleIcon class="w-5 h-5" />
+                                    {{ validationStatus.message }}
+                                </span>
+                                <span v-else class="text-red-700 dark:text-red-400 flex items-center gap-2">
+                                    <ExclamationTriangleIcon class="w-5 h-5" />
+                                    {{ validationStatus.message }}
+                                </span>
+                            </div>
+
+                            <div class="flex items-center gap-6 text-sm">
+                                <div>
+                                    <span class="block text-gray-500 text-xs">Total Asignado</span>
+                                    <span class="font-bold font-mono text-lg text-gray-800 dark:text-white">
+                                        {{ fmtMoney(Math.max(0, (form.monto_total || 0) - (form.anticipo || 0))) }}
+                                    </span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="block text-gray-500 text-xs">Suma Cuotas</span>
+                                    <span class="font-bold font-mono text-lg" :class="validationStatus.color === 'green' ? 'text-green-600' : 'text-red-600'">
+                                        {{ fmtMoney(manualCuotas.reduce((acc, r) => acc + Number(r.valor), 0)) }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
                     </template>
                     <div v-else class="p-10 text-center text-gray-500">
                          <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -436,10 +585,16 @@ const submit = () => {
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-4">
-                    <button @click="submit" :disabled="form.processing"
-                            class="w-full inline-flex justify-center items-center gap-2 px-4 py-3 rounded-md text-base font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                        Guardar Contrato
+                <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-4 sticky bottom-0 z-20 border-t dark:border-gray-700">
+                    <button @click="submit" 
+                            :disabled="form.processing || (form.modalidad !== 'LITIS' && !validationStatus.valid)"
+                            :class="[
+                                'w-full inline-flex justify-center items-center gap-2 px-4 py-3 rounded-md text-base font-semibold text-white transition-colors',
+                                (form.modalidad !== 'LITIS' && !validationStatus.valid) 
+                                    ? 'bg-gray-400 cursor-not-allowed' 
+                                    : 'bg-indigo-600 hover:bg-indigo-700'
+                            ]">
+                        {{ (form.modalidad !== 'LITIS' && !validationStatus.valid) ? 'Corrige los montos para guardar' : 'Guardar Contrato' }}
                     </button>
                 </div>
 

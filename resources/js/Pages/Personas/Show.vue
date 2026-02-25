@@ -1,7 +1,13 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
-import { PencilSquareIcon, ArrowLeftIcon, MapPinIcon, LinkIcon, ArrowTopRightOnSquareIcon } from '@heroicons/vue/24/outline';
+import { Head, Link, useForm } from '@inertiajs/vue3';
+import { 
+    PencilSquareIcon, ArrowLeftIcon, MapPinIcon, LinkIcon, 
+    ArrowTopRightOnSquareIcon, PaperClipIcon, TrashIcon, 
+    ArrowDownTrayIcon, DocumentPlusIcon, DocumentIcon,
+    EyeIcon,
+} from '@heroicons/vue/24/outline';
+import { ref } from 'vue';
 
 const props = defineProps({
   persona: {
@@ -10,6 +16,18 @@ const props = defineProps({
   },
 });
 
+const isViewable = (mimeType) => {
+    if (!mimeType) return false;
+    const viewableTypes = [
+        'application/pdf', 
+        'image/jpeg', 
+        'image/png', 
+        'image/jpg', 
+        'image/webp'
+    ];
+    return viewableTypes.includes(mimeType);
+};
+
 // Helper para verificar si hay datos en arrays
 const hasData = (arr) => Array.isArray(arr) && arr.length > 0;
 
@@ -17,6 +35,53 @@ const hasData = (arr) => Array.isArray(arr) && arr.length > 0;
 const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' });
+};
+
+// Formato de tamaño de archivo
+const formatBytes = (bytes, decimals = 2) => {
+    if (!+bytes) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+};
+
+// Lógica de Subida de Archivos
+const formUpload = useForm({
+    documento: null,
+});
+
+const fileInput = ref(null);
+
+const triggerFileInput = () => {
+    fileInput.value.click();
+};
+
+const handleFileChange = (e) => {
+    formUpload.documento = e.target.files[0];
+    if (formUpload.documento) {
+        submitUpload();
+    }
+};
+
+const submitUpload = () => {
+    formUpload.post(route('personas.upload_document', props.persona.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            formUpload.reset();
+            // Limpiar input file
+            if (fileInput.value) fileInput.value.value = null;
+        },
+    });
+};
+
+const deleteDocument = (docId) => {
+    if (confirm('¿Estás seguro de eliminar este documento? Esta acción no se puede deshacer.')) {
+        useForm({}).delete(route('personas.delete_document', docId), {
+            preserveScroll: true,
+        });
+    }
 };
 </script>
 
@@ -217,6 +282,72 @@ const formatDate = (dateString) => {
                 </div>
             </div>
         </div>
+
+        <!-- SECCIÓN DE DOCUMENTOS -->
+        <div class="mt-6 overflow-hidden bg-white shadow-sm dark:bg-gray-800 sm:rounded-lg">
+            <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-700/30">
+                <div>
+                    <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">Gestión Documental</h3>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Archivos adjuntos (contratos, cédulas, soportes).</p>
+                </div>
+                <div>
+                    <input 
+                        type="file" 
+                        ref="fileInput" 
+                        class="hidden" 
+                        @change="handleFileChange"
+                    >
+                    <button 
+                        @click="triggerFileInput"
+                        :disabled="formUpload.processing"
+                        class="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600"
+                    >
+                        <DocumentPlusIcon v-if="!formUpload.processing" class="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                        <span v-else class="animate-spin h-5 w-5 border-2 border-indigo-500 border-t-transparent rounded-full"></span>
+                        {{ formUpload.processing ? 'Subiendo...' : 'Adjuntar Archivo' }}
+                    </button>
+                    <div v-if="formUpload.errors.documento" class="text-red-500 text-xs mt-1 text-right">
+                        {{ formUpload.errors.documento }}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-200 dark:border-gray-700">
+                <ul v-if="hasData(persona.documentos)" role="list" class="divide-y divide-gray-100 dark:divide-gray-700">
+                    <li v-for="doc in persona.documentos" :key="doc.id" class="flex items-center justify-between gap-x-6 py-5 px-6 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+                        <div class="min-w-0">
+                            <div class="flex items-start gap-x-3">
+                                <DocumentIcon class="h-6 w-6 text-gray-400" />
+                                <div>
+                                    <p class="text-sm font-semibold leading-6 text-gray-900 dark:text-white">{{ doc.nombre_original }}</p>
+                                    <p class="mt-1 truncate text-xs leading-5 text-gray-500 dark:text-gray-400">
+                                        {{ formatBytes(doc.size) }} · Subido por {{ doc.uploader?.name || 'Sistema' }} el {{ formatDate(doc.created_at) }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex flex-none items-center gap-x-4">
+                            <a v-if="isViewable(doc.mime_type)" 
+                                :href="route('personas.view_document', doc.id)" 
+                                target="_blank"
+                                class="rounded-md bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:ring-gray-600 dark:hover:bg-gray-600 flex items-center gap-1"
+                                title="Ver en nueva pestaña">
+                                <EyeIcon class="h-4 w-4" />
+                                Ver
+                            </a>
+                            <a :href="route('personas.download_document', doc.id)" class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:ring-gray-600 dark:hover:bg-gray-600 flex items-center gap-1">
+                                <ArrowDownTrayIcon class="h-3 w-3" /> Descargar
+                            </a>
+                            <button @click="deleteDocument(doc.id)" class="rounded-full p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition">
+                                <TrashIcon class="h-5 w-5" />
+                            </button>
+                        </div>
+                    </li>
+                </ul>
+                <p v-else class="text-sm text-gray-500 italic text-center py-8">No hay documentos adjuntos.</p>
+            </div>
+        </div>
+
 
         <!-- QUINTA SECCIÓN: GESTIÓN DE CASOS -->
         <div class="mt-6 overflow-hidden bg-white shadow-sm dark:bg-gray-800 sm:rounded-lg">

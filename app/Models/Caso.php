@@ -15,11 +15,12 @@ use App\Models\RevisionDiaria;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use App\Models\Codeudor;
 use App\Models\Tarea;
-use App\Models\Contrato; 
+use App\Models\Contrato;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Caso extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'cooperativa_id', 'user_id', 'deudor_id',
@@ -39,6 +40,7 @@ class Caso extends Model
         'etapa_procesal',
         'juzgado_id', 'especialidad_id',
         'estado',
+        'nota_cierre', // <--- ¡AQUÍ ESTABA EL PROBLEMA! Faltaba esta autorización.
     ];
 
     protected $casts = [
@@ -52,6 +54,8 @@ class Caso extends Model
         'bloqueado' => 'boolean',
         'ultima_actividad' => 'datetime',
     ];
+    
+    protected $dates = ['deleted_at'];
 
     protected $appends = ['semaforo', 'dias_en_mora'];
 
@@ -100,32 +104,20 @@ class Caso extends Model
         return $this->belongsToMany(Codeudor::class, 'caso_codeudor');
     }
     
-    // =========================================================
-    // === 🚑 SOLUCIÓN AL ERROR SQL "Ambiguous column" ===
-    // =========================================================
-    /**
-     * Relación auxiliar para el "Primer Codeudor".
-     * CORREGIDO: Usamos 'codeudores.id' para evitar ambigüedad SQL.
-     */
     public function codeudor1()
     {
         return $this->belongsToMany(Codeudor::class, 'caso_codeudor')
-                    ->orderBy('codeudores.id') // ✅ Específico: id de la tabla codeudores
+                    ->orderBy('codeudores.id') 
                     ->limit(1);
     }
     
-    /**
-     * Relación auxiliar para el "Segundo Codeudor".
-     * CORREGIDO: Usamos 'codeudores.id' para evitar ambigüedad SQL.
-     */
     public function codeudor2()
     {
         return $this->belongsToMany(Codeudor::class, 'caso_codeudor')
-                    ->orderBy('codeudores.id') // ✅ Específico
+                    ->orderBy('codeudores.id')
                     ->skip(1)
                     ->take(1);
     }
-    // =========================================================
 
     public function documentos(): HasMany { return $this->hasMany(DocumentoCaso::class); }
     public function bitacoras(): HasMany { return $this->hasMany(BitacoraCaso::class)->orderBy('created_at', 'desc'); }

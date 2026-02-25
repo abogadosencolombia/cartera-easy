@@ -17,7 +17,7 @@ use App\Models\Contrato;
 use App\Models\Persona;
 use App\Models\ProcesoRadicado;
 use App\Models\Actuacion;
-use App\Models\AuditoriaEvento; // ✅ IMPORTANTE: Modelo de Auditoría
+use App\Models\AuditoriaEvento;
 
 class ContratosController extends Controller
 {
@@ -59,6 +59,7 @@ class ContratosController extends Controller
                 'total_pagado' => $contrato->total_pagado ?? 0,
                 'created_at' => $contrato->created_at,
                 'modalidad' => $contrato->modalidad,
+                'frecuencia_pago' => $contrato->frecuencia_pago, // Agregado al índice por si se requiere mostrar
                 'caso_id' => $contrato->caso?->id,
                 'proceso' => $contrato->proceso ? [
                     'id' => $contrato->proceso->id,
@@ -160,6 +161,11 @@ class ContratosController extends Controller
             'contrato_origen_id' => ['nullable', 'integer', 'exists:contratos,id'],
             'proceso_id' => ['nullable', 'integer', 'exists:proceso_radicados,id'],
             'caso_id'    => ['nullable', 'integer', 'exists:casos,id'], 
+            'manual_cuotas' => ['nullable', 'array'],
+            'manual_cuotas.*.fecha' => ['required_with:manual_cuotas', 'date'],
+            'manual_cuotas.*.valor' => ['required_with:manual_cuotas', 'numeric', 'min:0'],
+            // ✅ CAMBIO REALIZADO: Agregada opción AL_FINALIZAR a la validación
+            'frecuencia_pago' => ['nullable', 'in:DIARIO,SEMANAL,QUINCENAL,MENSUAL,AL_FINALIZAR'],
         ];
 
         $modalidad = $request->input('modalidad');
@@ -182,10 +188,25 @@ class ContratosController extends Controller
             return back()->withErrors(['anticipo' => 'El anticipo no puede superar el monto total.'])->withInput();
         }
 
+        // --- VALIDACIÓN MATEMÁTICA ESTRICTA DE CUOTAS MANUALES ---
+        $manualCuotas = $request->input('manual_cuotas');
+        if (!empty($manualCuotas) && $modalidad !== 'LITIS') {
+            $netoEsperado = round($monto_total - $anticipo, 2);
+            $sumaManual = 0;
+            foreach ($manualCuotas as $mc) {
+                $sumaManual += round((float)$mc['valor'], 2);
+            }
+            
+            // Tolerancia de 1 peso por redondeos
+            if (abs($netoEsperado - $sumaManual) > 1) {
+                return back()->withErrors(['monto_total' => "La suma de las cuotas manuales ($sumaManual) no coincide con el neto a financiar ($netoEsperado)."])->withInput();
+            }
+        }
+
         $contrato = null;
 
         try {
-            DB::transaction(function () use (&$contrato, $validatedData, $monto_total, $anticipo, $modalidad) {
+            DB::transaction(function () use (&$contrato, $validatedData, $monto_total, $anticipo, $modalidad, $manualCuotas) {
                 $contrato_origen_id = $validatedData['contrato_origen_id'] ?? null;
 
                 if ($contrato_origen_id) {
@@ -199,6 +220,7 @@ class ContratosController extends Controller
                     'porcentaje_litis'  => $validatedData['porcentaje_litis'] ?? null,
                     'monto_base_litis'  => null,
                     'modalidad'         => $modalidad,
+                    'frecuencia_pago'   => $validatedData['frecuencia_pago'] ?? 'MENSUAL', // Guardamos la frecuencia
                     'estado'            => 'ACTIVO',
                     'inicio'            => $validatedData['inicio'],
                     'nota'              => $validatedData['nota'] ?? null,
@@ -209,35 +231,75 @@ class ContratosController extends Controller
 
                 if ($modalidad !== 'LITIS') {
                     $neto = max(0, $monto_total - $anticipo);
-                    $cuotasCount = ($modalidad === 'PAGO_UNICO') ? 1 : (int)($validatedData['cuotas'] ?? 1);
-                    if ($cuotasCount < 1) $cuotasCount = 1;
+                    $cuotasData = [];
 
-                    if ($neto > 0 || $modalidad === 'PAGO_UNICO') {
-                        $netoCents  = (int) round($neto * 100);
-                        $baseCents  = intdiv($netoCents, $cuotasCount);
-                        $restoCents = $netoCents % $cuotasCount;
-
-                        $cuotasData = [];
-                        $fechaActual = Carbon::parse($validatedData['inicio']);
-
-                        for ($i = 1; $i <= $cuotasCount; $i++) {
-                            $valorCents = $baseCents + ($i <= $restoCents ? 1 : 0);
-                            $valor      = $valorCents / 100.0;
-
+                    // --- USAR CUOTAS MANUALES SI EXISTEN ---
+                    if (!empty($manualCuotas)) {
+                        foreach ($manualCuotas as $idx => $mc) {
                             $cuotasData[] = [
                                 'contrato_id'       => $contrato->id,
-                                'numero'            => $i,
-                                'fecha_vencimiento' => $fechaActual->copy()->addMonthsNoOverflow($i - 1)->toDateString(),
-                                'valor'             => $valor,
+                                'numero'            => $idx + 1,
+                                'fecha_vencimiento' => $mc['fecha'],
+                                'valor'             => $mc['valor'],
                                 'estado'            => $neto > 0 ? 'PENDIENTE' : 'PAGADA',
                                 'created_at'        => now(),
                                 'updated_at'        => now(),
                             ];
                         }
-                        if (!empty($cuotasData)) {
-                            DB::table('contrato_cuotas')->where('contrato_id', $contrato->id)->delete();
-                            DB::table('contrato_cuotas')->insert($cuotasData);
+                    } 
+                    // --- GENERACIÓN AUTOMÁTICA (FALLBACK SERVIDOR) ---
+                    // Esto se ejecuta si por alguna razón no llegan cuotas manuales
+                    else {
+                        $cuotasCount = ($modalidad === 'PAGO_UNICO') ? 1 : (int)($validatedData['cuotas'] ?? 1);
+                        if ($cuotasCount < 1) $cuotasCount = 1;
+                        $frecuencia = $validatedData['frecuencia_pago'] ?? 'MENSUAL';
+
+                        if ($neto > 0 || $modalidad === 'PAGO_UNICO') {
+                            $netoCents  = (int) round($neto * 100);
+                            $baseCents  = intdiv($netoCents, $cuotasCount);
+                            $restoCents = $netoCents % $cuotasCount;
+                            $fechaActual = Carbon::parse($validatedData['inicio']);
+
+                            for ($i = 1; $i <= $cuotasCount; $i++) {
+                                $valorCents = $baseCents + ($i <= $restoCents ? 1 : 0);
+                                $valor      = $valorCents / 100.0;
+
+                                // LÓGICA DE FECHAS SEGÚN FRECUENCIA
+                                $fechaVencimiento = $fechaActual->copy();
+                                $offset = $i - 1; // La primera cuota es la fecha de inicio
+
+                                switch ($frecuencia) {
+                                    case 'DIARIO':
+                                        $fechaVencimiento->addDays($offset);
+                                        break;
+                                    case 'SEMANAL':
+                                        $fechaVencimiento->addWeeks($offset);
+                                        break;
+                                    case 'QUINCENAL':
+                                        $fechaVencimiento->addDays($offset * 15);
+                                        break;
+                                    case 'MENSUAL':
+                                    case 'AL_FINALIZAR': // Fallback a mensual para cálculo
+                                    default:
+                                        $fechaVencimiento->addMonthsNoOverflow($offset);
+                                        break;
+                                }
+
+                                $cuotasData[] = [
+                                    'contrato_id'       => $contrato->id,
+                                    'numero'            => $i,
+                                    'fecha_vencimiento' => $fechaVencimiento->toDateString(),
+                                    'valor'             => $valor,
+                                    'estado'            => $neto > 0 ? 'PENDIENTE' : 'PAGADA',
+                                    'created_at'        => now(),
+                                    'updated_at'        => now(),
+                                ];
+                            }
                         }
+                    }
+
+                    if (!empty($cuotasData)) {
+                        DB::table('contrato_cuotas')->insert($cuotasData);
                     }
                 }
 
@@ -245,7 +307,7 @@ class ContratosController extends Controller
                 AuditoriaEvento::create([
                     'user_id' => Auth::id(),
                     'evento' => 'CREAR_CONTRATO',
-                    'descripcion_breve' => "Creado contrato #{$contrato->id} ({$modalidad}) por $" . number_format($monto_total, 2),
+                    'descripcion_breve' => "Creado contrato #{$contrato->id} ({$modalidad} - " . ($validatedData['frecuencia_pago'] ?? 'MENSUAL') . ") por $" . number_format($monto_total, 2),
                     'criticidad' => 'media',
                     'direccion_ip' => request()->ip(),
                     'user_agent' => request()->userAgent(),
@@ -260,7 +322,7 @@ class ContratosController extends Controller
 
         } catch (\Exception $e) {
             Log::error("Error al crear contrato: " . $e->getMessage());
-            return back()->with('error', 'Ocurrió un error al crear el contrato.')->withInput();
+            return back()->with('error', 'Ocurrió un error al crear el contrato: ' . $e->getMessage())->withInput();
         }
     }
 
@@ -364,7 +426,7 @@ class ContratosController extends Controller
             ->where('id', $validated['cuota_id'])
             ->where('contrato_id', $id)
             ->first();
-        if (!$cuota) return back()->withErrors(['cuota_id'=>'Cuota no encontrada.']);
+        if (!$cuota) return back()->withErrors(['cuota_id'=>'Cuota no encontrado.']);
 
         $valor = round((float)$validated['valor'], 2);
         
@@ -792,7 +854,7 @@ class ContratosController extends Controller
         $saldoPendiente = ($contrato->monto_total + $totalCargosValor + $totalMora) - $totalPagado;
 
         $cuotasPendientes = DB::table('contrato_cuotas')->where('contrato_id', $id)->where('estado', '!=', 'PAGADA')->orderBy('numero')->get();
-        $cargosPendientes = DB::table('contrato_cargos')->where('contrato_id', $id)->where('estado', '!=', 'PAGADO')->orderBy('fecha_aplicado')->get();
+        $cargosPendientes = DB::table('contrato_cargos')->where('contrato_id', $id)->where('estado', '!=', 'PAGADA')->orderBy('fecha_aplicado')->get();
 
         $data = [
             'contrato'      => $contrato,
@@ -819,7 +881,7 @@ class ContratosController extends Controller
     private function checkAndCloseContract($contrato_id, $isManualClosure = false)
     {
         $cuotasPendientes = DB::table('contrato_cuotas')->where('contrato_id',$contrato_id)->where('estado','!=','PAGADA')->count();
-        $cargosPendientes = DB::table('contrato_cargos')->where('contrato_id',$contrato_id)->where('estado','!=','PAGADA')->count();
+        $cargosPendientes = DB::table('contrato_cargos')->where('contrato_id',$contrato_id)->where('estado','!=','PAGADO')->count();
 
         $contrato = Contrato::find($contrato_id);
         if (!$contrato) return; 
@@ -827,10 +889,10 @@ class ContratosController extends Controller
         if ($cuotasPendientes === 0 && $cargosPendientes === 0) {
             if (in_array($contrato->modalidad, ['LITIS', 'CUOTA_MIXTA'])) {
                 if (is_null($contrato->monto_base_litis)) {
-                      if ($contrato->estado !== 'ACTIVO') {
-                          $contrato->update(['estado'=>'ACTIVO']);
-                      }
-                      return; 
+                        if ($contrato->estado !== 'ACTIVO') {
+                            $contrato->update(['estado'=>'ACTIVO']);
+                        }
+                        return; 
                 }
             }
             if ($contrato->estado !== 'CERRADO') {
@@ -1012,7 +1074,7 @@ class ContratosController extends Controller
     {
         $user = Auth::user();
         if ($actuacion->actuable_type !== Contrato::class || !$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
-             abort(403, 'No autorizado para eliminar esta actuación.');
+            abort(403, 'No autorizado para eliminar esta actuación.');
         }
 
         $contratoId = $actuacion->actuable_id; // Guardar ID antes de borrar

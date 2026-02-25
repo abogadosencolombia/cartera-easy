@@ -5,18 +5,18 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import DangerButton from '@/Components/DangerButton.vue';
-import Modal from '@/Components/Modal.vue';
 import TextInput from '@/Components/TextInput.vue';
 import Textarea from '@/Components/Textarea.vue';
 import Checkbox from '@/Components/Checkbox.vue';
-import { Head, Link, useForm, usePage, useRemember } from '@inertiajs/vue3';
+import Modal from '@/Components/Modal.vue';
+import { Head, Link, useForm, usePage, useRemember, router } from '@inertiajs/vue3';
 import { ref, computed, watch, onMounted } from 'vue';
 import vSelect from 'vue-select';
 import 'vue-select/dist/vue-select.css';
 import axios from 'axios';
 import { 
     TrashIcon, InformationCircleIcon, ScaleIcon, UsersIcon, LockClosedIcon, 
-    PlusIcon, MapPinIcon, LinkIcon, ChevronUpIcon, ChevronDownIcon 
+    PlusIcon, ChevronUpIcon, ChevronDownIcon, ArchiveBoxXMarkIcon, ArrowPathIcon 
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -27,17 +27,37 @@ const props = defineProps({
 
 const activeTab = useRemember('info-principal', 'casoEditTab:' + props.caso.id);
 const user = usePage().props.auth.user;
-const isClosed = computed(() => props.caso.estado_proceso === 'cerrado');
 
+// --- LÓGICA DE CIERRE/REAPERTURA ---
 const showCloseModal = ref(false);
 const closeForm = useForm({ nota_cierre: '' });
-const openCloseModal = () => { closeForm.reset(); showCloseModal.value = true; };
-const closeTheCase = () => { closeForm.patch(route('casos.close', props.caso.id), { preserveScroll: true, onSuccess: () => { showCloseModal.value = false; closeForm.reset(); } }); };
 
-const showReopenModal = ref(false);
-const reopenForm = useForm({});
-const openReopenModal = () => (showReopenModal.value = true);
-const reopenTheCase = () => { reopenForm.patch(route('casos.reopen', props.caso.id), { preserveScroll: true, onSuccess: () => (showReopenModal.value = false) }); };
+const confirmClose = () => {
+    closeForm.nota_cierre = '';
+    showCloseModal.value = true;
+};
+
+const submitClose = () => {
+    closeForm.patch(route('casos.close', props.caso.id), {
+        onSuccess: () => showCloseModal.value = false,
+        preserveScroll: true,
+    });
+};
+
+const submitReopen = () => {
+    if (confirm('¿Estás seguro de querer reabrir este caso?')) {
+        router.patch(route('casos.reopen', props.caso.id), {}, {
+            preserveScroll: true,
+        });
+    }
+};
+// -----------------------------------
+
+const isFormDisabled = computed(() => {
+    const isAdmin = user.tipo_usuario === 'admin';
+    if (isAdmin) return false;
+    return props.caso.bloqueado;
+});
 
 const useDebouncedSearch = (routeName, mapResult = (item) => item) => {
     const options = ref([]);
@@ -128,7 +148,6 @@ const form = useForm({
     tipo_garantia_asociada: props.caso.tipo_garantia_asociada ?? null,
     origen_documental: props.caso.origen_documental ?? null,
     medio_contacto: props.caso.medio_contacto ?? null,
-    estado_proceso: props.caso.estado_proceso,
     fecha_apertura: formatDateForInput(props.caso.fecha_apertura),
     fecha_vencimiento: formatDateForInput(props.caso.fecha_vencimiento),
     fecha_inicio_credito: formatDateForInput(props.caso.fecha_inicio_credito),
@@ -146,18 +165,7 @@ const form = useForm({
 const nuevoCodeudorTemplate = () => ({ id: null, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', celular: '', correo: '', addresses: [], social_links: [], showDetails: ref(true) });
 const addCodeudor = () => { form.codeudores.push(nuevoCodeudorTemplate()); activeTab.value = 'codeudores'; };
 const removeCodeudor = (index) => form.codeudores.splice(index, 1);
-const newAddressTemplate = () => ({ label: 'Casa', address: '', city: '' });
-const newSocialTemplate = () => ({ type: 'Facebook', url: '' });
-const addAddress = (codeudor) => codeudor.addresses.push(newAddressTemplate());
-const removeAddress = (codeudor, addrIndex) => codeudor.addresses.splice(addrIndex, 1);
-const addSocial = (codeudor) => codeudor.social_links.push(newSocialTemplate());
-const removeSocial = (codeudor, socialIndex) => codeudor.social_links.splice(socialIndex, 1);
 
-const isFormDisabled = computed(() => {
-    const isAdmin = user.tipo_usuario === 'admin';
-    if (isAdmin) return false;
-    return props.caso.bloqueado || isClosed.value;
-});
 watch(() => form.bloqueado, v => { if (!v) form.motivo_bloqueo = ''; });
 
 const formatLabel = (text) => {
@@ -171,14 +179,11 @@ const tiposDisponibles = ref([]);
 const subtiposDisponibles = ref([]);
 const subprocesosDisponibles = ref([]);
 
-// --- Lógica Cascada mejorada para Edición ---
 watch(() => form.especialidad_id, (newId) => {
     tiposDisponibles.value = []; 
     if (newId) {
         const esp = especialidades.value.find(e => e.id === newId);
         tiposDisponibles.value = esp ? esp.tipos_proceso : [];
-        
-        // Si cambiamos especialidad manualmente, resetear hijos
         if (newId !== props.caso.especialidad_id) {
              form.tipo_proceso = null; 
              form.subtipo_proceso = null; 
@@ -192,7 +197,6 @@ watch(() => form.tipo_proceso, (newNombre) => {
     if (newNombre) {
         const tipo = tiposDisponibles.value.find(t => t.nombre === newNombre);
         subtiposDisponibles.value = tipo ? tipo.subtipos : [];
-        
         if (newNombre !== props.caso.tipo_proceso) {
             form.subtipo_proceso = null; 
             form.subproceso = null;
@@ -205,14 +209,12 @@ watch(() => form.subtipo_proceso, (newNombre) => {
     if (newNombre) {
         const subtipo = subtiposDisponibles.value.find(s => s.nombre === newNombre);
         subprocesosDisponibles.value = (subtipo && Array.isArray(subtipo.subprocesos)) ? subtipo.subprocesos : [];
-        
         if (newNombre !== props.caso.subtipo_proceso) {
             form.subproceso = null;
         }
     }
 }, { immediate: true });
 
-// --- Inicialización forzada para asegurar que los valores guardados se muestren ---
 onMounted(() => {
     if (props.caso.especialidad_id) {
         const esp = especialidades.value.find(e => e.id === props.caso.especialidad_id);
@@ -273,12 +275,7 @@ const submit = () => {
                              Editando Caso <span class="text-indigo-500">#{{ caso.id }}</span>
                          </h2>
                          <span v-if="caso.bloqueado" class="px-2 py-0.5 text-xs rounded bg-red-100 text-red-700 font-medium">Bloqueado</span>
-                         <span class="px-2 py-0.5 text-xs rounded font-bold capitalize" :class="{
-                             'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300': !isClosed,
-                             'bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-200': isClosed,
-                         }">
-                             {{ caso.estado_proceso }}
-                         </span>
+                         <span v-if="caso.nota_cierre" class="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-700 font-medium border border-gray-300">Cerrado</span>
                      </div>
                  </div>
                  <div class="flex items-center gap-3">
@@ -288,31 +285,12 @@ const submit = () => {
                      <PrimaryButton @click="submit" :disabled="form.processing || isFormDisabled" :class="{ 'opacity-25': form.processing || isFormDisabled }">
                          Actualizar Caso
                      </PrimaryButton>
-                     <DangerButton v-if="!isClosed" @click="openCloseModal">Cerrar Caso</DangerButton>
-                     <PrimaryButton v-if="isClosed" @click="openReopenModal" class="!bg-blue-600 hover:!bg-blue-700 focus:!bg-blue-700 active:!bg-blue-800 focus:!ring-blue-500">
-                         Reabrir Caso
-                     </PrimaryButton>
                  </div>
              </div>
         </template>
 
         <div class="py-12">
             <div class="max-w-5xl mx-auto sm:px-6 lg:px-8 space-y-8">
-                
-                <div v-if="isClosed" class="bg-yellow-50 dark:bg-gray-800 border-l-4 border-yellow-400 p-4 rounded-r-lg">
-                    <div class="flex">
-                        <div class="flex-shrink-0">
-                            <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.21 3.03-1.742 3.03H4.42c-1.532 0-2.492-1.696-1.742-3.03l5.58-9.92zM10 13a1 1 0 110-2 1 1 0 010 2zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
-                        </div>
-                        <div class="ml-3">
-                            <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">Este caso está cerrado.</p>
-                            <div v-if="caso.nota_cierre" class="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
-                                <p class="font-semibold">Nota de cierre:</p>
-                                <p class="whitespace-pre-wrap">{{ caso.nota_cierre }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
                 
                 <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="border-b border-gray-200 dark:border-gray-700">
@@ -403,7 +381,6 @@ const submit = () => {
                                                 <InputError :message="form.errors.fecha_vencimiento" class="mt-2" />
                                             </div>
 
-                                            <!-- CAMPO NUEVO: LINK DRIVE -->
                                             <div class="md:col-span-2 lg:col-span-3">
                                                 <InputLabel for="link_drive" value="URL Carpeta Drive (Opcional)" />
                                                 <div class="relative mt-1 rounded-md shadow-sm">
@@ -584,16 +561,6 @@ const submit = () => {
                                         <h3 class="text-lg font-medium border-b dark:border-gray-700 pb-2 mb-6">Estado y Control del Caso</h3>
                                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div>
-                                                <InputLabel for="estado_proceso" value="Estado del Proceso *" />
-                                                <select v-model="form.estado_proceso" id="estado_proceso" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm" :disabled="isClosed && user.tipo_usuario !== 'admin'">
-                                                    <option value="prejurídico">Prejurídico</option>
-                                                    <option value="demandado">Demandado</option>
-                                                    <option value="en ejecución">En Ejecución</option>
-                                                    <option value="sentencia">Sentencia</option>
-                                                    <option value="cerrado">Cerrado</option>
-                                                </select>
-                                            </div>
-                                            <div>
                                                 <InputLabel for="etapa_actual" value="Etapa Actual del Proceso" />
                                                 <TextInput v-model="form.etapa_actual" id="etapa_actual" type="text" class="mt-1 block w-full" />
                                             </div>
@@ -611,7 +578,7 @@ const submit = () => {
                                         <h3 class="text-lg font-medium border-b dark:border-gray-700 pb-2 mb-6">Control de Acceso</h3>
                                         <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-900/40">
                                             <div class="flex items-start gap-3">
-                                                <Checkbox id="bloqueado" v-model:checked="form.bloqueado" :disabled="user.tipo_usuario !== 'admin' || isClosed" />
+                                                <Checkbox id="bloqueado" v-model:checked="form.bloqueado" :disabled="user.tipo_usuario !== 'admin'" />
                                                 <div class="grow">
                                                     <InputLabel for="bloqueado" value="Caso bloqueado" />
                                                     <p class="text-sm text-gray-500 dark:text-gray-400">
@@ -622,8 +589,43 @@ const submit = () => {
                                             </div>
                                             <div v-if="form.bloqueado" class="mt-4">
                                                 <InputLabel for="motivo_bloqueo" value="Motivo del bloqueo *" />
-                                                <Textarea id="motivo_bloqueo" v-model.trim="form.motivo_bloqueo" class="mt-1 block w-full resize-y min-h-[96px]" rows="3" maxlength="1000" placeholder="Describe la razón del bloqueo…" :disabled="user.tipo_usuario !== 'admin' || isClosed"/>
+                                                <Textarea id="motivo_bloqueo" v-model.trim="form.motivo_bloqueo" class="mt-1 block w-full resize-y min-h-[96px]" rows="3" maxlength="1000" placeholder="Describe la razón del bloqueo…" :disabled="user.tipo_usuario !== 'admin'"/>
                                                 <InputError :message="form.errors.motivo_bloqueo" class="mt-2" />
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    <!-- NUEVA SECCIÓN: Acciones de Cierre -->
+                                    <section v-if="user.tipo_usuario !== 'cliente'">
+                                        <h3 class="text-lg font-medium border-b dark:border-gray-700 pb-2 mb-6 text-red-600 dark:text-red-400 flex items-center">
+                                            <ArchiveBoxXMarkIcon class="h-5 w-5 mr-2" />
+                                            Cierre del Caso
+                                        </h3>
+                                        <div class="rounded-lg border border-red-200 dark:border-red-900/50 p-4 bg-red-50 dark:bg-red-900/20">
+                                            <div class="flex items-center justify-between">
+                                                <div>
+                                                    <h4 class="font-medium text-red-800 dark:text-red-300">
+                                                        {{ caso.nota_cierre ? 'Reabrir Caso' : 'Cerrar Caso' }}
+                                                    </h4>
+                                                    <p class="text-sm text-red-600 dark:text-red-400 mt-1">
+                                                        {{ caso.nota_cierre 
+                                                            ? 'El caso se encuentra cerrado. Puedes reabrirlo para continuar la gestión.' 
+                                                            : 'Finalizar la gestión de este caso. Se requerirá una nota de cierre.' 
+                                                        }}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <PrimaryButton v-if="caso.nota_cierre" type="button" @click="submitReopen" class="bg-indigo-600 hover:bg-indigo-500">
+                                                        <ArrowPathIcon class="h-4 w-4 mr-2" /> Reabrir
+                                                    </PrimaryButton>
+                                                    <DangerButton v-else type="button" @click="confirmClose">
+                                                        <ArchiveBoxXMarkIcon class="h-4 w-4 mr-2" /> Cerrar
+                                                    </DangerButton>
+                                                </div>
+                                            </div>
+                                            <div v-if="caso.nota_cierre" class="mt-4 p-3 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+                                                <p class="text-xs font-bold text-gray-500 uppercase mb-1">Motivo de Cierre:</p>
+                                                <p class="text-sm text-gray-700 dark:text-gray-300">{{ caso.nota_cierre }}</p>
                                             </div>
                                         </div>
                                     </section>
@@ -642,33 +644,36 @@ const submit = () => {
                 </div>
             </div>
         </div>
-        
+
+        <!-- MODAL DE CIERRE DE CASO -->
         <Modal :show="showCloseModal" @close="showCloseModal = false">
             <div class="p-6">
-                <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Cerrar Caso</h2>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Al cerrar el caso, su estado cambiará a "Cerrado" y se deshabilitará la edición.</p>
+                <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+                    Confirmar Cierre del Caso
+                </h2>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    Por favor, ingresa una nota final explicando el motivo del cierre. Esta acción finalizará la gestión del caso.
+                </p>
                 <div class="mt-6">
-                    <InputLabel for="nota_cierre" value="Nota de Cierre *" required />
-                    <Textarea v-model="closeForm.nota_cierre" id="nota_cierre" class="mt-1 block w-full" rows="4" />
+                    <InputLabel for="nota_cierre" value="Nota de Cierre" />
+                    <Textarea
+                        id="nota_cierre"
+                        v-model="closeForm.nota_cierre"
+                        class="mt-1 block w-full"
+                        rows="4"
+                        placeholder="Ej: Acuerdo de pago total cumplido..."
+                    />
                     <InputError :message="closeForm.errors.nota_cierre" class="mt-2" />
                 </div>
                 <div class="mt-6 flex justify-end gap-3">
-                    <SecondaryButton @click="showCloseModal = false">Cancelar</SecondaryButton>
-                    <DangerButton @click="closeTheCase" :disabled="closeForm.processing" :class="{ 'opacity-25': closeForm.processing }">{{ closeForm.processing ? 'Cerrando...' : 'Confirmar Cierre' }}</DangerButton>
+                    <SecondaryButton @click="showCloseModal = false"> Cancelar </SecondaryButton>
+                    <DangerButton @click="submitClose" :class="{ 'opacity-25': closeForm.processing }" :disabled="closeForm.processing">
+                        Cerrar Caso Permanentemente
+                    </DangerButton>
                 </div>
             </div>
         </Modal>
 
-        <Modal :show="showReopenModal" @close="showReopenModal = false">
-            <div class="p-6">
-                <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Reabrir Caso</h2>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">¿Estás seguro de que quieres reabrir este caso?</p>
-                <div class="mt-6 flex justify-end gap-3">
-                    <SecondaryButton @click="showReopenModal = false">Cancelar</SecondaryButton>
-                    <PrimaryButton @click="reopenTheCase" :disabled="reopenForm.processing" :class="{ 'opacity-25': reopenForm.processing }" class="!bg-blue-600 hover:!bg-blue-700 focus:!bg-blue-700 active:!bg-blue-800 focus:!ring-blue-500">{{ reopenForm.processing ? 'Reabriendo...' : 'Sí, Reabrir' }}</PrimaryButton>
-                </div>
-            </div>
-        </Modal>
     </AuthenticatedLayout>
 </template>
 

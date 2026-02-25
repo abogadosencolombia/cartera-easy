@@ -21,7 +21,7 @@ const form = useForm({
   tipo_documento: props.persona.tipo_documento,
   numero_documento: props.persona.numero_documento,
   fecha_expedicion: props.persona.fecha_expedicion,
-  fecha_nacimiento: props.persona.fecha_nacimiento, // <--- NUEVO CAMPO
+  fecha_nacimiento: props.persona.fecha_nacimiento,
   telefono_fijo: props.persona.telefono_fijo,
   celular_1: props.persona.celular_1,
   celular_2: props.persona.celular_2,
@@ -52,6 +52,23 @@ const removeLinkRow = (idx) => {
 const normalizeUrl = (l) => {
   if (!l.url) return;
   if (!/^https?:\/\//i.test(l.url)) l.url = `https://${l.url}`;
+};
+
+// --- LÓGICA DE SELECCIONAR TODOS ---
+const toggleCooperativas = () => {
+    if (form.cooperativas_ids.length === props.allCooperativas.length) {
+        form.cooperativas_ids = [];
+    } else {
+        form.cooperativas_ids = props.allCooperativas.map(c => c.id);
+    }
+};
+
+const toggleAbogados = () => {
+    if (form.abogados_ids.length === props.allAbogados.length) {
+        form.abogados_ids = [];
+    } else {
+        form.abogados_ids = props.allAbogados.map(a => a.id);
+    }
 };
 
 const submit = () => form.post(route('personas.update', props.persona.id));
@@ -96,7 +113,6 @@ const submit = () => form.post(route('personas.update', props.persona.id));
                     <InputError :message="form.errors.numero_documento" class="mt-2" />
                   </div>
                   
-                  <!-- FECHAS (Expedición y Nacimiento) -->
                   <div>
                     <InputLabel for="fecha_expedicion" value="Fecha de Expedición (Opcional)" />
                     <TextInput v-model="form.fecha_expedicion" id="fecha_expedicion" type="date" class="mt-1 block w-full" />
@@ -180,7 +196,7 @@ const submit = () => form.post(route('personas.update', props.persona.id));
 
               <section>
                   <h3 class="mb-4 text-lg font-medium text-gray-900 dark:text-gray-100">Información Adicional</h3>
-                   <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                       <div>
                           <InputLabel for="empresa" value="Empresa (Opcional)" />
                           <TextInput v-model="form.empresa" id="empresa" type="text" class="mt-1 block w-full" />
@@ -193,11 +209,16 @@ const submit = () => form.post(route('personas.update', props.persona.id));
                           <InputLabel for="observaciones" value="Observaciones (Opcional)" />
                           <Textarea v-model="form.observaciones" id="observaciones" class="mt-1 block w-full" rows="3" />
                       </div>
-                   </div>
+                    </div>
               </section>
 
               <section>
-                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Asignar Cooperativas</h3>
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Asignar Cooperativas</h3>
+                    <button type="button" @click="toggleCooperativas" class="text-sm text-indigo-600 hover:text-indigo-800 hover:underline dark:text-indigo-400">
+                        {{ form.cooperativas_ids.length === props.allCooperativas.length ? 'Deseleccionar todas' : 'Seleccionar todas' }}
+                    </button>
+                </div>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Selecciona las cooperativas a las que pertenece esta persona.</p>
                 
                 <div v-if="!props.allCooperativas.length" class="rounded-md border border-dashed border-gray-300 dark:border-gray-600 p-4 text-center text-sm text-gray-500 dark:text-gray-400">
@@ -219,7 +240,12 @@ const submit = () => form.post(route('personas.update', props.persona.id));
               </section>
 
               <section>
-                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Asignar Abogados / Gestores</h3>
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Asignar Abogados / Gestores</h3>
+                    <button type="button" @click="toggleAbogados" class="text-sm text-indigo-600 hover:text-indigo-800 hover:underline dark:text-indigo-400">
+                        {{ form.abogados_ids.length === props.allAbogados.length ? 'Deseleccionar todos' : 'Seleccionar todos' }}
+                    </button>
+                </div>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Selecciona los abogados o gestores que manejarán esta persona.</p>
                 
                 <div v-if="!props.allAbogados.length" class="rounded-md border border-dashed border-gray-300 dark:border-gray-600 p-4 text-center text-sm text-gray-500 dark:text-gray-400">

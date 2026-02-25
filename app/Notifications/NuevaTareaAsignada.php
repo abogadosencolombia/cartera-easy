@@ -4,13 +4,9 @@ namespace App\Notifications;
 
 use App\Models\Tarea;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
-use App\Models\Contrato; // Usamos el modelo correcto
 
-
-class NuevaTareaAsignada extends Notification implements ShouldQueue
+class NuevaTareaAsignada extends Notification 
 {
     use Queueable;
 
@@ -26,46 +22,51 @@ class NuevaTareaAsignada extends Notification implements ShouldQueue
 
     /**
      * Get the notification's delivery channels.
-     *
-     * @return array<int, string>
      */
     public function via(object $notifiable): array
     {
-        // La enviaremos solo a la base de datos (para que aparezca en la campana)
+        // Solo base de datos para que aparezca en la campana
         return ['database'];
     }
 
     /**
      * Get the array representation of the notification.
-     *
-     * @return array<string, mixed>
      */
     public function toDatabase(object $notifiable): array
     {
-        // Construimos el link al que irá el usuario
-        $link = '#'; // Link por defecto
-        $tipo = 'Elemento';
+        // 1. Valores por defecto (Caso: Nota General / Tarea Suelta)
+        $link = '#'; 
+        $tipo = 'Nota General';
+        
+        $tareaType = $this->tarea->tarea_type;
 
-        // ===== INICIO DE LA MODIFICACIÓN (FIX CORS) =====
-        // Creamos enlaces relativos en lugar de absolutos
-        if ($this->tarea->tarea_type === 'App\Models\ProcesoRadicado') {
-            $link = '/procesos/' . $this->tarea->tarea_id;
-            $tipo = 'Proceso/Radicado';
-        } elseif ($this->tarea->tarea_type === 'App\Models\Caso') {
-            $link = '/casos/' . $this->tarea->tarea_id;
-            $tipo = 'Caso';
-        } elseif ($this->tarea->tarea_type === 'App\Models\Contrato') { 
-            // Usamos la ruta de tu aplicación
-            $link = '/gestion/honorarios/contratos/' . $this->tarea->tarea_id;
-            $tipo = 'Contrato de Honorarios';
+        // 2. Si hay vinculación, calculamos el link y el nombre del tipo
+        if ($tareaType) {
+            if ($tareaType === 'App\Models\ProcesoRadicado' || $tareaType === 'proceso') {
+                $link = '/procesos/' . $this->tarea->tarea_id;
+                $tipo = 'Proceso/Radicado';
+            } elseif ($tareaType === 'App\Models\Caso' || $tareaType === 'caso') {
+                $link = '/casos/' . $this->tarea->tarea_id;
+                $tipo = 'Caso';
+            } elseif ($tareaType === 'App\Models\Contrato' || $tareaType === 'contrato') {
+                $link = '/gestion/honorarios/contratos/' . $this->tarea->tarea_id;
+                $tipo = 'Contrato de Honorarios';
+            }
         }
-        // ===== FIN DE LA MODIFICACIÓN =====
 
         return [
-            'icon' => 'task', // Un ícono para identificarla en el frontend
+            'icon' => 'task',
             'title' => 'Nueva Tarea Asignada',
             'message' => "Se te asignó la tarea: '{$this->tarea->titulo}'",
-            'details' => "Vinculada a: {$tipo}",
+            'description' => $this->tarea->descripcion,
+            
+            // 3. Manejo seguro de la fecha límite (puede ser null)
+            // Si hay fecha, la formateamos. Si no, enviamos null.
+            'deadline' => $this->tarea->fecha_limite ? $this->tarea->fecha_limite->format('d/m/Y h:i A') : null,
+            
+            // 4. Detalle dinámico
+            'details' => $tareaType ? "Vinculada a: {$tipo}" : "Tarea General",
+            
             'link' => $link,
             'tarea_id' => $this->tarea->id
         ];

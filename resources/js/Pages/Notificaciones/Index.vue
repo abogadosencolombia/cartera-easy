@@ -1,22 +1,15 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
 import Pagination from '@/Components/Pagination.vue';
 
-// Importación de iconos
+// --- IMPORTACIÓN DE ICONOS ---
 import {
-    BellAlertIcon,
-    InboxIcon,
-    EyeIcon,
-    CheckCircleIcon,
-    CheckBadgeIcon,
-    ClockIcon,
-    CalendarDaysIcon,
-    InformationCircleIcon,
-    // ===== INICIO DE LA MODIFICACIÓN (MÓDULO DE TAREAS) =====
-    BriefcaseIcon
-    // ===== FIN DE LA MODIFICACIÓN =====
+    BellAlertIcon, InboxIcon, EyeIcon, CheckCircleIcon, CheckBadgeIcon,
+    ClockIcon, InformationCircleIcon, BriefcaseIcon,
+    DocumentTextIcon, ExclamationTriangleIcon, BanknotesIcon, ScaleIcon,
+    ChevronRightIcon, FunnelIcon, XMarkIcon, SparklesIcon, TrashIcon // <--- NUEVO
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -25,25 +18,31 @@ const props = defineProps({
     tipos_alerta: Array,
 });
 
+const user = usePage().props.auth.user;
+
 // --- Lógica de Acciones ---
 const marcarComoLeida = (notificacionId) => {
-    // ===== INICIO DE LA MODIFICACIÓN (PASO 2 - CORREGIDO) =====
-    // Esta función ahora es genérica y marcará leída cualquier notificación
-    // de la tabla 'notifications' de Laravel.
     router.patch(route('notificaciones.leer', notificacionId), {}, {
         preserveScroll: true,
-        // ¡ESTA ES LA LÍNEA QUE ARREGLA EL CONTADOR!
-        only: ['notificaciones', 'auth'], // Recargamos 'auth' para el contador
+        only: ['notificaciones'],
     });
-    // ===== FIN DE LA MODIFICACIÓN =====
 };
 
 const marcarComoAtendida = (notificacionId) => {
-    // Esta función es de tu sistema 'NotificacionCaso' y se mantiene
     router.patch(route('notificaciones.atender', notificacionId), {}, {
         preserveScroll: true,
         only: ['notificaciones'],
     });
+};
+
+// --- NUEVA FUNCIÓN: ELIMINAR ---
+const eliminarNotificacion = (notificacionId) => {
+    if (confirm('¿Estás seguro de que deseas eliminar esta notificación de forma permanente?')) {
+        router.delete(route('notificaciones.destroy', notificacionId), {
+            preserveScroll: true,
+            only: ['notificaciones'],
+        });
+    }
 };
 
 // --- Lógica de Filtros ---
@@ -51,6 +50,10 @@ const localFiltros = ref({
     leido: props.filtros.leido || '',
     tipo: props.filtros.tipo || '',
 });
+
+const setFiltro = (campo, valor) => {
+    localFiltros.value[campo] = valor;
+};
 
 watch(localFiltros, (newFilters) => {
     router.get(route('notificaciones.index'), newFilters, {
@@ -60,244 +63,316 @@ watch(localFiltros, (newFilters) => {
 }, { deep: true });
 
 
-// --- Ayudantes de Estilo y Formato ---
-const alertaMeta = {
-    'vencimiento_termino': { icon: ClockIcon, color: 'text-red-600', bgColor: 'bg-red-100', borderColor: 'border-l-red-500' },
-    'tarea_asignada': { icon: CalendarDaysIcon, color: 'text-blue-600', bgColor: 'bg-blue-100', borderColor: 'border-l-blue-500' },
-    'recordatorio': { icon: BellAlertIcon, color: 'text-yellow-600', bgColor: 'bg-yellow-100', borderColor: 'border-l-yellow-500' },
-    'default': { icon: InformationCircleIcon, color: 'text-gray-600', bgColor: 'bg-gray-100', borderColor: 'border-l-gray-500' }
+// --- CONFIGURACIÓN VISUAL (ICONOS Y COLORES) ---
+const estilosVisuales = {
+    // JURÍDICO
+    'revision_proxima': { icon: ScaleIcon, color: 'text-indigo-600', bgIcon: 'bg-indigo-100', border: 'border-indigo-500', shadow: 'shadow-indigo-100', label: 'Gestión Legal' },
+    'revision_hoy':     { icon: ScaleIcon, color: 'text-amber-600', bgIcon: 'bg-amber-100', border: 'border-amber-500', shadow: 'shadow-amber-100', label: 'Revisión Prioritaria' },
+    'revision_vencida': { icon: ExclamationTriangleIcon, color: 'text-rose-600', bgIcon: 'bg-rose-100', border: 'border-rose-500', shadow: 'shadow-rose-100', label: 'Alerta Crítica' },
+
+    // FINANCIERO
+    'pago_proximo':     { icon: BanknotesIcon, color: 'text-emerald-600', bgIcon: 'bg-emerald-100', border: 'border-emerald-500', shadow: 'shadow-emerald-100', label: 'Cobro' },
+    'pago_hoy':         { icon: BanknotesIcon, color: 'text-teal-600', bgIcon: 'bg-teal-100', border: 'border-teal-500', shadow: 'shadow-teal-100', label: 'Pago Hoy' },
+    'pago_vencido':     { icon: BanknotesIcon, color: 'text-red-600', bgIcon: 'bg-red-100', border: 'border-red-500', shadow: 'shadow-red-100', label: 'Mora' },
+
+    // SISTEMA / OTROS
+    'vencimiento':      { icon: ClockIcon, color: 'text-rose-600', bgIcon: 'bg-rose-100', border: 'border-rose-500', shadow: 'shadow-rose-100', label: 'Vence' },
+    'mora':             { icon: BanknotesIcon, color: 'text-red-600', bgIcon: 'bg-red-100', border: 'border-red-500', shadow: 'shadow-red-100', label: 'En Mora' },
+    'alerta_manual':    { icon: BellAlertIcon, color: 'text-violet-600', bgIcon: 'bg-violet-100', border: 'border-violet-500', shadow: 'shadow-violet-100', label: 'Manual' },
+    'default':          { icon: InformationCircleIcon, color: 'text-slate-500', bgIcon: 'bg-slate-100', border: 'border-slate-400', shadow: 'shadow-slate-100', label: 'Notificación' }
 };
 
-// --- FUNCIÓN MEJORADA ---
-const getAlertaMeta = (tipo) => {
-    // Si el tipo es nulo o no existe, devuelve el valor por defecto de forma segura.
-    if (!tipo || !alertaMeta[tipo]) {
-        return alertaMeta['default'];
+const getAlertaMeta = (notificacion) => {
+    if (!notificacion || !notificacion.tipo) return estilosVisuales['default'];
+    const tipoBD = notificacion.tipo; 
+    const mensaje = (notificacion.mensaje || '').toLowerCase();
+
+    if (tipoBD === 'vencimiento' || tipoBD === 'mora') {
+        if (mensaje.includes('cuota') || mensaje.includes('pago') || mensaje.includes('cobro') || mensaje.includes('honorarios')) {
+            if (mensaje.includes('mora') || mensaje.includes('no pagó') || mensaje.includes('vencid')) return estilosVisuales['pago_vencido'];
+            if (mensaje.includes('hoy')) return estilosVisuales['pago_hoy'];
+            return estilosVisuales['pago_proximo'];
+        }
+        if (mensaje.includes('revisión') || mensaje.includes('proceso') || mensaje.includes('radicado')) {
+            if (mensaje.includes('vencida') || mensaje.includes('atrasada')) return estilosVisuales['revision_vencida'];
+            if (mensaje.includes('hoy') || mensaje.includes('atención')) return estilosVisuales['revision_hoy'];
+            return estilosVisuales['revision_proxima'];
+        }
     }
-    return alertaMeta[tipo];
+    return estilosVisuales[tipoBD] || estilosVisuales['default'];
 };
-
 
 const formatTime = (dateString) => {
     if (!dateString) return '';
-    return new Date(dateString).toLocaleTimeString('es-CO', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-    }).toLowerCase();
+    return new Date(dateString).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
 };
 
-// --- Lógica para Agrupar Notificaciones por Fecha ---
 const groupedNotifications = computed(() => {
-    const groups = { Hoy: [], Ayer: [], 'Esta semana': [], 'Este mes': [], 'Más antiguas': [] };
+    const groups = { Hoy: [], Ayer: [], 'Esta Semana': [], 'Anteriores': [] };
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
-    const oneWeekAgo = new Date(today); oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const oneMonthAgo = new Date(today); oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const yesterday = today - 86400000;
+    const weekAgo = today - (86400000 * 7);
 
-    // ===== INICIO DE LA MODIFICACIÓN (MÓDULO DE TAREAS) =====
-    // Se ajusta para que funcione con ambos tipos de notificación
-    const allNotifications = props.notificaciones.data;
-    // ===== FIN DE LA MODIFICACIÓN =====
-
-    for (const notif of allNotifications) {
-        const notifDate = new Date(notif.created_at);
-        const notifDay = new Date(notifDate.getFullYear(), notifDate.getMonth(), notifDate.getDate());
-
-        if (notifDay.getTime() === today.getTime()) groups.Hoy.push(notif);
-        else if (notifDay.getTime() === yesterday.getTime()) groups.Ayer.push(notif);
-        else if (notifDate > oneWeekAgo) groups['Esta semana'].push(notif);
-        else if (notifDate > oneMonthAgo) groups['Este mes'].push(notif);
-        else groups['Más antiguas'].push(notif);
-    }
-
-    return Object.entries(groups)
-        .filter(([, value]) => value.length > 0)
-        .map(([title, notifications]) => ({ title, notifications }));
+    (props.notificaciones?.data || []).forEach(n => {
+        const d = new Date(n.created_at);
+        const t = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        if (t === today) groups.Hoy.push(n);
+        else if (t === yesterday) groups.Ayer.push(n);
+        else if (t > weekAgo) groups['Esta Semana'].push(n);
+        else groups['Anteriores'].push(n);
+    });
+    return Object.entries(groups).filter(g => g[1].length).map(([title, notifications]) => ({ title, notifications }));
 });
 
-// ===== INICIO DE LA MODIFICACIÓN (MÓDULO DE TAREAS) =====
-// Esta función determina si la notificación es una TAREA
-const esNotificacionDeTarea = (notificacion) => {
-    return notificacion.type === 'App\\Notifications\\NuevaTareaAsignada';
+const esNotificacionDeSistema = (notificacion) => {
+    return notificacion.type && notificacion.type.startsWith('App\\Notifications');
 };
-// ===== FIN DE LA MODIFICACIÓN =====
-
+const esAlertaVencida = (notificacion) => {
+    return notificacion.type === 'App\\Notifications\\TareaVencidaAdmin';
+};
 </script>
 
 <template>
-    <Head title="Bandeja de Notificaciones" />
+    <Head title="Centro de Notificaciones" />
 
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-                Centro de Notificaciones
-            </h2>
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+                            Hola, {{ user.name.split(' ')[0] }}
+                        </h2>
+                        <SparklesIcon class="h-5 w-5 text-amber-400" />
+                    </div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Tienes <strong class="text-indigo-600 dark:text-indigo-400">{{ notificaciones.total }}</strong> actualizaciones importantes hoy.
+                    </p>
+                </div>
+            </div>
         </template>
 
-        <div class="py-12">
-            <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-6">
-                <!-- SECCIÓN DE FILTROS -->
-                <!-- (Tu sección de filtros no se modifica) -->
-                <div class="p-4 bg-white dark:bg-gray-800 shadow-sm rounded-lg border dark:border-gray-700">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label for="filtro_leido" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Estado</label>
-                            <select v-model="localFiltros.leido" id="filtro_leido" class="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition">
-                                <option value="">Todos</option>
-                                <option value="no">No Leídas</option>
-                                <option value="si">Leídas</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="filtro_tipo" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de Alerta</label>
-                            <select v-model="localFiltros.tipo" id="filtro_tipo" class="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm capitalize focus:ring-indigo-500 focus:border-indigo-500 transition">
-                                <option value="">Todos</option>
-                                <option v-for="tipo in tipos_alerta" :key="tipo" :value="tipo">{{ tipo ? tipo.replace(/_/g, ' ') : '' }}</option>
-                            </select>
-                        </div>
+        <div class="min-h-screen bg-gray-50/80 dark:bg-gray-900 py-8">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+                
+                <!-- BARRA DE FILTROS -->
+                <div class="sticky top-4 z-20 mb-8 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md p-2 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3">
+                    
+                    <div class="flex flex-wrap items-center gap-1">
+                        <span class="text-xs font-bold text-gray-400 uppercase tracking-wider px-3 mr-1 flex items-center gap-1">
+                            <FunnelIcon class="h-3 w-3" /> Filtros
+                        </span>
+
+                        <button @click="setFiltro('leido', '')" 
+                            class="px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200"
+                            :class="localFiltros.leido === '' ? 'bg-gray-900 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'">
+                            Todas
+                        </button>
+                        <button @click="setFiltro('leido', 'no')" 
+                            class="px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 relative"
+                            :class="localFiltros.leido === 'no' ? 'bg-gray-900 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'">
+                            No leídas
+                            <span v-if="localFiltros.leido !== 'no'" class="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-red-500"></span>
+                        </button>
+
+                        <div class="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-2 hidden sm:block"></div>
+
+                        <button @click="setFiltro('tipo', 'vencimiento')" 
+                             class="px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 flex items-center gap-1.5"
+                             :class="localFiltros.tipo === 'vencimiento' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'">
+                             <ScaleIcon class="w-3.5 h-3.5" /> Legal
+                        </button>
+                        <button @click="setFiltro('tipo', 'mora')" 
+                             class="px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 flex items-center gap-1.5"
+                             :class="localFiltros.tipo === 'mora' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'">
+                             <BanknotesIcon class="w-3.5 h-3.5" /> Pagos
+                        </button>
                     </div>
+
+                    <button v-if="localFiltros.leido || localFiltros.tipo" 
+                        @click="localFiltros = { leido: '', tipo: '' }"
+                        class="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-red-500 flex items-center gap-1 transition-colors">
+                        <XMarkIcon class="w-3 h-3" /> Limpiar
+                    </button>
                 </div>
 
-                <!-- LÍNEA DE TIEMPO DE NOTIFICACIONES -->
-                <div v-if="notificaciones.data.length > 0">
-                    <div v-for="group in groupedNotifications" :key="group.title" class="mb-8">
-                        <h3 class="px-2 text-xs font-bold uppercase text-gray-500 dark:text-gray-400 tracking-wider mb-3">
-                            {{ group.title }}
-                        </h3>
-                        <div class="space-y-4">
-                                <!-- TARJETA DE NOTIFICACIÓN EN LA LÍNEA DE TIEMPO -->
-                            <div v-for="notificacion in group.notifications" :key="notificacion.id" class="relative flex items-start space-x-4 pl-12 group">
+                <!-- LISTADO -->
+                <div v-if="notificaciones.data && notificaciones.data.length > 0" class="space-y-10 pb-20">
+                    <div v-for="group in groupedNotifications" :key="group.title" class="relative">
+                        
+                        <div class="flex items-center mb-5 ml-2">
+                            <div class="h-2 w-2 rounded-full bg-gray-300 dark:bg-gray-600 mr-3"></div>
+                            <h3 class="text-xs font-bold uppercase tracking-widest text-gray-400">
+                                {{ group.title }}
+                            </h3>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-4">
+                            <transition-group 
+                                enter-active-class="transition ease-out duration-300 delay-75"
+                                enter-from-class="opacity-0 translate-y-4"
+                                enter-to-class="opacity-100 translate-y-0"
+                                leave-active-class="transition ease-in duration-200"
+                                leave-from-class="opacity-100 translate-y-0"
+                                leave-to-class="opacity-0 translate-y-4">
                                 
-                                <!-- ===== INICIO DE LA MODIFICACIÓN (RENDERIZADO CONDICIONAL) ===== -->
-                                
-                                <!-- [ OPCIÓN 1: Es una Notificación de TAREA ] -->
-                                <template v-if="esNotificacionDeTarea(notificacion)">
-                                    <!-- La Línea y el Punto de la Timeline -->
-                                    <div class="absolute left-6 top-7 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700"></div>
-                                    <div class="absolute left-4 top-5 flex items-center justify-center h-5 w-5 rounded-full" :class="[ 'bg-blue-100 dark:bg-blue-800', { 'ring-4 ring-blue-500/30': !notificacion.read_at }]">
-                                        <BriefcaseIcon class="h-3 w-3 text-blue-600 dark:text-blue-300" />
-                                    </div>
+                                <div v-for="notif in group.notifications" :key="notif.id" 
+                                    class="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_16px_-4px_rgba(0,0,0,0.1)] transition-all duration-300 hover:-translate-y-0.5">
                                     
-                                    <div class="w-full bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 border-l-4 border-l-blue-500 transition-all duration-300 group-hover:shadow-md group-hover:-translate-y-px">
-                                        <!-- Encabezado de la Tarjeta de Tarea -->
-                                        <div class="px-4 py-3 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 rounded-t-md">
-                                            <p class="text-sm font-bold capitalize text-blue-600 dark:text-blue-400">
-                                                {{ notificacion.data.title }}
-                                            </p>
-                                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ formatTime(notificacion.created_at) }}</p>
-                                        </div>
-                                        
-                                        <!-- Cuerpo de la Tarjeta de Tarea -->
-                                        <div class="p-4">
-                                            <p class="text-gray-700 dark:text-gray-200 break-words">{{ notificacion.data.message }}</p>
-                                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ notificacion.data.details }}</p>
-                                        </div>
+                                    <!-- SISTEMA -->
+                                    <template v-if="esNotificacionDeSistema(notif)">
+                                        <div class="flex p-5 gap-5" :class="{'opacity-70 bg-gray-50/50': notif.read_at}">
+                                            <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-gray-200 to-transparent group-hover:from-indigo-400 transition-all duration-500"></div>
 
-                                        <!-- Pie de la Tarjeta de Tarea -->
-                                        <div class="px-4 py-2 bg-gray-50 dark:bg-gray-800/50 rounded-b-md flex items-center justify-between">
-                                            
-                                            <!-- ===== INICIO DE LA MODIFICACIÓN (LA 'OTRA COSA') ===== -->
-                                            <!-- Reemplazamos <Link> por <a> para forzar una recarga completa -->
-                                            <!-- y evitar el error 409 (Conflict) de Inertia -->
-                                            <a :href="notificacion.data.link" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
-                                                Ver Elemento Vinculado
-                                            </a>
-                                            <!-- ===== FIN DE LA MODIFICACIÓN ===== -->
-
-                                            <div class="flex items-center gap-2">
-                                                <!-- Botón Marcar como Leída (Usa el sistema de Laravel) -->
-                                                <button v-if="!notificacion.read_at" @click="marcarComoLeida(notificacion.id)" title="Marcar como leída"
-                                                        class="p-1.5 rounded-full text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                                                    <EyeIcon class="h-5 w-5" />
-                                                </button>
-                                                
-                                                <!-- Botón Marcar como Completada (Usa la ruta de TareaController) -->
-                                                <!-- (No mostramos el botón si notificacion.data.task_status === 'completada', pero necesitamos añadir eso al TareaController) -->
-                                                <!-- Por ahora, solo lo mostramos si está leída -->
-                                                <Link 
-                                                    v-if="notificacion.read_at && notificacion.data.tarea_id"
-                                                    :href="route('tareas.completar', notificacion.data.tarea_id)"
-                                                    method="patch"
-                                                    as="button"
-                                                    preserve-scroll
-                                                    title="Marcar como completada"
-                                                    class="p-1.5 rounded-full text-gray-500 hover:bg-green-100 dark:hover:bg-green-800/50 hover:text-green-600 transition-colors">
-                                                    <CheckBadgeIcon class="h-5 w-5" />
-                                                </Link>
+                                            <div class="flex-shrink-0">
+                                                <div class="h-10 w-10 rounded-xl flex items-center justify-center bg-gray-50 border border-gray-200 text-gray-500 group-hover:bg-white group-hover:shadow-sm transition-all">
+                                                    <BriefcaseIcon class="h-5 w-5" />
+                                                </div>
                                             </div>
-                                        </div>
-                                    </div>
-                                </template>
-
-                                <!-- [ OPCIÓN 2: Es una Notificación de CASO (Tu código original) ] -->
-                                <template v-else>
-                                    <!-- La Línea y el Punto de la Timeline -->
-                                    <div class="absolute left-6 top-7 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700"></div>
-                                    <!-- (Usamos 'notificacion.leido' del sistema custom, no 'read_at') -->
-                                    <div class="absolute left-4 top-5 flex items-center justify-center h-5 w-5 rounded-full" :class="[getAlertaMeta(notificacion.tipo_alerta).bgColor, { 'ring-4 ring-blue-500/30': !notificacion.leido }]">
-                                            <component :is="getAlertaMeta(notificacion.tipo_alerta).icon" class="h-3 w-3" :class="getAlertaMeta(notificacion.tipo_alerta).color" />
-                                    </div>
-
-                                    <div class="w-full bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 border-l-4 transition-all duration-300 group-hover:shadow-md group-hover:-translate-y-px"
-                                            :class="[getAlertaMeta(notificacion.tipo_alerta).borderColor, { 'opacity-60': notificacion.atendida_en }]">
-
-                                        <!-- Encabezado de la Tarjeta -->
-                                        <div class="px-4 py-3 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 rounded-t-md">
-                                            <p class="text-sm font-bold capitalize" :class="getAlertaMeta(notificacion.tipo_alerta).color">
-                                                {{ notificacion.tipo_alerta ? notificacion.tipo_alerta.replace(/_/g, ' ') : 'Notificación' }}
-                                            </p>
-                                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ formatTime(notificacion.created_at) }}</p>
-                                        </div>
-
-                                        <!-- Cuerpo de la Tarjeta -->
-                                        <div class="p-4">
-                                            <p class="text-gray-700 dark:text-gray-200 break-words">{{ notificacion.mensaje }}</p>
-                                        </div>
-
-                                        <!-- Pie de la Tarjeta -->
-                                        <div class="px-4 py-2 bg-gray-50 dark:bg-gray-800/50 rounded-b-md flex items-center justify-between">
-                                            <!-- Este enlace de CASO lo dejamos como <Link> porque probablemente SÍ funciona -->
-                                            <Link :href="route('casos.show', notificacion.caso_id)" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
-                                                Ver Caso #{{ notificacion.caso_id }}
-                                            </Link>
-                                            <div class="flex items-center gap-2">
-                                                <!-- (Botones de tu sistema custom) -->
-                                                <button v-if="!notificacion.leido" @click="marcarComoLeida(notificacion.id)" title="Marcar como leída"
-                                                        class="p-1.5 rounded-full text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                                                    <EyeIcon class="h-5 w-5" />
-                                                </button>
-                                                <button v-if="notificacion.leido && !notificacion.atendida_en" @click="marcarComoAtendida(notificacion.id)" title="Marcar como atendida"
-                                                        class="p-1.5 rounded-full text-gray-500 hover:bg-green-100 dark:hover:bg-green-800/50 hover:text-green-600 transition-colors">
-                                                    <CheckBadgeIcon class="h-5 w-5" />
-                                                </button>
-                                                <div v-if="notificacion.atendida_en" class="flex items-center text-xs text-green-600 dark:text-green-400 font-semibold">
-                                                    <CheckCircleIcon class="h-4 w-4 mr-1.5" />
-                                                    <span>Atendida</span>
+                                            <div class="flex-grow min-w-0">
+                                                <div class="flex justify-between items-start">
+                                                    <h4 class="text-sm font-bold text-gray-900 dark:text-white truncate">
+                                                        {{ notif.data.title }}
+                                                    </h4>
+                                                    <span class="text-[10px] font-medium text-gray-400 bg-gray-50 px-2 py-0.5 rounded border border-gray-100">
+                                                        {{ formatTime(notif.created_at) }}
+                                                    </span>
+                                                </div>
+                                                <p class="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
+                                                    {{ notif.data.message }}
+                                                </p>
+                                                <div class="mt-3 flex gap-4 opacity-60 group-hover:opacity-100 transition-opacity">
+                                                    <button v-if="!notif.read_at" @click="marcarComoLeida(notif.id)" class="text-xs font-semibold text-indigo-600 hover:underline">Marcar leída</button>
+                                                    <!-- Botón Eliminar para Sistema -->
+                                                    <button @click="eliminarNotificacion(notif.id)" class="text-xs font-semibold text-red-500 hover:underline flex items-center gap-1">
+                                                        <TrashIcon class="w-3 h-3" /> Eliminar
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </template>
-                                <!-- ===== FIN DE LA MODIFICACIÓN ===== -->
-                            </div>
+                                    </template>
+
+                                    <!-- CASOS -->
+                                    <template v-else>
+                                        <div class="absolute left-0 top-0 bottom-0 w-1 transition-all duration-300"
+                                             :class="getAlertaMeta(notif).color.replace('text-', 'bg-')"></div>
+
+                                        <div class="flex p-5 gap-4 sm:gap-6 items-start" 
+                                             :class="[notif.leido ? 'bg-gray-50/50 grayscale-[0.3]' : 'bg-white']">
+                                            
+                                            <div class="flex-shrink-0 relative mt-1">
+                                                <div class="h-12 w-12 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-sm group-hover:scale-110"
+                                                     :class="[getAlertaMeta(notif).bgIcon, getAlertaMeta(notif).color]">
+                                                    <component :is="getAlertaMeta(notif).icon" class="h-6 w-6" stroke-width="2" />
+                                                </div>
+                                            </div>
+
+                                            <div class="flex-grow min-w-0">
+                                                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-1 gap-2">
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded border bg-opacity-50"
+                                                              :class="[getAlertaMeta(notif).bgIcon, getAlertaMeta(notif).border, getAlertaMeta(notif).color]">
+                                                            {{ getAlertaMeta(notif).label }}
+                                                        </span>
+                                                        <span v-if="!notif.leido" class="relative flex h-2 w-2">
+                                                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                                          <span class="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                                                        </span>
+                                                    </div>
+                                                    <span class="text-xs font-mono text-gray-400 hidden sm:block">
+                                                        {{ formatTime(notif.created_at) }}
+                                                    </span>
+                                                </div>
+
+                                                <p class="text-sm leading-relaxed mb-3 transition-colors" 
+                                                   :class="notif.leido ? 'text-gray-500 font-normal' : 'text-gray-800 dark:text-gray-100 font-medium'">
+                                                    {{ notif.mensaje }}
+                                                </p>
+
+                                                <!-- Actions Footer -->
+                                                <div class="flex items-center justify-between pt-3 border-t border-dashed border-gray-100 dark:border-gray-700 transition-opacity duration-300 sm:opacity-50 sm:group-hover:opacity-100">
+                                                    
+                                                    <Link v-if="notif.caso_id" :href="route('casos.show', notif.caso_id)" 
+                                                          class="text-xs font-bold text-gray-400 hover:text-indigo-600 transition-colors flex items-center gap-1">
+                                                        VER EXPEDIENTE <ChevronRightIcon class="h-3 w-3" />
+                                                    </Link>
+                                                    <span v-else class="text-xs text-gray-300 italic">Notificación general</span>
+
+                                                    <div class="flex items-center gap-2">
+                                                        <!-- Botón Eliminar -->
+                                                        <button @click="eliminarNotificacion(notif.id)" 
+                                                                title="Eliminar notificación"
+                                                                class="h-8 w-8 flex items-center justify-center rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all">
+                                                            <TrashIcon class="h-4 w-4" />
+                                                        </button>
+
+                                                        <!-- Botón Leído -->
+                                                        <button v-if="!notif.leido" 
+                                                                @click="marcarComoLeida(notif.id)" 
+                                                                title="Archivar"
+                                                                class="h-8 w-8 flex items-center justify-center rounded-full text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all">
+                                                            <EyeIcon class="h-4 w-4" />
+                                                        </button>
+
+                                                        <!-- Botón Atender -->
+                                                        <button v-if="!notif.atendida_en" 
+                                                                @click="marcarComoAtendida(notif.id)" 
+                                                                title="Marcar Resuelto"
+                                                                class="h-8 px-3 flex items-center gap-1 rounded-full text-xs font-bold text-gray-400 hover:text-white hover:bg-emerald-500 transition-all border border-gray-200 hover:border-transparent">
+                                                            <CheckCircleIcon class="h-4 w-4" />
+                                                            <span class="hidden sm:inline">HECHO</span>
+                                                        </button>
+
+                                                        <span v-if="notif.atendida_en" class="flex items-center gap-1 text-xs font-bold text-emerald-600 px-2 py-1 bg-emerald-50 rounded-md">
+                                                            <CheckBadgeIcon class="h-4 w-4" /> RESUELTA
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </transition-group>
                         </div>
                     </div>
                 </div>
 
-                <!-- ESTADO VACÍO -->
-                <div v-else class="text-center py-20 px-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
-                    <InboxIcon class="h-20 w-20 mx-auto text-gray-300 dark:text-gray-600" />
-                    <h3 class="mt-4 text-xl font-semibold text-gray-800 dark:text-gray-200">Todo en orden</h3>
-                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">No hay notificaciones por ahora. ¡Buen trabajo!</p>
+                <!-- Empty State Ilustrado -->
+                <div v-else class="flex flex-col items-center justify-center min-h-[50vh] text-center">
+                    <div class="relative mb-8 group">
+                        <div class="absolute inset-0 bg-gradient-to-r from-indigo-200 to-purple-200 rounded-full blur-2xl opacity-20 group-hover:opacity-30 transition-opacity duration-500"></div>
+                        <div class="relative bg-white dark:bg-gray-800 p-8 rounded-[2rem] shadow-xl border border-gray-50 dark:border-gray-700 transform transition-transform duration-500 group-hover:scale-105">
+                            <InboxIcon class="h-20 w-20 text-indigo-300 dark:text-indigo-700" stroke-width="0.8" />
+                        </div>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-3">Estás totalmente al día</h3>
+                    <p class="text-gray-500 dark:text-gray-400 max-w-sm mx-auto leading-relaxed">
+                        No hay notificaciones con los filtros seleccionados.
+                    </p>
                 </div>
 
-                <!-- Paginación -->
-                <div v-if="notificaciones.data.length > 0" class="mt-6">
-                    <Pagination :links="notificaciones.links" />
+                <!-- Pagination -->
+                <div v-if="notificaciones.data && notificaciones.data.length > 0" class="flex justify-center mt-8">
+                    <div class="bg-white dark:bg-gray-800 p-2 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                        <Pagination :links="notificaciones.links" />
+                    </div>
                 </div>
             </div>
         </div>
     </AuthenticatedLayout>
 </template>
+
+<style scoped>
+/* Scrollbar fino para la pagina */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 20px;
+}
+</style>

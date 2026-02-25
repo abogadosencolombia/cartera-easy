@@ -6,7 +6,8 @@ use App\Models\ProcesoRadicado;
 use App\Http\Requests\StoreProcesoRadicadoRequest;
 use App\Http\Requests\UpdateProcesoRadicadoRequest;
 use App\Models\User;
-use App\Models\AuditoriaEvento; // ✅ IMPORTANTE: Modelo de Auditoría
+use App\Models\AuditoriaEvento;
+use App\Models\EtapaProcesal;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -26,11 +27,14 @@ class ProcesoRadicadoController extends Controller
      */
     public function index(Request $request): Response
     {
-        // ... (El código del index se mantiene igual para ahorrar espacio) ...
-        // ... Solo copio la lógica original de visualización ...
         $query = ProcesoRadicado::with([
-            'abogado', 'responsableRevision', 'juzgado', 'tipoProceso',
-            'demandantes', 'demandados',
+            'abogado', 
+            'responsableRevision', 
+            'juzgado', 
+            'tipoProceso',
+            'demandantes', 
+            'demandados',
+            'etapaActual'
         ]);
 
         if ($search = $request->input('search')) {
@@ -46,12 +50,22 @@ class ProcesoRadicadoController extends Controller
                            ->orWhere('numero_documento', 'Ilike', "%{$search}%");
                     })
                     ->orWhereHas('abogado', fn($sq) => $sq->where('name', 'Ilike', "%{$search}%"))
-                    ->orWhereHas('juzgado', fn($sq) => $sq->where('nombre', 'Ilike', "%{$search}%"));
+                    ->orWhereHas('juzgado', fn($sq) => $sq->where('nombre', 'Ilike', "%{$search}%"))
+                    ->orWhereHas('etapaActual', fn($sq) => $sq->where('nombre', 'Ilike', "%{$search}%"));
             });
         }
 
         if ($request->filled('estado') && in_array($request->input('estado'), ['ACTIVO', 'CERRADO'])) {
             $query->where('estado', $request->input('estado'));
+        }
+
+        // ✅ FILTRO INTELIGENTE POR TIPO DE ENTIDAD (Busca en el nombre del juzgado)
+        if ($request->filled('tipo_entidad')) {
+            $tipo = $request->input('tipo_entidad');
+            $query->whereHas('juzgado', function ($q) use ($tipo) {
+                // Buscamos si el nombre contiene la palabra clave (Ej: 'Fiscalía')
+                $q->where('nombre', 'ilike', "%{$tipo}%");
+            });
         }
 
         if ($desde = $request->date('rev_desde')) {
@@ -78,14 +92,16 @@ class ProcesoRadicadoController extends Controller
 
         return Inertia::render('Radicados/Index', [
             'procesos' => $query->paginate(15)->withQueryString(),
-            'filtros'  => $request->only(['search', 'rev_desde', 'rev_hasta', 'estado']),
+            'filtros'  => $request->only(['search', 'rev_desde', 'rev_hasta', 'estado', 'tipo_entidad']),
             'abogados' => $abogadosParaFiltro,
         ]);
     }
 
     public function create(): Response
     {
-        return Inertia::render('Radicados/Create');
+        return Inertia::render('Radicados/Create', [
+            'etapas' => EtapaProcesal::orderBy('orden')->get(['id', 'nombre', 'riesgo'])
+        ]);
     }
 
     public function store(StoreProcesoRadicadoRequest $request)
@@ -93,6 +109,15 @@ class ProcesoRadicadoController extends Controller
         $data = $request->validated();
         $data['created_by'] = $request->user()->id;
         $data['estado'] = 'ACTIVO';
+        
+        if (empty($data['etapa_procesal_id'])) {
+            $etapaInicial = EtapaProcesal::orderBy('orden', 'asc')->first();
+            if ($etapaInicial) {
+                $data['etapa_procesal_id'] = $etapaInicial->id;
+            }
+        }
+        
+        $data['fecha_cambio_etapa'] = now();
 
         $demandantesIds = $data['demandantes'] ?? [];
         $demandadosIds = $data['demandados'] ?? [];
@@ -109,7 +134,6 @@ class ProcesoRadicadoController extends Controller
                 $proceso->demandados()->attach($demandadosIds, ['tipo' => 'DEMANDADO']);
             }
 
-            // ✅ AUDITORÍA GLOBAL
             AuditoriaEvento::create([
                 'user_id' => Auth::id(),
                 'evento' => 'CREAR_RADICADO',
@@ -120,7 +144,7 @@ class ProcesoRadicadoController extends Controller
             ]);
         });
 
-        return to_route('procesos.edit', $proceso)
+        return to_route('procesos.show', $proceso)
             ->with('success', 'Radicado creado exitosamente.');
     }
 
@@ -129,6 +153,7 @@ class ProcesoRadicadoController extends Controller
         $proceso->load([
             'abogado', 'responsableRevision', 'juzgado', 'tipoProceso',
             'demandantes', 'demandados',
+            'etapaActual', 
             'documentos' => fn($q) => $q->latest('created_at'),
             'actuaciones' => function ($query) {
                 $query->with('user:id,name')->orderBy('fecha_actuacion', 'desc')->orderBy('created_at', 'desc');
@@ -138,6 +163,7 @@ class ProcesoRadicadoController extends Controller
 
         return Inertia::render('Radicados/Show', [
             'proceso' => $proceso,
+            'etapas' => EtapaProcesal::orderBy('orden')->get(['id', 'nombre', 'riesgo'])
         ]);
     }
 
@@ -146,10 +172,12 @@ class ProcesoRadicadoController extends Controller
         $proceso->load([
             'abogado', 'responsableRevision', 'juzgado', 'tipoProceso',
             'demandantes', 'demandados',
+            'etapaActual'
         ]);
 
         return Inertia::render('Radicados/Edit', [
             'proceso' => $proceso,
+            'etapas' => EtapaProcesal::orderBy('orden')->get(['id', 'nombre', 'riesgo'])
         ]);
     }
 
@@ -161,11 +189,14 @@ class ProcesoRadicadoController extends Controller
         unset($data['demandantes'], $data['demandados']);
 
         DB::transaction(function () use ($proceso, $data, $demandantesIds, $demandadosIds) {
+            if (isset($data['etapa_procesal_id']) && $data['etapa_procesal_id'] != $proceso->etapa_procesal_id) {
+                $data['fecha_cambio_etapa'] = now();
+            }
+
             $proceso->update($data);
             $proceso->demandantes()->syncWithPivotValues($demandantesIds, ['tipo' => 'DEMANDANTE']);
             $proceso->demandados()->syncWithPivotValues($demandadosIds, ['tipo' => 'DEMANDADO']);
 
-            // ✅ AUDITORÍA GLOBAL
             AuditoriaEvento::create([
                 'user_id' => Auth::id(),
                 'evento' => 'EDITAR_RADICADO',
@@ -180,11 +211,48 @@ class ProcesoRadicadoController extends Controller
             ->with('success', 'Radicado actualizado correctamente.');
     }
 
+    public function updateEtapa(Request $request, ProcesoRadicado $proceso)
+    {
+        $validated = $request->validate([
+            'etapa_procesal_id' => 'required|exists:etapas_procesales,id',
+            'observacion' => 'nullable|string|max:500'
+        ]);
+
+        $nuevaEtapa = EtapaProcesal::find($validated['etapa_procesal_id']);
+
+        DB::transaction(function () use ($proceso, $nuevaEtapa, $validated) {
+            $proceso->update([
+                'etapa_procesal_id' => $nuevaEtapa->id,
+                'fecha_cambio_etapa' => now(),
+            ]);
+
+            $nota = "El proceso avanzó a la etapa: {$nuevaEtapa->nombre}";
+            if (!empty($validated['observacion'])) {
+                $nota .= ". Observación: {$validated['observacion']}";
+            }
+
+            $proceso->actuaciones()->create([
+                'nota' => $nota,
+                'fecha_actuacion' => now(),
+                'user_id' => Auth::id(),
+            ]);
+
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'CAMBIO_ETAPA',
+                'descripcion_breve' => "Proceso {$proceso->radicado} movido a {$nuevaEtapa->nombre}",
+                'criticidad' => 'media',
+                'direccion_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+        });
+
+        return back()->with('success', "Etapa actualizada a: {$nuevaEtapa->nombre}");
+    }
+
     public function destroy(ProcesoRadicado $proceso)
     {
-        // --- SEGURIDAD: SOLO ADMINS PUEDEN BORRAR ---
         if (Auth::user()->tipo_usuario !== 'admin') {
-            // ✅ AUDITORÍA: INTENTO FALLIDO
             AuditoriaEvento::create([
                 'user_id' => Auth::id(),
                 'evento' => 'INTENTO_ELIMINAR_RADICADO',
@@ -193,15 +261,14 @@ class ProcesoRadicadoController extends Controller
                 'direccion_ip' => request()->ip(),
                 'user_agent' => request()->userAgent(),
             ]);
-            return back()->with('error', 'Acción no autorizada. Solo los administradores pueden eliminar radicados.');
+            return back()->with('error', 'Acción no autorizada.');
         }
 
-        // ✅ AUDITORÍA: ÉXITO
-        $radicadoTemp = $proceso->radicado; // Guardar para el log
+        $radicadoTemp = $proceso->radicado; 
         AuditoriaEvento::create([
             'user_id' => Auth::id(),
             'evento' => 'ELIMINAR_RADICADO',
-            'descripcion_breve' => "Administrador eliminó permanentemente el radicado {$radicadoTemp}",
+            'descripcion_breve' => "Eliminado radicado {$radicadoTemp}",
             'criticidad' => 'alta',
             'direccion_ip' => request()->ip(),
             'user_agent' => request()->userAgent(),
@@ -219,21 +286,17 @@ class ProcesoRadicadoController extends Controller
     
     public function handleImport(Request $request)
     {
-        // ... (Lógica de importación original) ...
         $request->validate(['file' => ['required', 'file', 'mimes:xlsx,xls,csv']]);
         try {
             Excel::import(new ProcesosImport, $request->file('file'));
-            
-            // ✅ AUDITORÍA GLOBAL
             AuditoriaEvento::create([
                 'user_id' => Auth::id(),
                 'evento' => 'IMPORTAR_RADICADOS',
-                'descripcion_breve' => "Importación masiva de procesos realizada",
+                'descripcion_breve' => "Importación masiva realizada",
                 'criticidad' => 'alta',
                 'direccion_ip' => request()->ip(),
                 'user_agent' => request()->userAgent(),
             ]);
-
         } catch (ValidationException $e) {
             $failures = $e->failures();
             $errors = [];
@@ -242,9 +305,9 @@ class ProcesoRadicadoController extends Controller
             }
             return back()->withErrors(['file' => implode(' | ', $errors)]);
         } catch (\Exception $e) {
-            return back()->withErrors(['file' => 'Error inesperado: '.$e->getMessage()]);
+            return back()->withErrors(['file' => 'Error: '.$e->getMessage()]);
         }
-        return to_route('procesos.index')->with('success', 'Archivo importado correctamente.');
+        return to_route('procesos.index')->with('success', 'Importado correctamente.');
     }
 
     public function close(Request $request, ProcesoRadicado $proceso)
@@ -252,41 +315,38 @@ class ProcesoRadicadoController extends Controller
         $request->validate(['nota_cierre' => ['required', 'string', 'max:5000']]);
         $proceso->update(['estado' => 'CERRADO', 'nota_cierre' => $request->input('nota_cierre')]);
         
-        // ✅ AUDITORÍA GLOBAL
         AuditoriaEvento::create([
             'user_id' => Auth::id(),
             'evento' => 'CERRAR_RADICADO',
-            'descripcion_breve' => "Cierre del radicado {$proceso->radicado}. Nota: {$request->input('nota_cierre')}",
+            'descripcion_breve' => "Cierre radicado {$proceso->radicado}",
             'criticidad' => 'media',
             'direccion_ip' => request()->ip(),
             'user_agent' => request()->userAgent(),
         ]);
 
-        return back()->with('success', 'El caso ha sido cerrado.');
+        return back()->with('success', 'Caso cerrado.');
     }
 
     public function reopen(ProcesoRadicado $proceso)
     {
         if (Auth::user()->tipo_usuario !== 'admin') {
-             return back()->with('error', 'Solo administradores pueden reabrir.');
+             return back()->with('error', 'Solo admins.');
         }
 
         $proceso->update(['estado' => 'ACTIVO', 'nota_cierre' => null]);
         
-        // ✅ AUDITORÍA GLOBAL
         AuditoriaEvento::create([
             'user_id' => Auth::id(),
             'evento' => 'REABRIR_RADICADO',
-            'descripcion_breve' => "Reapertura del radicado {$proceso->radicado}",
+            'descripcion_breve' => "Reapertura radicado {$proceso->radicado}",
             'criticidad' => 'media',
             'direccion_ip' => request()->ip(),
             'user_agent' => request()->userAgent(),
         ]);
 
-        return back()->with('success', 'El caso ha sido reabierto exitosamente.');
+        return back()->with('success', 'Caso reabierto.');
     }
 
-    // Actuaciones CRUD
     public function storeActuacion(Request $request, ProcesoRadicado $proceso)
     {
         $validated = $request->validate([
@@ -300,24 +360,23 @@ class ProcesoRadicadoController extends Controller
         ]);
         $this->actualizarUltimaActuacion($proceso);
 
-        // ✅ AUDITORÍA GLOBAL
         AuditoriaEvento::create([
             'user_id' => Auth::id(),
-            'evento' => 'NUEVA_ACTUACION_RADICADO',
-            'descripcion_breve' => "Nueva actuación en radicado {$proceso->radicado}",
+            'evento' => 'NUEVA_ACTUACION',
+            'descripcion_breve' => "Nueva actuación radicado {$proceso->radicado}",
             'criticidad' => 'baja',
             'direccion_ip' => request()->ip(),
             'user_agent' => request()->userAgent(),
         ]);
 
-        return back()->with('success', 'Actuación registrada.');
+        return back()->with('success', 'Registrado.');
     }
 
     public function updateActuacion(Request $request, Actuacion $actuacion)
     {
         $user = Auth::user();
         if ($actuacion->actuable_type !== ProcesoRadicado::class || !$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
-             abort(403, 'No autorizado para editar esta actuación.');
+             abort(403);
         }
         $validated = $request->validate([
             'nota' => ['required', 'string', 'max:5000'],
@@ -326,42 +385,22 @@ class ProcesoRadicadoController extends Controller
         $actuacion->update($validated);
         if ($actuacion->actuable instanceof ProcesoRadicado) {
             $this->actualizarUltimaActuacion($actuacion->actuable);
-            
-            // ✅ AUDITORÍA GLOBAL
-            AuditoriaEvento::create([
-                'user_id' => Auth::id(),
-                'evento' => 'EDITAR_ACTUACION_RADICADO',
-                'descripcion_breve' => "Edición actuación ID {$actuacion->id} en radicado {$actuacion->actuable->radicado}",
-                'criticidad' => 'baja',
-                'direccion_ip' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
         }
-        return back(303)->with('success', 'Actuación actualizada.');
+        return back(303)->with('success', 'Actualizado.');
     }
 
     public function destroyActuacion(Actuacion $actuacion)
     {
         $user = Auth::user();
         if ($actuacion->actuable_type !== ProcesoRadicado::class || !$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
-             abort(403, 'No autorizado para eliminar esta actuación.');
+             abort(403);
         }
         $proceso = $actuacion->actuable;
         $actuacion->delete();
         if ($proceso instanceof ProcesoRadicado) {
              $this->actualizarUltimaActuacion($proceso);
-             
-             // ✅ AUDITORÍA GLOBAL
-             AuditoriaEvento::create([
-                'user_id' => Auth::id(),
-                'evento' => 'ELIMINAR_ACTUACION_RADICADO',
-                'descripcion_breve' => "Eliminada actuación en radicado {$proceso->radicado}",
-                'criticidad' => 'media',
-                'direccion_ip' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
         }
-        return back(303)->with('success', 'Actuación eliminada.');
+        return back(303)->with('success', 'Eliminado.');
     }
 
     private function actualizarUltimaActuacion(ProcesoRadicado $proceso)
@@ -375,31 +414,20 @@ class ProcesoRadicadoController extends Controller
         $proceso->updateQuietly(['ultima_actuacion' => $textoUltimaActuacion]);
     }
 
-    // --- EXPORTACIÓN MEJORADA ---
     public function exportarExcel(Request $request)
     {
-        // ... (Lógica de exportación original) ...
-        // ... (Mantenemos el código de filtrado para el export) ...
-        $query = ProcesoRadicado::with([
-            'abogado', 'responsableRevision', 'juzgado', 'tipoProceso',
-            'demandantes', 'demandados', 
-        ]);
+        $filtros = $request->all();
+        $filename = "Reporte_Expedientes_" . Carbon::now()->format('Ymd_His') . ".xlsx";
 
-        // (Aquí irían los mismos filtros que en el index, omitidos por brevedad pero deben estar en tu archivo real)
-        if ($search = $request->input('search')) { /* ... filtros ... */ }
-        // ... resto de filtros ...
-
-        // ✅ AUDITORÍA GLOBAL
         AuditoriaEvento::create([
             'user_id' => Auth::id(),
             'evento' => 'EXPORTAR_RADICADOS',
-            'descripcion_breve' => "Usuario descargó reporte Excel de radicados",
+            'descripcion_breve' => "Descarga Excel Expedientes",
             'criticidad' => 'baja',
             'direccion_ip' => request()->ip(),
             'user_agent' => request()->userAgent(),
         ]);
 
-        $filename = "reporte_radicados_" . Carbon::now()->format('Ymd_His') . ".xlsx";
-        return Excel::download(new ProcesosExport($query), $filename);
+        return Excel::download(new ProcesosExport($filtros), $filename);
     }
 }

@@ -34,13 +34,13 @@ class UpdateCasoRequest extends FormRequest
                 }),
             ],
             
-            'estado_proceso' => ['required', Rule::in(['prejurídico', 'demandado', 'en ejecución', 'sentencia', 'cerrado'])],
+            // ELIMINADO: estado_proceso
             'tipo_garantia_asociada' => ['required', Rule::in(['codeudor', 'hipotecaria', 'prendaria', 'sin garantía'])],
             'fecha_apertura' => ['required', 'date', 'before_or_equal:today'],
             'fecha_vencimiento' => ['nullable', 'date', 'after_or_equal:fecha_apertura'],
             'origen_documental' => ['required', Rule::in(['pagaré', 'libranza', 'contrato', 'otro'])],
 
-            // --- LINK DRIVE (YA ESTABA, PERO ES CRUCIAL MANTENERLO) ---
+            // --- LINK DRIVE ---
             'link_drive' => ['nullable', 'url', 'max:2048'],
 
             // --- DATOS FINANCIEROS ---
@@ -62,7 +62,7 @@ class UpdateCasoRequest extends FormRequest
             'codeudores.*.celular' => ['nullable', 'string', 'max:20'],
             'codeudores.*.correo' => ['nullable', 'email', 'max:255'], 
             
-            // --- ARRAYS (CRUCIAL PARA EVITAR ERRORES DE GUARDADO) ---
+            // --- ARRAYS ---
             'codeudores.*.addresses' => ['nullable', 'array'],
             'codeudores.*.social_links' => ['nullable', 'array'],
 

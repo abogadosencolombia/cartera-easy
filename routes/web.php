@@ -46,6 +46,9 @@ use App\Http\Controllers\Api\AlertasController;
 use App\Http\Controllers\Api\DirectorySearchController;
 use App\Http\Controllers\Api\JuzgadoSearchController;
 
+// --- ✅ NUEVO: CONTROLADOR DE JUZGADOS (IMPORTACIÓN) ---
+use App\Http\Controllers\JuzgadoController;
+
 // --- NUEVOS CONTROLADORES: GESTIÓN > HONORARIOS ---
 use App\Http\Controllers\Gestion\Honorarios\ContratosController;
 
@@ -59,21 +62,14 @@ use App\Http\Controllers\DocumentoProcesoController;
 use App\Http\Controllers\RevisionDiariaController;
 // --- FIN: NUEVO CONTROLADOR REVISIÓN DIARIA ---
 
-// ===== INICIO DE LA MODIFICACIÓN (Añadir Controlador de Tareas) =====
 use App\Http\Controllers\TareaController;
-// ===== FIN DE LA MODIFICACIÓN =====
 
-// =======================================================
-// ===== NUEVAS DECLARACIONES PARA EL CHATBOT ============
-// =======================================================
-use Illuminate\Http\Request; // <-- YA EXISTE, PERO LO NECESITAMOS
+use Illuminate\Http\Request; 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use App\Models\Message;
 use App\Events\ChatbotResponseReceived;
-use Illuminate\Support\Facades\Broadcast; // <-- Añadido
-// =======================================================
-
+use Illuminate\Support\Facades\Broadcast; 
 
 /*
 |--------------------------------------------------------------------------
@@ -85,20 +81,15 @@ Broadcast::routes(['middleware' => ['web', 'auth']]);
 
 // Ruta pública de bienvenida / login
 Route::get('/', function () {
-    // Si el usuario ya inició sesión, llévalo al dashboard
     if (auth()->check()) {
         return redirect()->route('dashboard');
     }
-
-    // --- AQUÍ ESTÁ LA CORRECCIÓN ---
-    // Muestra la vista 'Welcome' si no está logueado
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
         'canRegister' => Route::has('register'),
     ]);
 })->name('welcome');
 
-// Rutas de prueba y simulación (pueden ser eliminadas en producción)
 Route::get('/_push-test', function () {
     $u = auth()->user() ?: \App\Models\User::first();
     if ($u) $u->notify(new \App\Notifications\DebugPushNotification());
@@ -144,21 +135,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // --- Dashboard, Perfil y Notificaciones ---
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    // --- INICIO: NUEVA RUTA REVISIÓN DIARIA ---
+    // --- NOTIFICACIONES ---
+    Route::get('/notificaciones', [NotificacionController::class, 'index'])->name('notificaciones.index');
+    Route::patch('/notificaciones/{notificacion}/leer', [NotificacionController::class, 'marcarComoLeida'])->name('notificaciones.leer');
+    Route::patch('/notificaciones/{notificacion}/atender', [NotificacionController::class, 'marcarComoAtendida'])->name('notificaciones.atender');
+    Route::delete('/notificaciones/{notificacion}', [NotificacionController::class, 'destroy'])->name('notificaciones.destroy');
+
+    // --- REVISIÓN DIARIA ---
     Route::get('/revision-diaria', [RevisionDiariaController::class, 'index'])->name('revision.index');
-    // --- INICIO: AÑADIR RUTA TOGGLE ---
     Route::post('/revision-diaria/toggle', [RevisionDiariaController::class, 'toggle'])->name('revision.toggle');
-    // --- FIN: AÑADIR RUTA TOGGLE ---
-    // --- FIN: NUEVA RUTA REVISIÓN DIARIA ---
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::patch('/profile/preferences', [ProfileController::class, 'updatePreferences'])->name('profile.preferences.update');
-    Route::get('/notificaciones', [NotificacionController::class, 'index'])->name('notificaciones.index');
-    Route::patch('/notificaciones/{notificacion}/leer', [NotificacionController::class, 'marcarComoLeida'])->name('notificaciones.leer');
-    Route::patch('/notificaciones/{notificacion}/atender', [NotificacionController::class, 'marcarComoAtendida'])->name('notificaciones.atender');
-    
+
     // --- Reportes y Validaciones ---
     Route::get('/reportes', [ReporteController::class, 'index'])->name('reportes.index');
     Route::get('/reportes/exportar', [ReporteController::class, 'exportar'])->name('reportes.exportar');
@@ -174,9 +165,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ===== BLOQUE DE RUTAS PARA RADICADOS (PROCESOS) =================
     // =================================================================
     Route::get('procesos', [ProcesoRadicadoController::class, 'index'])->name('procesos.index');
-    // Ruta para exportar
     Route::get('procesos/exportar', [ProcesoRadicadoController::class, 'exportarExcel'])->name('procesos.exportar');
-    // ===== FIN DE LA MODIFICACIÓN =====
     Route::get('procesos/create', [ProcesoRadicadoController::class, 'create'])->name('procesos.create');
     Route::post('procesos', [ProcesoRadicadoController::class, 'store'])->name('procesos.store');
     Route::get('procesos/{proceso}', [ProcesoRadicadoController::class, 'show'])->name('procesos.show');
@@ -184,7 +173,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('procesos/{proceso}', [ProcesoRadicadoController::class, 'update'])->name('procesos.update');
     Route::delete('procesos/{proceso}', [ProcesoRadicadoController::class, 'destroy'])->name('procesos.destroy');
     
-    // --- RUTAS PARA LA IMPORTACIÓN DE EXCEL ---
+    // --- NUEVA RUTA PARA CAMBIAR ETAPA (Show.vue) ---
+    Route::patch('/procesos/{proceso}/etapa', [ProcesoRadicadoController::class, 'updateEtapa'])->name('procesos.update_etapa');
+    
+    // --- RUTAS PARA LA IMPORTACIÓN DE EXCEL DE PROCESOS ---
     Route::get('procesos/import', [ProcesoRadicadoController::class, 'showImportForm'])->name('procesos.import');
     Route::post('procesos/import', [ProcesoRadicadoController::class, 'handleImport'])->name('procesos.import.store');
     
@@ -194,14 +186,33 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/procesos/{proceso}/close', [ProcesoRadicadoController::class, 'close'])->name('procesos.close');
     Route::patch('/procesos/{proceso}/reopen', [ProcesoRadicadoController::class, 'reopen'])->name('procesos.reopen');
 
-    // --- INICIO: Rutas CRUD Actuaciones para Radicados ---
+    // --- Rutas CRUD Actuaciones para Radicados ---
     Route::post('procesos/{proceso}/actuaciones', [ProcesoRadicadoController::class, 'storeActuacion'])->name('procesos.actuaciones.store');
     Route::put('procesos/actuaciones/{actuacion}', [ProcesoRadicadoController::class, 'updateActuacion'])->name('procesos.actuaciones.update');
     Route::delete('procesos/actuaciones/{actuacion}', [ProcesoRadicadoController::class, 'destroyActuacion'])->name('procesos.actuaciones.destroy');
-    // --- FIN: Rutas CRUD Actuaciones para Radicados ---
 
     // =================================================================
-    // ===== RUTAS DE BÚSQUEDA ASÍNCRONA (CORREGIDAS Y UNIFICADAS) =====
+    // ===== ✅ BLOQUE DE JUZGADOS (GESTIÓN E IMPORTACIÓN) ===========
+    // =================================================================
+    Route::middleware('juzgado.access')->group(function () {
+        Route::get('juzgados', [JuzgadoController::class, 'index'])->name('juzgados.index');
+        
+        // Importación
+        Route::get('juzgados/importar', [JuzgadoController::class, 'importForm'])->name('juzgados.import.form');
+        Route::post('juzgados/importar', [JuzgadoController::class, 'import'])->name('juzgados.import');
+        
+        // Crear (Nuevas)
+        Route::get('juzgados/crear', [JuzgadoController::class, 'create'])->name('juzgados.create');
+        Route::post('juzgados', [JuzgadoController::class, 'store'])->name('juzgados.store');
+
+        // Editar y Eliminar
+        Route::get('juzgados/{juzgado}/edit', [JuzgadoController::class, 'edit'])->name('juzgados.edit');
+        Route::put('juzgados/{juzgado}', [JuzgadoController::class, 'update'])->name('juzgados.update');
+        Route::delete('juzgados/{juzgado}', [JuzgadoController::class, 'destroy'])->name('juzgados.destroy');
+    });
+    
+    // =================================================================
+    // ===== RUTAS DE BÚSQUEDA ASÍNCRONA ===============================
     // =================================================================
     Route::get('/search/users', [DirectorySearchController::class, 'usuariosAbogadosYGestores'])->name('users.search');
     Route::get('/search/cooperativas', [DirectorySearchController::class, 'cooperativas'])->name('cooperativas.search');
@@ -212,42 +223,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // --- RUTAS PARA GESTORES Y ABOGADOS (Y ADMINS) ---
     Route::middleware('role:admin,gestor,abogado')->group(function() {
 
-        // --- INICIO: MODIFICACIÓN EXPORTAR CASOS ---
-        // Esta ruta DEBE ir antes del resource 'casos'
         Route::get('casos/exportar', [CasoController::class, 'export'])->name('casos.export');
-        // --- FIN: MODIFICACIÓN EXPORTAR CASOS ---
-        
         Route::resource('casos', CasoController::class);
         Route::patch('/casos/{caso}/unlock', [CasoController::class, 'unlock'])->name('casos.unlock');
-
-        // --- INICIO: RUTA AÑADIDA ---
         Route::patch('/casos/{caso}/reopen', [CasoController::class, 'reopen'])->name('casos.reopen');
-        // --- FIN: RUTA AÑADIDA ---
+        Route::patch('/casos/{caso}/close', [CasoController::class, 'close'])->name('casos.close');
 
-        // Route::patch('/casos/{caso}/reopen', [CasoController::class, 'reopen'])->name('casos.reopen'); // <-- ESTA LÍNEA ESTABA DUPLICADA, LA DEJAMOS UNA VEZ
-        Route::patch('/casos/{caso}/close', [CasoController::class, 'close'])->name('casos.close'); // <-- AÑADIDA ESTA LÍNEA
-
-        // --- INICIO: Rutas CRUD Actuaciones para Casos ---
+        // --- Rutas CRUD Actuaciones para Casos ---
         Route::post('casos/{caso}/actuaciones', [CasoController::class, 'storeActuacion'])->name('casos.actuaciones.store');
         Route::put('casos/actuaciones/{actuacion}', [CasoController::class, 'updateActuacion'])->name('casos.actuaciones.update');
         Route::delete('casos/actuaciones/{actuacion}', [CasoController::class, 'destroyActuacion'])->name('casos.actuaciones.destroy');
-        // --- FIN: Rutas CRUD Actuaciones para Casos ---
 
-        // ================================================
-        // ===== INICIO DE LA CORRECCIÓN DE RUTAS =========
-        // ================================================
-        
-        // La ruta de exportación DEBE ir ANTES del route resource
-        // para que 'exportar-excel' no sea interpretado como un ID de persona.
+        // Personas
         Route::get('/personas/exportar-excel', [PersonaController::class, 'exportExcel'])->name('personas.export.excel');
-        
-        // Esta ruta (resource) debe ir DESPUÉS de cualquier ruta
-        // personalizada que comience con /personas/
         Route::resource('personas', PersonaController::class);
-        
-        // ================================================
-        // ===== FIN DE LA CORRECCIÓN DE RUTAS ============
-        // ================================================
+
+        Route::post('/personas/{persona}/documentos', [PersonaController::class, 'uploadDocument'])->name('personas.upload_document');
+        Route::get('/personas/documentos/{documento}', [PersonaController::class, 'downloadDocument'])->name('personas.download_document');
+        Route::delete('/personas/documentos/{documento}', [PersonaController::class, 'deleteDocument'])->name('personas.delete_document');
+        Route::get('/personas/documentos/{documento}/ver', [PersonaController::class, 'viewDocument'])->name('personas.view_document');
         
         Route::resource('cooperativas', CooperativaController::class);
         Route::resource('plantillas', PlantillaDocumentoController::class)->except(['show', 'edit', 'update']);
@@ -274,17 +268,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/crear', [ContratosController::class, 'create'])->name('create');
             Route::post('/', [ContratosController::class, 'store'])->name('store');
             
-            // Rutas específicas (deben ir ANTES de las rutas con parámetros dinámicos)
             Route::get('/pagos/{pago_id}/comprobante', [ContratosController::class, 'verComprobante'])->name('pagos.verComprobante');
             Route::get('/cargos/{cargo_id}/comprobante', [ContratosController::class, 'verCargoComprobante'])->name('cargos.verComprobante');
             
-            // Rutas con parámetros dinámicos
             Route::get('/{id}', [ContratosController::class, 'show'])->name('show');
-            Route::delete('/{id}', [ContratosController::class, 'destroy'])->name('destroy'); // --- Ruta Eliminar Contrato ---
+            Route::delete('/{id}', [ContratosController::class, 'destroy'])->name('destroy');
             Route::get('/{id}/reestructurar', [ContratosController::class, 'reestructurar'])->name('reestructurar');
             Route::get('/archivado/{id}', [ContratosController::class, 'showArchivado'])->name('showArchivado');
             
-            // Acciones sobre contratos
             Route::post('/{id}/pagar', [ContratosController::class, 'pagar'])->name('pagar');
             Route::post('/{id}/cargos', [ContratosController::class, 'agregarCargo'])->name('cargos.store');
             Route::post('/{contrato_id}/cargos/pagar', [ContratosController::class, 'pagarCargo'])->name('cargos.pagar');
@@ -294,21 +285,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/{id}/reabrir', [ContratosController::class, 'reabrir'])->name('reabrir');
             Route::post('/{id}/resolver-litis', [ContratosController::class, 'resolverLitis'])->name('resolverLitis');
             
-            // Documentos del contrato - CORREGIDO
             Route::post('/{id}/documento', [ContratosController::class, 'subirDocumento'])->name('documento.subir');
             Route::get('/{id}/documento', [ContratosController::class, 'verDocumento'])->name('documento.ver');
             Route::delete('/{id}/documento', [ContratosController::class, 'eliminarDocumento'])->name('documento.eliminar');
             
-            // PDFs
             Route::get('/{id}/pdf/contrato', [ContratosController::class, 'pdfContrato'])->name('pdf.contrato');
             Route::get('/{id}/pdf/liquidacion', [ContratosController::class, 'pdfLiquidacion'])->name('pdf.liquidacion');
 
-            // --- INICIO: Rutas CRUD Actuaciones ---
             Route::post('/{id}/actuaciones', [ContratosController::class, 'storeActuacion'])->name('actuaciones.store');
-            // Usar un prefijo /actuaciones/ para las rutas de update y destroy
             Route::put('/actuaciones/{actuacion}', [ContratosController::class, 'updateActuacion'])->name('actuaciones.update');
             Route::delete('/actuaciones/{actuacion}', [ContratosController::class, 'destroyActuacion'])->name('actuaciones.destroy');
-            // --- FIN: Rutas CRUD Actuaciones ---
         });
     });
 
@@ -332,22 +318,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/tasas-interes/{tasa_id}', [TasasInteresController::class, 'destroy'])->name('tasas.destroy');
         Route::get('/gestores', [GestoresController::class, 'index'])->name('gestores.index');
         Route::post('users/{user}/upload-card', [UserController::class, 'uploadProfessionalCard'])->name('users.upload.card');
-        // Rutas para documentos generales del usuario
         Route::post('users/{user}/documents', [UserController::class, 'storeDocument'])->name('users.documents.store');
         Route::delete('users/documents/{document}', [UserController::class, 'destroyDocument'])->name('users.documents.destroy');
         
-        // ===== INICIO DE LA MODIFICACIÓN (Añadir rutas de Tareas Admin) =====
+        // Tareas Admin
         Route::get('/tareas', [TareaController::class, 'index'])->name('tareas.index');
         Route::post('/tareas', [TareaController::class, 'store'])->name('tareas.store');
         Route::delete('/tareas/{tarea}', [TareaController::class, 'destroy'])->name('tareas.destroy');
-        
-        // --- INICIO: RUTAS DE BÚSQUEDA SEPARADAS (PARA EL NUEVO MODAL) ---
         Route::get('/tareas/buscar/procesos', [TareaController::class, 'buscarProcesos'])->name('tareas.buscar.procesos');
         Route::get('/tareas/buscar/casos', [TareaController::class, 'buscarCasos'])->name('tareas.buscar.casos');
         Route::get('/tareas/buscar/contratos', [TareaController::class, 'buscarContratos'])->name('tareas.buscar.contratos');
-        // --- FIN: RUTAS DE BÚSQUEDA SEPARADAS ---
-
-        // ===== FIN DE LA MODIFICACIÓN =====
     });
 
     Route::middleware(['role:admin'])->group(function() {
@@ -365,7 +345,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('hallazgos',     [AlertasController::class, 'hallazgos'])->name('hallazgos');
         Route::get('reporte-cliente', [AlertasController::class, 'reporteCliente'])->name('reporte-cliente');
         Route::get('vigilancia-judicial', [AlertasController::class, 'vigilanciaJudicial'])->name('vigilancia-judicial');
-        // Exportaciones
         Route::get('preventivas/export',   [AlertasController::class, 'exportPreventivas'])->name('preventivas.export');
         Route::get('reactivas/export',     [AlertasController::class, 'exportReactivas'])->name('reactivas.export');
         Route::get('hallazgos/export',     [AlertasController::class, 'exportHallazgos'])->name('hallazgos.export');
@@ -373,9 +352,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('vigilancia-judicial/export', [AlertasController::class, 'exportVigilanciaJudicial'])->name('vigilancia-judicial.export');
     });
 
-    // =================================================================
-    // ===== INICIO: RUTAS DEL CHATBOT AÑADIDAS AQUÍ ===================
-    // =================================================================
+    // --- CHATBOT ---
     Route::post('/chatbot/send', function (Request $request) {
         $validated = $request->validate([
             'message' => 'required|string|max:4096',
@@ -386,13 +363,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
             return response()->json(['error' => 'Unauthorized'], 401);
         }
         
-        // Guardar mensaje del usuario
         $userMessage = Message::create([
             'user_id' => $user->id,
             'body' => $validated['message'],
         ]);
         
-        // Enviar a n8n
         try {
             Http::post('https://cobrocartera-n8n.hrymiz.easypanel.host/webhook/messages-customers', [
                 'message' => $userMessage->body,
@@ -404,43 +379,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         
         return response()->json($userMessage);
     })->name('chatbot.send');
-    // =================================================================
-    // ===== FIN: RUTA DE ENVÍO DEL CHATBOT ============================
-    // =================================================================
 
-    // ===== INICIO DE LA MODIFICACIÓN (Añadir ruta para completar tarea) =====
-    // Esta ruta debe estar fuera del middleware 'admin' porque la usan los abogados/gestores
+    // Completar Tarea
     Route::patch('/tareas/{tarea}/completar', [TareaController::class, 'marcarComoCompletada'])->name('tareas.completar');
-    // ===== FIN DE LA MODIFICACIÓN =====
 
 }); // Fin del grupo principal de middleware
 
-// =================================================================
-// ===== RUTA PÚBLICA PARA NOTIFICACIONES DE N8N =====================
-// =================================================================
-// Route::post('/chatbot/notify', function (Request $request) {
-//     $validated = $request->validate([
-//         'response' => 'required|string',
-//         'userId' => 'required|integer',
-//     ]);
-
-//     $botMessage = Message::create([
-//         'user_id' => 0,
-//         'body' => $validated['response']
-//     ]);
-
-//     broadcast(new ChatbotResponseReceived(
-//         $botMessage->body,
-//         $validated['userId']
-//     ));
-
-//     return response()->json(['status' => 'notification_sent_to_user']);
-// })->name('chatbot.notify');
-
-# Export de pendientes
-
+// # Export de pendientes
 Route::get('/revision-diaria/exportar-pendientes', [App\Http\Controllers\RevisionDiariaController::class, 'exportPendientesExcel'])
-    ->middleware(['auth', 'verified']) // Asegura que solo usuarios logueados puedan acceder
+    ->middleware(['auth', 'verified'])
     ->name('revision.export.pendientes');
 
 // Radicados - Rutas que necesitan estar fuera del middleware principal
@@ -454,12 +401,8 @@ Route::get('documentos-proceso/{documento}/ver', [DocumentoProcesoController::cl
 Route::get('documentos-proceso/{documento}/descargar', [DocumentoProcesoController::class, 'download'])
     ->middleware('auth')->name('documentos-proceso.download');
 
-// Archivo de rutas de autenticación (login, registro, etc.)
 require __DIR__.'/auth.php';
 
-// =================================================================
-// ===== INICIO: RUTA PARA REFRESCAR EL TOKEN CSRF (LA SOLUCIÓN) =====
-// =================================================================
 Route::get('/csrf-token', function (Request $request) {
     return response()->json(['csrf_token' => csrf_token()]);
 })->middleware('web');

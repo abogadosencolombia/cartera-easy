@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne; 
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany; // <-- Importante
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use App\Models\RevisionDiaria;
 use App\Models\Contrato; 
 use App\Models\Tarea;
+use App\Models\EtapaProcesal; 
 
 class ProcesoRadicado extends Model
 {
@@ -24,23 +25,33 @@ class ProcesoRadicado extends Model
         'fecha_revision','fecha_proxima_revision','ultima_actuacion','link_expediente',
         'ubicacion_drive','correos_juzgado','observaciones','created_by',
         'abogado_id','responsable_revision_id','juzgado_id','tipo_proceso_id',
-        // 'demandante_id', 'demandado_id', // <-- Estos ya no se usan directamente
         'estado', 'nota_cierre',
+        'etapa_procesal_id', 
+        'fecha_cambio_etapa'
     ];
 
     protected $casts = [
         'fecha_radicado' => 'date',
         'fecha_revision' => 'date',
         'fecha_proxima_revision' => 'date',
+        'fecha_cambio_etapa' => 'datetime',
     ];
 
+    // --- RELACIONES ---
+
     public function abogado(): BelongsTo { return $this->belongsTo(User::class, 'abogado_id'); }
+    
     public function responsableRevision(): BelongsTo { return $this->belongsTo(User::class, 'responsable_revision_id'); }
+
+    // ALIAS PARA EVITAR ERROR 500
+    public function responsable(): BelongsTo { return $this->belongsTo(User::class, 'responsable_revision_id'); }
+
+    // RELACIÓN CREADOR (Necesaria para el Excel)
+    public function creator(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
+
     public function juzgado(): BelongsTo { return $this->belongsTo(Juzgado::class, 'juzgado_id'); }
     public function tipoProceso(): BelongsTo { return $this->belongsTo(TipoProceso::class, 'tipo_proceso_id'); }
 
-    // ===== NUEVAS RELACIONES MUCHOS A MUCHOS =====
-    
     public function demandantes(): BelongsToMany
     {
         return $this->belongsToMany(Persona::class, 'proceso_radicado_personas')
@@ -55,8 +66,6 @@ class ProcesoRadicado extends Model
                     ->withTimestamps();
     }
     
-    // --- Helpers para compatibilidad (opcional, útil para exportaciones) ---
-    // Devuelve el primero de la lista para casos donde solo se necesite uno
     public function getDemandanteAttribute() { return $this->demandantes->first(); }
     public function getDemandadoAttribute() { return $this->demandados->first(); }
 
@@ -83,5 +92,31 @@ class ProcesoRadicado extends Model
     public function tareas(): MorphMany
     {
         return $this->morphMany(Tarea::class, 'tarea');
+    }
+
+    // --- LÓGICA INTELIGENTE ---
+    public function etapaActual(): BelongsTo
+    {
+        return $this->belongsTo(EtapaProcesal::class, 'etapa_procesal_id');
+    }
+
+    public function getSemaforoRiesgoAttribute()
+    {
+        if (!$this->etapaActual) return 'gray';
+        return match($this->etapaActual->riesgo) {
+            'MUY_ALTO' => 'red',
+            'ALTO'     => 'orange',
+            'MEDIO'    => 'yellow',
+            default    => 'green',
+        };
+    }
+
+    public function getDiasParaVencerAttribute()
+    {
+        if (!$this->etapaActual || !$this->fecha_cambio_etapa || $this->etapaActual->sla_dias == 0) {
+            return null; 
+        }
+        $fechaLimite = $this->fecha_cambio_etapa->copy()->addWeekdays($this->etapaActual->sla_dias);
+        return now()->diffInDays($fechaLimite, false);
     }
 }

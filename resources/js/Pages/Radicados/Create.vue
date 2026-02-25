@@ -11,13 +11,17 @@ import Textarea from '@/Components/Textarea.vue';
 import AsyncSelect from '@/Components/AsyncSelect.vue';
 import { PlusIcon, TrashIcon } from '@heroicons/vue/24/outline';
 
+const props = defineProps({
+  etapas: { type: Array, required: true }, // <--- Recibimos las etapas
+});
+
 // --- State for the Wizard ---
 const step = ref(1);
 const totalSteps = 3;
 const transitionName = ref('slide-next');
 
 const steps = [
-  { id: 1, name: 'Información Principal', fields: ['tipo_proceso_id'] },
+  { id: 1, name: 'Información Principal', fields: ['tipo_proceso_id', 'etapa_procesal_id'] },
   { id: 2, name: 'Partes y Contacto', fields: ['demandantes', 'demandados', 'abogado_id'] },
   { id: 3, name: 'Seguimiento y Enlaces', fields: ['fecha_proxima_revision'] },
 ];
@@ -30,7 +34,9 @@ const form = useForm({
   responsable_revision_id: null,
   juzgado_id: null,
   tipo_proceso_id: null,
-  // CAMBIO: Ahora son arrays de objetos para la UI
+  etapa_procesal_id: '', // <--- Campo Nuevo
+
+  // Arrays de objetos para la UI
   demandantes: [{ id: null, selected: null }],
   demandados: [{ id: null, selected: null }],
   
@@ -183,6 +189,20 @@ const submit = () => {
                       <AsyncSelect id="tipo_proceso" v-model="form.tipo_proceso_id" :endpoint="route('tipos-proceso.search')" placeholder="Buscar tipo..." />
                       <InputError :message="form.errors.tipo_proceso_id" class="mt-2" />
                     </div>
+
+                    <!-- NUEVO CAMPO: ETAPA PROCESAL -->
+                    <div>
+                        <InputLabel for="etapa" value="Etapa Inicial" />
+                        <select id="etapa" v-model="form.etapa_procesal_id" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
+                            <option value="">(Automático: Registro Inicial)</option>
+                            <option v-for="etapa in etapas" :key="etapa.id" :value="etapa.id">
+                                {{ etapa.nombre }}
+                            </option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Si lo dejas vacío, iniciará en la primera etapa.</p>
+                        <InputError :message="form.errors.etapa_procesal_id" class="mt-2" />
+                    </div>
+
                     <div>
                       <InputLabel for="naturaleza" value="Naturaleza (opcional)" />
                       <TextInput id="naturaleza" v-model="form.naturaleza" class="mt-1 block w-full" />
@@ -191,11 +211,11 @@ const submit = () => {
                   </div>
                 </div>
                 
-                <!-- Step 2: Partes y Contacto (MODIFICADO) -->
+                <!-- Step 2: Partes y Contacto -->
                 <div v-else-if="step === 2" key="step2" class="space-y-6">
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     
-                    <!-- Demandantes Dinámicos -->
+                    <!-- Demandantes -->
                     <div class="space-y-3">
                         <div class="flex justify-between items-center">
                             <InputLabel value="Demandantes / Denunciantes" />
@@ -214,7 +234,7 @@ const submit = () => {
                         <InputError :message="form.errors.demandantes" class="mt-1" />
                     </div>
 
-                    <!-- Demandados Dinámicos -->
+                    <!-- Demandados -->
                     <div class="space-y-3">
                         <div class="flex justify-between items-center">
                             <InputLabel value="Demandados / Denunciados" />

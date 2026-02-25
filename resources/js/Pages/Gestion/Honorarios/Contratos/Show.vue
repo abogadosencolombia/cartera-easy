@@ -30,6 +30,14 @@ const props = defineProps({
 // --- FORMULARIO PARA ACCIONES GENERALES ---
 const accionesForm = useForm({})
 
+// Opciones de Frecuencia (Igual que en Create.vue)
+const frecuencias = [
+    { value: 'DIARIO', label: 'Diario' },
+    { value: 'SEMANAL', label: 'Semanal' },
+    { value: 'QUINCENAL', label: 'Quincenal (15 días)' },
+    { value: 'MENSUAL', label: 'Mensual' },
+];
+
 // --- HELPERS ---
 const fmtMoney = (n) =>
     new Intl.NumberFormat('es-CO', {
@@ -41,37 +49,30 @@ const fmtMoney = (n) =>
 // --- fmtDate Corregido ---
 const fmtDate = (d) => {
     if (!d) return 'N/A';
-    // Intenta interpretar la fecha, reemplazando espacio por T si tiene hora
     const dateStr = String(d).replace(' ', 'T');
     const dateObj = new Date(dateStr);
     
-    // Verifica si la fecha es válida
     if (isNaN(dateObj.getTime())) {
-        // Intenta interpretar solo como fecha YYYY-MM-DD si falla lo anterior
         const dateOnlyMatch = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
         if (dateOnlyMatch) {
             const [, year, month, day] = dateOnlyMatch;
-            // Usar UTC para evitar problemas de un día menos
             const dateOnlyObj = new Date(Date.UTC(year, month - 1, day));
              if (!isNaN(dateOnlyObj.getTime())) {
                  return dateOnlyObj.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
              }
         }
-        return 'Fecha Inválida'; // Si ambos fallan
+        return 'Fecha Inválida';
     }
-    // Formato original si la fecha es válida (usar UTC para consistencia)
     return dateObj.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 };
 
 const fmtDateTime = (d) =>
-    d ? new Date(String(d).replace(' ', 'T')).toLocaleString('es-CO', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'UTC' }) : 'N/A'; // Añadir UTC
+    d ? new Date(String(d).replace(' ', 'T')).toLocaleString('es-CO', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'UTC' }) : 'N/A';
 
 const today    = new Date().toISOString().slice(0, 10)
 
-// --- Corregido ParseDate ---
 const parseDate = (d) => {
     if (!d) return null
-    // Usar 'T' como separador para compatibilidad ISO 8601 si viene con hora
     const dt = new Date(String(d).replace(' ', 'T'))
     return isNaN(dt.getTime()) ? null : dt
 }
@@ -80,7 +81,6 @@ const diffDays = (from, to) => {
     const a = parseDate(from)
     const b = parseDate(to || new Date().toISOString().slice(0,10))
     if (!a || !b) return null
-     // Usar UTC para evitar problemas de DST/zona horaria en la diferencia
     const aUTC = Date.UTC(a.getUTCFullYear(), a.getUTCMonth(), a.getUTCDate());
     const bUTC = Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate());
     return Math.floor((bUTC - aUTC) / (1000 * 60 * 60 * 24));
@@ -95,14 +95,11 @@ const valorTotalContrato = computed(() => {
     const c = props.contrato || {}
     const modalidad = String(c.modalidad || '')
     if (modalidad === 'LITIS') {
-        // Para Litis puro, el valor fijo es 0, el valor real viene de litis_valor_ganado
         return Number(c.litis_valor_ganado || 0) 
     }
      if (modalidad === 'CUOTA_MIXTA') {
-        // Para Mixta, es la suma de la parte fija + la parte ganada
          return (Number(c.monto_total || 0) + Number(c.litis_valor_ganado || 0))
     }
-    // Para Cuotas y Pago Unico, es solo el monto_total
     return Number(c.monto_total || 0)
 })
 
@@ -112,16 +109,11 @@ const netoContrato = computed(() => {
     const modalidad = String(c.modalidad || '')
 
     if (modalidad === 'LITIS') {
-         // Litis puro no tiene 'monto_total' fijo ni anticipo sobre ese monto
         return 0;
     }
      if (modalidad === 'CUOTA_MIXTA') {
-         // En mixta, el neto es (Parte Fija - Anticipo)
-         // La parte Litis se maneja via Cargos
          return Math.max(0, (Number(c.monto_total || 0) - anticipo))
     }
-    
-    // Para Cuotas y Pago Unico
     return Math.max(0, (Number(c.monto_total || 0) - anticipo))
 })
 
@@ -132,7 +124,7 @@ const totalPagosValor  = computed(() => Math.abs(Number(props.total_pagos_valor)
 const totalInteresesMora = computed(() => {
     const moraCuotas = (props.cuotas?.data || []).reduce((sum, c) => sum + Number(c.intereses_mora_acumulados || 0), 0)
     const moraCargos = (props.cargos?.data || [])
-        .filter(c => String(c.tipo || '') !== 'INTERES_MORA') // No sumar la mora de un cargo que *es* de mora
+        .filter(c => String(c.tipo || '') !== 'INTERES_MORA')
         .reduce((sum, c) => sum + Number(c.intereses_mora_acumulados || 0), 0)
     return moraCuotas + moraCargos
 })
@@ -140,7 +132,6 @@ const totalInteresesMora = computed(() => {
 const valorTotalCargosConMora = computed(() => totalCargosValor.value + totalInteresesMora.value)
 
 const saldo = computed(() => {
-     // El saldo es: (Neto de cuotas) + (Total cargos con mora) - (Total Pagos)
      return Math.max(0, netoContrato.value + valorTotalCargosConMora.value - totalPagosValor.value)
 })
 
@@ -148,7 +139,7 @@ const saldo = computed(() => {
 const totalCargosPendientes = computed(() => {
     if (!props.cargos?.data) return 0
     return props.cargos.data
-        .filter(c => c.estado !== 'PAGADO') // Usar '!= PAGADO' en lugar de '=== PENDIENTE'
+        .filter(c => c.estado !== 'PAGADO')
         .reduce((a, c) => {
             const base = Math.abs(Number(c.monto) || 0)
             const mora = String(c.tipo || '') === 'INTERES_MORA' ? 0 : Math.abs(Number(c.intereses_mora_acumulados) || 0)
@@ -165,9 +156,7 @@ const comprobanteUrl = (pago) =>
 const cargoComprobanteCreacionUrl = (cargo) =>
     cargo?.comprobante ? route('honorarios.contratos.cargos.verComprobante', { cargo_id: cargo.id }) : null
 
-// --- CORRECCIÓN: Usar la ruta segura y el ID del pago ---
 const cargoComprobantePagoUrl = (cargo) =>
-    // Usamos el 'pago_id_del_cargo' (que viene del backend) para construir la misma ruta segura que usa la pestaña de Pagos
     cargo?.pago_id_del_cargo && cargo?.comprobante_pago_cargo ? route('honorarios.contratos.pagos.verComprobante', { pago_id: cargo.pago_id_del_cargo }) : null
 
 // ===================================
@@ -243,7 +232,7 @@ const abrirPagoCuotaModal = (cuota) => {
     cuotaSeleccionada.value = cuota
     pagoCuotaForm.reset()
     pagoCuotaForm.cuota_id = cuota.id
-    pagoCuotaForm.valor    = cuotaRestoConMora(cuota) // Sugerir el valor pendiente
+    pagoCuotaForm.valor    = cuotaRestoConMora(cuota) 
     pagoCuotaForm.fecha    = today
     pagoModalAbierto.value = true
 }
@@ -273,7 +262,7 @@ const abrirPagoCargoModal = (cargo) => {
     cargoSeleccionado.value = cargo
     pagoCargoForm.reset()
     pagoCargoForm.cargo_id = cargo.id
-    pagoCargoForm.valor    = cargoTotalAPagar(cargo) // Sugerir el valor total (monto + mora)
+    pagoCargoForm.valor    = cargoTotalAPagar(cargo) 
     pagoCargoForm.fecha    = today
     pagoCargoModalAbierto.value = true
 }
@@ -351,7 +340,7 @@ const subirDocumento = () => {
         forceFormData: true,
         onSuccess: () => {
             cerrarSubirDocumentoModal()
-            documentoMenuAbierto.value = false // Cerrar menu si estaba abierto
+            documentoMenuAbierto.value = false 
         }
     })
 }
@@ -415,8 +404,6 @@ const guardarActuacion = () => {
         onSuccess: () => {
             actuacionForm.reset() // Limpiar formulario
             actuacionForm.fecha_actuacion = today // Resetear fecha a hoy
-            // Usar 303 redirect (onSuccess) o router.reload
-            // router.reload({ only: ['actuaciones'], preserveState: true }) // preserveState true para no perder la pestaña
         },
         onError: (errors) => {
              console.error("Error al guardar actuación:", errors);
@@ -438,7 +425,6 @@ const editActuacionForm = useForm({
 const abrirModalEditar = (actuacion) => {
     actuacionEnEdicion.value = actuacion
     editActuacionForm.nota = actuacion.nota
-    // Asegurarse de que la fecha esté en formato YYYY-MM-DD para el input[type=date]
     editActuacionForm.fecha_actuacion = actuacion.fecha_actuacion ? String(actuacion.fecha_actuacion).split('T')[0] : ''
     editActuacionModalAbierto.value = true
 }
@@ -456,7 +442,6 @@ const actualizarActuacion = () => {
         preserveScroll: true,
         onSuccess: () => {
             cerrarModalEditar()
-            // router.reload({ only: ['actuaciones'], preserveState: true })
         },
         onError: (errors) => {
              console.error("Error al actualizar actuación:", errors);
@@ -480,12 +465,10 @@ const eliminarActuacionConfirmado = () => {
         preserveScroll: true,
         onSuccess: () => {
              cerrarConfirmarEliminarActuacion()
-             // router.reload({ only: ['actuaciones'], preserveState: true })
         },
         onError: (errors) => {
             console.error("Error al eliminar actuación:", errors);
             cerrarConfirmarEliminarActuacion()
-            // Aquí podrías mostrar un modal de error
         }
     })
 }
@@ -496,14 +479,14 @@ const eliminarActuacionConfirmado = () => {
 const contractStatusClasses = {
     'ACTIVO':           'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300',
     'PAGOS_PENDIENTES': 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300',
-    'PAGO_PARCIAL':     'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300', // Añadido
+    'PAGO_PARCIAL':     'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
     'CERRADO':          'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
     'EN_MORA':          'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
     'REESTRUCTURADO':   'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300',
 }
 
 // --- Lógica de Pestañas (Tabs) ---
-const pestanaActiva = ref('cuotas') // Default 'cuotas'
+const pestanaActiva = ref('cuotas') 
 const cambiarPestana = (nuevaPestana) => {
     pestanaActiva.value = nuevaPestana
     const url = new URL(window.location)
@@ -515,13 +498,12 @@ onMounted(() => {
     if (tabFromUrl && ['cuotas', 'cargos', 'pagos', 'actuaciones'].includes(tabFromUrl)) {
          pestanaActiva.value = tabFromUrl;
     } else {
-         // Si la prop 'actuaciones' tiene datos y las otras no, abrir 'actuaciones'
          if (props.actuaciones.length > 0 && props.cuotas.data.length === 0 && props.cargos.data.length === 0) {
              pestanaActiva.value = 'actuaciones';
          } else {
-             pestanaActiva.value = 'cuotas'; // Default 'cuotas'
+             pestanaActiva.value = 'cuotas';
          }
-         cambiarPestana(pestanaActiva.value); // Sincronizar URL
+         cambiarPestana(pestanaActiva.value); 
     }
 })
 
@@ -534,19 +516,28 @@ const pagosLinks  = computed(() => (props.pagos?.links  || []).map(l => ({ ...l,
 const navegarPagina = (url) => {
     if (!url) return
     const nuevaUrl = new URL(url, window.location.origin)
-    // No es necesario añadir 'tab' aquí, 'withTab' ya lo hizo.
     
     router.get(nuevaUrl.toString(), {}, {
         preserveScroll: true,
-        preserveState: true, // Mantener el estado (incluyendo la pestaña activa)
-        // Cargar solo los props que cambian (los datos paginados)
+        preserveState: true, 
         only: ['cuotas', 'pagos', 'cargos'] 
     })
 }
 
 // --- MODAL REESTRUCTURACIÓN ---
 const reestructurarModalAbierto = ref(false)
-const crearContratoForm = useForm({ cliente_id: null, modalidad: 'CUOTAS', inicio: today, monto_total: '', cuotas: 12, anticipo: '', porcentaje_litis: '', nota: '', contrato_origen_id: null })
+const crearContratoForm = useForm({ 
+    cliente_id: null, 
+    modalidad: 'CUOTAS', 
+    frecuencia_pago: 'MENSUAL', // NUEVO CAMPO
+    inicio: today, 
+    monto_total: '', 
+    cuotas: 12, 
+    anticipo: '', 
+    porcentaje_litis: '', 
+    nota: '', 
+    contrato_origen_id: null 
+})
 
 // --- CORRECCIÓN DE BUG: ---
 const clienteSearch = ref(''); 
@@ -559,6 +550,7 @@ const abrirReestructurarModal = () => {
     crearContratoForm.defaults({ 
         cliente_id: props.contrato?.cliente_id ?? null, 
         modalidad: props.contrato?.modalidad ?? 'CUOTAS', 
+        frecuencia_pago: props.contrato?.frecuencia_pago ?? 'MENSUAL', // Cargar frecuencia actual
         inicio: today, 
         monto_total: props.contrato?.monto_total ?? '', 
         cuotas: 12, 
@@ -569,14 +561,11 @@ const abrirReestructurarModal = () => {
     })
     crearContratoForm.reset()
     
-    // --- CORRECCIÓN: Usar 'nombre_completo' o 'nombre' de props.clientes ---
     const clienteOriginal = props.clientes.find(c => c.id === props.contrato.cliente_id);
     if (clienteOriginal) {
-        // 'props.clientes' viene con 'id' y 'nombre' (alias de 'nombre_completo')
         clienteSearch.value = clienteOriginal.nombre; 
         selectedClientName.value = clienteOriginal.nombre;
     } else {
-        // Fallback si el cliente no está en la lista (raro)
         clienteSearch.value = props.cliente?.nombre_completo ?? '';
         selectedClientName.value = props.cliente?.nombre_completo ?? '';
     }
@@ -818,13 +807,13 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
                                             <div v-else class="space-y-4">
                                                 <div v-for="c in props.cargos.data" :key="c.id"
                                                      :class="[
-                                                         'border rounded-lg transition-all',
-                                                         c.estado === 'PAGADO'
-                                                             ? 'bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-900'
-                                                             : (String(c.tipo || '') === 'INTERES_MORA'
-                                                                 ? 'bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-900'
-                                                                 : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700')
-                                                     ]">
+                                                      'border rounded-lg transition-all',
+                                                      c.estado === 'PAGADO'
+                                                          ? 'bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-900'
+                                                          : (String(c.tipo || '') === 'INTERES_MORA'
+                                                              ? 'bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-900'
+                                                              : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700')
+                                                    ]">
                                                     <div class="flex items-start sm:items-center gap-4 p-4 flex-col sm:flex-row">
                                                         <div class="flex-shrink-0">
                                                             <span v-if="String(c.tipo || '') === 'INTERES_MORA'" class="inline-flex justify-center items-center w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300">
@@ -1023,6 +1012,13 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
                                     <div>
                                         <dt class="text-gray-500 dark:text-gray-400">Modalidad</dt>
                                         <dd class="font-medium text-gray-800 dark:text-gray-200">{{ (props.contrato.modalidad || '').replace('_',' ') }}</dd>
+                                    </div>
+                                    <!-- NUEVO CAMPO DE FRECUENCIA -->
+                                    <div v-if="props.contrato.modalidad !== 'LITIS'">
+                                        <dt class="text-gray-500 dark:text-gray-400">Frecuencia de Pago</dt>
+                                        <dd class="font-medium text-gray-800 dark:text-gray-200 capitalize">
+                                            {{ (props.contrato.frecuencia_pago || 'Mensual').toLowerCase() }}
+                                        </dd>
                                     </div>
                                     
                                     <!-- Sección de Litis -->
@@ -1367,6 +1363,13 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
                                 <InputLabel for="cuotas_reestructurar" value="Número de Cuotas" />
                                 <TextInput id="cuotas_reestructurar" type="number" v-model="crearContratoForm.cuotas" class="mt-1 block w-full" placeholder="Ej: 12" />
                                 <InputError class="mt-2" :message="crearContratoForm.errors.cuotas" />
+                            </div>
+                            <!-- NUEVO: SELECTOR DE FRECUENCIA EN REESTRUCTURAR -->
+                            <div v-if="crearContratoForm.modalidad !== 'PAGO_UNICO'">
+                                <InputLabel for="frecuencia_reestructurar" value="Frecuencia de Pago" />
+                                <select v-model="crearContratoForm.frecuencia_pago" id="frecuencia_reestructurar" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-700">
+                                    <option v-for="freq in frecuencias" :key="freq.value" :value="freq.value">{{ freq.label }}</option>
+                                </select>
                             </div>
                             <div>
                                 <InputLabel for="anticipo_reestructurar" value="Anticipo (Opcional)" />

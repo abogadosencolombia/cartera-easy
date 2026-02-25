@@ -27,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckUserRole::class,
+            'juzgado.access' => \App\Http\Middleware\EnsureJuzgadoAccess::class,
         ]);
     })
     // IMPORTANTE: sin type-hint para evitar el TypeError entre versiones

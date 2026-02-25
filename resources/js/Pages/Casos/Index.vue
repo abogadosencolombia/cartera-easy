@@ -6,14 +6,14 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import { ref, watch, reactive } from 'vue';
-import { TrashIcon, MagnifyingGlassIcon, InboxIcon, EyeIcon, ArrowDownTrayIcon, FunnelIcon } from '@heroicons/vue/24/outline'; 
+import { TrashIcon, MagnifyingGlassIcon, InboxIcon, EyeIcon, ArrowDownTrayIcon, FunnelIcon, ArchiveBoxXMarkIcon } from '@heroicons/vue/24/outline'; 
 import { debounce } from 'lodash';
 
 const props = defineProps({
     casos: Object,
     can: Object,
     filters: Object,
-    abogados: Array, // <--- Nueva prop recibida del backend
+    abogados: Array,
 });
 
 // --- Lógica de Búsqueda y Filtros Combinada ---
@@ -110,7 +110,7 @@ const formatLabel = (text) => {
                     </h2>
                     <div class="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
                         
-                        <!-- NUEVO: Filtro por Abogado -->
+                        <!-- Filtro por Abogado -->
                         <div class="relative w-full md:w-64" v-if="abogados && abogados.length > 0">
                             <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
                                 <FunnelIcon class="w-5 h-5 text-gray-500 dark:text-gray-400" />
@@ -216,13 +216,19 @@ const formatLabel = (text) => {
                                     </td>
 
                                     <td class="px-6 py-5 whitespace-nowrap">
-                                        <span
-                                            v-if="caso.etapa_procesal || caso.estado_proceso"
-                                            class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
-                                            :class="statusProcessoClasses[caso.etapa_procesal || caso.estado_proceso] || statusProcessoClasses['default']"
-                                        >
-                                            {{ formatLabel(caso.etapa_procesal || caso.estado_proceso) }}
-                                        </span>
+                                        <div class="flex flex-col items-start gap-1">
+                                            <!-- BADGE DE CERRADO (VISUALIZACIÓN) -->
+                                            <span v-if="caso.nota_cierre" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-800 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800">
+                                                <ArchiveBoxXMarkIcon class="w-3 h-3 mr-1"/> CERRADO
+                                            </span>
+
+                                            <span
+                                                class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                                :class="statusProcessoClasses[caso.etapa_procesal || caso.estado_proceso] || statusProcessoClasses['default']"
+                                            >
+                                                {{ formatLabel(caso.etapa_procesal || caso.estado_proceso) }}
+                                            </span>
+                                        </div>
                                     </td>
 
                                     <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -257,7 +263,7 @@ const formatLabel = (text) => {
                             </tbody>
                         </table>
                     </div>
-
+                    
                     <div v-if="casos && casos.links?.length > 1" class="p-4 flex flex-wrap justify-center gap-2 border-t dark:border-gray-700">
                         <Link
                             v-for="(link, idx) in casos.links"

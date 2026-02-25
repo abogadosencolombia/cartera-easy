@@ -32,7 +32,7 @@ class StoreCasoRequest extends FormRequest
                     }
                 }),
             ],
-            'estado_proceso' => ['required', Rule::in(['prejurídico', 'demandado', 'en ejecución', 'sentencia', 'cerrado'])],
+            // ELIMINADO: estado_proceso
             'tipo_garantia_asociada' => ['required', Rule::in(['codeudor', 'hipotecaria', 'prendaria', 'sin garantía'])],
             'fecha_apertura' => ['required', 'date', 'before_or_equal:today'],
             'fecha_vencimiento' => ['nullable', 'date', 'after_or_equal:fecha_inicio_credito'],

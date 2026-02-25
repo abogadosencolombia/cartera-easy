@@ -12,17 +12,23 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // Tarea existente para procesar alertas
+        // Tarea existente para procesar alertas (Esta corre cada minuto, no necesita zona horaria)
         $schedule->job(new \App\Jobs\ProcesarAlertasProgramadas)
                  ->everyMinute()
                  ->withoutOverlapping(55)
                  ->name('procesar_alertas_programadas');
 
-        // --- NUEVA TAREA AÑADIDA ---
         // Tarea para calcular los intereses de mora diariamente
         $schedule->command('app:calculate-late-fees')
-                 ->dailyAt('12:00') // Se ejecutará todos los días a la 12:00 M
+                 ->dailyAt('12:00')
+                 ->timezone('America/Bogota') // <--- AGREGADO: Para que sea al mediodía COLOMBIA
                  ->name('calculate_late_fees');
+
+        // --- TAREA DE NOTIFICACIONES ---
+        $schedule->command('alertas:procesar-vencimientos')
+                 ->dailyAt('08:00')
+                 ->timezone('America/Bogota') // <--- LA SOLUCIÓN: Hora de Colombia
+                 ->name('generar_alertas_juridicas_financieras');
     }
 
     /**
@@ -35,4 +41,3 @@ class Kernel extends ConsoleKernel
         require base_path('routes/console.php');
     }
 }
-

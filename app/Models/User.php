@@ -10,13 +10,15 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Casts\Attribute; // --- AÑADIDO ---
-use Illuminate\Support\Facades\Log;          // --- AÑADIDO ---
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Support\Facades\Log;
 use NotificationChannels\WebPush\HasPushSubscriptions;
+use Illuminate\Database\Eloquent\SoftDeletes; // <--- 1. IMPORTANTE: Importar SoftDeletes
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, HasPushSubscriptions;
+    // 2. IMPORTANTE: Agregar SoftDeletes al use
+    use HasFactory, Notifiable, HasPushSubscriptions, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -29,7 +31,7 @@ class User extends Authenticatable
         'estado_activo',
         'persona_id',
         'preferencias_notificacion',
-        'addresses', // --- AÑADIDO ---
+        'addresses',
     ];
 
     /**
@@ -39,13 +41,14 @@ class User extends Authenticatable
         'password',
         'remember_token',
     ];
+    
+    // --- PROTECCIÓN EXTRA: FECHAS ---
+    protected $dates = ['deleted_at'];
 
     /**
      * The accessors to append to the model's array form.
-     * ESTA LÍNEA LE DICE A LARAVEL QUE SIEMPRE INCLUYA NUESTRO ATRIBUTO MÁGICO
-     * @var array
      */
-    protected $appends = ['cooperativas_display']; // <-- 2. LÍNEA AÑADIDA
+    protected $appends = ['cooperativas_display'];
 
     /**
      * Get the attributes that should be cast.
@@ -57,11 +60,10 @@ class User extends Authenticatable
             'password' => 'hashed',
             'estado_activo' => 'boolean',
             'preferencias_notificacion' => 'array',
-            // No añadimos 'addresses' aquí, se maneja con el Accessor/Mutator
         ];
     }
 
-    // --- RELACIONES (Tus relaciones existentes se mantienen intactas) ---
+    // --- RELACIONES ---
 
     public function cooperativas(): BelongsToMany
     {
@@ -98,31 +100,21 @@ class User extends Authenticatable
         return $this->hasMany(NotificacionCaso::class);
     }
 
-    /**
-     * Relación: Personas asignadas a este abogado (User).
-     */
     public function personasAsignadas(): BelongsToMany
     {
-        // Esta es la relación inversa de la que definimos en Persona.php
         return $this->belongsToMany(Persona::class, 'persona_user', 'abogado_id', 'persona_id')
                     ->withTimestamps();
     }
 
-    // --- ACCESSORS (ATRIBUTOS MÁGICOS) ---
+    // --- ACCESSORS ---
 
-    /**
-     * Crea un atributo virtual que muestra los nombres de las cooperativas como un string.
-     * ESTA ES LA FUNCIÓN NUEVA QUE SOLUCIONA EL PROBLEMA.
-     */
     protected function cooperativasDisplay(): Attribute
     {
         return Attribute::make(
             get: function () {
-                // Si el usuario no tiene cooperativas, devuelve 'Ninguna'.
                 if ($this->cooperativas->isEmpty()) {
                     return 'Ninguna';
                 }
-                // Si tiene, une todos los nombres con una coma.
                 return $this->cooperativas->pluck('nombre')->join(', ');
             }
         );
@@ -145,54 +137,35 @@ class User extends Authenticatable
         return $this->hasMany(UserDocument::class);
     }
 
-    // --- INICIO: NUEVO ACCESSOR SEGURO PARA JSON (copiado de Persona) ---
-
-    /**
-     * Decodifica de forma segura el campo 'addresses'.
-     */
     protected function addresses(): Attribute
     {
         return Attribute::make(
             get: function ($value) {
                 if (empty($value)) {
-                    return []; // Devolver un array vacío por defecto
+                    return [];
                 }
 
                 try {
-                    // Intentar decodificar el JSON
                     $data = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
-                    // Asegurarse de que es un array
                     return is_array($data) ? $data : [];
                 } catch (\JsonException $e) {
-                    // Si el JSON es inválido, registrar el error y devolver array vacío
                     Log::warning("JSON inválido en 'addresses' para User ID: {$this->id}. Valor: {$value}");
                     return [];
                 }
             },
-            // El 'set' codifica el array a JSON (para cuando guardas)
             set: fn ($value) => is_array($value) ? json_encode($value) : null
         );
     }
     
-    // --- FIN: NUEVO ACCESSOR SEGURO PARA JSON ---
+    // ===== MÓDULO DE TAREAS =====
 
-    // ===== INICIO DE LA MODIFICACIÓN (MÓDULO DE TAREAS) =====
-
-    /**
-     * Tareas que este usuario debe realizar.
-     */
     public function tareasAsignadas(): HasMany
     {
         return $this->hasMany(Tarea::class, 'user_id');
     }
 
-    /**
-     * Tareas que este usuario (como admin) ha creado.
-     */
     public function tareasCreadas(): HasMany
     {
         return $this->hasMany(Tarea::class, 'admin_id');
     }
-    
-    // ===== FIN DE LA MODIFICACIÓN =====
 }

@@ -8,14 +8,13 @@ use App\Models\User;
 use App\Models\Caso;
 use App\Models\Contrato;
 use App\Models\ProcesoRadicado;
-use App\Models\Persona;
 use App\Notifications\NuevaTareaAsignada;
 use Illuminate\Http\Request;
-use Illuminate\Notifications\DatabaseNotification; // Importante
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
 
 class TareaController extends Controller
 {
@@ -38,11 +37,23 @@ class TareaController extends Controller
             $query->where('user_id', $request->user_id);
         }
 
-        $tareas = $query->latest('created_at')->paginate(20)->withQueryString();
+        // ===== ORDENAMIENTO INTELIGENTE =====
+        // 1. Vencidas (Urgencia máxima)
+        // 2. Pendientes con fecha futura (Lo que sigue)
+        // 3. Pendientes SIN fecha (Notas generales / Tareas sueltas)
+        // 4. Completadas (Al final del todo)
+        $tareas = $query->orderByRaw("
+            CASE 
+                WHEN estado = 'completada' THEN 4
+                WHEN fecha_limite IS NOT NULL AND fecha_limite < NOW() THEN 1 
+                WHEN fecha_limite IS NOT NULL THEN 2
+                ELSE 3
+            END ASC
+        ")->orderBy('fecha_limite', 'asc')->paginate(20)->withQueryString();
 
         $usuariosAsignables = User::whereIn('tipo_usuario', ['abogado', 'gestor', 'admin'])
-                                        ->orderBy('name')
-                                        ->get(['id', 'name']);
+                                    ->orderBy('name')
+                                    ->get(['id', 'name']);
 
         return Inertia::render('Admin/Tareas/Index', [
             'tareas' => $tareas,
@@ -58,48 +69,71 @@ class TareaController extends Controller
     {
         $this->authorize('create', Tarea::class);
 
+        // Validamos, pero ahora permitimos nulos (nullable)
         $validated = $request->validate([
             'titulo' => 'required|string|max:255',
             'descripcion' => 'required|string|max:5000',
             'user_id' => 'required|exists:users,id',
-            'tarea_type' => 'required|string', // Se recibe 'proceso', 'caso', 'contrato'
-            'tarea_id' => 'required|integer',
+            // Estos ahora son opcionales:
+            'tarea_type' => 'nullable|string', 
+            'tarea_id' => 'nullable|integer',
+            'fecha_limite' => 'nullable|date|after:now', 
+        ], [
+            'fecha_limite.after' => 'Si pones fecha, debe ser en el futuro.',
         ]);
 
-        $modelMap = [
-            'proceso' => ProcesoRadicado::class,
-            'caso' => Caso::class,
-            'contrato' => Contrato::class,
-        ];
+        // Lógica de vinculación (Solo si el usuario seleccionó algo)
+        $modelClass = null;
+        if (!empty($validated['tarea_type']) && !empty($validated['tarea_id'])) {
+            $modelMap = [
+                'proceso' => ProcesoRadicado::class,
+                'caso' => Caso::class,
+                'contrato' => Contrato::class,
+            ];
 
-        // El 'tarea_type' viene del frontend como string ('proceso', 'caso', 'contrato')
-        $modelClass = $modelMap[$validated['tarea_type']] ?? null;
+            $modelClass = $modelMap[$validated['tarea_type']] ?? null;
 
-        if (!$modelClass || !class_exists($modelClass)) {
-            return back()->withErrors(['tarea_type' => 'El tipo de elemento vinculado no es válido.']);
+            if (!$modelClass || !class_exists($modelClass)) {
+                return back()->withErrors(['tarea_type' => 'Tipo de vinculación inválido.']);
+            }
+            
+            // Verificar que el elemento exista
+            if (!$modelClass::find($validated['tarea_id'])) {
+                return back()->withErrors(['tarea_id' => 'El elemento vinculado no existe.']);
+            }
         }
 
-        $elemento = $modelClass::find($validated['tarea_id']);
-        if (!$elemento) {
-            return back()->withErrors(['tarea_id' => 'El elemento vinculado no existe.']);
+        // Crear la tarea (Manejando los nulos correctamente)
+        try {
+            $tarea = Tarea::create([
+                'titulo' => $validated['titulo'],
+                'descripcion' => $validated['descripcion'],
+                'user_id' => $validated['user_id'],
+                'admin_id' => Auth::id(),
+                'tarea_type' => $modelClass, // Puede ser null
+                'tarea_id' => $validated['tarea_id'] ?? null, // Puede ser null
+                'estado' => 'pendiente',
+                'fecha_limite' => $validated['fecha_limite'] ?? null, // Puede ser null
+            ]);
+            
+            Log::info('Tarea creada ID: ' . $tarea->id);
+
+        } catch (\Exception $e) {
+            Log::error('Error DB al crear tarea: ' . $e->getMessage());
+            return back()->withErrors(['error' => 'Error de base de datos al guardar la tarea.']);
         }
 
-        $tarea = Tarea::create([
-            'titulo' => $validated['titulo'],
-            'descripcion' => $validated['descripcion'],
-            'user_id' => $validated['user_id'],
-            'admin_id' => Auth::id(),
-            'tarea_type' => $modelClass, // Aquí se guarda la clase del Modelo
-            'tarea_id' => $validated['tarea_id'],
-            'estado' => 'pendiente',
-        ]);
-
+        // Notificar al usuario
         $usuarioAsignado = User::find($validated['user_id']);
         if ($usuarioAsignado) {
-            $usuarioAsignado->notify(new NuevaTareaAsignada($tarea));
+            try {
+                $usuarioAsignado->notify(new NuevaTareaAsignada($tarea));
+            } catch (\Exception $e) {
+                Log::error('Error enviando notificación: ' . $e->getMessage());
+            }
         }
 
-        return to_route('admin.tareas.index')->with('success', 'Tarea asignada y notificada correctamente.');
+        return to_route('admin.tareas.index')->with('success', 'Tarea creada exitosamente.');
     }
 
     /**
@@ -107,9 +141,8 @@ class TareaController extends Controller
      */
     public function marcarComoCompletada(Request $request, Tarea $tarea)
     {
-        // BUG CORREGIDO: La autorización debe ser contra el 'user_id' de la tarea, no del admin
         if (Auth::id() !== $tarea->user_id && !Auth::user()->hasRole('admin')) {
-             abort(403, 'No estás autorizado para completar esta tarea.');
+             abort(403, 'No autorizado.');
         }
 
         if ($tarea->estado === 'pendiente') {
@@ -117,129 +150,48 @@ class TareaController extends Controller
                 'estado' => 'completada',
                 'fecha_completado' => Carbon::now()
             ]);
-            
-            return back(303)->with('success', 'Tarea marcada como completada.');
+            return back(303)->with('success', 'Tarea completada.');
         }
-
-        return back(303)->with('info', 'Esta tarea ya estaba completada.');
+        return back(303);
     }
 
     /**
-     * Elimina una tarea.
+     * Elimina una tarea y limpia sus notificaciones.
      */
     public function destroy(Tarea $tarea)
     {
         $this->authorize('delete', $tarea);
         
-        // --- INICIO DE LA MODIFICACIÓN (LA SOLUCIÓN A PRUEBA DE FALLOS) ---
-        
-        // Ya que la columna 'data' es TIPO TEXTO, no podemos usar operadores JSON.
-        // En su lugar, buscamos el string literal "tarea_id":ID dentro del texto.
-        // Ej: ... "link":"/casos/1", "tarea_id":7 }
         $searchString = '"tarea_id":' . $tarea->id;
-
         DatabaseNotification::where('type', \App\Notifications\NuevaTareaAsignada::class)
             ->where('data', 'LIKE', '%' . $searchString . '%')
             ->delete();
         
-        // --- FIN DE LA MODIFICACIÓN ---
-
-        // Ahora sí, eliminar la tarea
         $tarea->delete();
         
-        // Devolver respuesta
-        return to_route('admin.tareas.index')->with('success', 'Tarea y notificación eliminadas.');
+        return to_route('admin.tareas.index')->with('success', 'Tarea eliminada.');
     }
 
-    // --- INICIO: MÉTODOS DE BÚSQUEDA CORREGIDOS Y SEPARADOS ---
+    // --- MÉTODOS DE BÚSQUEDA ---
+    // Se mantienen igual para soportar el modal de búsqueda
 
-    /**
-     * Busca Procesos (Radicados)
-     */
-    public function buscarProcesos(Request $request)
-    {
-        $queryTerm = $request->q;
-        // CORRECCIÓN: Usar LOWER() y LIKE para compatibilidad con todas las BD
-        $queryLike = "%" . strtolower($queryTerm) . "%"; 
-        $baseQuery = ProcesoRadicado::with('demandante:id,nombre_completo');
-
-        if (!$queryTerm) {
-            $resultados = $baseQuery->latest()->limit(10)->get();
-        } else {
-            $resultados = $baseQuery
-                ->where(function ($q) use ($queryLike) { 
-                    $q->whereRaw('LOWER(radicado) LIKE ?', [$queryLike])
-                      ->orWhereRaw('LOWER(asunto) LIKE ?', [$queryLike])
-                      ->orWhereHas('demandante', function ($subQ) use ($queryLike) {
-                            $subQ->whereRaw('LOWER(nombre_completo) LIKE ?', [$queryLike]);
-                      });
-                })
-                ->limit(10)->get();
-        }
-        return response()->json($resultados->map(fn ($p) => [
-            'id' => $p->id, 
-            'texto' => "Rad: {$p->radicado}" . ($p->demandante ? " - {$p->demandante->nombre_completo}" : "")
-        ]));
+    public function buscarProcesos(Request $request) { 
+        $q = strtolower($request->q);
+        if (!$q) return response()->json(ProcesoRadicado::orderBy('id', 'desc')->limit(10)->get()->map(fn($p)=>['id'=>$p->id,'texto'=>"Rad: {$p->radicado}"]));
+        return response()->json(ProcesoRadicado::whereRaw('LOWER(radicado) LIKE ?', ["%$q%"])->limit(10)->get()->map(fn($p)=>['id'=>$p->id,'texto'=>"Rad: {$p->radicado}"]));
     }
 
-    /**
-     * Busca Casos
-     */
-    public function buscarCasos(Request $request)
-    {
-        $queryTerm = $request->q;
-        // CORRECCIÓN: Usar LOWER() y LIKE
-        $queryLike = "%" . strtolower($queryTerm) . "%";
-        $baseQuery = Caso::with('deudor:id,nombre_completo');
-
-        if (!$queryTerm) {
-            $resultados = $baseQuery->latest()->limit(10)->get();
-        } else {
-            $resultados = $baseQuery
-                ->where(function ($q) use ($queryLike) { 
-                       $q->whereRaw('LOWER(numero_caso) LIKE ?', [$queryLike])
-                         // CORRECCIÓN: Usar LIKE estándar para el CAST
-                         ->orWhereRaw('CAST(id AS TEXT) LIKE ?', [$queryLike]) 
-                         ->orWhereHas('deudor', function ($subQ) use ($queryLike) { 
-                            $subQ->whereRaw('LOWER(nombre_completo) LIKE ?', [$queryLike]);
-                         });
-                }) 
-                ->limit(10)->get();
-        }
-        return response()->json($resultados->map(fn ($c) => [
-            'id' => $c->id, 
-            'texto' => "Caso #{$c->numero_caso} (ID: {$c->id})" . ($c->deudor ? " - {$c->deudor->nombre_completo}" : "")
-        ]));
+    public function buscarCasos(Request $request) { 
+        $q = strtolower($request->q);
+        $query = Caso::with('deudor');
+        if (!$q) return response()->json($query->orderBy('id', 'desc')->limit(10)->get()->map(fn($c)=>['id'=>$c->id,'texto'=>"Caso #{$c->numero_caso}"]));
+        return response()->json($query->whereRaw('LOWER(numero_caso) LIKE ?', ["%$q%"])->limit(10)->get()->map(fn($c)=>['id'=>$c->id,'texto'=>"Caso #{$c->numero_caso}"]));
     }
 
-    /**
-     * Busca Contratos
-     */
-    public function buscarContratos(Request $request)
-    {
-        $queryTerm = $request->q;
-        // CORRECCIÓN: Usar LOWER() y LIKE
-        $queryLike = "%" . strtolower($queryTerm) . "%";
-        $baseQuery = Contrato::with('cliente:id,nombre_completo');
-
-        if (!$queryTerm) {
-            $resultados = $baseQuery->latest()->limit(10)->get();
-        } else {
-            $resultados = $baseQuery
-                ->where(function ($q) use ($queryLike) { 
-                       $q->whereRaw('LOWER(objeto) LIKE ?', [$queryLike]) // Asumiendo que 'objeto' existe
-                         // CORRECCIÓN: Usar LIKE estándar para el CAST
-                         ->orWhereRaw('CAST(id AS TEXT) LIKE ?', [$queryLike])
-                         ->orWhereHas('cliente', function ($subQ) use ($queryLike) { 
-                            $subQ->whereRaw('LOWER(nombre_completo) LIKE ?', [$queryLike]);
-                         });
-                }) 
-                ->limit(10)->get();
-        }
-        return response()->json($resultados->map(fn ($c) => [
-            'id' => $c->id, 
-            'texto' => "Contrato #{$c->id}" . ($c->cliente ? " - {$c->cliente->nombre_completo}" : "")
-        ]));
+    public function buscarContratos(Request $request) {
+        $q = strtolower($request->q);
+        $query = Contrato::with('cliente');
+        if (!$q) return response()->json($query->orderBy('id', 'desc')->limit(10)->get()->map(fn($c)=>['id'=>$c->id,'texto'=>"Contrato #{$c->id}"]));
+        return response()->json($query->whereRaw('LOWER(objeto) LIKE ?', ["%$q%"])->limit(10)->get()->map(fn($c)=>['id'=>$c->id,'texto'=>"Contrato #{$c->id}"]));
     }
-    // --- FIN: MÉTODOS DE BÚSQUEDA CORREGIDOS ---
 }

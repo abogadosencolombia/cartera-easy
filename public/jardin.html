@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jardín</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #87CEEB;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            /* Cielo azul profundo y brillante */
+            background: linear-gradient(to bottom, #1e90ff 0%, #87CEEB 60%, #e0f7fa 100%);
+        }
+        canvas {
+            display: block;
+        }
+        .ui-instruction {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.95);
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 16px;
+            pointer-events: none;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <canvas id="valleyCanvas"></canvas>
+    </div>
+    <div class="ui-instruction">Haz clic en el suelo para plantar • Pasa el mouse para moverlos</div>
+
+    <script>
+        const canvas = document.getElementById('valleyCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let width, height;
+        let plants = [];
+        let grasses = []; // Hojas de césped decorativas
+        let clouds = [];
+        let particles = [];
+        let time = 0;
+        
+        // Configuración del suelo
+        let groundLevel; 
+
+        const mouse = { x: -1000, y: -1000, active: false };
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            
+            // El suelo ocupa el 25% inferior
+            groundLevel = height * 0.75;
+            
+            initGarden();
+        }
+        window.addEventListener('resize', resize);
+
+        window.addEventListener('mousemove', e => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+            mouse.active = true;
+        });
+
+        window.addEventListener('click', (e) => {
+             // Solo plantar si el click es cerca del suelo o abajo
+             if(e.clientY > height * 0.5) {
+                 createSinglePlant(e.clientX, e.clientY, true);
+             }
+        });
+
+        const random = (min, max) => Math.random() * (max - min) + min;
+
+        // --- CLASE: NUBE (Fondo) ---
+        class Cloud {
+            constructor() {
+                this.init(true);
+            }
+            init(startRandomX = false) {
+                this.x = startRandomX ? random(0, width) : -300;
+                this.y = random(50, height * 0.4);
+                this.speed = random(0.1, 0.3);
+                this.scale = random(0.6, 1.5);
+                this.puffs = [];
+                const count = Math.floor(random(4, 8));
+                for(let i=0; i<count; i++) {
+                    this.puffs.push({ x: random(-50,50), y: random(-30,30), r: random(30,60) });
+                }
+            }
+            update() {
+                this.x += this.speed;
+                if(this.x > width + 300) this.init(false);
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.scale(this.scale, this.scale);
+                ctx.fillStyle = "rgba(255, 255, 255, 0.9)"; // Nubes blancas brillantes
+                // Sombra suave para volumen
+                ctx.shadowColor = "rgba(200, 230, 255, 0.5)";
+                ctx.shadowOffsetY = 5;
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                this.puffs.forEach(p => ctx.arc(p.x, p.y, p.r, 0, Math.PI*2));
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // --- CLASE: HIERBA (Decoración de suelo) ---
+        class GrassBlade {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.height = random(20, 50);
+                this.lean = random(-10, 10);
+                this.colorOffset = random(-20, 20);
+            }
+            draw(ctx, wind) {
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y);
+                // Curva cuadrática para la hoja de pasto
+                let tipX = this.x + this.lean + wind * 20;
+                let tipY = this.y - this.height;
+                ctx.quadraticCurveTo(this.x, this.y - this.height/2, tipX, tipY);
+                
+                // Color variado para realismo
+                ctx.strokeStyle = `hsl(${100 + this.colorOffset}, 60%, 40%)`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+        }
+
+        // --- CLASE: LIRIO DE CRISTAL ---
+        class CrystalLily {
+            constructor(x, y, scale) {
+                this.x = x;
+                this.y = y;
+                this.scale = scale;
+                this.growth = 0; 
+                this.growthSpeed = random(0.008, 0.015);
+                
+                this.swayOffset = random(0, Math.PI * 2);
+                this.currentSway = 0;
+
+                this.stemHeight = random(200, 300) * scale;
+                this.curveDirection = Math.random() > 0.5 ? 1 : -1;
+                this.curveAmount = random(50, 90) * scale;
+                
+                // Generar campanitas
+                this.bells = [];
+                const bellCount = Math.floor(random(6, 10));
+                for(let i=0; i<bellCount; i++) {
+                    this.bells.push({
+                        t: 0.2 + (i / bellCount) * 0.7,
+                        size: random(10, 14) * scale,
+                        swing: 0,
+                        bloom: 0,
+                        // Mayoría azules (cian), algunos rosas
+                        type: Math.random() > 0.85 ? 'pink' : 'blue' 
+                    });
+                }
+
+                // Hojas base grandes
+                this.leafWidth = random(40, 60) * scale;
+                this.leafHeight = random(120, 200) * scale;
+            }
+
+            update() {
+                if(this.growth < 1) this.growth += this.growthSpeed;
+
+                // Viento
+                const wind = Math.sin(time * 0.003 + this.x * 0.005) * 0.08;
+                
+                // Mouse
+                let mouseForce = 0;
+                if(mouse.active) {
+                    const dx = this.x - mouse.x;
+                    const dy = (this.y - this.stemHeight/2) - mouse.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if(dist < 250) mouseForce = (dx/dist) * 0.3 * (1 - dist/250);
+                }
+
+                this.currentSway += (wind + mouseForce - this.currentSway) * 0.05;
+
+                this.bells.forEach(bell => {
+                    if (this.growth > bell.t) {
+                        bell.bloom = Math.min(bell.bloom + 0.03, 1);
+                    }
+                    bell.swing = Math.sin(time * 0.05 + bell.t * 8) * 0.15 * this.growth;
+                });
+            }
+
+            draw(ctx) {
+                if (this.growth < 0.01) return;
+
+                ctx.save();
+                ctx.translate(this.x, this.y); // Punto de anclaje en el suelo
+
+                // Dibujar Hojas Base PRIMERO para ocultar el tallo naciendo
+                this.drawBaseLeaves(ctx);
+
+                // Rotar tallo y flores
+                ctx.rotate(this.currentSway);
+
+                // --- TALLO DE VIDRIO ---
+                const h = this.stemHeight * this.growth;
+                const curveX = this.curveDirection * this.curveAmount * this.growth;
+                
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                const cp1x = 0; const cp1y = -h * 0.5;
+                const cp2x = curveX; const cp2y = -h * 1.1;
+                const endx = curveX * 1.4; const endy = -h * 0.75;
+
+                ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endx, endy);
+                
+                // Estilo "Tallo de Cristal Verde"
+                ctx.strokeStyle = `rgba(120, 220, 150, 0.6)`; 
+                ctx.lineWidth = 4 * this.scale;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+                
+                // Brillo blanco en el tallo (reflejo)
+                ctx.strokeStyle = `rgba(255, 255, 255, 0.4)`; 
+                ctx.lineWidth = 1 * this.scale;
+                ctx.stroke();
+
+                // Campanitas
+                this.bells.forEach(bell => {
+                    if (this.growth < bell.t) return;
+                    // Calcular posición en curva
+                    const t = bell.t; const invT = 1 - t;
+                    const bx = Math.pow(invT, 3)*0 + 3*Math.pow(invT, 2)*t*cp1x + 3*invT*Math.pow(t, 2)*cp2x + Math.pow(t, 3)*endx;
+                    const by = Math.pow(invT, 3)*0 + 3*Math.pow(invT, 2)*t*cp1y + 3*invT*Math.pow(t, 2)*cp2y + Math.pow(t, 3)*endy;
+                    
+                    this.drawCrystalBell(ctx, bx, by, bell);
+                });
+
+                ctx.restore();
+            }
+
+            drawBaseLeaves(ctx) {
+                // Dibujar dos hojas grandes en la base para anclar
+                const h = this.leafHeight * this.growth;
+                const w = this.leafWidth * this.growth;
+                
+                // Hoja Izquierda
+                ctx.save();
+                ctx.rotate(this.currentSway * 0.2 - 0.2); 
+                this.drawSingleLeaf(ctx, -1, w, h);
+                ctx.restore();
+
+                // Hoja Derecha
+                ctx.save();
+                ctx.rotate(this.currentSway * 0.2 + 0.2); 
+                this.drawSingleLeaf(ctx, 1, w, h);
+                ctx.restore();
+            }
+
+            drawSingleLeaf(ctx, dir, w, h) {
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.quadraticCurveTo(dir * w, -h * 0.6, dir * w * 0.1, -h);
+                ctx.quadraticCurveTo(0, -h * 0.5, 0, 0);
+                
+                // Color verde profundo pero translúcido
+                const grad = ctx.createLinearGradient(0, 0, 0, -h);
+                grad.addColorStop(0, '#0a3d15');
+                grad.addColorStop(1, '#4caf50');
+                
+                ctx.fillStyle = grad;
+                ctx.fill();
+                
+                // Borde brillante
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+
+            drawCrystalBell(ctx, x, y, bell) {
+                if (bell.bloom <= 0.01) return;
+
+                ctx.save();
+                ctx.translate(x, y);
+                // Colgando, compensando rotación
+                ctx.rotate(-this.currentSway * 0.9 + bell.swing); 
+
+                // Pedúnculo
+                ctx.beginPath();
+                ctx.moveTo(0,0);
+                ctx.quadraticCurveTo(2, 5, 0, 10);
+                ctx.strokeStyle = "rgba(150, 255, 180, 0.8)";
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                ctx.translate(0, 10);
+                const s = bell.size * bell.bloom;
+                
+                // --- ESTILO CRISTAL AL SOL ---
+                let mainColor, glowColor;
+                if (bell.type === 'blue') {
+                    // Cian Cristalino
+                    mainColor = `rgba(180, 240, 255, 0.5)`; // Cuerpo muy transparente
+                    glowColor = `rgba(100, 200, 255, 0.8)`; // Borde brillante
+                } else {
+                    // Rosa Cuarzo
+                    mainColor = `rgba(255, 200, 220, 0.5)`;
+                    glowColor = `rgba(255, 150, 200, 0.8)`;
+                }
+
+                // Resplandor (Glow) que funciona sobre fondo claro
+                // Usamos sombra blanca + color para simular refracción
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = glowColor;
+                ctx.fillStyle = mainColor;
+
+                // Forma Campana
+                ctx.beginPath();
+                ctx.moveTo(-s*0.6, s*0.2); 
+                ctx.bezierCurveTo(-s*0.8, -s*0.8, s*0.8, -s*0.8, s*0.6, s*0.2);
+                
+                const spikes = 5;
+                const bottomY = s * 0.8;
+                const widthX = s * 0.7;
+                for(let i=0; i<=spikes; i++) {
+                   let px = widthX - (widthX*2 * (i/spikes));
+                   let py = (i % 2 === 0) ? bottomY : bottomY - s*0.15;
+                   ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.fill();
+
+                // --- REFLEJOS ESPECULARES (Highlights) ---
+                // Esto es clave para el efecto cristal de día
+                ctx.shadowBlur = 0;
+                
+                // Reflejo fuerte superior (Sol)
+                ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+                ctx.beginPath();
+                ctx.ellipse(-s*0.35, -s*0.3, s*0.15, s*0.25, -0.3, 0, Math.PI*2);
+                ctx.fill();
+
+                // Reflejo suave borde derecho (Rim light)
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // Estambre luminoso interno
+                ctx.fillStyle = "#fff";
+                ctx.shadowBlur = 5;
+                ctx.shadowColor = "#FFFFE0";
+                ctx.beginPath();
+                ctx.arc(0, s*0.5, s*0.15, 0, Math.PI*2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        // --- SISTEMA DE POLEN (Sparkles) ---
+        class Sparkle {
+            constructor() {
+                this.init();
+            }
+            init() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.vy = random(0.2, 1);
+                this.vx = random(-0.5, 0.5);
+                this.size = random(1, 3);
+                this.life = random(0.5, 1);
+            }
+            update() {
+                this.y += this.vy;
+                this.x += this.vx;
+                this.life -= 0.005;
+                if(this.y > height || this.life <= 0) this.init();
+            }
+            draw(ctx) {
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = "#FFD700"; // Oro
+                ctx.beginPath();
+                // Forma de estrella de 4 puntas para brillar más
+                ctx.moveTo(this.x, this.y - this.size);
+                ctx.lineTo(this.x + this.size, this.y);
+                ctx.lineTo(this.x, this.y + this.size);
+                ctx.lineTo(this.x - this.size, this.y);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        function initGarden() {
+            plants = [];
+            clouds = [];
+            grasses = [];
+            particles = [];
+
+            // Nubes
+            for(let i=0; i<6; i++) clouds.push(new Cloud());
+            
+            // Césped de fondo (decorativo)
+            const grassCount = Math.floor(width / 3);
+            for(let i=0; i<grassCount; i++) {
+                // Distribuir hierba en la zona inferior
+                let y = random(groundLevel, height);
+                let x = random(0, width);
+                grasses.push(new GrassBlade(x, y));
+            }
+
+            // Lirios iniciales
+            const plantCount = Math.floor(width / 40);
+            for(let i=0; i<plantCount; i++) {
+                // Perspectiva: Y determina la profundidad y escala
+                // Rango de plantación: desde un poco arriba del borde del suelo hasta abajo
+                let y = random(groundLevel + 20, height); 
+                let x = random(0, width);
+                
+                // Normalizar Y para calcular escala (0 = horizonte, 1 = frente)
+                let depth = (y - groundLevel) / (height - groundLevel);
+                let scale = 0.5 + 1.0 * depth;
+
+                plants.push(new CrystalLily(x, y, scale));
+            }
+            
+            // Ordenar por Y para oclusión correcta (las de abajo tapan a las de arriba)
+            plants.sort((a,b) => a.y - b.y);
+
+            // Partículas
+            for(let i=0; i<30; i++) particles.push(new Sparkle());
+        }
+
+        function createSinglePlant(x, y, manual) {
+            // Asegurar que no se plante en el cielo
+            if (y < groundLevel) y = groundLevel + 20;
+
+            let depth = (y - groundLevel) / (height - groundLevel);
+            let scale = manual ? 0.8 + 0.5 * depth : 0.5 + depth;
+            
+            plants.push(new CrystalLily(x, y, scale));
+            plants.sort((a,b) => a.y - b.y);
+        }
+
+        function drawGround(ctx) {
+            // Dibujar colina suave
+            const grad = ctx.createLinearGradient(0, groundLevel, 0, height);
+            grad.addColorStop(0, '#2e7d32'); // Verde medio
+            grad.addColorStop(1, '#1b5e20'); // Verde oscuro
+
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.moveTo(0, height);
+            ctx.lineTo(0, groundLevel + 50);
+            
+            // Curva horizonte suave
+            ctx.bezierCurveTo(width/3, groundLevel, width*2/3, groundLevel + 80, width, groundLevel + 20);
+            ctx.lineTo(width, height);
+            ctx.fill();
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            time++;
+
+            // 1. Cielo y Nubes
+            clouds.forEach(c => { c.update(); c.draw(ctx); });
+
+            // 2. Suelo Base
+            drawGround(ctx);
+
+            // 3. Hierba de fondo (detrás de las plantas)
+            // Solo dibujamos algunas para textura
+            const windStrength = Math.sin(time * 0.003) * 0.5;
+            
+            // 4. Plantas y Lirios
+            plants.forEach(plant => {
+                plant.update();
+                plant.draw(ctx);
+            });
+
+            // 5. Partículas de Luz
+            particles.forEach(p => {
+                p.update();
+                p.draw(ctx);
+            });
+
+            // 6. Sol radiante (Efecto lente/brillo global)
+            const gradSun = ctx.createRadialGradient(0, 0, 20, 0, 0, 600);
+            gradSun.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+            gradSun.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = gradSun;
+            ctx.fillRect(0,0,width,height);
+
+            requestAnimationFrame(animate);
+        }
+
+        resize();
+        animate();
+
+    </script>
+</body>
+</html>

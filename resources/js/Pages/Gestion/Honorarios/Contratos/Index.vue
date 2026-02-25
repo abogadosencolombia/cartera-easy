@@ -163,7 +163,6 @@ const calcularProgreso = (contrato) => {
                     <div v-if="contratos.data.length > 0" class="divide-y divide-gray-200 dark:divide-gray-700">
                         <div v-for="c in contratos.data" :key="c.id" class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors duration-150 ease-in-out">
                             <div class="flex flex-col md:flex-row items-start md:items-center gap-4">
-                                <!-- CORRECCIÓN: Comentarios en sintaxis HTML -->
                                 <div class="flex-1 min-w-0"> <!-- Añadido min-w-0 para correcto truncado -->
                                     <div class="flex items-center gap-3 flex-wrap"> <!-- Añadido flex-wrap -->
                                         <Link :href="route('honorarios.contratos.show', c.id)" class="text-indigo-600 dark:text-indigo-400 font-bold hover:underline truncate" :title="c.persona_nombre">
@@ -172,13 +171,16 @@ const calcularProgreso = (contrato) => {
                                         <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold flex-shrink-0" :class="estadoClass(c.estado)">
                                             {{ c.estado.replace('_', ' ') }}
                                         </span>
+                                        <!-- NUEVO: Badge de Frecuencia -->
+                                        <span v-if="c.modalidad !== 'LITIS' && c.frecuencia_pago" class="px-2 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-xs text-gray-600 dark:text-gray-400 font-medium bg-gray-50 dark:bg-gray-800">
+                                            {{ c.frecuencia_pago.toLowerCase() }}
+                                        </span>
                                     </div>
                                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2 flex-wrap"> <!-- Añadido flex-wrap -->
                                         <span>Contrato #{{ c.id }}</span>
                                         <span class="text-gray-300 dark:text-gray-600">|</span>
                                         <span>Creado el {{ fmtDateShort(c.created_at) }}</span>
                                         
-                                        <!-- ===== INICIO: MOSTRAR CASO ID ===== -->
                                         <template v-if="c.caso_id">
                                             <span class="text-gray-300 dark:text-gray-600">|</span>
                                             <Link :href="route('casos.show', c.caso_id)" class="text-green-600 dark:text-green-400 hover:underline flex items-center gap-1 text-xs" title="Ver caso asociado">
@@ -186,9 +188,7 @@ const calcularProgreso = (contrato) => {
                                                 Caso #{{ c.caso_id }}
                                             </Link>
                                         </template>
-                                        <!-- ===== FIN: MOSTRAR CASO ID ===== -->
                                         
-                                        <!-- ===== MODIFICACIÓN AQUÍ ===== -->
                                         <template v-if="c.proceso">
                                             <span class="text-gray-300 dark:text-gray-600">|</span>
                                             <Link :href="route('procesos.show', c.proceso.id)" class="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 text-xs" title="Ver radicado asociado">
@@ -196,7 +196,6 @@ const calcularProgreso = (contrato) => {
                                                 Radicado #{{ c.proceso.numero }}
                                             </Link>
                                         </template>
-                                        <!-- ============================= -->
                                     </p>
                                 </div>
                                 <div class="w-full md:w-auto md:min-w-[200px] flex-shrink-0"> <!-- Ajustes de ancho -->

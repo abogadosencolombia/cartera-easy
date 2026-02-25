@@ -1,11 +1,9 @@
 <script setup>
 /**
  * AuthenticatedLayout.vue
- * Layout principal para toda el área autenticada del sistema.
- * Estructura consistente con navegación, cabecera, contenido y chat global.
+ * Layout principal corregido para mostrar notificaciones.
  */
 
-// 1. IMPORTACIONES ------------------------------------------------------------
 import { ref, computed, onMounted } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { initPush } from '@/push';
@@ -25,37 +23,53 @@ import {
     BanknotesIcon,
     ClipboardDocumentCheckIcon,
     ShieldCheckIcon, 
-    ExclamationTriangleIcon, 
+    ExclamationTriangleIcon,
+    BuildingOffice2Icon,
 } from '@heroicons/vue/24/outline';
 
 
 // 2. DEFINICIÓN DEL MENÚ ------------------------------------------------------
 const NAV_ITEMS = [
     { type: 'link', label: 'Dashboard', href: route('dashboard'), active: 'dashboard', icon: ChartBarIcon, roles: ['admin', 'gestor', 'abogado'] },
-    { type: 'link', label: 'Casos', href: route('casos.index'), active: 'casos.*', icon: FolderIcon, roles: ['admin', 'gestor', 'abogado'] },
-    { type: 'link', label: 'Abogados en Colombia', href: route('procesos.index'), active: 'procesos.*', roles: ['admin', 'gestor', 'abogado'] },
+    
+    // --- GRUPO: CASOS (Unificado) ---
+    {
+        type: 'dropdown', label: 'Casos', icon: FolderIcon,
+        active: ['casos.*', 'procesos.*'],
+        roles: ['admin', 'gestor', 'abogado'],
+        items: [
+            { label: 'Casos Cooperativas', href: route('casos.index'), active: 'casos.*', roles: ['admin', 'gestor', 'abogado'] },
+            { label: 'Casos Abogados en Colombia', href: route('procesos.index'), active: 'procesos.*', roles: ['admin', 'gestor', 'abogado'] },
+        ],
+    },
+
+    // --- GRUPO: ENTIDADES (Sin Abogados/Gestores) ---
     {
         type: 'dropdown', label: 'Entidades', icon: UsersIcon,
-        active: ['cooperativas.*', 'personas.*', 'admin.users.*', 'admin.gestores.*', 'procesos.*'],
+        active: ['cooperativas.*', 'personas.*', 'admin.users.*', 'juzgados.*'],
         roles: ['admin', 'gestor', 'abogado'],
         items: [
             { label: 'Cooperativas', href: route('cooperativas.index'), active: 'cooperativas.*', roles: ['admin', 'gestor', 'abogado'] },
             { label: 'Personas', href: route('personas.index'), active: 'personas.*', roles: ['admin', 'gestor', 'abogado'] },
+            { label: 'Directorio de Juzgados', href: route('juzgados.index'), active: 'juzgados.*', roles: ['admin'] },
             { type: 'divider', roles: ['admin'] },
             { label: 'Usuarios del Sistema', href: route('admin.users.index'), active: 'admin.users.*', roles: ['admin'] },
+        ],
+    },
+
+    // --- GRUPO: GESTIÓN (Con Abogados/Gestores y Contratos renombrado) ---
+    {
+        type: 'dropdown', label: 'Gestión', icon: ScaleIcon,
+        active: ['gestion.honorarios.*', 'honorarios.contratos.*', 'admin.gestores.*'],
+        roles: ['admin', 'gestor', 'abogado'],
+        items: [
+            { label: 'Contratos', href: route('gestion.honorarios.index'), active: 'gestion.honorarios.*', roles: ['admin', 'gestor', 'abogado'] },
+            { type: 'divider', roles: ['admin'] },
             { label: 'Abogados/Gestores', href: route('admin.gestores.index'), active: 'admin.gestores.*', roles: ['admin'] },
         ],
     },
 
-    {
-        type: 'dropdown', label: 'Gestión', icon: ScaleIcon,
-        active: ['gestion.honorarios.*', 'honorarios.contratos.*'],
-        roles: ['admin', 'gestor', 'abogado'],
-        items: [
-            { label: 'Honorarios', href: route('gestion.honorarios.index'), active: 'gestion.honorarios.*', roles: ['admin', 'gestor', 'abogado'] },
-        ],
-    },
-
+    // --- GRUPO: CONFIGURACIÓN (Solo Admin) ---
     {
         type: 'dropdown', label: 'Configuración', icon: Cog6ToothIcon,
         active: [
@@ -70,7 +84,7 @@ const NAV_ITEMS = [
         items: [
             // --- FLUJO DE TRABAJO DIARIO ---
             { label: 'Gestión de Tareas', href: route('admin.tareas.index'), active: 'admin.tareas.*', icon: ListBulletIcon, roles: ['admin'] },
-            { type: 'link', label: 'Revisión Diaria', href: route('revision.index'), active: 'revision.*', icon: ClipboardDocumentCheckIcon, roles: ['admin', 'gestor', 'abogado'] },     
+            { type: 'link', label: 'Revisión Diaria', href: route('revision.index'), active: 'revision.*', icon: ClipboardDocumentCheckIcon, roles: ['admin', 'gestor', 'abogado'] },    
             
             { type: 'divider', roles: ['admin'] },
             
@@ -88,6 +102,7 @@ const NAV_ITEMS = [
         ],
     },
 
+    // --- GRUPO: HERRAMIENTAS ---
     {
         type: 'dropdown', label: 'Herramientas', icon: GlobeAltIcon,
         active: [],
@@ -97,6 +112,7 @@ const NAV_ITEMS = [
             { type: 'external', label: 'Procesos rama judicial', href: 'https://procesos.ramajudicial.gov.co/procesoscs/ConsultaJusticias21.aspx?EntryId=1ND%2fT1QaEBFgDjwxVoCZ45pYS4g%3d', roles: ['admin', 'gestor', 'abogado'] },
             { type: 'external', label: 'MonoLegal', href: 'https://nuevoexpedientedigital.monolegal.co/#/admin/default', roles: ['admin', 'gestor', 'abogado'] },
             { type: 'external', label: 'Publicaciones Procesales', href: 'https://publicacionesprocesales.ramajudicial.gov.co/', roles: ['admin', 'gestor', 'abogado'] },
+            { type: 'external', label: 'Tyba', href: 'https://procesojudicial.ramajudicial.gov.co/Justicia21/Administracion/Ciudadanos/frmConsulta', roles: ['admin', 'gestor', 'abogado'] },
             { type: 'external', label: 'Asistente ChatGPT', href: 'https://chatgpt.com/g/g-68360119b4d48191898d44cb97865146-abogado-civil-director-juridico-experto?model=gpt-5-pro', roles: ['admin', 'gestor', 'abogado'] },
             { type: 'external', label: 'Asistente Gemini', href: 'https://gemini.google.com/', roles: ['admin', 'gestor', 'abogado'] },
             { type: 'external', label: 'Asistente Claude', href: 'https://claude.ai/', recommendation: 'Se recomienda la app de escritorio', roles: ['admin', 'gestor', 'abogado'] },
@@ -110,20 +126,60 @@ const page = usePage();
 const showingNavigationDropdown = ref(false);
 const currentUser = computed(() => page.props.auth?.user ?? { name: 'Usuario', email: '' });
 const userRole = computed(() => page.props.auth?.user?.tipo_usuario ?? page.props.auth?.user?.role ?? 'guest');
+
+// LÓGICA CORREGIDA: Acceso seguro a las props de Inertia para el contador
 const unreadCount = computed(() => Number(page.props.auth?.unreadNotifications ?? 0));
 
 
 // 4. LÓGICA COMPUTADA ---------------------------------------------------------
-// Filtra los menús basándose en el rol del usuario
-const visibleMenu = computed(() =>
-    NAV_ITEMS
-        .filter((item) => item.roles.includes(userRole.value))
-        .map((item) =>
-            item.type === 'dropdown'
-                ? { ...item, items: item.items.filter((sub) => sub.roles.includes(userRole.value)) }
-                : item
-        )
-);
+const visibleMenu = computed(() => {
+    const role = userRole.value;
+    // Aseguramos que el ID sea un número para la comparación estricta
+    const userId = Number(page.props.auth?.user?.id || 0);
+    const isUser28 = (userId === 28);
+
+    return NAV_ITEMS.map((item) => {
+        // Clonamos superficialmente para no mutar el array original
+        const newItem = { ...item };
+
+        // --- 1. Verificación del Padre (Grupo) ---
+        const hasRole = newItem.roles.includes(role);
+        
+        // Verificar si este grupo contiene la sección de juzgados
+        const containsJuzgados = Array.isArray(newItem.active) 
+            ? newItem.active.includes('juzgados.*') 
+            : newItem.active === 'juzgados.*';
+
+        // Permitir acceso si tiene el rol O si es el usuario 28 y el grupo contiene juzgados
+        if (!hasRole && !(isUser28 && containsJuzgados)) {
+            return null;
+        }
+
+        // --- 2. Verificación de Hijos (Dropdown) ---
+        if (newItem.type === 'dropdown' && Array.isArray(newItem.items)) {
+            newItem.items = newItem.items.filter((sub) => {
+                // Regla A: El usuario tiene el rol requerido para este sub-item
+                const subHasRole = sub.roles ? sub.roles.includes(role) : true;
+                
+                // Regla B: Es el usuario 28 y es el item de juzgados
+                const isJuzgadoItem = sub.active === 'juzgados.*';
+                
+                if (isUser28 && isJuzgadoItem) {
+                    return true;
+                }
+
+                return subHasRole;
+            });
+
+            // Si se quedó sin items hijos visibles, ocultamos el grupo completo
+            if (newItem.items.length === 0) {
+                return null;
+            }
+        }
+
+        return newItem;
+    }).filter(Boolean); // Eliminar los nulos del array final
+});
 
 
 // 5. HELPERS ------------------------------------------------------------------

@@ -6,17 +6,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
-
-// ===== INICIO DE LA MODIFICACIÓN (PASO 1) =====
-// Esta es la línea que faltaba para que el auto-borrado
-// de notificaciones funcione correctamente.
 use Illuminate\Notifications\DatabaseNotification;
-// ===== FIN DE LA MODIFICACIÓN =====
 
 class Tarea extends Model
 {
     use HasFactory;
 
+    // EL PORTERO: Aquí agregamos 'fecha_limite' y 'aviso_vencimiento_enviado'
     protected $fillable = [
         'titulo',
         'descripcion',
@@ -26,31 +22,54 @@ class Tarea extends Model
         'tarea_id',
         'estado',
         'fecha_completado',
+        'fecha_limite',             // <--- ¡IMPORTANTE! Sin esto, no se guarda.
+        'aviso_vencimiento_enviado' // <--- ¡IMPORTANTE!
     ];
 
     protected $casts = [
         'fecha_completado' => 'datetime',
+        'fecha_limite' => 'datetime', // Para que Carbon maneje las fechas
+        'aviso_vencimiento_enviado' => 'boolean',
     ];
 
+    protected $appends = ['semaforo'];
+
     /**
-     * Obtiene el elemento al que esta vinculada la tarea (Proceso, Caso, Contrato).
+     * Semáforo lógico para el Frontend
      */
+    public function getSemaforoAttribute()
+    {
+        if ($this->estado === 'completada') {
+            return 'completado'; // Azul
+        }
+
+        if (!$this->fecha_limite) {
+            return 'sin_fecha'; // Gris
+        }
+
+        $ahora = now();
+
+        if ($ahora->greaterThan($this->fecha_limite)) {
+            return 'vencida'; // Rojo
+        }
+
+        if ($ahora->diffInHours($this->fecha_limite) < 24) {
+            return 'urgente'; // Amarillo
+        }
+
+        return 'tiempo'; // Verde
+    }
+
     public function tarea(): MorphTo
     {
         return $this->morphTo();
     }
 
-    /**
-     * Obtiene el usuario al que se le asignó la tarea.
-     */
     public function asignadoA(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
     }
 
-    /**
-     * Obtiene el administrador que creó la tarea.
-     */
     public function creadaPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'admin_id');
@@ -58,14 +77,7 @@ class Tarea extends Model
 
     protected static function booted(): void
     {
-        /**
-         * Escucha el evento 'deleting' (cuando se llama a $tarea->delete()).
-         * Esto buscará y eliminará las notificaciones huérfanas
-         * asociadas a esta tarea para que no aparezcan en la UI.
-         */
         static::deleting(function (Tarea $tarea) {
-            // Buscamos en la tabla 'notifications'
-            // Esta línea ahora funcionará gracias a la importación
             DatabaseNotification::where('type', 'App\Notifications\NuevaTareaAsignada')
                 ->where('data', 'like', '%"tarea_id":'.$tarea->id.'%')
                 ->delete();

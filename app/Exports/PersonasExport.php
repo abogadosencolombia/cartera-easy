@@ -17,7 +17,7 @@ class PersonasExport implements FromQuery, WithHeadings, WithMapping, ShouldAuto
     protected $filters;
 
     // Recibimos los filtros desde el controlador
-    public function __construct(array $filters)
+    public function __construct(array $filters = [])
     {
         $this->filters = $filters;
     }
