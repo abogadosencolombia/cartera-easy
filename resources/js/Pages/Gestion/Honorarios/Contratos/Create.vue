@@ -538,6 +538,7 @@ onMounted(() => {
                             </table>
                         </div>
 
+                        
                         <!-- BARRA DE VALIDACIÓN (A PRUEBA DE TONTOS) -->
                         <div class="p-4 border-t dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4"
                              :class="{
