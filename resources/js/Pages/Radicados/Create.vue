@@ -116,19 +116,39 @@ const submit = () => {
     
     // Enviar objetos completos de demandantes/demandados
     demandantes: data.demandantes.map(d => {
-        if (d.is_new) return d;
+        if (d.is_new) {
+            return {
+                is_new: true,
+                nombre_completo: d.nombre_completo,
+                tipo_documento: d.tipo_documento,
+                numero_documento: d.numero_documento
+            };
+        }
         return { id: d.selected?.id };
     }).filter(d => d.id || d.is_new),
     
     demandados: data.demandados.map(d => {
-        if (d.is_new) return d;
+        if (d.is_new) {
+            return {
+                is_new: true,
+                nombre_completo: d.nombre_completo,
+                tipo_documento: d.tipo_documento,
+                numero_documento: d.numero_documento,
+                sin_info: d.sin_info
+            };
+        }
         return { id: d.selected?.id };
     }).filter(d => d.id || d.is_new),
   })).post(route('procesos.store'), {
     preserveScroll: true,
+    onSuccess: () => {
+        console.log('Guardado exitoso');
+    },
     onError: (errors) => {
+      console.error('Errores recibidos:', errors);
       const errorKeys = Object.keys(errors);
       if (errorKeys.length > 0) {
+        // Si hay errores, saltar al paso donde está el error
         for (const s of steps) {
           if (s.fields.some(field => errorKeys.includes(field) || errorKeys.some(k => k.startsWith(field)))) {
             goToStep(s.id);

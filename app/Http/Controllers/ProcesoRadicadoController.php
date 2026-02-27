@@ -468,7 +468,6 @@ class ProcesoRadicadoController extends Controller
 
         foreach ($partes as $parte) {
             // Caso 1: Persona existente enviada como objeto con ID { id: ... }
-            // O simplemente el ID si viene de un select tradicional
             $id = is_array($parte) ? ($parte['id'] ?? null) : $parte;
 
             if ($id && !isset($parte['is_new'])) {
@@ -483,25 +482,32 @@ class ProcesoRadicadoController extends Controller
 
                 if ($sinInfo) {
                     $infoIncompleta = true;
-                    if (empty($nombre)) $nombre = "SIN INFORMACIÓN";
+                    if (empty($nombre)) $nombre = "DEMANDADO POR IDENTIFICAR";
                 }
 
-                // Buscamos por documento para no duplicar si ya existe
-                $numeroDoc = $parte['numero_documento'] ?? ($sinInfo ? 'S/N-' . uniqid() : 'S/N-' . uniqid());
+                // Generamos un identificador único temporal si no hay documento
+                // para evitar colisiones en la DB si el campo es UNIQUE.
+                $numeroDoc = $parte['numero_documento'] ?? null;
+                if (empty($numeroDoc)) {
+                    $numeroDoc = 'TEMP-' . strtoupper(substr(uniqid(), -6));
+                }
                 
+                $tipoDoc = $parte['tipo_documento'] ?? 'CC';
+
+                // Intentamos buscar por documento para no duplicar si es posible
                 $persona = Persona::where('numero_documento', $numeroDoc)
-                    ->where('tipo_documento', $parte['tipo_documento'] ?? 'CC')
+                    ->where('tipo_documento', $tipoDoc)
                     ->first();
 
                 if (!$persona) {
                     $persona = Persona::create([
-                        'nombre_completo' => $nombre,
-                        'tipo_documento'  => $parte['tipo_documento'] ?? 'CC',
+                        'nombre_completo' => $nombre ?: 'SIN NOMBRE',
+                        'tipo_documento'  => $tipoDoc,
                         'numero_documento'=> $numeroDoc,
                         'es_demandado'    => ($tipo === 'DEMANDADO'),
                     ]);
                 } else {
-                    // Si ya existe y es demandado en este flujo, actualizamos el flag si es necesario
+                    // Actualizamos flag si es necesario
                     if ($tipo === 'DEMANDADO' && !$persona->es_demandado) {
                         $persona->update(['es_demandado' => true]);
                     }
