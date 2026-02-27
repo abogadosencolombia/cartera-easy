@@ -260,9 +260,9 @@ const getVencimientoInfo = (proceso) => {
                                                 <Link :href="route('procesos.show', proceso.id)" class="text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
                                                     {{ proceso.radicado || 'Sin Radicado' }}
                                                 </Link>
-                                                <!-- Indicador de Info Incompleta REFORZADO -->
+                                                <!-- Indicador de Info Incompleta ESTÁTICO -->
                                                 <span v-if="proceso.info_incompleta" 
-                                                      class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-red-600 text-white animate-pulse shadow-sm"
+                                                      class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black bg-red-100 text-red-700 border border-red-200 shadow-sm"
                                                       title="Este proceso tiene demandados sin identificar">
                                                     FALTA INFO
                                                 </span>
@@ -386,7 +386,9 @@ const getVencimientoInfo = (proceso) => {
                             <div>
                                 <div class="flex items-center gap-2">
                                     <h3 class="font-bold text-indigo-600 dark:text-indigo-400 text-lg">{{ proceso.radicado }}</h3>
-                                    <ExclamationTriangleIcon v-if="proceso.info_incompleta" class="h-4 w-4 text-amber-500" />
+                                    <span v-if="proceso.info_incompleta" class="px-1.5 py-0.5 rounded text-[9px] font-black bg-red-100 text-red-700 border border-red-200 uppercase">
+                                        Falta Info
+                                    </span>
                                 </div>
                                 <p class="text-xs text-gray-500">{{ proceso.tipo_proceso?.nombre }}</p>
                             </div>
