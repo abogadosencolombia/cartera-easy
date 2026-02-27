@@ -167,6 +167,22 @@ class NotificacionController extends Controller
         return back(303)->with('error', 'No se pudo eliminar la notificación.');
     }
 
+    /**
+     * ELIMINAR TODAS LAS NOTIFICACIONES DEL USUARIO
+     */
+    public function clearAll()
+    {
+        $user = Auth::user();
+
+        // 1. Borrar notificaciones de la tabla personalizada (NotificacionCaso)
+        NotificacionCaso::where('user_id', $user->id)->delete();
+
+        // 2. Borrar notificaciones del sistema de Laravel
+        $user->notifications()->delete();
+
+        return back(303)->with('success', 'Todas tus notificaciones han sido eliminadas.');
+    }
+
     public function storeManual(Request $request, Caso $caso): RedirectResponse
     {
          $validated = $request->validate([

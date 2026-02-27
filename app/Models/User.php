@@ -159,6 +159,34 @@ class User extends Authenticatable
     
     // ===== MÓDULO DE TAREAS =====
 
+    public function isAdmin(): bool
+    {
+        return $this->tipo_usuario === 'admin';
+    }
+
+    public function isGestor(): bool
+    {
+        return $this->tipo_usuario === 'gestor';
+    }
+
+    public function isAbogado(): bool
+    {
+        return $this->tipo_usuario === 'abogado';
+    }
+
+    public function isCliente(): bool
+    {
+        return $this->tipo_usuario === 'cliente';
+    }
+
+    public function hasRole(string|array $roles): bool
+    {
+        if (is_array($roles)) {
+            return in_array($this->tipo_usuario, $roles);
+        }
+        return $this->tipo_usuario === $roles;
+    }
+
     public function tareasAsignadas(): HasMany
     {
         return $this->hasMany(Tarea::class, 'user_id');

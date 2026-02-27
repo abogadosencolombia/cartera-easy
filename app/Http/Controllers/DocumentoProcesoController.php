@@ -47,6 +47,8 @@ class DocumentoProcesoController extends Controller
 
     public function view(DocumentoProceso $documento)
     {
+        $this->authorize('view', $documento->proceso);
+
         if (!$documento->file_path || !Storage::disk('public')->exists($documento->file_path)) {
             abort(404);
         }
@@ -60,6 +62,8 @@ class DocumentoProcesoController extends Controller
 
     public function download(DocumentoProceso $documento)
     {
+        $this->authorize('view', $documento->proceso);
+
         if (!$documento->file_path || !Storage::disk('public')->exists($documento->file_path)) {
             abort(404);
         }
@@ -68,6 +72,8 @@ class DocumentoProcesoController extends Controller
 
     public function destroy(ProcesoRadicado $proceso, DocumentoProceso $documento)
     {
+        $this->authorize('update', $proceso);
+
         if ((int) $documento->proceso_radicado_id !== (int) $proceso->id) {
             abort(Response::HTTP_FORBIDDEN);
         }

@@ -3,13 +3,16 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
 import Pagination from '@/Components/Pagination.vue';
+import Modal from '@/Components/Modal.vue';
+import DangerButton from '@/Components/DangerButton.vue';
+import SecondaryButton from '@/Components/SecondaryButton.vue';
 
 // --- IMPORTACIÓN DE ICONOS ---
 import {
     BellAlertIcon, InboxIcon, EyeIcon, CheckCircleIcon, CheckBadgeIcon,
     ClockIcon, InformationCircleIcon, BriefcaseIcon,
     DocumentTextIcon, ExclamationTriangleIcon, BanknotesIcon, ScaleIcon,
-    ChevronRightIcon, FunnelIcon, XMarkIcon, SparklesIcon, TrashIcon // <--- NUEVO
+    ChevronRightIcon, FunnelIcon, XMarkIcon, SparklesIcon, TrashIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -19,6 +22,11 @@ const props = defineProps({
 });
 
 const user = usePage().props.auth.user;
+
+// --- Estado de Modales ---
+const confirmingAllDeletion = ref(false);
+const confirmingSingleDeletion = ref(false);
+const notifToDelete = ref(null);
 
 // --- Lógica de Acciones ---
 const marcarComoLeida = (notificacionId) => {
@@ -37,12 +45,33 @@ const marcarComoAtendida = (notificacionId) => {
 
 // --- NUEVA FUNCIÓN: ELIMINAR ---
 const eliminarNotificacion = (notificacionId) => {
-    if (confirm('¿Estás seguro de que deseas eliminar esta notificación de forma permanente?')) {
-        router.delete(route('notificaciones.destroy', notificacionId), {
-            preserveScroll: true,
-            only: ['notificaciones'],
-        });
-    }
+    notifToDelete.value = notificacionId;
+    confirmingSingleDeletion.value = true;
+};
+
+const confirmSingleDelete = () => {
+    if (!notifToDelete.value) return;
+    router.delete(route('notificaciones.destroy', notifToDelete.value), {
+        preserveScroll: true,
+        only: ['notificaciones'],
+        onSuccess: () => {
+            confirmingSingleDeletion.value = false;
+            notifToDelete.value = null;
+        }
+    });
+};
+
+const limpiarTodas = () => {
+    confirmingAllDeletion.value = true;
+};
+
+const confirmClearAll = () => {
+    router.delete(route('notificaciones.clearAll'), {
+        preserveScroll: true,
+        onSuccess: () => {
+            confirmingAllDeletion.value = false;
+        }
+    });
 };
 
 // --- Lógica de Filtros ---
@@ -65,17 +94,12 @@ watch(localFiltros, (newFilters) => {
 
 // --- CONFIGURACIÓN VISUAL (ICONOS Y COLORES) ---
 const estilosVisuales = {
-    // JURÍDICO
     'revision_proxima': { icon: ScaleIcon, color: 'text-indigo-600', bgIcon: 'bg-indigo-100', border: 'border-indigo-500', shadow: 'shadow-indigo-100', label: 'Gestión Legal' },
     'revision_hoy':     { icon: ScaleIcon, color: 'text-amber-600', bgIcon: 'bg-amber-100', border: 'border-amber-500', shadow: 'shadow-amber-100', label: 'Revisión Prioritaria' },
     'revision_vencida': { icon: ExclamationTriangleIcon, color: 'text-rose-600', bgIcon: 'bg-rose-100', border: 'border-rose-500', shadow: 'shadow-rose-100', label: 'Alerta Crítica' },
-
-    // FINANCIERO
     'pago_proximo':     { icon: BanknotesIcon, color: 'text-emerald-600', bgIcon: 'bg-emerald-100', border: 'border-emerald-500', shadow: 'shadow-emerald-100', label: 'Cobro' },
     'pago_hoy':         { icon: BanknotesIcon, color: 'text-teal-600', bgIcon: 'bg-teal-100', border: 'border-teal-500', shadow: 'shadow-teal-100', label: 'Pago Hoy' },
     'pago_vencido':     { icon: BanknotesIcon, color: 'text-red-600', bgIcon: 'bg-red-100', border: 'border-red-500', shadow: 'shadow-red-100', label: 'Mora' },
-
-    // SISTEMA / OTROS
     'vencimiento':      { icon: ClockIcon, color: 'text-rose-600', bgIcon: 'bg-rose-100', border: 'border-rose-500', shadow: 'shadow-rose-100', label: 'Vence' },
     'mora':             { icon: BanknotesIcon, color: 'text-red-600', bgIcon: 'bg-red-100', border: 'border-red-500', shadow: 'shadow-red-100', label: 'En Mora' },
     'alerta_manual':    { icon: BellAlertIcon, color: 'text-violet-600', bgIcon: 'bg-violet-100', border: 'border-violet-500', shadow: 'shadow-violet-100', label: 'Manual' },
@@ -128,9 +152,6 @@ const groupedNotifications = computed(() => {
 const esNotificacionDeSistema = (notificacion) => {
     return notificacion.type && notificacion.type.startsWith('App\\Notifications');
 };
-const esAlertaVencida = (notificacion) => {
-    return notificacion.type === 'App\\Notifications\\TareaVencidaAdmin';
-};
 </script>
 
 <template>
@@ -147,8 +168,17 @@ const esAlertaVencida = (notificacion) => {
                         <SparklesIcon class="h-5 w-5 text-amber-400" />
                     </div>
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        Tienes <strong class="text-indigo-600 dark:text-indigo-400">{{ notificaciones.total }}</strong> actualizaciones importantes hoy.
+                        Gestiona tus avisos y alertas pendientes.
                     </p>
+                </div>
+                <div class="flex-shrink-0">
+                    <button 
+                        @click="limpiarTodas"
+                        class="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold shadow-lg transition-all"
+                    >
+                        <TrashIcon class="w-4 h-4" />
+                        Borrar todo
+                    </button>
                 </div>
             </div>
         </template>
@@ -193,7 +223,7 @@ const esAlertaVencida = (notificacion) => {
                     <button v-if="localFiltros.leido || localFiltros.tipo" 
                         @click="localFiltros = { leido: '', tipo: '' }"
                         class="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-red-500 flex items-center gap-1 transition-colors">
-                        <XMarkIcon class="w-3 h-3" /> Limpiar
+                        <XMarkIcon class="w-3 h-3" /> Limpiar filtros
                     </button>
                 </div>
 
@@ -244,7 +274,6 @@ const esAlertaVencida = (notificacion) => {
                                                 </p>
                                                 <div class="mt-3 flex gap-4 opacity-60 group-hover:opacity-100 transition-opacity">
                                                     <button v-if="!notif.read_at" @click="marcarComoLeida(notif.id)" class="text-xs font-semibold text-indigo-600 hover:underline">Marcar leída</button>
-                                                    <!-- Botón Eliminar para Sistema -->
                                                     <button @click="eliminarNotificacion(notif.id)" class="text-xs font-semibold text-red-500 hover:underline flex items-center gap-1">
                                                         <TrashIcon class="w-3 h-3" /> Eliminar
                                                     </button>
@@ -290,7 +319,6 @@ const esAlertaVencida = (notificacion) => {
                                                     {{ notif.mensaje }}
                                                 </p>
 
-                                                <!-- Actions Footer -->
                                                 <div class="flex items-center justify-between pt-3 border-t border-dashed border-gray-100 dark:border-gray-700 transition-opacity duration-300 sm:opacity-50 sm:group-hover:opacity-100">
                                                     
                                                     <Link v-if="notif.caso_id" :href="route('casos.show', notif.caso_id)" 
@@ -300,14 +328,12 @@ const esAlertaVencida = (notificacion) => {
                                                     <span v-else class="text-xs text-gray-300 italic">Notificación general</span>
 
                                                     <div class="flex items-center gap-2">
-                                                        <!-- Botón Eliminar -->
                                                         <button @click="eliminarNotificacion(notif.id)" 
                                                                 title="Eliminar notificación"
                                                                 class="h-8 w-8 flex items-center justify-center rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all">
                                                             <TrashIcon class="h-4 w-4" />
                                                         </button>
 
-                                                        <!-- Botón Leído -->
                                                         <button v-if="!notif.leido" 
                                                                 @click="marcarComoLeida(notif.id)" 
                                                                 title="Archivar"
@@ -315,7 +341,6 @@ const esAlertaVencida = (notificacion) => {
                                                             <EyeIcon class="h-4 w-4" />
                                                         </button>
 
-                                                        <!-- Botón Atender -->
                                                         <button v-if="!notif.atendida_en" 
                                                                 @click="marcarComoAtendida(notif.id)" 
                                                                 title="Marcar Resuelto"
@@ -338,7 +363,7 @@ const esAlertaVencida = (notificacion) => {
                     </div>
                 </div>
 
-                <!-- Empty State Ilustrado -->
+                <!-- Empty State -->
                 <div v-else class="flex flex-col items-center justify-center min-h-[50vh] text-center">
                     <div class="relative mb-8 group">
                         <div class="absolute inset-0 bg-gradient-to-r from-indigo-200 to-purple-200 rounded-full blur-2xl opacity-20 group-hover:opacity-30 transition-opacity duration-500"></div>
@@ -353,26 +378,49 @@ const esAlertaVencida = (notificacion) => {
                 </div>
 
                 <!-- Pagination -->
-                <div v-if="notificaciones.data && notificaciones.data.length > 0" class="flex justify-center mt-8">
-                    <div class="bg-white dark:bg-gray-800 p-2 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-                        <Pagination :links="notificaciones.links" />
-                    </div>
+                <div v-if="notificaciones.data && notificaciones.data.length > 0" class="flex justify-center mt-8 pb-10">
+                    <Pagination :links="notificaciones.links" />
                 </div>
             </div>
         </div>
+
+        <!-- MODAL CONFIRMAR BORRAR TODO -->
+        <Modal :show="confirmingAllDeletion" @close="confirmingAllDeletion = false">
+            <div class="p-6">
+                <div class="flex items-center gap-3 text-red-600 mb-4">
+                    <ExclamationTriangleIcon class="h-8 w-8" />
+                    <h2 class="text-lg font-bold">¿Eliminar todas las notificaciones?</h2>
+                </div>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    Esta acción eliminará permanentemente todos tus avisos y alertas. 
+                    <span class="font-bold">No se puede deshacer.</span>
+                </p>
+                <div class="mt-6 flex justify-end gap-3">
+                    <SecondaryButton @click="confirmingAllDeletion = false"> Cancelar </SecondaryButton>
+                    <DangerButton @click="confirmClearAll"> Sí, borrar todo </DangerButton>
+                </div>
+            </div>
+        </Modal>
+
+        <!-- MODAL CONFIRMAR BORRAR UNA -->
+        <Modal :show="confirmingSingleDeletion" @close="confirmingSingleDeletion = false">
+            <div class="p-6">
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Eliminar notificación</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    ¿Estás seguro de que deseas eliminar este aviso?
+                </p>
+                <div class="mt-6 flex justify-end gap-3">
+                    <SecondaryButton @click="confirmingSingleDeletion = false"> Cancelar </SecondaryButton>
+                    <DangerButton @click="confirmSingleDelete"> Eliminar </DangerButton>
+                </div>
+            </div>
+        </Modal>
+
     </AuthenticatedLayout>
 </template>
 
 <style scoped>
-/* Scrollbar fino para la pagina */
-::-webkit-scrollbar {
-    width: 8px;
-}
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-::-webkit-scrollbar-thumb {
-    background-color: #cbd5e1;
-    border-radius: 20px;
-}
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
 </style>

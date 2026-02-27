@@ -26,7 +26,9 @@ class UserController extends Controller
      */
     public function index(): Response
     {
-        $this->authorize('viewAny', User::class);
+        if (!Auth::user()->isAdmin()) {
+            abort(403);
+        }
         
         return Inertia::render('Users/Index', [
             'users' => User::with('cooperativas', 'especialidades')->get(),
@@ -52,7 +54,9 @@ class UserController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        $this->authorize('create', User::class);
+        if (!Auth::user()->isAdmin()) {
+            abort(403);
+        }
 
         $data = $request->validate([
             'name' => 'required|string|max:255',
@@ -129,7 +133,9 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user): RedirectResponse
     {
-        $this->authorize('update', $user);
+        if (!Auth::user()->isAdmin()) {
+            abort(403);
+        }
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -190,7 +196,9 @@ class UserController extends Controller
      */
     public function destroy(User $user): RedirectResponse
     {
-        $this->authorize('delete', $user);
+        if (!Auth::user()->isAdmin()) {
+            abort(403);
+        }
         $user->delete();
         return to_route('admin.users.index')->with('success', 'Usuario eliminado exitosamente.');
     }
@@ -200,7 +208,9 @@ class UserController extends Controller
      */
     public function toggleStatus(User $user): RedirectResponse
     {
-        $this->authorize('update', $user);
+        if (!Auth::user()->isAdmin()) {
+            abort(403);
+        }
 
         if ($user->id === auth()->id()) {
             return to_route('admin.users.index')->with('error', 'No puede suspender su propia cuenta.');

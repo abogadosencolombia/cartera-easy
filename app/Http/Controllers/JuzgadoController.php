@@ -70,6 +70,9 @@ class JuzgadoController extends Controller
 
     public function store(Request $request)
     {
+        if (!Auth::user()->isAdmin()) {
+            abort(403);
+        }
         $validated = $request->validate([
             'nombre' => 'required|string|max:255',
             'email' => 'nullable|email|max:255',
@@ -96,6 +99,9 @@ class JuzgadoController extends Controller
 
     public function update(Request $request, Juzgado $juzgado)
     {
+        if (!Auth::user()->isAdmin()) {
+            abort(403);
+        }
         $validated = $request->validate([
             'nombre' => 'required|string|max:255',
             'email' => 'nullable|email|max:255',
@@ -113,6 +119,9 @@ class JuzgadoController extends Controller
 
     public function destroy(Juzgado $juzgado)
     {
+        if (!Auth::user()->isAdmin()) {
+            abort(403);
+        }
         $juzgado->delete();
         return redirect()->back()->with('success', 'Juzgado eliminado correctamente.');
     }

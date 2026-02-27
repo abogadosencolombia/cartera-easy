@@ -67,17 +67,17 @@ const submitContactForm = () => {
 const featuresContent = {
     centralice: {
         title: 'Todo en un solo lugar',
-        description: 'Acceda a expedientes, documentos, clientes y contactos al instante. Convierta el desorden de archivos en un activo digital organizado y seguro.',
+        description: 'Vea sus documentos y clientes en segundos. Olvídese del desorden y guarde todo de forma segura.',
         icon: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z',
     },
     organice: {
-        title: 'Flexibilidad Total',
-        description: 'Nuestra plataforma se adapta a su especialidad. Gestione con precisión desde complejos cobros de cartera de cooperativas hasta delicados asuntos personales.',
+        title: 'Fácil de usar',
+        description: 'Nuestra plataforma le ayuda en cualquier tipo de caso. Funciona para cobrar deudas de cooperativas o para asuntos personales.',
         icon: 'M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5',
     },
     colabore: {
-        title: 'Colaboración Transparente',
-        description: 'Defina permisos claros. Administradores configuran, abogados ejecutan y gestores actualizan en tiempo real. Elimine los cuellos de botella.',
+        title: 'Trabajo en equipo',
+        description: 'Organice quién hace cada tarea. Los jefes mandan, los abogados trabajan y los gestores pasan reportes al instante. Sin retrasos.',
         icon: 'M18 18.72a9.094 9.094 0 00-3.071 1.99a9.094 9.094 0 00-3.071-1.99m-9.585 5.176l.345-.17a1.125 1.125 0 011.086 0l.345.17a1.125 1.125 0 001.086 0l.345-.17a1.125 1.125 0 011.086 0l.345.17a1.125 1.125 0 001.086 0l.345-.17a1.125 1.125 0 011.086 0l.345.17a1.125 1.125 0 001.086 0l.345-.17a1.125 1.125 0 011.086 0l.345.17a1.125 1.125 0 001.086 0l.345-.17a1.125 1.125 0 011.086 0l1.173 1.173c.121.12.27.218.428.304l.309.176A1.125 1.125 0 0021 21.178V6.983a1.125 1.125 0 00-.624-1.03l-1.173-1.173a1.125 1.125 0 00-.428-.304l-.309-.176A1.125 1.125 0 0017.25 4.102V3.75A1.125 1.125 0 0016.125 2.625H5.625A1.125 1.125 0 004.5 3.75v.352c0 .248.09.487.26.66l.309.176c.158.086.307.184.428.304l1.173 1.173A1.125 1.125 0 006.75 8.017v5.966c0 .248-.09.487-.26.66l-.309.176a1.125 1.125 0 00-.428.304l-1.173 1.173A1.125 1.125 0 003 17.653v3.524c0 .351.098.683.278.966l.345.17z',
     },
 };
@@ -195,11 +195,11 @@ onUnmounted(() => {
                 
                 <div class="relative z-10 container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center animate-fade-in-up">
                     <h1 class="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight [text-wrap:balance]">
-                        Transforme su Práctica Legal.
-                        <span class="text-[#D4AF37] block">Bienvenido a la Gestión Definitiva.</span>
+                        Mejore su Trabajo Legal.
+                        <span class="text-[#D4AF37] block">Todo lo que necesita en un solo lugar.</span>
                     </h1>
                     <p class="mt-6 max-w-2xl mx-auto text-lg md:text-xl text-blue-200 [text-wrap:balance]">
-                        La plataforma para centralizar casos, automatizar cartera y unificar la comunicación entre abogados, gestores y clientes.
+                        Organice sus casos, controle sus cobros y hable con su equipo de forma fácil y rápida.
                     </p>
                     <div class="mt-10 flex flex-col sm:flex-row justify-center items-center gap-4">
                         <Link
@@ -213,7 +213,7 @@ onUnmounted(() => {
                             href="#features"
                             class="w-full sm:w-auto px-8 py-3 text-lg font-semibold text-slate-900 dark:text-white bg-white dark:bg-slate-800 rounded-lg shadow-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-all duration-300"
                         >
-                            Vea la Solución
+                            Ver cómo funciona
                         </a>
                     </div>
                 </div>
@@ -228,10 +228,10 @@ onUnmounted(() => {
                     <!-- Cabecera de la sección -->
                     <div class="text-center mb-16 animate-section">
                         <h2 class="text-3xl md:text-4xl font-bold text-slate-800 dark:text-white [text-wrap:balance]">
-                            Más que un software. Es su nuevo flujo de trabajo.
+                            Más que un programa. Es su nueva forma de trabajar.
                         </h2>
                         <p class="mt-4 text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto [text-wrap:balance]">
-                            Diseñado para firmas, cooperativas y abogados que valoran la eficiencia y la claridad.
+                            Hecho para oficinas y abogados que quieren trabajar rápido y sin enredos.
                         </p>
                     </div>
                     
@@ -319,9 +319,9 @@ onUnmounted(() => {
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-16 items-center animate-section">
                         <!-- Columna de Información -->
                         <div>
-                            <h2 class="text-3xl md:text-4xl font-bold text-slate-800 dark:text-white [text-wrap:balance]">Vea la plataforma en acción.</h2>
+                            <h2 class="text-3xl md:text-4xl font-bold text-slate-800 dark:text-white [text-wrap:balance]">Vea cómo funciona.</h2>
                             <p class="mt-4 text-lg text-slate-600 dark:text-slate-400 max-w-lg">
-                                Solicite una demo personalizada y descubra por qué las firmas más eficientes nos eligen. Sin compromiso.
+                                Pida una muestra gratis y vea por qué somos la mejor opción para organizar su oficina. Sin compromisos.
                             </p>
                             <div class="mt-8 space-y-4 text-slate-700 dark:text-slate-300">
                                 <p class="flex items-center gap-3">
@@ -359,7 +359,7 @@ onUnmounted(() => {
                                 </div>
                                 <div>
                                     <button type="submit" class="w-full px-8 py-3 text-lg font-semibold text-white bg-gradient-to-r from-[#0052CC] to-blue-700 rounded-lg shadow-lg hover:shadow-xl hover:shadow-blue-500/50 transition-all duration-300 transform hover:-translate-y-0.5">
-                                        Solicitar Demo
+                                        Ver demostración
                                     </button>
                                 </div>
                             </form>

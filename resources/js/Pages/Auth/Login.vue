@@ -38,8 +38,8 @@ const submit = () => {
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 3a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m15-3V6a2.25 2.25 0 00-2.25-2.25H9.375a3 3 0 11-6 0H3.75A2.25 2.25 0 001.5 6v3m18-3h-2.25m-15 0H3.75" />
                     </svg>
                 </Link>
-                <h2 class="text-4xl font-bold mb-4 tracking-wider [text-wrap:balance]">Bienvenido de Nuevo a Cobro Cartera</h2>
-                <p class="text-blue-200 max-w-sm mx-auto [text-wrap:balance]">La plataforma que redefine la eficiencia en la gestión de carteras.</p>
+                <h2 class="text-4xl font-bold mb-4 tracking-wider [text-wrap:balance]">Hola de nuevo</h2>
+                <p class="text-blue-200 max-w-sm mx-auto [text-wrap:balance]">La forma más fácil de organizar sus casos y cobros.</p>
             </div>
             <div class="absolute bottom-6 text-center text-sm text-blue-300 z-10 animate-fade-in-up">
                 <p>Desarrollado por <a href="https://centipy.com" target="_blank" class="font-semibold underline hover:text-purple-500 transition-colors duration-300">Centipy.com</a></p>
@@ -50,8 +50,8 @@ const submit = () => {
         <div class="lg:col-span-7 flex items-center justify-center min-h-screen bg-white dark:bg-slate-900 p-6">
             <div class="w-full max-w-md animate-fade-in-up">
                 <div class="mb-10 text-center lg:text-left">
-                    <h1 class="text-3xl font-bold text-slate-800 dark:text-white">Acceso a la Plataforma</h1>
-                    <p class="text-slate-500 dark:text-slate-400 mt-2">Por favor, ingrese sus credenciales para continuar.</p>
+                    <h1 class="text-3xl font-bold text-slate-800 dark:text-white">Entrar a su cuenta</h1>
+                    <p class="text-slate-500 dark:text-slate-400 mt-2">Ingrese sus datos para continuar.</p>
                 </div>
 
                 <div v-if="status" class="mb-4 font-medium text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">

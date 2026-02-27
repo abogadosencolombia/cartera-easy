@@ -54,7 +54,7 @@ const deleteJuzgado = (id, nombre) => {
                 </div>
                 <div class="flex flex-wrap gap-3">
                     <!-- Botón Crear Manualmente -->
-                    <Link :href="route('juzgados.create')">
+                    <Link :href="route('juzgados.create')" v-if="$page.props.auth.user.tipo_usuario === 'admin'">
                         <PrimaryButton class="bg-indigo-600 hover:bg-indigo-700 flex items-center gap-2">
                             <PlusIcon class="h-4 w-4" />
                             Crear Nuevo
@@ -62,7 +62,7 @@ const deleteJuzgado = (id, nombre) => {
                     </Link>
                     
                     <!-- Botón Importar Excel -->
-                    <Link :href="route('juzgados.import.form')">
+                    <Link :href="route('juzgados.import.form')" v-if="$page.props.auth.user.tipo_usuario === 'admin'">
                         <PrimaryButton class="bg-green-600 hover:bg-green-700 flex items-center gap-2">
                             <ArrowUpTrayIcon class="h-4 w-4" />
                             Subir Excel
@@ -131,7 +131,7 @@ const deleteJuzgado = (id, nombre) => {
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 text-right">
-                                        <div class="flex justify-end gap-2">
+                                        <div class="flex justify-end gap-2" v-if="$page.props.auth.user.tipo_usuario === 'admin'">
                                             <Link :href="route('juzgados.edit', juzgado.id)" class="p-2 text-blue-600 hover:bg-blue-50 rounded-full dark:hover:bg-gray-700" title="Editar">
                                                 <PencilSquareIcon class="w-5 h-5" />
                                             </Link>

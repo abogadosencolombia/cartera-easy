@@ -252,10 +252,10 @@ class ProcesoRadicadoController extends Controller
 
     public function destroy(ProcesoRadicado $proceso)
     {
-        if (Auth::user()->tipo_usuario !== 'admin') {
+        if (!Auth::user()->can('delete', $proceso)) {
             AuditoriaEvento::create([
                 'user_id' => Auth::id(),
-                'evento' => 'INTENTO_ELIMINAR_RADICADO',
+                'evento' => 'INTENTO_ELIMINAR_RADICADO_NO_AUTORIZADO',
                 'descripcion_breve' => "Usuario no autorizado intentó eliminar radicado {$proceso->radicado}",
                 'criticidad' => 'alta',
                 'direccion_ip' => request()->ip(),
@@ -286,6 +286,9 @@ class ProcesoRadicadoController extends Controller
     
     public function handleImport(Request $request)
     {
+        if (!Auth::user()->isAdmin()) {
+            abort(403);
+        }
         $request->validate(['file' => ['required', 'file', 'mimes:xlsx,xls,csv']]);
         try {
             Excel::import(new ProcesosImport, $request->file('file'));
@@ -329,7 +332,15 @@ class ProcesoRadicadoController extends Controller
 
     public function reopen(ProcesoRadicado $proceso)
     {
-        if (Auth::user()->tipo_usuario !== 'admin') {
+        if (!Auth::user()->can('restore', $proceso)) {
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'INTENTO_REABRIR_RADICADO_NO_AUTORIZADO',
+                'descripcion_breve' => "Usuario no autorizado intentó reabrir radicado {$proceso->radicado}",
+                'criticidad' => 'alta',
+                'direccion_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
              return back()->with('error', 'Solo admins.');
         }
 

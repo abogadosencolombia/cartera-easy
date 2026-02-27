@@ -353,8 +353,8 @@ const getVencimientoInfo = (proceso) => {
                                                 </template>
                                                 <template #content>
                                                     <DropdownLink :href="route('procesos.edit', proceso.id)">Editar Información</DropdownLink>
-                                                    <button v-if="proceso.estado === 'ACTIVO'" @click="openCloseModal(proceso)" class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Cerrar Caso</button>
-                                                    <button v-if="proceso.estado === 'CERRADO'" @click="openReopenModal(proceso)" class="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-100">Reabrir Caso</button>
+                                                    <button v-if="proceso.estado === 'ACTIVO' && $page.props.auth.user.tipo_usuario === 'admin'" @click="openCloseModal(proceso)" class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Cerrar Caso</button>
+                                                    <button v-if="proceso.estado === 'CERRADO' && $page.props.auth.user.tipo_usuario === 'admin'" @click="openReopenModal(proceso)" class="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-100">Reabrir Caso</button>
                                                 </template>
                                             </Dropdown>
                                         </div>

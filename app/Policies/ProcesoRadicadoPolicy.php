@@ -62,12 +62,10 @@ class ProcesoRadicadoPolicy
 
     /**
      * Determina si el usuario puede eliminar un radicado.
-     * (Asumimos que gestores y abogados pueden, aunque esto es peligroso,
-     * ajústalo a tu lógica de negocio si es solo para admins)
      */
     public function delete(User $user, ProcesoRadicado $procesoRadicado): bool
     {
-        return in_array($user->tipo_usuario, ['gestor', 'abogado']);
+        return $user->isAdmin();
     }
 
     /**
@@ -75,7 +73,7 @@ class ProcesoRadicadoPolicy
      */
     public function restore(User $user, ProcesoRadicado $procesoRadicado): bool
     {
-        return in_array($user->tipo_usuario, ['gestor', 'abogado']);
+        return $user->isAdmin();
     }
 
     /**
@@ -83,6 +81,6 @@ class ProcesoRadicadoPolicy
      */
     public function forceDelete(User $user, ProcesoRadicado $procesoRadicado): bool
     {
-        return false; // Generalmente solo para admins, que ya están cubiertos por before()
+        return $user->isAdmin();
     }
 }

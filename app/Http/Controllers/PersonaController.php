@@ -138,7 +138,18 @@ class PersonaController extends Controller
 
     public function destroy(Persona $persona)
     {
-        // ... (Tu código destroy existente)
+        if (!Auth::user()->can('delete', $persona)) {
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'INTENTO_SUSPENDER_PERSONA_NO_AUTORIZADO',
+                'descripcion_breve' => "Intento no autorizado de suspender a {$persona->nombre_completo}",
+                'criticidad' => 'alta',
+                'direccion_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+            return redirect()->back()->with('error', 'No tienes permiso para realizar esta acción.');
+        }
+
         $nombre = $persona->nombre_completo;
         $persona->delete();
 
@@ -156,8 +167,20 @@ class PersonaController extends Controller
 
     public function restore($id)
     {
-        // ... (Tu código restore existente)
         $persona = Persona::withTrashed()->findOrFail($id);
+
+        if (!Auth::user()->can('restore', $persona)) {
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'INTENTO_REACTIVAR_PERSONA_NO_AUTORIZADO',
+                'descripcion_breve' => "Intento no autorizado de reactivar a {$persona->nombre_completo}",
+                'criticidad' => 'alta',
+                'direccion_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+            return redirect()->back()->with('error', 'No tienes permiso para realizar esta acción.');
+        }
+
         $persona->restore();
 
         AuditoriaEvento::create([

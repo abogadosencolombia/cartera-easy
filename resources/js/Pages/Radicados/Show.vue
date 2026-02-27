@@ -174,8 +174,8 @@ const eliminarActuacion = (actuacionId) => {
              <PrimaryButton class="!bg-teal-600 hover:!bg-teal-700">Ver Contrato</PrimaryButton>
           </Link>
 
-          <DangerButton @click="openCloseModal" v-if="!isClosed">Cerrar</DangerButton>
-          <PrimaryButton @click="openReopenModal" v-if="isClosed" class="!bg-blue-600 hover:!bg-blue-700">Reabrir</PrimaryButton>
+          <DangerButton @click="openCloseModal" v-if="!isClosed && $page.props.auth.user.tipo_usuario === 'admin'">Cerrar</DangerButton>
+          <PrimaryButton @click="openReopenModal" v-if="isClosed && $page.props.auth.user.tipo_usuario === 'admin'" class="!bg-blue-600 hover:!bg-blue-700">Reabrir</PrimaryButton>
 
           <DangerButton v-if="$page.props.auth.user.tipo_usuario === 'admin'" @click="askDelete" :disabled="isClosed">Eliminar</DangerButton>
           <Link :href="route('procesos.index')"><SecondaryButton>Volver</SecondaryButton></Link>

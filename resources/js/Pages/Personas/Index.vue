@@ -405,6 +405,7 @@ const restorePersona = (id) => {
                       <!-- Reactivar (Si está suspendido) -->
                       <template v-if="persona.deleted_at">
                         <button 
+                          v-if="$page.props.auth.user.tipo_usuario === 'admin'"
                           @click="restorePersona(persona.id)" 
                           class="p-1.5 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-md transition flex items-center" 
                           title="Reactivar">
@@ -418,7 +419,11 @@ const restorePersona = (id) => {
                           <PencilSquareIcon class="w-5 h-5" />
                         </Link>
 
-                        <button @click="deletePersona(persona.id)" class="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition" title="Suspender">
+                        <button 
+                          v-if="$page.props.auth.user.tipo_usuario === 'admin'"
+                          @click="deletePersona(persona.id)" 
+                          class="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition" 
+                          title="Suspender">
                           <TrashIcon class="w-5 h-5" />
                         </button>
                       </template>

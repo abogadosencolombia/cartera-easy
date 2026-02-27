@@ -137,6 +137,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // --- NOTIFICACIONES ---
     Route::get('/notificaciones', [NotificacionController::class, 'index'])->name('notificaciones.index');
+    Route::delete('/notificaciones/clear-all', [NotificacionController::class, 'clearAll'])->name('notificaciones.clearAll');
     Route::patch('/notificaciones/{notificacion}/leer', [NotificacionController::class, 'marcarComoLeida'])->name('notificaciones.leer');
     Route::patch('/notificaciones/{notificacion}/atender', [NotificacionController::class, 'marcarComoAtendida'])->name('notificaciones.atender');
     Route::delete('/notificaciones/{notificacion}', [NotificacionController::class, 'destroy'])->name('notificaciones.destroy');
@@ -214,11 +215,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // =================================================================
     // ===== RUTAS DE BÚSQUEDA ASÍNCRONA ===============================
     // =================================================================
-    Route::get('/search/users', [DirectorySearchController::class, 'usuariosAbogadosYGestores'])->name('users.search');
-    Route::get('/search/cooperativas', [DirectorySearchController::class, 'cooperativas'])->name('cooperativas.search');
-    Route::get('/search/personas', [DirectorySearchController::class, 'personas'])->name('personas.search');
-    Route::get('/juzgados/search', JuzgadoSearchController::class)->name('juzgados.search');
-    Route::get('/search/tipos-proceso', [DirectorySearchController::class, 'tiposProceso'])->name('tipos-proceso.search');
+    Route::middleware('role:admin,gestor,abogado')->group(function () {
+        Route::get('/search/users', [DirectorySearchController::class, 'usuariosAbogadosYGestores'])->name('users.search');
+        Route::get('/search/cooperativas', [DirectorySearchController::class, 'cooperativas'])->name('cooperativas.search');
+        Route::get('/search/personas', [DirectorySearchController::class, 'personas'])->name('personas.search');
+        Route::get('/juzgados/search', JuzgadoSearchController::class)->name('juzgados.search');
+        Route::get('/search/tipos-proceso', [DirectorySearchController::class, 'tiposProceso'])->name('tipos-proceso.search');
+    });
 
     // --- RUTAS PARA GESTORES Y ABOGADOS (Y ADMINS) ---
     Route::middleware('role:admin,gestor,abogado')->group(function() {
