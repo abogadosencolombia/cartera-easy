@@ -341,8 +341,11 @@ const restorePersona = (id) => {
                         </span>
                       </div>
                       <div class="ml-4">
-                        <div class="text-sm font-bold text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 transition-colors">
+                        <div class="text-sm font-bold text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 transition-colors flex items-center gap-2">
                           {{ persona.nombre_completo }}
+                          <span v-if="persona.es_demandado" class="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200 uppercase tracking-tighter">
+                            Demandado
+                          </span>
                         </div>
                         <div class="text-xs text-gray-500 flex items-center">
                           <span class="bg-gray-100 text-gray-600 px-1.5 rounded text-[10px] font-mono mr-1">ID: {{ persona.id }}</span>

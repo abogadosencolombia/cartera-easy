@@ -120,18 +120,16 @@ class ProcesoRadicadoController extends Controller
         
         $data['fecha_cambio_etapa'] = now();
 
-        $demandantesRaw = $data['demandantes'] ?? [];
-        $demandadosRaw = $data['demandados'] ?? [];
+        $demandantesRaw = $request->input('demandantes', []);
+        $demandadosRaw = $request->input('demandados', []);
         unset($data['demandantes'], $data['demandados']);
 
         $proceso = null;
 
         DB::transaction(function () use ($data, $demandantesRaw, $demandadosRaw, &$proceso) {
-            // Procesar demandantes y demandados
             $resDte = $this->procesarPartes($demandantesRaw, 'DEMANDANTE');
             $resDdo = $this->procesarPartes($demandadosRaw, 'DEMANDADO');
 
-            // El radicado está incompleto si algún demandado no tiene info
             $data['info_incompleta'] = $resDte['info_incompleta'] || $resDdo['info_incompleta'];
 
             $proceso = ProcesoRadicado::create($data);
@@ -193,8 +191,8 @@ class ProcesoRadicadoController extends Controller
     public function update(UpdateProcesoRadicadoRequest $request, ProcesoRadicado $proceso)
     {
         $data = $request->validated();
-        $demandantesRaw = $data['demandantes'] ?? [];
-        $demandadosRaw = $data['demandados'] ?? [];
+        $demandantesRaw = $request->input('demandantes', []);
+        $demandadosRaw = $request->input('demandados', []);
         unset($data['demandantes'], $data['demandados']);
 
         DB::transaction(function () use ($proceso, $data, $demandantesRaw, $demandadosRaw) {
@@ -202,7 +200,6 @@ class ProcesoRadicadoController extends Controller
                 $data['fecha_cambio_etapa'] = now();
             }
 
-            // Procesar demandantes y demandados
             $resDte = $this->procesarPartes($demandantesRaw, 'DEMANDANTE');
             $resDdo = $this->procesarPartes($demandadosRaw, 'DEMANDADO');
 
@@ -470,8 +467,13 @@ class ProcesoRadicadoController extends Controller
             // Caso 1: Persona existente enviada como objeto con ID { id: ... }
             $id = is_array($parte) ? ($parte['id'] ?? null) : $parte;
 
-            if ($id && !isset($parte['is_new'])) {
+                if ($id && (!isset($parte['is_new']) || !$parte['is_new'])) {
                 $ids[] = $id;
+                
+                // Si es demandado, forzamos la marca en la DB para el Index de personas
+                if ($tipo === 'DEMANDADO') {
+                    Persona::where('id', $id)->update(['es_demandado' => true]);
+                }
                 continue;
             }
 

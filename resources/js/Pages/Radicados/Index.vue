@@ -260,9 +260,11 @@ const getVencimientoInfo = (proceso) => {
                                                 <Link :href="route('procesos.show', proceso.id)" class="text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
                                                     {{ proceso.radicado || 'Sin Radicado' }}
                                                 </Link>
-                                                <!-- Indicador de Info Incompleta -->
-                                                <span v-if="proceso.info_incompleta" title="Expediente con información incompleta (Demandados sin identificar)">
-                                                    <ExclamationTriangleIcon class="h-4 w-4 text-amber-500 animate-pulse" />
+                                                <!-- Indicador de Info Incompleta REFORZADO -->
+                                                <span v-if="proceso.info_incompleta" 
+                                                      class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-red-600 text-white animate-pulse shadow-sm"
+                                                      title="Este proceso tiene demandados sin identificar">
+                                                    FALTA INFO
                                                 </span>
                                             </div>
                                             <span class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 max-w-xs" :title="proceso.asunto">

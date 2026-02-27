@@ -25,7 +25,7 @@ class ProcesoRadicado extends Model
         'fecha_revision','fecha_proxima_revision','ultima_actuacion','link_expediente',
         'ubicacion_drive','correos_juzgado','observaciones','created_by',
         'abogado_id','responsable_revision_id','juzgado_id','tipo_proceso_id',
-        'estado', 'nota_cierre',
+        'estado', 'nota_cierre', 'info_incompleta',
         'etapa_procesal_id', 
         'fecha_cambio_etapa'
     ];
@@ -35,6 +35,7 @@ class ProcesoRadicado extends Model
         'fecha_revision' => 'date',
         'fecha_proxima_revision' => 'date',
         'fecha_cambio_etapa' => 'datetime',
+        'info_incompleta' => 'boolean',
     ];
 
     // --- RELACIONES ---
