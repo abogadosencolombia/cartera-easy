@@ -24,9 +24,7 @@ class UpdateProcesoRadicadoRequest extends FormRequest
             
             // --- CAMBIO: ARRAYS MULTIPLES ---
             'demandantes'          => ['required', 'array', 'min:1'],
-            'demandantes.*'        => ['exists:personas,id'],
             'demandados'           => ['required', 'array', 'min:1'],
-            'demandados.*'         => ['exists:personas,id'],
 
             // --- CAMPOS OPCIONALES ---
             'radicado'             => ['nullable', 'string', 'max:255', Rule::unique('proceso_radicados')->ignore($procesoId)],

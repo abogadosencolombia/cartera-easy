@@ -256,9 +256,15 @@ const getVencimientoInfo = (proceso) => {
                                     <!-- Radicado -->
                                     <td class="px-6 py-4">
                                         <div class="flex flex-col">
-                                            <Link :href="route('procesos.show', proceso.id)" class="text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 mb-1">
-                                                {{ proceso.radicado || 'Sin Radicado' }}
-                                            </Link>
+                                            <div class="flex items-center gap-2">
+                                                <Link :href="route('procesos.show', proceso.id)" class="text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
+                                                    {{ proceso.radicado || 'Sin Radicado' }}
+                                                </Link>
+                                                <!-- Indicador de Info Incompleta -->
+                                                <span v-if="proceso.info_incompleta" title="Expediente con información incompleta (Demandados sin identificar)">
+                                                    <ExclamationTriangleIcon class="h-4 w-4 text-amber-500 animate-pulse" />
+                                                </span>
+                                            </div>
                                             <span class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 max-w-xs" :title="proceso.asunto">
                                                 {{ proceso.asunto || 'Sin asunto registrado' }}
                                             </span>
@@ -376,7 +382,10 @@ const getVencimientoInfo = (proceso) => {
                         
                         <div class="flex justify-between items-start mb-3">
                             <div>
-                                <h3 class="font-bold text-indigo-600 dark:text-indigo-400 text-lg">{{ proceso.radicado }}</h3>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="font-bold text-indigo-600 dark:text-indigo-400 text-lg">{{ proceso.radicado }}</h3>
+                                    <ExclamationTriangleIcon v-if="proceso.info_incompleta" class="h-4 w-4 text-amber-500" />
+                                </div>
                                 <p class="text-xs text-gray-500">{{ proceso.tipo_proceso?.nombre }}</p>
                             </div>
                             <span class="px-2 py-1 text-[10px] font-bold rounded-full border" :class="getRiesgoClasses(proceso)">

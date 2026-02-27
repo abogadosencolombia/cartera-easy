@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Persona;
 use App\Models\ProcesoRadicado;
 use App\Http\Requests\StoreProcesoRadicadoRequest;
 use App\Http\Requests\UpdateProcesoRadicadoRequest;
@@ -119,19 +120,27 @@ class ProcesoRadicadoController extends Controller
         
         $data['fecha_cambio_etapa'] = now();
 
-        $demandantesIds = $data['demandantes'] ?? [];
-        $demandadosIds = $data['demandados'] ?? [];
+        $demandantesRaw = $data['demandantes'] ?? [];
+        $demandadosRaw = $data['demandados'] ?? [];
         unset($data['demandantes'], $data['demandados']);
 
         $proceso = null;
 
-        DB::transaction(function () use ($data, $demandantesIds, $demandadosIds, &$proceso) {
+        DB::transaction(function () use ($data, $demandantesRaw, $demandadosRaw, &$proceso) {
+            // Procesar demandantes y demandados
+            $resDte = $this->procesarPartes($demandantesRaw, 'DEMANDANTE');
+            $resDdo = $this->procesarPartes($demandadosRaw, 'DEMANDADO');
+
+            // El radicado está incompleto si algún demandado no tiene info
+            $data['info_incompleta'] = $resDte['info_incompleta'] || $resDdo['info_incompleta'];
+
             $proceso = ProcesoRadicado::create($data);
-            if (!empty($demandantesIds)) {
-                $proceso->demandantes()->attach($demandantesIds, ['tipo' => 'DEMANDANTE']);
+
+            if (!empty($resDte['ids'])) {
+                $proceso->demandantes()->attach($resDte['ids'], ['tipo' => 'DEMANDANTE']);
             }
-            if (!empty($demandadosIds)) {
-                $proceso->demandados()->attach($demandadosIds, ['tipo' => 'DEMANDADO']);
+            if (!empty($resDdo['ids'])) {
+                $proceso->demandados()->attach($resDdo['ids'], ['tipo' => 'DEMANDADO']);
             }
 
             AuditoriaEvento::create([
@@ -184,18 +193,24 @@ class ProcesoRadicadoController extends Controller
     public function update(UpdateProcesoRadicadoRequest $request, ProcesoRadicado $proceso)
     {
         $data = $request->validated();
-        $demandantesIds = $data['demandantes'] ?? [];
-        $demandadosIds = $data['demandados'] ?? [];
+        $demandantesRaw = $data['demandantes'] ?? [];
+        $demandadosRaw = $data['demandados'] ?? [];
         unset($data['demandantes'], $data['demandados']);
 
-        DB::transaction(function () use ($proceso, $data, $demandantesIds, $demandadosIds) {
+        DB::transaction(function () use ($proceso, $data, $demandantesRaw, $demandadosRaw) {
             if (isset($data['etapa_procesal_id']) && $data['etapa_procesal_id'] != $proceso->etapa_procesal_id) {
                 $data['fecha_cambio_etapa'] = now();
             }
 
+            // Procesar demandantes y demandados
+            $resDte = $this->procesarPartes($demandantesRaw, 'DEMANDANTE');
+            $resDdo = $this->procesarPartes($demandadosRaw, 'DEMANDADO');
+
+            $data['info_incompleta'] = $resDte['info_incompleta'] || $resDdo['info_incompleta'];
+
             $proceso->update($data);
-            $proceso->demandantes()->syncWithPivotValues($demandantesIds, ['tipo' => 'DEMANDANTE']);
-            $proceso->demandados()->syncWithPivotValues($demandadosIds, ['tipo' => 'DEMANDADO']);
+            $proceso->demandantes()->syncWithPivotValues($resDte['ids'], ['tipo' => 'DEMANDANTE']);
+            $proceso->demandados()->syncWithPivotValues($resDdo['ids'], ['tipo' => 'DEMANDADO']);
 
             AuditoriaEvento::create([
                 'user_id' => Auth::id(),
@@ -440,5 +455,62 @@ class ProcesoRadicadoController extends Controller
         ]);
 
         return Excel::download(new ProcesosExport($filtros), $filename);
+    }
+
+    /**
+     * Procesa los arrays de demandantes/demandados, crea nuevas personas si es necesario
+     * y detecta si falta información.
+     */
+    private function procesarPartes($partes, $tipo = 'DEMANDANTE')
+    {
+        $ids = [];
+        $infoIncompleta = false;
+
+        foreach ($partes as $parte) {
+            // Caso 1: Persona existente enviada como objeto con ID { id: ... }
+            // O simplemente el ID si viene de un select tradicional
+            $id = is_array($parte) ? ($parte['id'] ?? null) : $parte;
+
+            if ($id && !isset($parte['is_new'])) {
+                $ids[] = $id;
+                continue;
+            }
+
+            // Caso 2: Persona nueva
+            if (isset($parte['is_new']) && $parte['is_new']) {
+                $nombre = $parte['nombre_completo'] ?? null;
+                $sinInfo = isset($parte['sin_info']) && $parte['sin_info'];
+
+                if ($sinInfo) {
+                    $infoIncompleta = true;
+                    if (empty($nombre)) $nombre = "SIN INFORMACIÓN";
+                }
+
+                // Buscamos por documento para no duplicar si ya existe
+                $numeroDoc = $parte['numero_documento'] ?? ($sinInfo ? 'S/N-' . uniqid() : 'S/N-' . uniqid());
+                
+                $persona = Persona::where('numero_documento', $numeroDoc)
+                    ->where('tipo_documento', $parte['tipo_documento'] ?? 'CC')
+                    ->first();
+
+                if (!$persona) {
+                    $persona = Persona::create([
+                        'nombre_completo' => $nombre,
+                        'tipo_documento'  => $parte['tipo_documento'] ?? 'CC',
+                        'numero_documento'=> $numeroDoc,
+                        'es_demandado'    => ($tipo === 'DEMANDADO'),
+                    ]);
+                } else {
+                    // Si ya existe y es demandado en este flujo, actualizamos el flag si es necesario
+                    if ($tipo === 'DEMANDADO' && !$persona->es_demandado) {
+                        $persona->update(['es_demandado' => true]);
+                    }
+                }
+
+                $ids[] = $persona->id;
+            }
+        }
+
+        return ['ids' => $ids, 'info_incompleta' => $infoIncompleta];
     }
 }

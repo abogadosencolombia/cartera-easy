@@ -33,11 +33,10 @@ class StoreProcesoRadicadoRequest extends FormRequest
             'juzgado_id'              => ['nullable', 'exists:juzgados,id'],
             'tipo_proceso_id'         => ['required', 'exists:tipos_proceso,id'],
             
-            // --- CAMBIO: AHORA SON ARRAYS ---
+            // --- CAMBIO: AHORA SON ARRAYS DE OBJETOS O IDS ---
             'demandantes'             => ['required', 'array', 'min:1'],
-            'demandantes.*'           => ['exists:personas,id'],
             'demandados'              => ['nullable', 'array'],
-            'demandados.*'            => ['exists:personas,id'],
+            // Las validaciones detalladas se manejarán en el controlador para permitir flexibilidad (IDs o Nuevos)
         ];
     }
 

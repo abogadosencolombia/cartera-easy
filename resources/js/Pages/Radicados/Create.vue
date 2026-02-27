@@ -36,9 +36,24 @@ const form = useForm({
   tipo_proceso_id: null,
   etapa_procesal_id: '', // <--- Campo Nuevo
 
-  // Arrays de objetos para la UI
-  demandantes: [{ id: null, selected: null }],
-  demandados: [{ id: null, selected: null }],
+  // Arrays de objetos para la UI con soporte para creación rápida
+  demandantes: [{ 
+    id: null, 
+    selected: null, 
+    is_new: false, 
+    nombre_completo: '', 
+    tipo_documento: 'CC', 
+    numero_documento: '' 
+  }],
+  demandados: [{ 
+    id: null, 
+    selected: null, 
+    is_new: false, 
+    nombre_completo: '', 
+    tipo_documento: 'CC', 
+    numero_documento: '', 
+    sin_info: false 
+  }],
   
   radicado: '',
   fecha_radicado: new Date().toISOString().slice(0, 10),
@@ -54,12 +69,16 @@ const form = useForm({
 });
 
 // --- Helpers para Listas Dinámicas ---
-const addDemandante = () => form.demandantes.push({ id: null, selected: null });
+const addDemandante = () => form.demandantes.push({ 
+    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '' 
+});
 const removeDemandante = (index) => {
     if (form.demandantes.length > 1) form.demandantes.splice(index, 1);
 };
 
-const addDemandado = () => form.demandados.push({ id: null, selected: null });
+const addDemandado = () => form.demandados.push({ 
+    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', sin_info: false 
+});
 const removeDemandado = (index) => {
     if (form.demandados.length > 1) form.demandados.splice(index, 1);
 };
@@ -94,9 +113,17 @@ const submit = () => {
     responsable_revision_id: data.responsable_revision_id?.id ?? null,
     juzgado_id: data.juzgado_id?.id ?? null,
     tipo_proceso_id: data.tipo_proceso_id?.id ?? null,
-    // Extraer solo los IDs de los arrays
-    demandantes: data.demandantes.map(d => d.selected?.id).filter(id => id),
-    demandados: data.demandados.map(d => d.selected?.id).filter(id => id),
+    
+    // Enviar objetos completos de demandantes/demandados
+    demandantes: data.demandantes.map(d => {
+        if (d.is_new) return d;
+        return { id: d.selected?.id };
+    }).filter(d => d.id || d.is_new),
+    
+    demandados: data.demandados.map(d => {
+        if (d.is_new) return d;
+        return { id: d.selected?.id };
+    }).filter(d => d.id || d.is_new),
   })).post(route('procesos.store'), {
     preserveScroll: true,
     onError: (errors) => {
@@ -216,39 +243,87 @@ const submit = () => {
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     
                     <!-- Demandantes -->
-                    <div class="space-y-3">
+                    <div class="space-y-4">
                         <div class="flex justify-between items-center">
-                            <InputLabel value="Demandantes / Denunciantes" />
-                            <button type="button" @click="addDemandante" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center">
-                                <PlusIcon class="w-3 h-3 mr-1"/> Agregar
+                            <InputLabel value="Demandantes / Denunciantes" class="!text-indigo-700 dark:!text-indigo-400 font-bold" />
+                            <button type="button" @click="addDemandante" class="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-2 py-1 rounded-md font-semibold flex items-center transition">
+                                <PlusIcon class="w-3 h-3 mr-1"/> Agregar otro
                             </button>
                         </div>
-                        <div v-for="(item, index) in form.demandantes" :key="index" class="flex gap-2">
-                            <div class="flex-grow">
-                                <AsyncSelect v-model="item.selected" :endpoint="route('personas.search')" placeholder="Buscar persona..." />
+                        <div v-for="(item, index) in form.demandantes" :key="index" class="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50/50 dark:bg-gray-900/20 space-y-3 relative group">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Demandante #{{ index + 1 }}</span>
+                                <div class="flex items-center gap-3">
+                                    <button type="button" @click="item.is_new = !item.is_new" class="text-[10px] font-bold uppercase" :class="item.is_new ? 'text-blue-600' : 'text-green-600'">
+                                        {{ item.is_new ? '← Buscar en base de datos' : '+ Registrar como nuevo' }}
+                                    </button>
+                                    <button v-if="form.demandantes.length > 1" type="button" @click="removeDemandante(index)" class="text-red-400 hover:text-red-600 transition">
+                                        <TrashIcon class="w-4 h-4"/>
+                                    </button>
+                                </div>
                             </div>
-                            <button v-if="form.demandantes.length > 1" type="button" @click="removeDemandante(index)" class="text-red-500 hover:text-red-700">
-                                <TrashIcon class="w-5 h-5"/>
-                            </button>
+
+                            <!-- MODO BUSCAR -->
+                            <div v-if="!item.is_new">
+                                <AsyncSelect v-model="item.selected" :endpoint="route('personas.search')" placeholder="Buscar por nombre o documento..." />
+                            </div>
+
+                            <!-- MODO REGISTRO RÁPIDO -->
+                            <div v-else class="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <TextInput v-model="item.nombre_completo" placeholder="Nombre Completo *" class="text-sm w-full" />
+                                <div class="grid grid-cols-3 gap-2">
+                                    <select v-model="item.tipo_documento" class="text-sm rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm">
+                                        <option>CC</option><option>NIT</option><option>CE</option><option>TI</option><option>Pasaporte</option>
+                                    </select>
+                                    <TextInput v-model="item.numero_documento" placeholder="Número Documento *" class="text-sm col-span-2" />
+                                </div>
+                            </div>
                         </div>
                         <InputError :message="form.errors.demandantes" class="mt-1" />
                     </div>
 
                     <!-- Demandados -->
-                    <div class="space-y-3">
+                    <div class="space-y-4">
                         <div class="flex justify-between items-center">
-                            <InputLabel value="Demandados / Denunciados" />
-                            <button type="button" @click="addDemandado" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center">
-                                <PlusIcon class="w-3 h-3 mr-1"/> Agregar
+                            <InputLabel value="Demandados / Denunciados" class="!text-red-700 dark:!text-red-400 font-bold" />
+                            <button type="button" @click="addDemandado" class="text-xs bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1 rounded-md font-semibold flex items-center transition">
+                                <PlusIcon class="w-3 h-3 mr-1"/> Agregar otro
                             </button>
                         </div>
-                        <div v-for="(item, index) in form.demandados" :key="index" class="flex gap-2">
-                            <div class="flex-grow">
-                                <AsyncSelect v-model="item.selected" :endpoint="route('personas.search')" placeholder="Buscar persona..." />
+                        <div v-for="(item, index) in form.demandados" :key="index" class="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50/50 dark:bg-gray-900/20 space-y-3 relative group">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Demandado #{{ index + 1 }}</span>
+                                <div class="flex items-center gap-3">
+                                    <button type="button" @click="item.is_new = !item.is_new" class="text-[10px] font-bold uppercase" :class="item.is_new ? 'text-blue-600' : 'text-green-600'">
+                                        {{ item.is_new ? '← Buscar en base de datos' : '+ Registrar como nuevo' }}
+                                    </button>
+                                    <button v-if="form.demandados.length > 1" type="button" @click="removeDemandado(index)" class="text-red-400 hover:text-red-600 transition">
+                                        <TrashIcon class="w-4 h-4"/>
+                                    </button>
+                                </div>
                             </div>
-                            <button v-if="form.demandados.length > 1" type="button" @click="removeDemandado(index)" class="text-red-500 hover:text-red-700">
-                                <TrashIcon class="w-5 h-5"/>
-                            </button>
+
+                            <!-- MODO BUSCAR -->
+                            <div v-if="!item.is_new">
+                                <AsyncSelect v-model="item.selected" :endpoint="route('personas.search')" placeholder="Buscar por nombre o documento..." />
+                            </div>
+
+                            <!-- MODO REGISTRO RÁPIDO -->
+                            <div v-else class="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <label class="flex items-center gap-2 cursor-pointer mb-2">
+                                    <input type="checkbox" v-model="item.sin_info" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 shadow-sm transition" />
+                                    <span class="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-tight">Sin información completa</span>
+                                </label>
+
+                                <TextInput v-model="item.nombre_completo" :placeholder="item.sin_info ? 'Nombre (Opcional)' : 'Nombre Completo *'" class="text-sm w-full" />
+                                
+                                <div v-if="!item.sin_info" class="grid grid-cols-3 gap-2">
+                                    <select v-model="item.tipo_documento" class="text-sm rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm">
+                                        <option>CC</option><option>NIT</option><option>CE</option><option>TI</option><option>Pasaporte</option>
+                                    </select>
+                                    <TextInput v-model="item.numero_documento" placeholder="Número Documento *" class="text-sm col-span-2" />
+                                </div>
+                            </div>
                         </div>
                         <InputError :message="form.errors.demandados" class="mt-1" />
                     </div>
