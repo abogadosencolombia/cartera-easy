@@ -186,7 +186,7 @@ const eliminarActuacion = (actuacionId) => {
     <div class="py-12">
       <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
         <!-- Alerta de Información Incompleta -->
-        <div v-if="proceso.info_incompleta" class="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-4 mb-6 rounded-r-lg shadow-sm animate-pulse">
+        <div v-if="proceso.info_incompleta" class="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-4 mb-6 rounded-r-lg shadow-sm">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     <svg class="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
