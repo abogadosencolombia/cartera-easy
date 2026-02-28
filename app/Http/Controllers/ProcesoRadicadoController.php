@@ -28,6 +28,7 @@ class ProcesoRadicadoController extends Controller
      */
     public function index(Request $request): Response
     {
+        $user = Auth::user();
         $query = ProcesoRadicado::with([
             'abogado', 
             'responsableRevision', 
@@ -37,6 +38,23 @@ class ProcesoRadicadoController extends Controller
             'demandados',
             'etapaActual'
         ]);
+
+        // --- FILTRO DE SEGURIDAD POR ROL ---
+        if ($user->tipo_usuario !== 'admin') {
+            $query->where(function($q) use ($user) {
+                // 1. Donde es el abogado/gestor principal
+                $q->where('abogado_id', $user->id)
+                  // 2. Donde es el responsable de revisión
+                  ->orWhere('responsable_revision_id', $user->id)
+                  // 3. Donde la persona demandante/demandada le pertenece
+                  ->orWhereHas('demandantes', function($sq) use ($user) {
+                      $sq->whereHas('abogados', fn($aq) => $aq->where('users.id', $user->id));
+                  })
+                  ->orWhereHas('demandados', function($sq) use ($user) {
+                      $sq->whereHas('abogados', fn($aq) => $aq->where('users.id', $user->id));
+                  });
+            });
+        }
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {

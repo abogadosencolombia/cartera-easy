@@ -38,14 +38,23 @@ class CasoController extends Controller
 
         $query = Caso::with(['cooperativa', 'deudor', 'user', 'users']);
 
-        // --- 1. Filtros por Rol de Usuario ---
+        // --- 1. Filtros por Rol de Usuario (Seguridad) ---
         if ($user->tipo_usuario === 'admin') {
             // Admin ve todo
         } elseif (in_array($user->tipo_usuario, ['gestor', 'abogado'])) {
-            if (method_exists($user, 'cooperativas')) {
-                $cooperativaIds = $user->cooperativas->pluck('id');
-                $query->whereIn('cooperativa_id', $cooperativaIds);
-            }
+            $query->where(function($q) use ($user) {
+                // Opción A: Casos de sus cooperativas asignadas
+                if (method_exists($user, 'cooperativas')) {
+                    $cooperativaIds = $user->cooperativas->pluck('id');
+                    $q->whereIn('cooperativa_id', $cooperativaIds);
+                }
+                // Opción B: Casos donde es responsable directo (Nueva tabla pivote)
+                $q->orWhereHas('users', function($uq) use ($user) {
+                    $uq->where('users.id', $user->id);
+                });
+                // Opción C: Casos donde es el responsable legacy (por si acaso)
+                $q->orWhere('user_id', $user->id);
+            });
         } elseif ($user->tipo_usuario === 'cli') {
             $query->where('deudor_id', $user->persona_id);
         }
