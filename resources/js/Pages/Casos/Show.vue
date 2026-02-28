@@ -161,6 +161,7 @@ const montoParaContrato = computed(() => {
                     >
                         Generar Contrato
                     </Link>
+                    
 
                     <Link
                         v-else-if="caso.contrato"
