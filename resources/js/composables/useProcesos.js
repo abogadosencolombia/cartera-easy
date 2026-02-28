@@ -53,7 +53,7 @@ export function useProcesos() {
 
     if (diffDays <= 2) {
       const label = diffDays < 0 ? `Vencido (${shortDate})` : `Urgente (${shortDate})`;
-      return { text: label, classes: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200 ring-1 ring-inset ring-red-600/20 animate-pulse' };
+      return { text: label, classes: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200 ring-1 ring-inset ring-red-600/20 animate-blink' };
     }
     if (diffDays <= 4) {
       return { text: `Próximo (${shortDate})`, classes: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200 ring-1 ring-inset ring-yellow-600/20' };

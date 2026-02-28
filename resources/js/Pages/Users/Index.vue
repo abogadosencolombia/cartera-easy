@@ -2,11 +2,12 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import TextInput from '@/Components/TextInput.vue';
 import SelectInput from '@/Components/SelectInput.vue';
+import Dropdown from '@/Components/Dropdown.vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
 import { 
     UserIcon, BriefcaseIcon, ShieldCheckIcon, BuildingOffice2Icon, // Roles
-    PencilSquareIcon, LockClosedIcon, LockOpenIcon, EyeIcon // <-- 1. ICONO AÑADIDO
+    PencilSquareIcon, LockClosedIcon, LockOpenIcon, EyeIcon, ChevronDownIcon // <-- 1. ICONO AÑADIDO
 } from '@heroicons/vue/24/outline';
 
 // --- PROPS ---
@@ -104,18 +105,41 @@ const getInitials = (name) => {
                             v-model="searchQuery" 
                             placeholder="Buscar por nombre o email..." 
                         />
-                        <SelectInput v-model="roleFilter" class="block w-full">
-                            <option value="">Filtrar por Rol</option>
-                            <option value="admin">Administrador</option>
-                            <option value="abogado">Abogado</option>
-                            <option value="gestor">Gestor</option>
-                            <option value="cliente">Cliente</option>
-                        </SelectInput>
-                         <SelectInput v-model="statusFilter" class="block w-full">
-                            <option value="">Filtrar por Estado</option>
-                            <option value="1">Activo</option>
-                            <option value="0">Suspendido</option>
-                        </SelectInput>
+                        
+                        <!-- Filtro por Rol -->
+                        <Dropdown align="left" width="full">
+                            <template #trigger>
+                                <button type="button" class="flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 dark:border-gray-700 dark:bg-gray-900 bg-white px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer dark:text-gray-300">
+                                    <span>{{ roleFilter === '' ? 'Filtrar por Rol' : roleDisplay[roleFilter].label }}</span>
+                                    <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                </button>
+                            </template>
+                            <template #content>
+                                <div class="py-1 bg-white dark:bg-gray-800">
+                                    <button @click="roleFilter = ''" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': roleFilter === '' }">Filtrar por Rol</button>
+                                    <button v-for="(info, key) in roleDisplay" :key="key" @click="roleFilter = key" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': roleFilter === key }">
+                                        {{ info.label }}
+                                    </button>
+                                </div>
+                            </template>
+                        </Dropdown>
+
+                        <!-- Filtro por Estado -->
+                        <Dropdown align="left" width="full">
+                            <template #trigger>
+                                <button type="button" class="flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 dark:border-gray-700 dark:bg-gray-900 bg-white px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer dark:text-gray-300">
+                                    <span>{{ statusFilter === '' ? 'Filtrar por Estado' : (statusFilter === '1' ? 'Activo' : 'Suspendido') }}</span>
+                                    <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                </button>
+                            </template>
+                            <template #content>
+                                <div class="py-1 bg-white dark:bg-gray-800">
+                                    <button @click="statusFilter = ''" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': statusFilter === '' }">Filtrar por Estado</button>
+                                    <button @click="statusFilter = '1'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': statusFilter === '1' }">Activo</button>
+                                    <button @click="statusFilter = '0'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': statusFilter === '0' }">Suspendido</button>
+                                </div>
+                            </template>
+                        </Dropdown>
                     </div>
                 </div>
 

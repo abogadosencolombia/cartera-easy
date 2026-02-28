@@ -86,7 +86,7 @@ watch(formFilters, throttle(() => {
         </div>
         <!-- Contenedor del Botón de Exportar -->
         <div class="mt-4 md:mt-0">
-            <a :href="route('integraciones.exportar', formFilters)" class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700">
+            <a :href="route('integraciones.exportar', formFilters)" class="inline-flex items-center px-4 py-2 bg-blue-500 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-600 shadow-sm transition-colors">
                 Exportar a Excel
             </a>
         </div>

@@ -8,6 +8,7 @@ import Modal from '@/Components/Modal.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import InputError from '@/Components/InputError.vue';
 import TextInput from '@/Components/TextInput.vue';
+import DatePicker from '@/Components/DatePicker.vue';
 import Textarea from '@/Components/Textarea.vue';
 import Pagination from '@/Components/Pagination.vue';
 import { debounce } from 'lodash';
@@ -125,7 +126,7 @@ const getUserInitials = (name) => name ? name.substring(0, 2).toUpperCase() : '?
 
 const getSemaforoClasses = (semaforo) => {
     switch (semaforo) {
-        case 'vencida': return 'bg-red-100 text-red-800 border-red-200 animate-pulse'; 
+        case 'vencida': return 'bg-red-100 text-red-800 border-red-200 animate-blink'; 
         case 'urgente': return 'bg-yellow-100 text-yellow-800 border-yellow-200'; 
         case 'tiempo': return 'bg-green-100 text-green-800 border-green-200'; 
         case 'completado': return 'bg-blue-100 text-blue-800 border-blue-200 opacity-75'; 
@@ -196,11 +197,10 @@ const formatDateLocal = (dateString) => {
                                     <InputLabel for="fecha_limite" value="Fecha Límite" />
                                     <span class="text-xs text-gray-400 italic mt-1">(Opcional)</span>
                                 </div>
-                                <input 
-                                    type="datetime-local" 
+                                <DatePicker 
                                     id="fecha_limite" 
                                     v-model="form.fecha_limite"
-                                    class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                    class="mt-1 block w-full"
                                 />
                                 <InputError :message="form.errors.fecha_limite" class="mt-2" />
                             </div>

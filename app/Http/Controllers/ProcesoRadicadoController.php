@@ -464,21 +464,31 @@ class ProcesoRadicadoController extends Controller
         $infoIncompleta = false;
 
         foreach ($partes as $parte) {
-            // Caso 1: Persona existente enviada como objeto con ID { id: ... }
+            // Caso 1: Persona existente enviada como objeto con ID { id: ... } o solo ID
             $id = is_array($parte) ? ($parte['id'] ?? null) : $parte;
+            $isNew = is_array($parte) && isset($parte['is_new']) && $parte['is_new'];
 
-                if ($id && (!isset($parte['is_new']) || !$parte['is_new'])) {
+            if ($id && !$isNew) {
                 $ids[] = $id;
                 
-                // Si es demandado, forzamos la marca en la DB para el Index de personas
-                if ($tipo === 'DEMANDADO') {
-                    Persona::where('id', $id)->update(['es_demandado' => true]);
+                $persona = Persona::find($id);
+                if ($persona) {
+                    // Si es demandado, forzamos la marca en la DB para el Index de personas
+                    if ($tipo === 'DEMANDADO' && !$persona->es_demandado) {
+                        $persona->update(['es_demandado' => true]);
+                    }
+
+                    // IMPORTANTE: Si la persona existente sigue siendo "POR IDENTIFICAR", 
+                    // el proceso sigue teniendo información incompleta.
+                    if ($persona->nombre_completo === 'DEMANDADO POR IDENTIFICAR') {
+                        $infoIncompleta = true;
+                    }
                 }
                 continue;
             }
 
-            // Caso 2: Persona nueva
-            if (isset($parte['is_new']) && $parte['is_new']) {
+            // Caso 2: Persona nueva o edición de una existente incompleta (is_new = true)
+            if ($isNew) {
                 $nombre = $parte['nombre_completo'] ?? null;
                 $sinInfo = isset($parte['sin_info']) && $parte['sin_info'];
 
@@ -487,35 +497,59 @@ class ProcesoRadicadoController extends Controller
                     if (empty($nombre)) $nombre = "DEMANDADO POR IDENTIFICAR";
                 }
 
-                // Generamos un identificador único temporal si no hay documento
-                // para evitar colisiones en la DB si el campo es UNIQUE.
+                // Si el nombre resultante es el placeholder, marcar como incompleto
+                if ($nombre === 'DEMANDADO POR IDENTIFICAR') {
+                    $infoIncompleta = true;
+                }
+
+                // Generamos o recuperamos el identificador único temporal
                 $numeroDoc = $parte['numero_documento'] ?? null;
                 if (empty($numeroDoc)) {
-                    $numeroDoc = 'TEMP-' . strtoupper(substr(uniqid(), -6));
+                    if ($id) {
+                        $pExistente = Persona::find($id);
+                        $numeroDoc = $pExistente?->numero_documento ?: 'TEMP-' . strtoupper(substr(uniqid(), -6));
+                    } else {
+                        $numeroDoc = 'TEMP-' . strtoupper(substr(uniqid(), -6));
+                    }
                 }
                 
                 $tipoDoc = $parte['tipo_documento'] ?? 'CC';
 
-                // Intentamos buscar por documento para no duplicar si es posible
-                $persona = Persona::where('numero_documento', $numeroDoc)
-                    ->where('tipo_documento', $tipoDoc)
-                    ->first();
-
-                if (!$persona) {
-                    $persona = Persona::create([
-                        'nombre_completo' => $nombre ?: 'SIN NOMBRE',
-                        'tipo_documento'  => $tipoDoc,
-                        'numero_documento'=> $numeroDoc,
-                        'es_demandado'    => ($tipo === 'DEMANDADO'),
-                    ]);
+                // Si tiene ID, intentamos actualizar esa persona específica
+                if ($id) {
+                    $persona = Persona::find($id);
+                    if ($persona) {
+                        $persona->update([
+                            'nombre_completo' => $nombre ?: 'SIN NOMBRE',
+                            'tipo_documento'  => $tipoDoc,
+                            'numero_documento'=> $numeroDoc,
+                            'es_demandado'    => ($tipo === 'DEMANDADO'),
+                        ]);
+                    }
                 } else {
-                    // Actualizamos flag si es necesario
-                    if ($tipo === 'DEMANDADO' && !$persona->es_demandado) {
-                        $persona->update(['es_demandado' => true]);
+                    // Si no tiene ID, buscamos por documento para no duplicar si es posible
+                    $persona = Persona::where('numero_documento', $numeroDoc)
+                        ->where('tipo_documento', $tipoDoc)
+                        ->first();
+
+                    if (!$persona) {
+                        $persona = Persona::create([
+                            'nombre_completo' => $nombre ?: 'SIN NOMBRE',
+                            'tipo_documento'  => $tipoDoc,
+                            'numero_documento'=> $numeroDoc,
+                            'es_demandado'    => ($tipo === 'DEMANDADO'),
+                        ]);
+                    } else {
+                        // Actualizamos flag si es necesario
+                        if ($tipo === 'DEMANDADO' && !$persona->es_demandado) {
+                            $persona->update(['es_demandado' => true]);
+                        }
                     }
                 }
 
-                $ids[] = $persona->id;
+                if ($persona) {
+                    $ids[] = $persona->id;
+                }
             }
         }
 

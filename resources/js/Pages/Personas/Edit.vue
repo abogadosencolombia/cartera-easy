@@ -4,6 +4,7 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
+import DatePicker from '@/Components/DatePicker.vue';
 import Textarea from '@/Components/Textarea.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline';
@@ -115,12 +116,12 @@ const submit = () => form.post(route('personas.update', props.persona.id));
                   
                   <div>
                     <InputLabel for="fecha_expedicion" value="Fecha de Expedición (Opcional)" />
-                    <TextInput v-model="form.fecha_expedicion" id="fecha_expedicion" type="date" class="mt-1 block w-full" />
+                    <DatePicker v-model="form.fecha_expedicion" id="fecha_expedicion" class="mt-1 block w-full" />
                     <InputError :message="form.errors.fecha_expedicion" class="mt-2" />
                   </div>
                   <div>
                     <InputLabel for="fecha_nacimiento" value="Fecha de Nacimiento (Opcional)" />
-                    <TextInput v-model="form.fecha_nacimiento" id="fecha_nacimiento" type="date" class="mt-1 block w-full" />
+                    <DatePicker v-model="form.fecha_nacimiento" id="fecha_nacimiento" class="mt-1 block w-full" />
                     <InputError :message="form.errors.fecha_nacimiento" class="mt-2" />
                   </div>
 
@@ -159,7 +160,7 @@ const submit = () => form.post(route('personas.update', props.persona.id));
               <section>
                 <div class="mb-2 flex items-center justify-between">
                   <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Direcciones</h3>
-                  <button type="button" @click="addAddressRow" class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700">
+                  <button type="button" @click="addAddressRow" class="inline-flex items-center gap-2 rounded-md bg-blue-500 px-3 py-1.5 text-sm text-white hover:bg-blue-600 transition shadow-sm">
                     <PlusIcon class="h-4 w-4" /> Agregar Dirección
                   </button>
                 </div>
@@ -269,7 +270,7 @@ const submit = () => form.post(route('personas.update', props.persona.id));
               <section>
                 <div class="mb-2 flex items-center justify-between">
                   <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Redes Sociales</h3>
-                  <button type="button" @click="addLinkRow" class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700">
+                  <button type="button" @click="addLinkRow" class="inline-flex items-center gap-2 rounded-md bg-blue-500 px-3 py-1.5 text-sm text-white hover:bg-blue-600 transition shadow-sm">
                     <PlusIcon class="h-4 w-4" /> Agregar enlace
                   </button>
                 </div>

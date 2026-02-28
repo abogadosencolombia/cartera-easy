@@ -7,9 +7,11 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import InputError from '@/Components/InputError.vue';
 import TextInput from '@/Components/TextInput.vue';
+import DatePicker from '@/Components/DatePicker.vue';
 import Textarea from '@/Components/Textarea.vue';
 import AsyncSelect from '@/Components/AsyncSelect.vue';
-import { PlusIcon, TrashIcon } from '@heroicons/vue/24/outline';
+import Dropdown from '@/Components/Dropdown.vue';
+import { PlusIcon, TrashIcon, ChevronDownIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
   etapas: { type: Array, required: true }, // <--- Recibimos las etapas
@@ -70,7 +72,7 @@ const form = useForm({
 
 // --- Helpers para Listas Dinámicas ---
 const addDemandante = () => form.demandantes.push({ 
-    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '' 
+    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', sin_info: false 
 });
 const removeDemandante = (index) => {
     if (form.demandantes.length > 1) form.demandantes.splice(index, 1);
@@ -116,27 +118,12 @@ const submit = () => {
     
     // Enviar objetos completos de demandantes/demandados
     demandantes: data.demandantes.map(d => {
-        if (d.is_new) {
-            return {
-                is_new: true,
-                nombre_completo: d.nombre_completo,
-                tipo_documento: d.tipo_documento,
-                numero_documento: d.numero_documento
-            };
-        }
+        if (d.is_new) return d;
         return { id: d.selected?.id };
     }).filter(d => d.id || d.is_new),
     
     demandados: data.demandados.map(d => {
-        if (d.is_new) {
-            return {
-                is_new: true,
-                nombre_completo: d.nombre_completo,
-                tipo_documento: d.tipo_documento,
-                numero_documento: d.numero_documento,
-                sin_info: d.sin_info
-            };
-        }
+        if (d.is_new) return d;
         return { id: d.selected?.id };
     }).filter(d => d.id || d.is_new),
   })).post(route('procesos.store'), {
@@ -190,13 +177,13 @@ const submit = () => {
           <ol role="list" class="flex items-center">
             <li v-for="(s, index) in steps" :key="s.id" class="relative" :class="{'flex-1': index < steps.length - 1}">
               <div v-if="s.id < step" class="absolute inset-0 flex items-center" aria-hidden="true">
-                <div class="h-0.5 w-full bg-indigo-600"></div>
+                <div class="h-0.5 w-full bg-blue-500"></div>
               </div>
-              <a @click="goToStep(s.id)" class="relative flex h-8 w-8 items-center justify-center rounded-full transition-all duration-300" :class="[s.id < step ? 'bg-indigo-600 hover:bg-indigo-800 cursor-pointer' : '', s.id === step ? 'border-2 border-indigo-600 bg-white dark:bg-gray-800 scale-110' : '', s.id > step ? 'border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700' : '']">
+              <a @click="goToStep(s.id)" class="relative flex h-8 w-8 items-center justify-center rounded-full transition-all duration-300" :class="[s.id < step ? 'bg-blue-500 hover:bg-blue-700 cursor-pointer' : '', s.id === step ? 'border-2 border-blue-500 bg-white dark:bg-gray-800 scale-110' : '', s.id > step ? 'border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700' : '']">
                 <span v-if="s.id < step" class="text-white">
                   <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.052-.143z" clip-rule="evenodd" /></svg>
                 </span>
-                <span v-else class="text-indigo-600 dark:text-indigo-400">{{ s.id }}</span>
+                <span v-else class="text-blue-500 dark:text-blue-400">{{ s.id }}</span>
               </a>
               <div class="absolute top-10 w-max text-center -translate-x-1/2 transition-opacity duration-300">
                   <p class="text-xs font-medium" :class="step >= s.id ? 'text-gray-800 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'">{{ s.name }}</p>
@@ -223,7 +210,7 @@ const submit = () => {
                     </div>
                     <div>
                       <InputLabel for="fecha_radicado" value="Fecha de Radicado" />
-                      <TextInput id="fecha_radicado" v-model="form.fecha_radicado" type="date" class="mt-1 block w-full" />
+                      <DatePicker id="fecha_radicado" v-model="form.fecha_radicado" class="mt-1 block w-full" />
                       <InputError :message="form.errors.fecha_radicado" class="mt-2" />
                     </div>
                     <div class="md:col-span-2">
@@ -240,12 +227,24 @@ const submit = () => {
                     <!-- NUEVO CAMPO: ETAPA PROCESAL -->
                     <div>
                         <InputLabel for="etapa" value="Etapa Inicial" />
-                        <select id="etapa" v-model="form.etapa_procesal_id" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
-                            <option value="">(Automático: Registro Inicial)</option>
-                            <option v-for="etapa in etapas" :key="etapa.id" :value="etapa.id">
-                                {{ etapa.nombre }}
-                            </option>
-                        </select>
+                        <Dropdown align="left" width="full">
+                            <template #trigger>
+                                <button type="button" class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 dark:border-gray-700 dark:bg-gray-900 bg-white px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer dark:text-gray-300">
+                                    <span>{{ form.etapa_procesal_id ? etapas.find(e => e.id === form.etapa_procesal_id)?.nombre : '(Automático: Registro Inicial)' }}</span>
+                                    <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                </button>
+                            </template>
+                            <template #content>
+                                <div class="py-1 bg-white dark:bg-gray-800 max-h-60 overflow-y-auto">
+                                    <button @click="form.etapa_procesal_id = ''" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': form.etapa_procesal_id === '' }">
+                                        (Automático: Registro Inicial)
+                                    </button>
+                                    <button v-for="etapa in etapas" :key="etapa.id" @click="form.etapa_procesal_id = etapa.id" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': form.etapa_procesal_id === etapa.id }">
+                                        {{ etapa.nombre }}
+                                    </button>
+                                </div>
+                            </template>
+                        </Dropdown>
                         <p class="text-xs text-gray-500 mt-1">Si lo dejas vacío, iniciará en la primera etapa.</p>
                         <InputError :message="form.errors.etapa_procesal_id" class="mt-2" />
                     </div>
@@ -376,12 +375,12 @@ const submit = () => {
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <InputLabel for="fecha_revision" value="Fecha de Revisión" />
-                      <TextInput id="fecha_revision" v-model="form.fecha_revision" type="date" class="mt-1 block w-full" />
+                      <DatePicker id="fecha_revision" v-model="form.fecha_revision" class="mt-1 block w-full" />
                       <InputError :message="form.errors.fecha_revision" class="mt-2" />
                     </div>
                     <div>
                       <InputLabel for="fecha_proxima_revision" value="Fecha Próxima Revisión" />
-                      <TextInput id="fecha_proxima_revision" v-model="form.fecha_proxima_revision" type="date" class="mt-1 block w-full" />
+                      <DatePicker id="fecha_proxima_revision" v-model="form.fecha_proxima_revision" class="mt-1 block w-full" />
                       <InputError :message="form.errors.fecha_proxima_revision" class="mt-2" />
                     </div>
 

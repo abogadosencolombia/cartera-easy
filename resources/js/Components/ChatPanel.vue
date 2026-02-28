@@ -246,7 +246,7 @@ watch(isOpen, (newVal) => {
                     <div 
                       class="px-5 py-3.5 rounded-2xl text-[15px] leading-relaxed shadow-sm" 
                       :class="{
-                        'bg-blue-600 text-white rounded-br-none': message.type === 'user',
+                        'bg-blue-500 text-white rounded-br-none': message.type === 'user',
                         'bg-white text-slate-700 rounded-bl-none border border-slate-200': message.type === 'bot',
                         'bg-red-50 border border-red-200 text-red-700': message.type === 'error',
                       }" 
@@ -285,8 +285,8 @@ watch(isOpen, (newVal) => {
             <button 
                 type="submit" 
                 :disabled="isLoading || newMessage.trim() === ''" 
-                class="bg-blue-600 text-white rounded-xl h-12 w-12 flex items-center justify-center transition-all duration-200 shadow-md shadow-blue-600/20" 
-                :class="{'hover:bg-blue-700 hover:scale-105 active:scale-95': newMessage.trim() !== '', 'bg-slate-300 cursor-not-allowed shadow-none': newMessage.trim() === ''}"
+                class="bg-blue-500 text-white rounded-xl h-12 w-12 flex items-center justify-center transition-all duration-200 shadow-md shadow-blue-500/20" 
+                :class="{'hover:bg-blue-600 hover:scale-105 active:scale-95': newMessage.trim() !== '', 'bg-slate-300 cursor-not-allowed shadow-none': newMessage.trim() === ''}"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transform rotate-0" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.428A1 1 0 009.586 16.5l-4.293-4.293a1 1 0 010-1.414l7-7a1 1 0 011.414 0l4.293 4.293-5.586 5.586a1 1 0 00.28 1.55l5 1.428a1 1 0 001.17-1.408l-7-14z" />
@@ -298,7 +298,7 @@ watch(isOpen, (newVal) => {
     </transition>
 
     <!-- Botón Flotante -->
-    <button @click="toggleChat" class="group bg-blue-600 text-white rounded-full h-14 w-14 flex items-center justify-center shadow-[0_8px_30px_rgb(0,0,0,0.2)] hover:bg-blue-700 transition-all duration-300 transform hover:scale-105 active:scale-95 hover:shadow-blue-600/40">
+    <button @click="toggleChat" class="group bg-blue-500 text-white rounded-full h-14 w-14 flex items-center justify-center shadow-[0_8px_30px_rgb(0,0,0,0.2)] hover:bg-blue-600 transition-all duration-300 transform hover:scale-105 active:scale-95 hover:shadow-blue-500/40">
       <transition name="fab-icon" mode="out-in">
         <svg v-if="!isOpen" key="open" xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />

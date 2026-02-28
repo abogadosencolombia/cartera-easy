@@ -4,6 +4,8 @@ import { ref, watch } from 'vue'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
 import Pagination from '@/Components/Pagination.vue'
 import TextInput from '@/Components/TextInput.vue'; // <-- Importar TextInput
+import Dropdown from '@/Components/Dropdown.vue';
+import { ChevronDownIcon } from '@heroicons/vue/24/outline';
 
 // Usar debounce para evitar búsquedas en cada tecla
 import { debounce } from 'lodash';
@@ -102,7 +104,7 @@ const calcularProgreso = (contrato) => {
                     Gestión de Contratos de Honorarios
                 </h2>
                 <Link :href="route('honorarios.contratos.create')"
-                      class="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors">
+                      class="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors shadow-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
                     Nuevo Contrato
                 </Link>
@@ -149,13 +151,36 @@ const calcularProgreso = (contrato) => {
                                 placeholder="Buscar por ID, nombre de cliente o radicado..."
                                 class="w-full pl-10 pr-4 py-2 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
                         </div>
-                        <select v-model="estado" class="w-full md:w-auto rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-                            <option value="">Todos los Estados</option>
-                            <option value="ACTIVO">Activo</option>
-                            <option value="PAGOS_PENDIENTES">Pagos Pendientes</option>
-                            <option value="EN_MORA">En Mora</option>
-                            <option value="CERRADO">Cerrado</option>
-                        </select>
+                        
+                        <!-- Filtro Estado -->
+                        <Dropdown align="right" width="48">
+                            <template #trigger>
+                                <button type="button" class="w-full md:w-auto flex items-center justify-between gap-2 bg-white dark:bg-gray-900 px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition shadow-sm min-w-[160px]">
+                                    <span>{{ estado === '' ? 'Todos los Estados' : (estado === 'ACTIVO' ? 'Activo' : (estado === 'PAGOS_PENDIENTES' ? 'Pagos Pendientes' : (estado === 'EN_MORA' ? 'En Mora' : 'Cerrado'))) }}</span>
+                                    <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                </button>
+                            </template>
+                            <template #content>
+                                <div class="py-1 bg-white dark:bg-gray-800">
+                                    <button @click="estado = ''" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': estado === '' }">
+                                        Todos los Estados
+                                    </button>
+                                    <button @click="estado = 'ACTIVO'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': estado === 'ACTIVO' }">
+                                        Activo
+                                    </button>
+                                    <button @click="estado = 'PAGOS_PENDIENTES'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': estado === 'PAGOS_PENDIENTES' }">
+                                        Pagos Pendientes
+                                    </button>
+                                    <button @click="estado = 'EN_MORA'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': estado === 'EN_MORA' }">
+                                        En Mora
+                                    </button>
+                                    <button @click="estado = 'CERRADO'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': estado === 'CERRADO' }">
+                                        Cerrado
+                                    </button>
+                                </div>
+                            </template>
+                        </Dropdown>
+
                         <button v-if="q || estado" @click="limpiarFiltros" class="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex-shrink-0">Limpiar</button>
                     </div>
 
@@ -208,7 +233,7 @@ const calcularProgreso = (contrato) => {
                                     </div>
                                 </div>
                                 <div class="flex-shrink-0 self-start md:self-center"> <!-- Alinear botón -->
-                                    <Link :href="route('honorarios.contratos.show', c.id)" class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors">
+                                    <Link :href="route('honorarios.contratos.show', c.id)" class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors shadow-sm">
                                          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" ><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                                         Ver
                                     </Link>

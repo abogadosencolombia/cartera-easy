@@ -8,7 +8,7 @@ import Dropdown from '@/Components/Dropdown.vue';
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
 import { debounce, pickBy } from 'lodash'; // <-- Importamos pickBy
-import { ScaleIcon, PlusIcon, ArrowDownTrayIcon } from '@heroicons/vue/24/outline';
+import { ScaleIcon, PlusIcon, ArrowDownTrayIcon, ChevronDownIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     incidentes: Object,
@@ -130,21 +130,43 @@ const estadoClass = (estado) => {
                                 <input type="text" v-model="form.search" id="search" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Ej: derecho de petición...">
                             </div>
                             <div>
-                                <label for="estado" class="block text-sm font-medium text-gray-700">Estado</label>
-                                <select v-model="form.estado" id="estado" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                                    <option value="">Todos</option>
-                                    <option value="pendiente">Pendiente</option>
-                                    <option value="en_revision">En Revisión</option>
-                                    <option value="resuelto">Resuelto</option>
-                                    <option value="archivado">Archivado</option>
-                                </select>
+                                <label for="estado" class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                                <Dropdown align="left" width="full">
+                                    <template #trigger>
+                                        <button type="button" class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer">
+                                            <span>{{ form.estado === '' ? 'Todos' : (form.estado === 'pendiente' ? 'Pendiente' : (form.estado === 'en_revision' ? 'En Revisión' : (form.estado === 'resuelto' ? 'Resuelto' : 'Archivado'))) }}</span>
+                                            <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                        </button>
+                                    </template>
+                                    <template #content>
+                                        <div class="py-1 bg-white">
+                                            <button @click="form.estado = ''" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" :class="{ 'bg-indigo-50 text-indigo-700 font-bold': form.estado === '' }">Todos</button>
+                                            <button @click="form.estado = 'pendiente'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" :class="{ 'bg-indigo-50 text-indigo-700 font-bold': form.estado === 'pendiente' }">Pendiente</button>
+                                            <button @click="form.estado = 'en_revision'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" :class="{ 'bg-indigo-50 text-indigo-700 font-bold': form.estado === 'en_revision' }">En Revisión</button>
+                                            <button @click="form.estado = 'resuelto'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" :class="{ 'bg-indigo-50 text-indigo-700 font-bold': form.estado === 'resuelto' }">Resuelto</button>
+                                            <button @click="form.estado = 'archivado'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" :class="{ 'bg-indigo-50 text-indigo-700 font-bold': form.estado === 'archivado' }">Archivado</button>
+                                        </div>
+                                    </template>
+                                </Dropdown>
                             </div>
                             <div>
-                                <label for="responsable_id" class="block text-sm font-medium text-gray-700">Responsable</label>
-                                <select v-model="form.responsable_id" id="responsable_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                                    <option value="">Todos</option>
-                                    <option v-for="usuario in usuarios" :key="usuario.id" :value="usuario.id">{{ usuario.name }}</option>
-                                </select>
+                                <label for="responsable_id" class="block text-sm font-medium text-gray-700 mb-1">Responsable</label>
+                                <Dropdown align="left" width="full">
+                                    <template #trigger>
+                                        <button type="button" class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer">
+                                            <span class="truncate">{{ form.responsable_id ? usuarios.find(u => u.id === form.responsable_id)?.name : 'Todos' }}</span>
+                                            <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                        </button>
+                                    </template>
+                                    <template #content>
+                                        <div class="py-1 bg-white max-h-60 overflow-y-auto">
+                                            <button @click="form.responsable_id = ''" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" :class="{ 'bg-indigo-50 text-indigo-700 font-bold': form.responsable_id === '' }">Todos</button>
+                                            <button v-for="usuario in usuarios" :key="usuario.id" @click="form.responsable_id = usuario.id" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" :class="{ 'bg-indigo-50 text-indigo-700 font-bold': form.responsable_id === usuario.id }">
+                                                {{ usuario.name }}
+                                            </button>
+                                        </div>
+                                    </template>
+                                </Dropdown>
                             </div>
                         </div>
                         <div class="overflow-x-auto">

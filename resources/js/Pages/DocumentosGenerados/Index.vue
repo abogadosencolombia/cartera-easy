@@ -2,9 +2,11 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
-import { LockClosedIcon, ArrowDownTrayIcon, ArrowPathIcon } from '@heroicons/vue/24/outline';
+import { LockClosedIcon, ArrowDownTrayIcon, ArrowPathIcon, ChevronDownIcon } from '@heroicons/vue/24/outline';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import Dropdown from '@/Components/Dropdown.vue';
+import DatePicker from '@/Components/DatePicker.vue';
 
 const props = defineProps({
     documentos: Object,
@@ -58,30 +60,52 @@ const formatDateTime = (dateString) => {
                         <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Filtros de Búsqueda</h3>
                         <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
                             <div>
-                                <label for="usuario_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Usuario</label>
-                                <select v-model="form.usuario_id" id="usuario_id" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option value="">Todos</option>
-                                    <option v-for="user in usuarios" :key="user.id" :value="user.id">{{ user.name }}</option>
-                                </select>
+                                <label for="usuario_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Usuario</label>
+                                <Dropdown align="left" width="full">
+                                    <template #trigger>
+                                        <button type="button" class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 dark:border-gray-700 dark:bg-gray-900 bg-white px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer dark:text-gray-300">
+                                            <span class="truncate">{{ form.usuario_id ? usuarios.find(u => u.id === form.usuario_id)?.name : 'Todos' }}</span>
+                                            <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                        </button>
+                                    </template>
+                                    <template #content>
+                                        <div class="py-1 bg-white dark:bg-gray-800 max-h-60 overflow-y-auto">
+                                            <button @click="form.usuario_id = ''; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': form.usuario_id === '' }">Todos</button>
+                                            <button v-for="user in usuarios" :key="user.id" @click="form.usuario_id = user.id; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': form.usuario_id === user.id }">
+                                                {{ user.name }}
+                                            </button>
+                                        </div>
+                                    </template>
+                                </Dropdown>
                             </div>
                             <div>
-                                <label for="tipo_plantilla" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo Plantilla</label>
-                                <select v-model="form.tipo_plantilla" id="tipo_plantilla" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option value="">Todos</option>
-                                    <option value="demanda">Demanda</option>
-                                    <option value="carta">Carta</option>
-                                    <option value="medida cautelar">Medida Cautelar</option>
-                                    <option value="notificación">Notificación</option>
-                                    <option value="otros">Otros</option>
-                                </select>
+                                <label for="tipo_plantilla" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo Plantilla</label>
+                                <Dropdown align="left" width="full">
+                                    <template #trigger>
+                                        <button type="button" class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 dark:border-gray-700 dark:bg-gray-900 bg-white px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer dark:text-gray-300">
+                                            <span class="truncate">{{ form.tipo_plantilla === '' ? 'Todos' : form.tipo_plantilla.charAt(0).toUpperCase() + form.tipo_plantilla.slice(1) }}</span>
+                                            <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                        </button>
+                                    </template>
+                                    <template #content>
+                                        <div class="py-1 bg-white dark:bg-gray-800">
+                                            <button @click="form.tipo_plantilla = ''; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': form.tipo_plantilla === '' }">Todos</button>
+                                            <button @click="form.tipo_plantilla = 'demanda'; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': form.tipo_plantilla === 'demanda' }">Demanda</button>
+                                            <button @click="form.tipo_plantilla = 'carta'; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': form.tipo_plantilla === 'carta' }">Carta</button>
+                                            <button @click="form.tipo_plantilla = 'medida cautelar'; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': form.tipo_plantilla === 'medida cautelar' }">Medida Cautelar</button>
+                                            <button @click="form.tipo_plantilla = 'notificación'; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': form.tipo_plantilla === 'notificación' }">Notificación</button>
+                                            <button @click="form.tipo_plantilla = 'otros'; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': form.tipo_plantilla === 'otros' }">Otros</button>
+                                        </div>
+                                    </template>
+                                </Dropdown>
                             </div>
                             <div>
-                                <label for="fecha_desde" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Desde</label>
-                                <input type="date" v-model="form.fecha_desde" id="fecha_desde" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                <label for="fecha_desde" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Desde</label>
+                                <DatePicker v-model="form.fecha_desde" id="fecha_desde" class="w-full" />
                             </div>
                             <div>
-                                <label for="fecha_hasta" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Hasta</label>
-                                <input type="date" v-model="form.fecha_hasta" id="fecha_hasta" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                <label for="fecha_hasta" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Hasta</label>
+                                <DatePicker v-model="form.fecha_hasta" id="fecha_hasta" class="w-full" />
                             </div>
                             <div class="flex items-end space-x-2">
                                 <PrimaryButton @click="aplicarFiltros" class="w-full justify-center h-10">Filtrar</PrimaryButton>

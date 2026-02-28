@@ -4,6 +4,7 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import { debounce } from 'lodash-es';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import Pagination from '@/Components/Pagination.vue';
+import DatePicker from '@/Components/DatePicker.vue';
 import {
     CheckIcon,
     FolderIcon,
@@ -12,8 +13,10 @@ import {
     CheckCircleIcon,
     MagnifyingGlassIcon,
     PencilSquareIcon,
-    ArrowDownTrayIcon // --- AÑADIDO: Icono para exportar ---
+    ArrowDownTrayIcon, // --- AÑADIDO: Icono para exportar ---
+    ChevronDownIcon
 } from '@heroicons/vue/24/outline';
+import Dropdown from '@/Components/Dropdown.vue';
 
 // --- PROPS ---
 const props = defineProps([
@@ -171,7 +174,7 @@ const formatFecha = (fechaISO) => {
                 </h2>
                 <!-- Botón de Exportar -->
                  <a :href="exportUrl"
-                    class="inline-flex items-center px-4 py-2 bg-emerald-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-500 active:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150"
+                    class="inline-flex items-center px-4 py-2 bg-blue-500 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-600 active:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150 shadow-sm"
                     download>
                      <ArrowDownTrayIcon class="w-4 h-4 mr-2"/>
                      Exportar Pendientes
@@ -190,14 +193,14 @@ const formatFecha = (fechaISO) => {
                         <button @click="activeTab = 'casos'"
                                 :class="[
                                     activeTab === 'casos'
-                                        ? 'bg-indigo-600 text-white shadow-md'
+                                        ? 'bg-blue-500 text-white shadow-md'
                                         : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/60',
                                     'flex items-center py-2.5 px-4 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out'
                                 ]">
                             <FolderIcon class="w-5 h-5 mr-2" />
                             <span>Casos</span>
                             <span :class="[
-                                    activeTab === 'casos' ? 'bg-indigo-400 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200',
+                                    activeTab === 'casos' ? 'bg-blue-400 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200',
                                     'ml-2 text-xs font-semibold py-0.5 px-2 rounded-full'
                                 ]">
                                 {{ pendientesCounts ? pendientesCounts.casos : 0 }}
@@ -207,14 +210,14 @@ const formatFecha = (fechaISO) => {
                         <button @click="activeTab = 'radicados'"
                                 :class="[
                                     activeTab === 'radicados'
-                                        ? 'bg-indigo-600 text-white shadow-md'
+                                        ? 'bg-blue-500 text-white shadow-md'
                                         : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/60',
                                     'flex items-center py-2.5 px-4 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out'
                                 ]">
                             <DocumentTextIcon class="w-5 h-5 mr-2" />
                             <span>Radicados</span>
                             <span :class="[
-                                    activeTab === 'radicados' ? 'bg-indigo-400 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200',
+                                    activeTab === 'radicados' ? 'bg-blue-400 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200',
                                     'ml-2 text-xs font-semibold py-0.5 px-2 rounded-full'
                                 ]">
                                 {{ pendientesCounts ? pendientesCounts.radicados : 0 }}
@@ -224,14 +227,14 @@ const formatFecha = (fechaISO) => {
                         <button @click="activeTab = 'contratos'"
                                 :class="[
                                     activeTab === 'contratos'
-                                        ? 'bg-indigo-600 text-white shadow-md'
+                                        ? 'bg-blue-500 text-white shadow-md'
                                         : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/60',
                                     'flex items-center py-2.5 px-4 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out'
                                 ]">
                             <ClipboardDocumentCheckIcon class="w-5 h-5 mr-2" />
                             <span>Contratos</span>
                             <span :class="[
-                                    activeTab === 'contratos' ? 'bg-indigo-400 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200',
+                                    activeTab === 'contratos' ? 'bg-blue-400 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200',
                                     'ml-2 text-xs font-semibold py-0.5 px-2 rounded-full'
                                 ]">
                                 {{ pendientesCounts ? pendientesCounts.contratos : 0 }}
@@ -277,10 +280,9 @@ const formatFecha = (fechaISO) => {
                                 <span v-if="activeTab === 'radicados'">Fecha Revisión (Desde)</span>
                                 <span v-if="activeTab === 'contratos'">Fecha Creación (Desde)</span>
                             </label>
-                            <input v-model="startDate"
+                            <DatePicker v-model="startDate"
                                    id="start_date"
-                                   type="date"
-                                   class="block w-full border border-gray-300 rounded-lg shadow-sm leading-5 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" />
+                                   class="block w-full" />
                         </div>
                         <!-- Fecha de Fin -->
                         <div class="flex-1">
@@ -289,10 +291,9 @@ const formatFecha = (fechaISO) => {
                                 <span v-if="activeTab === 'radicados'">Fecha Revisión (Hasta)</span>
                                 <span v-if="activeTab === 'contratos'">Fecha Creación (Hasta)</span>
                             </label>
-                            <input v-model="endDate"
+                            <DatePicker v-model="endDate"
                                    id="end_date"
-                                   type="date"
-                                   class="block w-full border border-gray-300 rounded-lg shadow-sm leading-5 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" />
+                                   class="block w-full" />
                         </div>
 
                         <!-- --- INICIO: FILTRO ABOGADO --- -->
@@ -300,14 +301,24 @@ const formatFecha = (fechaISO) => {
                             <label for="abogado_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Abogado Responsable
                             </label>
-                            <select v-model="abogadoId"
-                                    id="abogado_id"
-                                    class="block w-full border border-gray-300 rounded-lg shadow-sm leading-5 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2">
-                                <option value="">Todos los Abogados</option>
-                                <option v-for="abogado in abogados" :key="abogado.id" :value="abogado.id">
-                                    {{ formatNombre(abogado) }} <!-- Usará .name -->
-                                </option>
-                            </select>
+                            <Dropdown align="left" width="full">
+                                <template #trigger>
+                                    <button type="button" class="w-full flex items-center justify-between gap-2 border border-gray-300 rounded-lg shadow-sm leading-5 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition-all cursor-pointer">
+                                        <span class="truncate">{{ abogadoId ? abogados.find(a => a.id === abogadoId)?.name : 'Todos los Abogados' }}</span>
+                                        <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                    </button>
+                                </template>
+                                <template #content>
+                                    <div class="py-1 bg-white dark:bg-gray-800 max-h-60 overflow-y-auto">
+                                        <button @click="abogadoId = ''" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': abogadoId === '' }">
+                                            Todos los Abogados
+                                        </button>
+                                        <button v-for="abogado in abogados" :key="abogado.id" @click="abogadoId = abogado.id" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': abogadoId === abogado.id }">
+                                            {{ abogado.name }}
+                                        </button>
+                                    </div>
+                                </template>
+                            </Dropdown>
                         </div>
                         <!-- --- FIN: FILTRO ABOGADO --- -->
 
@@ -321,7 +332,7 @@ const formatFecha = (fechaISO) => {
                         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ progresoActual.texto }}</span>
                     </div>
                     <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 shadow-inner">
-                        <div class="bg-indigo-600 h-2.5 rounded-full transition-all duration-500 ease-out"
+                        <div class="bg-blue-500 h-2.5 rounded-full transition-all duration-500 ease-out"
                              :style="{ width: progresoActual.porcentaje + '%' }">
                         </div>
                     </div>
@@ -355,8 +366,8 @@ const formatFecha = (fechaISO) => {
                                             class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 ease-in-out group relative"
                                             :class="[
                                                 caso.revisadoHoy
-                                                    ? 'bg-green-500 text-white hover:bg-green-600'
-                                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 hover:text-indigo-600 dark:hover:text-indigo-400'
+                                                    ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 dark:hover:text-blue-400'
                                             ]"
                                             :title="caso.revisadoHoy ? 'Marcar como pendiente' : 'Marcar como revisado'">
                                         <CheckIcon v-if="caso.revisadoHoy" class="w-6 h-6" />
@@ -418,8 +429,8 @@ const formatFecha = (fechaISO) => {
                                             class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 ease-in-out group relative"
                                             :class="[
                                                 radicado.revisadoHoy
-                                                    ? 'bg-green-500 text-white hover:bg-green-600'
-                                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 hover:text-indigo-600 dark:hover:text-indigo-400'
+                                                    ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 dark:hover:text-blue-400'
                                             ]"
                                             :title="radicado.revisadoHoy ? 'Marcar como pendiente' : 'Marcar como revisado'">
                                         <CheckIcon v-if="radicado.revisadoHoy" class="w-6 h-6" />
@@ -477,8 +488,8 @@ const formatFecha = (fechaISO) => {
                                             class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 ease-in-out group relative"
                                             :class="[
                                                 contrato.revisadoHoy
-                                                    ? 'bg-green-500 text-white hover:bg-green-600'
-                                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 hover:text-indigo-600 dark:hover:text-indigo-400'
+                                                    ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 dark:hover:text-blue-400'
                                             ]"
                                             :title="contrato.revisadoHoy ? 'Marcar como pendiente' : 'Marcar como revisado'">
                                         <CheckIcon v-if="contrato.revisadoHoy" class="w-6 h-6" />

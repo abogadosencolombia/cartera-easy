@@ -26,10 +26,10 @@ return new class extends Migration
         }
 
         // 2. Encontrar todos los IDs de 'personas' que fueron codeudores
-        $personaIds = Caso::whereNotNull('codeudor1_id')
+        $personaIds = DB::table('casos')->whereNotNull('codeudor1_id')
             ->select('codeudor1_id as id')
             ->union(
-                Caso::whereNotNull('codeudor2_id')->select('codeudor2_id as id')
+                DB::table('casos')->whereNotNull('codeudor2_id')->select('codeudor2_id as id')
             )
             ->distinct()
             ->pluck('id');
@@ -57,7 +57,7 @@ return new class extends Migration
         }
 
         // 4. Llenar la tabla pivote 'caso_codeudor'
-        $casosAntiguos = Caso::whereNotNull('codeudor1_id')
+        $casosAntiguos = DB::table('casos')->whereNotNull('codeudor1_id')
             ->orWhereNotNull('codeudor2_id')
             ->get(['id', 'codeudor1_id', 'codeudor2_id']);
         
