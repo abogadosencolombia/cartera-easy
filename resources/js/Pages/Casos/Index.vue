@@ -240,7 +240,14 @@ const formatLabel = (text) => {
                                     </td>
 
                                     <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                        {{ caso.user ? caso.user.name : 'N/A' }}
+                                        <div class="flex flex-wrap gap-1 max-w-[150px]">
+                                            <template v-if="caso.users && caso.users.length > 0">
+                                                <span v-for="u in caso.users" :key="u.id" class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-[10px] font-medium truncate" :title="u.name">
+                                                    {{ u.name }}
+                                                </span>
+                                            </template>
+                                            <span v-else>{{ caso.user ? caso.user.name : 'N/A' }}</span>
+                                        </div>
                                     </td>
                                     <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                         {{ formatDate(caso.created_at) }}

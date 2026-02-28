@@ -96,6 +96,12 @@ class Caso extends Model
     }
 
     public function cooperativa(): BelongsTo { return $this->belongsTo(Cooperativa::class); }
+    
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'caso_user');
+    }
+
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
     public function deudor(): BelongsTo { return $this->belongsTo(Persona::class, 'deudor_id'); }
     

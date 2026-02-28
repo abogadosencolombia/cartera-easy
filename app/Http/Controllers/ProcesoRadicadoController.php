@@ -548,6 +548,8 @@ class ProcesoRadicadoController extends Controller
                 }
 
                 if ($persona) {
+                    if (!empty($parte['cooperativas_ids'])) $persona->cooperativas()->sync($parte['cooperativas_ids']);
+                    if (!empty($parte['abogados_ids'])) $persona->abogados()->sync($parte['abogados_ids']);
                     $ids[] = $persona->id;
                 }
             }

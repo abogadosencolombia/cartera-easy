@@ -225,8 +225,15 @@ const submitNotification = () => {
                     <li class="flex items-center pt-4 border-t border-gray-200 dark:border-gray-700">
                         <UserCircleIcon class="h-6 w-6 mr-3 text-gray-400" />
                         <div class="text-sm">
-                            <span class="font-medium text-gray-900 dark:text-white">Abogado:</span>
-                            <div class="text-gray-600 dark:text-gray-300">{{ caso.user ? caso.user.name : 'N/A' }}</div>
+                            <span class="font-medium text-gray-900 dark:text-white">Responsable(s):</span>
+                            <div class="flex flex-wrap gap-1 mt-1">
+                                <template v-if="caso.users && caso.users.length > 0">
+                                    <span v-for="u in caso.users" :key="u.id" class="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-[10px] font-bold">
+                                        {{ u.name }}
+                                    </span>
+                                </template>
+                                <div v-else class="text-gray-600 dark:text-gray-300">{{ caso.user ? caso.user.name : 'N/A' }}</div>
+                            </div>
                         </div>
                     </li>
                 </ul>

@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class UpdateProcesoRadicadoRequest extends FormRequest
 {
@@ -14,32 +13,27 @@ class UpdateProcesoRadicadoRequest extends FormRequest
 
     public function rules(): array
     {
-        $proceso = $this->route('proceso');
-        $procesoId = is_object($proceso) ? $proceso->id : $proceso;
-
         return [
-            // --- CAMPOS REQUERIDOS ---
-            'tipo_proceso_id'      => ['required', 'exists:tipos_proceso,id'],
-            'abogado_id'           => ['required', 'exists:users,id'],
-            'fecha_proxima_revision' => ['required', 'date'],
-            
-            // --- CAMBIO: ARRAYS MULTIPLES ---
-            'demandantes'          => ['required', 'array', 'min:1'],
-            'demandados'           => ['required', 'array', 'min:1'],
-
-            // --- CAMPOS OPCIONALES ---
-            'radicado'             => ['nullable', 'string', 'max:255', Rule::unique('proceso_radicados')->ignore($procesoId)],
+            'radicado'             => ['nullable', 'string', 'max:255'],
             'fecha_radicado'       => ['nullable', 'date'],
             'naturaleza'           => ['nullable', 'string', 'max:255'],
             'asunto'               => ['nullable', 'string', 'max:500'],
             'correo_radicacion'    => ['nullable', 'email', 'max:255'],
             'fecha_revision'       => ['nullable', 'date'],
+            'fecha_proxima_revision' => ['required', 'date'],
             'link_expediente'      => ['nullable', 'string', 'max:1024'],
             'ubicacion_drive'      => ['nullable', 'string', 'max:1024'],
             'correos_juzgado'      => ['nullable', 'string'],
             'observaciones'        => ['nullable', 'string'],
+
+            'abogado_id'              => ['required', 'exists:users,id'],
             'responsable_revision_id' => ['nullable', 'exists:users,id'],
-            'juzgado_id'           => ['nullable', 'exists:juzgados,id'],
+            'juzgado_id'              => ['nullable', 'exists:juzgados,id'],
+            'tipo_proceso_id'         => ['required', 'exists:tipos_proceso,id'],
+            'etapa_procesal_id'       => ['nullable', 'exists:etapas_procesales,id'],
+
+            'demandantes'             => ['required', 'array', 'min:1'],
+            'demandados'              => ['nullable', 'array'],
         ];
     }
 }
