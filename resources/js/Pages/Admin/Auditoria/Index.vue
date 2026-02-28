@@ -12,13 +12,16 @@ import {
     CheckCircleIcon,
     InformationCircleIcon,
     ShieldCheckIcon,
-    ClockIcon
+    ClockIcon,
+    ChevronDownIcon
 } from '@heroicons/vue/24/outline';
 import Pagination from '@/Components/Pagination.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
+import Dropdown from '@/Components/Dropdown.vue';
+import DatePicker from '@/Components/DatePicker.vue';
 
 const props = defineProps({
     eventos: Object, // Laravel Paginator Object
@@ -125,16 +128,25 @@ const getCriticidadConfig = (nivel) => {
                             <!-- Filtro Usuario -->
                             <div class="space-y-2">
                                 <InputLabel for="filtro_usuario" value="¿Quién realizó la acción?" />
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <UserIcon class="h-5 w-5 text-gray-400" />
-                                    </div>
-                                    <select v-model="filtroForm.user_id" id="filtro_usuario" 
-                                        class="pl-10 mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                                        <option value="">Todos los usuarios</option>
-                                        <option v-for="user in usuarios" :key="user.id" :value="user.id">{{ user.name }}</option>
-                                    </select>
-                                </div>
+                                <Dropdown align="left" width="full">
+                                    <template #trigger>
+                                        <button type="button" class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 dark:border-gray-700 dark:bg-gray-900 bg-white px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer dark:text-gray-300">
+                                            <div class="flex items-center gap-2 truncate">
+                                                <UserIcon class="h-5 w-5 text-gray-400" />
+                                                <span class="truncate">{{ filtroForm.user_id ? usuarios.find(u => u.id === filtroForm.user_id)?.name : 'Todos los usuarios' }}</span>
+                                            </div>
+                                            <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                        </button>
+                                    </template>
+                                    <template #content>
+                                        <div class="py-1 bg-white dark:bg-gray-800 max-h-60 overflow-y-auto">
+                                            <button @click="filtroForm.user_id = ''" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filtroForm.user_id === '' }">Todos los usuarios</button>
+                                            <button v-for="user in usuarios" :key="user.id" @click="filtroForm.user_id = user.id" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filtroForm.user_id === user.id }">
+                                                {{ user.name }}
+                                            </button>
+                                        </div>
+                                    </template>
+                                </Dropdown>
                             </div>
 
                             <!-- Filtro Evento -->
@@ -157,33 +169,13 @@ const getCriticidadConfig = (nivel) => {
                             <!-- Filtro Fecha Desde -->
                             <div class="space-y-2">
                                 <InputLabel for="fecha_desde" value="Desde la fecha" />
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <CalendarDaysIcon class="h-5 w-5 text-gray-400" />
-                                    </div>
-                                    <TextInput 
-                                        type="date" 
-                                        v-model="filtroForm.fecha_desde" 
-                                        id="fecha_desde" 
-                                        class="pl-10 mt-1 block w-full text-gray-500"
-                                    />
-                                </div>
+                                <DatePicker v-model="filtroForm.fecha_desde" id="fecha_desde" class="w-full" />
                             </div>
 
                             <!-- Filtro Fecha Hasta -->
                             <div class="space-y-2">
                                 <InputLabel for="fecha_hasta" value="Hasta la fecha" />
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <CalendarDaysIcon class="h-5 w-5 text-gray-400" />
-                                    </div>
-                                    <TextInput 
-                                        type="date" 
-                                        v-model="filtroForm.fecha_hasta" 
-                                        id="fecha_hasta" 
-                                        class="pl-10 mt-1 block w-full text-gray-500"
-                                    />
-                                </div>
+                                <DatePicker v-model="filtroForm.fecha_hasta" id="fecha_hasta" class="w-full" />
                             </div>
                         </div>
 

@@ -231,7 +231,7 @@ const lineData = computed(() => {
                             </div>
 
                             <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                                <button @click="mostrandoModalContacto = true" class="inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none transition-all">
+                                <button @click="mostrandoModalContacto = true" class="inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-200 dark:shadow-none transition-all">
                                     <EnvelopeIcon class="w-5 h-5 mr-2"/> Contactar Gestor
                                 </button>
                                 <a href="https://wa.me/573152819233" target="_blank" class="inline-flex justify-center items-center px-6 py-3 border border-gray-200 dark:border-gray-600 text-base font-medium rounded-xl text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-all">

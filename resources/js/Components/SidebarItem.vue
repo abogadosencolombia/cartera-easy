@@ -23,8 +23,7 @@ const unreadCount = computed(() => usePage().props.auth?.unreadNotifications ?? 
   <div>
     <Link v-if="item.type === 'link' || item.type === 'notification'" :href="item.href"
           :class="['group flex items-center w-full px-3 py-2.5 text-sm font-medium rounded-md transition-colors',
-                   isRouteActive(item.active) ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:bg-gray-700 hover:text-white']">
-      <component :is="item.icon" :class="['h-6 w-6 mr-3', isRouteActive(item.active) ? 'text-white' : 'text-gray-400 group-hover:text-gray-300']" aria-hidden="true" />
+                                       isRouteActive(item.active) ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-gray-300 hover:bg-gray-700 hover:text-white']">      <component :is="item.icon" :class="['h-6 w-6 mr-3', isRouteActive(item.active) ? 'text-white' : 'text-gray-400 group-hover:text-gray-300']" aria-hidden="true" />
       <span class="truncate flex-1">{{ item.label }}</span>
       <span v-if="item.type === 'notification' && unreadCount > 0"
             class="ml-auto inline-block py-0.5 px-2 text-xs rounded-full bg-red-500 text-white">

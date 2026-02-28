@@ -9,9 +9,12 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth; // ✅ Auth
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class DocumentoProcesoController extends Controller
 {
+    use AuthorizesRequests;
+
     public function store(Request $request, ProcesoRadicado $proceso)
     {
         $data = $request->validate([

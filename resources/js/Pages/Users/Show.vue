@@ -141,7 +141,7 @@ const getDocumentUrl = (path) => {
                                 </span>
                             </div>
                              <div class="mt-6 w-full">
-                                 <Link :href="route('admin.users.edit', user.id)" class="w-full text-center inline-flex items-center justify-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase hover:bg-indigo-500">
+                                 <Link :href="route('admin.users.edit', user.id)" class="w-full text-center inline-flex items-center justify-center px-4 py-2 bg-blue-500 border border-transparent rounded-md font-semibold text-xs text-white uppercase hover:bg-blue-600 transition-colors shadow-sm">
                                      Editar Información
                                  </Link>
                              </div>
@@ -216,7 +216,7 @@ const getDocumentUrl = (path) => {
                                         </div>
                                     </div>
                                     <div class="mt-4 text-right">
-                                        <button type="submit" :disabled="documentForm.processing" class="inline-flex items-center px-4 py-2 bg-indigo-600 border rounded-md font-semibold text-xs text-white hover:bg-indigo-500 disabled:opacity-50">
+                                        <button type="submit" :disabled="documentForm.processing" class="inline-flex items-center px-4 py-2 bg-blue-500 border rounded-md font-semibold text-xs text-white hover:bg-blue-600 disabled:opacity-50 transition-colors shadow-sm">
                                             <DocumentPlusIcon class="h-4 w-4 mr-2"/>Añadir Documento
                                         </button>
                                     </div>

@@ -2,6 +2,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import Dropdown from '@/Components/Dropdown.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { reactive, watch, computed } from 'vue';
 import { 
@@ -18,7 +19,8 @@ import {
   XMarkIcon,
   FunnelIcon,
   BarsArrowUpIcon, // Iconos para ordenamiento
-  BarsArrowDownIcon
+  BarsArrowDownIcon,
+  ChevronDownIcon
 } from '@heroicons/vue/24/outline';
 import { debounce } from 'lodash';
 import Swal from 'sweetalert2';
@@ -251,49 +253,73 @@ const restorePersona = (id) => {
               <!-- 2. Cooperativa -->
               <div class="md:col-span-3">
                 <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 ml-1">Filtrar por Cooperativa</label>
-                <select 
-                  v-model="params.cooperativa_id" 
-                  class="block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm shadow-sm hover:border-gray-400 dark:hover:border-gray-500 transition-all cursor-pointer"
-                  :class="{'border-indigo-300 bg-indigo-50/30 text-indigo-900 dark:bg-indigo-900/10 dark:text-indigo-100': params.cooperativa_id}"
-                >
-                  <option value="">Todas las Cooperativas</option>
-                  <option v-for="coop in cooperativas" :key="coop.id" :value="coop.id">{{ coop.nombre }}</option>
-                </select>
+                <Dropdown align="left" width="full">
+                    <template #trigger>
+                        <button type="button" class="w-full flex items-center justify-between gap-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm shadow-sm hover:border-gray-400 dark:hover:border-gray-500 transition-all cursor-pointer" :class="{'border-indigo-300 bg-indigo-50/30 text-indigo-900 dark:bg-indigo-900/10 dark:text-indigo-100': params.cooperativa_id}">
+                            <span class="truncate">{{ params.cooperativa_id ? cooperativas.find(c => c.id === params.cooperativa_id)?.nombre : 'Todas las Cooperativas' }}</span>
+                            <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                        </button>
+                    </template>
+                    <template #content>
+                        <div class="py-1 bg-white dark:bg-gray-800">
+                            <button @click="params.cooperativa_id = ''" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': params.cooperativa_id === '' }">
+                                Todas las Cooperativas
+                            </button>
+                            <button v-for="coop in cooperativas" :key="coop.id" @click="params.cooperativa_id = coop.id" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': params.cooperativa_id === coop.id }">
+                                {{ coop.nombre }}
+                            </button>
+                        </div>
+                    </template>
+                </Dropdown>
               </div>
 
               <!-- 3. Abogado -->
               <div class="md:col-span-3">
                 <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 ml-1">Filtrar por Abogado</label>
-                <select 
-                  v-model="params.abogado_id" 
-                  class="block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm shadow-sm hover:border-gray-400 dark:hover:border-gray-500 transition-all cursor-pointer"
-                  :class="{'border-indigo-300 bg-indigo-50/30 text-indigo-900 dark:bg-indigo-900/10 dark:text-indigo-100': params.abogado_id}"
-                >
-                  <option value="">Todos los Abogados</option>
-                  <option v-for="abg in abogados" :key="abg.id" :value="abg.id">{{ abg.name }}</option>
-                </select>
+                <Dropdown align="left" width="full">
+                    <template #trigger>
+                        <button type="button" class="w-full flex items-center justify-between gap-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm shadow-sm hover:border-gray-400 dark:hover:border-gray-500 transition-all cursor-pointer" :class="{'border-indigo-300 bg-indigo-50/30 text-indigo-900 dark:bg-indigo-900/10 dark:text-indigo-100': params.abogado_id}">
+                            <span class="truncate">{{ params.abogado_id ? abogados.find(a => a.id === params.abogado_id)?.name : 'Todos los Abogados' }}</span>
+                            <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                        </button>
+                    </template>
+                    <template #content>
+                        <div class="py-1 bg-white dark:bg-gray-800">
+                            <button @click="params.abogado_id = ''" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': params.abogado_id === '' }">
+                                Todos los Abogados
+                            </button>
+                            <button v-for="abg in abogados" :key="abg.id" @click="params.abogado_id = abg.id" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': params.abogado_id === abg.id }">
+                                {{ abg.name }}
+                            </button>
+                        </div>
+                    </template>
+                </Dropdown>
               </div>
 
               <!-- 4. Ordenamiento (Mejorado con iconos) -->
               <div class="md:col-span-2">
                 <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 ml-1">Orden</label>
-                <div class="relative">
-                  <select 
-                    v-model="sortOption" 
-                    class="block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm shadow-sm hover:border-gray-400 dark:hover:border-gray-500 transition-all cursor-pointer pl-9"
-                  >
-                    <option value="created_at|desc">Recientes</option>
-                    <option value="created_at|asc">Antiguos</option>
-                    <option value="nombre_completo|asc">A - Z</option>
-                    <option value="nombre_completo|desc">Z - A</option>
-                  </select>
-                  <!-- Icono dinámico -->
-                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                     <BarsArrowDownIcon v-if="params.sort === 'created_at' && params.direction === 'desc'" class="h-4 w-4 text-gray-400" />
-                     <BarsArrowUpIcon v-else-if="params.sort === 'created_at' && params.direction === 'asc'" class="h-4 w-4 text-gray-400" />
-                     <span v-else class="text-gray-400 text-xs font-bold">AZ</span>
-                  </div>
-                </div>
+                <Dropdown align="right" width="full">
+                    <template #trigger>
+                        <button type="button" class="w-full flex items-center justify-between gap-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm shadow-sm hover:border-gray-400 dark:hover:border-gray-500 transition-all cursor-pointer">
+                            <div class="flex items-center gap-2">
+                                <BarsArrowDownIcon v-if="params.sort === 'created_at' && params.direction === 'desc'" class="h-4 w-4 text-gray-400" />
+                                <BarsArrowUpIcon v-else-if="params.sort === 'created_at' && params.direction === 'asc'" class="h-4 w-4 text-gray-400" />
+                                <span v-else class="text-gray-400 text-xs font-bold">AZ</span>
+                                <span>{{ sortOption === 'created_at|desc' ? 'Recientes' : (sortOption === 'created_at|asc' ? 'Antiguos' : (sortOption === 'nombre_completo|asc' ? 'A - Z' : 'Z - A')) }}</span>
+                            </div>
+                            <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                        </button>
+                    </template>
+                    <template #content>
+                        <div class="py-1 bg-white dark:bg-gray-800">
+                            <button @click="sortOption = 'created_at|desc'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': sortOption === 'created_at|desc' }">Recientes</button>
+                            <button @click="sortOption = 'created_at|asc'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': sortOption === 'created_at|asc' }">Antiguos</button>
+                            <button @click="sortOption = 'nombre_completo|asc'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': sortOption === 'nombre_completo|asc' }">A - Z</button>
+                            <button @click="sortOption = 'nombre_completo|desc'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': sortOption === 'nombre_completo|desc' }">Z - A</button>
+                        </div>
+                    </template>
+                </Dropdown>
               </div>
 
             </div>

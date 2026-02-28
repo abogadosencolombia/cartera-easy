@@ -609,20 +609,20 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
                         </button>
                     </template>
                     <template v-if="['PAGOS_PENDIENTES', 'PAGO_PARCIAL'].includes(props.contrato?.estado)">
-                        <button v-if="saldo <= 0" @click="accionesForm.post(route('honorarios.contratos.saldar', props.contrato.id), { preserveScroll: true })" class="text-sm px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700">
+                        <button v-if="saldo <= 0" @click="accionesForm.post(route('honorarios.contratos.saldar', props.contrato.id), { preserveScroll: true })" class="text-sm px-3 py-1.5 rounded-md bg-blue-500 text-white hover:bg-blue-600 transition-colors shadow-sm">
                             Saldar y Cerrar
                         </button>
-                        <button v-if="props.contrato?.estado !== 'ACTIVO'" @click="accionesForm.post(route('honorarios.contratos.activar', props.contrato.id), { preserveScroll: true })" class="text-sm px-3 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-700">
+                        <button v-if="props.contrato?.estado !== 'ACTIVO'" @click="accionesForm.post(route('honorarios.contratos.activar', props.contrato.id), { preserveScroll: true })" class="text-sm px-3 py-1.5 rounded-md bg-blue-500 text-white hover:bg-blue-600 transition-colors shadow-sm">
                             Activar
                         </button>
                     </template>
                     <button v-if="props.contrato?.estado === 'CERRADO'"
                             @click="accionesForm.post(route('honorarios.contratos.reabrir', props.contrato.id), { preserveScroll: true })"
-                            class="text-sm px-3 py-1.5 rounded-md bg-amber-600 text-white hover:bg-amber-700">
+                            class="text-sm px-3 py-1.5 rounded-md bg-blue-500 text-white hover:bg-blue-600 transition-colors shadow-sm">
                         Reabrir
                     </button>
                     <button @click="abrirReestructurarModal"
-                            class="text-sm px-3 py-1.5 rounded-md bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900">
+                            class="text-sm px-3 py-1.5 rounded-md bg-blue-500 text-white hover:bg-blue-600 transition-colors shadow-sm">
                         Reestructurar
                     </button>
 

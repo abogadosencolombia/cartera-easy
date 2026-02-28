@@ -6,9 +6,11 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import TextInput from '@/Components/TextInput.vue';
+import DatePicker from '@/Components/DatePicker.vue';
 import Textarea from '@/Components/Textarea.vue';
 import Checkbox from '@/Components/Checkbox.vue';
 import Modal from '@/Components/Modal.vue';
+import Dropdown from '@/Components/Dropdown.vue';
 import { Head, Link, useForm, usePage, useRemember, router } from '@inertiajs/vue3';
 import { ref, computed, watch, onMounted } from 'vue';
 import vSelect from 'vue-select';
@@ -367,17 +369,17 @@ const submit = () => {
                                             </div>
                                             <div>
                                                 <InputLabel for="fecha_inicio_credito" value="Fecha Inicio del Crédito" />
-                                                <TextInput v-model="form.fecha_inicio_credito" id="fecha_inicio_credito" type="date" class="mt-1 block w-full" />
+                                                <DatePicker v-model="form.fecha_inicio_credito" id="fecha_inicio_credito" class="mt-1 block w-full" />
                                                 <InputError :message="form.errors.fecha_inicio_credito" class="mt-2" />
                                             </div>
                                             <div>
                                                 <InputLabel for="fecha_apertura" value="Fecha de Demanda" />
-                                                <TextInput v-model="form.fecha_apertura" id="fecha_apertura" type="date" class="mt-1 block w-full" />
+                                                <DatePicker v-model="form.fecha_apertura" id="fecha_apertura" class="mt-1 block w-full" />
                                                 <InputError :message="form.errors.fecha_apertura" class="mt-2" />
                                             </div>
                                             <div>
                                                 <InputLabel for="fecha_vencimiento" value="Fecha de Vencimiento" />
-                                                <TextInput v-model="form.fecha_vencimiento" id="fecha_vencimiento" type="date" class="mt-1 block w-full" />
+                                                <DatePicker v-model="form.fecha_vencimiento" id="fecha_vencimiento" class="mt-1 block w-full" />
                                                 <InputError :message="form.errors.fecha_vencimiento" class="mt-2" />
                                             </div>
 
@@ -480,10 +482,24 @@ const submit = () => {
                                             </div>
                                             <div>
                                                 <InputLabel for="etapa_procesal" value="Etapa Procesal" />
-                                                <select v-model="form.etapa_procesal" id="etapa_procesal" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
-                                                    <option :value="null">-- Sin especificar --</option>
-                                                    <option v-for="etapa in etapas_procesales" :key="etapa" :value="etapa">{{ formatLabel(etapa) }}</option>
-                                                </select>
+                                                <Dropdown align="left" width="full">
+                                                    <template #trigger>
+                                                        <button type="button" class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 dark:border-gray-700 dark:bg-gray-900 bg-white px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer dark:text-gray-300">
+                                                            <span>{{ form.etapa_procesal ? formatLabel(form.etapa_procesal) : '-- Sin especificar --' }}</span>
+                                                            <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                                        </button>
+                                                    </template>
+                                                    <template #content>
+                                                        <div class="py-1 bg-white dark:bg-gray-800 max-h-60 overflow-y-auto">
+                                                            <button @click="form.etapa_procesal = null" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': form.etapa_procesal === null }">
+                                                                -- Sin especificar --
+                                                            </button>
+                                                            <button v-for="etapa in etapas_procesales" :key="etapa" @click="form.etapa_procesal = etapa" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': form.etapa_procesal === etapa }">
+                                                                {{ formatLabel(etapa) }}
+                                                            </button>
+                                                        </div>
+                                                    </template>
+                                                </Dropdown>
                                                 <InputError class="mt-2" :message="form.errors.etapa_procesal" />
                                             </div>
                                             <div class="md:col-span-2">
@@ -615,7 +631,7 @@ const submit = () => {
                                                     </p>
                                                 </div>
                                                 <div>
-                                                    <PrimaryButton v-if="caso.nota_cierre" type="button" @click="submitReopen" class="bg-indigo-600 hover:bg-indigo-500">
+                                                    <PrimaryButton v-if="caso.nota_cierre" type="button" @click="submitReopen" class="bg-blue-500 hover:bg-blue-600">
                                                         <ArrowPathIcon class="h-4 w-4 mr-2" /> Reabrir
                                                     </PrimaryButton>
                                                     <DangerButton v-else type="button" @click="confirmClose">

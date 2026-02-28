@@ -5,6 +5,8 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { Chart, registerables } from 'chart.js';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import Dropdown from '@/Components/Dropdown.vue';
+import DatePicker from '@/Components/DatePicker.vue';
 
 // --- ICONOS ---
 import {
@@ -241,39 +243,73 @@ const formatDateForCompliance = (dateString) => {
                         <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Filtros Globales del Reporte</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             <div>
-                                <label for="filtro_cooperativa" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cooperativa</label>
-                                <select v-model="filtroForm.cooperativa_id" id="filtro_cooperativa" @change="aplicarFiltros" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option value="">Todas</option>
-                                    <option v-for="coop in cooperativas" :key="coop.id" :value="coop.id">{{ coop.nombre }}</option>
-                                </select>
+                                <label for="filtro_cooperativa" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cooperativa</label>
+                                <Dropdown align="left" width="full">
+                                    <template #trigger>
+                                        <button type="button" class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 dark:border-gray-700 dark:bg-gray-900 px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer">
+                                            <span class="truncate">{{ filtroForm.cooperativa_id ? cooperativas.find(c => c.id === filtroForm.cooperativa_id)?.nombre : 'Todas' }}</span>
+                                            <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                        </button>
+                                    </template>
+                                    <template #content>
+                                        <div class="py-1 bg-white dark:bg-gray-800 max-h-60 overflow-y-auto">
+                                            <button @click="filtroForm.cooperativa_id = ''; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filtroForm.cooperativa_id === '' }">Todas</button>
+                                            <button v-for="coop in cooperativas" :key="coop.id" @click="filtroForm.cooperativa_id = coop.id; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filtroForm.cooperativa_id === coop.id }">
+                                                {{ coop.nombre }}
+                                            </button>
+                                        </div>
+                                    </template>
+                                </Dropdown>
                             </div>
                             <div>
-                                <label for="filtro_abogado" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Gestor Asignado</label>
-                                <select v-model="filtroForm.user_id" id="filtro_abogado" @change="aplicarFiltros" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option value="">Todos</option>
-                                    <option v-for="user in abogadosYGestores" :key="user.id" :value="user.id">{{ user.name }}</option>
-                                </select>
+                                <label for="filtro_abogado" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Gestor Asignado</label>
+                                <Dropdown align="left" width="full">
+                                    <template #trigger>
+                                        <button type="button" class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 dark:border-gray-700 dark:bg-gray-900 px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer">
+                                            <span class="truncate">{{ filtroForm.user_id ? abogadosYGestores.find(u => u.id === filtroForm.user_id)?.name : 'Todos' }}</span>
+                                            <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                        </button>
+                                    </template>
+                                    <template #content>
+                                        <div class="py-1 bg-white dark:bg-gray-800 max-h-60 overflow-y-auto">
+                                            <button @click="filtroForm.user_id = ''; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filtroForm.user_id === '' }">Todos</button>
+                                            <button v-for="user in abogadosYGestores" :key="user.id" @click="filtroForm.user_id = user.id; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filtroForm.user_id === user.id }">
+                                                {{ user.name }}
+                                            </button>
+                                        </div>
+                                    </template>
+                                </Dropdown>
                             </div>
                             <div>
-                                <label for="filtro_tipo_proceso" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de Proceso</label>
-                                <select v-model="filtroForm.tipo_proceso" id="filtro_tipo_proceso" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option value="">Todos</option>
-                                    <option value="ejecutivo singular">Ejecutivo Singular</option>
-                                    <option value="hipotecario">Hipotecario</option>
-                                    <option value="prendario">Prendario</option>
-                                    <option value="libranza">Libranza</option>
-                                </select>
+                                <label for="filtro_tipo_proceso" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de Proceso</label>
+                                <Dropdown align="left" width="full">
+                                    <template #trigger>
+                                        <button type="button" class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 dark:border-gray-700 dark:bg-gray-900 px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer">
+                                            <span class="truncate">{{ filtroForm.tipo_proceso === '' ? 'Todos' : filtroForm.tipo_proceso.charAt(0).toUpperCase() + filtroForm.tipo_proceso.slice(1) }}</span>
+                                            <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                        </button>
+                                    </template>
+                                    <template #content>
+                                        <div class="py-1 bg-white dark:bg-gray-800">
+                                            <button @click="filtroForm.tipo_proceso = ''" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filtroForm.tipo_proceso === '' }">Todos</button>
+                                            <button @click="filtroForm.tipo_proceso = 'ejecutivo singular'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filtroForm.tipo_proceso === 'ejecutivo singular' }">Ejecutivo Singular</button>
+                                            <button @click="filtroForm.tipo_proceso = 'hipotecario'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filtroForm.tipo_proceso === 'hipotecario' }">Hipotecario</button>
+                                            <button @click="filtroForm.tipo_proceso = 'prendario'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filtroForm.tipo_proceso === 'prendario' }">Prendario</button>
+                                            <button @click="filtroForm.tipo_proceso = 'libranza'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filtroForm.tipo_proceso === 'libranza' }">Libranza</button>
+                                        </div>
+                                    </template>
+                                </Dropdown>
                             </div>
                             
                             <!-- ELIMINADO FILTRO ESTADO PROCESO -->
 
                             <div>
-                                <label for="fecha_desde" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Desde (Creación)</label>
-                                <input type="date" v-model="filtroForm.fecha_desde" id="fecha_desde" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                <label for="fecha_desde" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Desde (Creación)</label>
+                                <DatePicker v-model="filtroForm.fecha_desde" id="fecha_desde" class="mt-1 block w-full" />
                             </div>
                             <div>
-                                <label for="fecha_hasta" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Hasta (Creación)</label>
-                                <input type="date" v-model="filtroForm.fecha_hasta" id="fecha_hasta" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                <label for="fecha_hasta" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Hasta (Creación)</label>
+                                <DatePicker v-model="filtroForm.fecha_hasta" id="fecha_hasta" class="mt-1 block w-full" />
                             </div>
                             <div class="lg:col-start-3 lg:col-span-2 flex items-end space-x-2">
                                 <PrimaryButton @click="aplicarFiltros" class="w-full justify-center h-10">Aplicar Filtros</PrimaryButton>

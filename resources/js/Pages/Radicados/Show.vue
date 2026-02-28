@@ -10,9 +10,11 @@ import DangerButton from '@/Components/DangerButton.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import InputError from '@/Components/InputError.vue';
 import TextInput from '@/Components/TextInput.vue';
+import DatePicker from '@/Components/DatePicker.vue';
 import Textarea from '@/Components/Textarea.vue';
+import Dropdown from '@/Components/Dropdown.vue';
 import { useProcesos } from '@/composables/useProcesos';
-import { ArrowPathIcon } from '@heroicons/vue/24/outline';
+import { ArrowPathIcon, ChevronDownIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     proceso: { type: Object, required: true },
@@ -154,7 +156,7 @@ const eliminarActuacion = (actuacionId) => {
 
         <div class="flex items-center gap-3 flex-shrink-0 flex-wrap justify-end">
           <!-- BOTÓN CAMBIAR ETAPA -->
-          <PrimaryButton @click="openEtapaModal" v-if="!isClosed" class="!bg-indigo-600 hover:!bg-indigo-700">
+          <PrimaryButton @click="openEtapaModal" v-if="!isClosed">
               <ArrowPathIcon class="w-4 h-4 mr-2" />
               Cambiar Etapa
           </PrimaryButton>
@@ -168,14 +170,14 @@ const eliminarActuacion = (actuacionId) => {
           
           <!-- Botón Contrato -->
           <Link v-if="!tieneContrato && !isClosed" :href="route('honorarios.contratos.create', { proceso_id: proceso.id, cliente_id: proceso.demandantes?.[0]?.id })">
-            <PrimaryButton class="!bg-blue-600 hover:!bg-blue-700">Generar Contrato</PrimaryButton>
+            <PrimaryButton>Generar Contrato</PrimaryButton>
           </Link>
           <Link v-else-if="tieneContrato" :href="route('honorarios.contratos.show', proceso.contrato.id)">
-             <PrimaryButton class="!bg-teal-600 hover:!bg-teal-700">Ver Contrato</PrimaryButton>
+             <PrimaryButton>Ver Contrato</PrimaryButton>
           </Link>
 
-          <DangerButton @click="openCloseModal" v-if="!isClosed && $page.props.auth.user.tipo_usuario === 'admin'">Cerrar</DangerButton>
-          <PrimaryButton @click="openReopenModal" v-if="isClosed && $page.props.auth.user.tipo_usuario === 'admin'" class="!bg-blue-600 hover:!bg-blue-700">Reabrir</PrimaryButton>
+          <PrimaryButton @click="openCloseModal" v-if="!isClosed && $page.props.auth.user.tipo_usuario === 'admin'">Cerrar</PrimaryButton>
+          <PrimaryButton @click="openReopenModal" v-if="isClosed && $page.props.auth.user.tipo_usuario === 'admin'">Reabrir</PrimaryButton>
 
           <DangerButton v-if="$page.props.auth.user.tipo_usuario === 'admin'" @click="askDelete" :disabled="isClosed">Eliminar</DangerButton>
           <Link :href="route('procesos.index')"><SecondaryButton>Volver</SecondaryButton></Link>
@@ -214,15 +216,15 @@ const eliminarActuacion = (actuacionId) => {
             <!-- Info -->
             <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg">
               <div class="p-6">
-                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                   <span>Información del Proceso</span>
                 </h3>
                 <dl class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
-                    <div class="md:col-span-2"><dt class="text-xs uppercase text-gray-500">Juzgado</dt><dd class="text-gray-900 dark:text-gray-100 mt-1">{{ proceso.juzgado?.nombre || '—' }}</dd></div>
-                    <div><dt class="text-xs uppercase text-gray-500">Tipo</dt><dd class="text-gray-900 dark:text-gray-100 mt-1">{{ proceso.tipo_proceso?.nombre || '—' }}</dd></div>
-                    <div><dt class="text-xs uppercase text-gray-500">Naturaleza</dt><dd class="text-gray-900 dark:text-gray-100 mt-1">{{ asText(proceso.naturaleza) }}</dd></div>
-                    <div class="md:col-span-2"><dt class="text-xs uppercase text-gray-500">Observaciones</dt><dd class="text-gray-900 dark:text-gray-100 mt-1 whitespace-pre-wrap">{{ asText(proceso.observaciones) }}</dd></div>
+                    <div class="md:col-span-2"><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Juzgado</dt><dd class="text-gray-900 dark:text-gray-100 mt-1">{{ proceso.juzgado?.nombre || '—' }}</dd></div>
+                    <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Tipo</dt><dd class="text-gray-900 dark:text-gray-100 mt-1">{{ proceso.tipo_proceso?.nombre || '—' }}</dd></div>
+                    <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Naturaleza</dt><dd class="text-gray-900 dark:text-gray-100 mt-1">{{ asText(proceso.naturaleza) }}</dd></div>
+                    <div class="md:col-span-2"><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Observaciones</dt><dd class="text-gray-900 dark:text-gray-100 mt-1 whitespace-pre-wrap">{{ asText(proceso.observaciones) }}</dd></div>
                 </dl>
               </div>
             </div>
@@ -232,7 +234,7 @@ const eliminarActuacion = (actuacionId) => {
               <div class="grid grid-cols-1 md:grid-cols-5 gap-8">
                 <div class="md:col-span-2 bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg">
                   <div class="p-6">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Agregar documento</h3>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Agregar documento</h3>
                     <form @submit.prevent="submitUpload" class="space-y-4">
                       <div><input ref="fileInput" type="file" @change="onPickFile" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-indigo-50 file:text-indigo-700" /><InputError :message="uploadForm.errors.archivo" class="mt-2" /></div>
                       <div><InputLabel for="nombre" value="Nombre" /><TextInput id="nombre" v-model="uploadForm.nombre" class="mt-1 block w-full" /><InputError :message="uploadForm.errors.nombre" class="mt-2" /></div>
@@ -243,20 +245,22 @@ const eliminarActuacion = (actuacionId) => {
                 </div>
                 <div class="md:col-span-3 bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg">
                   <div class="p-6">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Documentos</h3>
-                    <div v-if="files.length === 0" class="text-center py-8 text-gray-500">No hay documentos.</div>
-                    <ul v-else class="divide-y divide-gray-200 dark:divide-gray-700">
-                      <li v-for="doc in files" :key="doc.id" class="py-3 flex items-start justify-between gap-4">
-                        <div class="min-w-0 flex-1">
-                            <a :href="route('documentos-proceso.view', doc.id)" target="_blank" class="font-medium text-gray-900 dark:text-gray-100 hover:underline">{{ asText(doc.file_name) }}</a>
-                            <p class="text-xs text-gray-500 mt-1">{{ formatDate(doc.created_at) }} <span v-if="doc.descripcion"> · {{ doc.descripcion }}</span></p>
-                        </div>
-                        <div class="shrink-0 flex items-center gap-2">
-                            <a :href="route('documentos-proceso.view', doc.id)" target="_blank" class="text-gray-400 hover:text-indigo-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5c-7.633 0-10 7-10 7s2.367 7 10 7 10-7 10-7-2.367-7-10-7Zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10Z"/></svg></a>
-                            <button @click="askDeleteDoc(doc)" class="text-gray-400 hover:text-red-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                        </div>
-                      </li>
-                    </ul>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Documentos</h3>
+                    <div class="max-h-[450px] overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
+                        <div v-if="files.length === 0" class="text-center py-8 text-gray-500">No hay documentos.</div>
+                        <ul v-else class="divide-y divide-gray-200 dark:divide-gray-700">
+                          <li v-for="doc in files" :key="doc.id" class="py-3 flex items-start justify-between gap-4">
+                            <div class="min-w-0 flex-1">
+                                <a :href="route('documentos-proceso.view', doc.id)" target="_blank" class="font-medium text-gray-900 dark:text-gray-100 hover:underline break-all">{{ asText(doc.file_name) }}</a>
+                                <p class="text-xs text-gray-500 mt-1">{{ formatDate(doc.created_at) }} <span v-if="doc.descripcion"> · {{ doc.descripcion }}</span></p>
+                            </div>
+                            <div class="shrink-0 flex items-center gap-2">
+                                <a :href="route('documentos-proceso.view', doc.id)" target="_blank" class="text-gray-400 hover:text-indigo-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5c-7.633 0-10 7-10 7s2.367 7 10 7 10-7 10-7-2.367-7-10-7Zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10Z"/></svg></a>
+                                <button @click="askDeleteDoc(doc)" class="text-gray-400 hover:text-red-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                            </div>
+                          </li>
+                        </ul>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -267,15 +271,15 @@ const eliminarActuacion = (actuacionId) => {
                 <div class="p-6">
                    <fieldset :disabled="isClosed">
                         <form @submit.prevent="guardarActuacion" class="mb-6 pb-6 border-b dark:border-gray-700">
-                            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Nueva Actuación</h3>
+                            <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">Nueva Actuación</h3>
                             <div class="grid md:grid-cols-4 gap-4 mb-4">
                                 <div class="md:col-span-3"><InputLabel value="Descripción" /><Textarea v-model="actuacionForm.nota" rows="3" class="mt-1 block w-full" required /></div>
-                                <div><InputLabel value="Fecha" /><TextInput type="date" v-model="actuacionForm.fecha_actuacion" class="mt-1 block w-full" required /></div>
+                                <div><InputLabel value="Fecha" /><DatePicker v-model="actuacionForm.fecha_actuacion" class="mt-1 block w-full" /></div>
                             </div>
                             <div class="flex justify-end"><PrimaryButton :disabled="actuacionForm.processing">Registrar</PrimaryButton></div>
                         </form>
                    </fieldset>
-                   <h3 class="text-lg font-medium mb-4">Historial</h3>
+                   <h3 class="text-lg font-bold mb-4">Historial</h3>
                    <div v-if="!actuaciones.length" class="text-center py-8 text-gray-500">No hay actuaciones.</div>
                    <div v-else class="space-y-4">
                        <div v-for="actuacion in actuaciones" :key="actuacion.id" class="p-4 border rounded-lg bg-gray-50 dark:bg-gray-800/50">
@@ -297,26 +301,26 @@ const eliminarActuacion = (actuacionId) => {
           <div class="lg:col-span-1">
             <div class="sticky top-8 space-y-6">
               <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg p-6">
-                <h3 class="text-lg font-medium mb-4">Seguimiento</h3>
+                <h3 class="text-lg font-bold mb-4">Seguimiento</h3>
                 <dl class="space-y-4 text-sm">
-                   <div><dt class="text-xs uppercase text-gray-500">Próxima Revisión</dt><dd><span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold" :class="getRevisionStatus(proceso.fecha_proxima_revision).classes">{{ getRevisionStatus(proceso.fecha_proxima_revision).text }}</span></dd></div>
-                   <div><dt class="text-xs uppercase text-gray-500">Fecha Revisión</dt><dd>{{ formatDate(proceso.fecha_revision) }}</dd></div>
-                   <div><dt class="text-xs uppercase text-gray-500">Fecha Radicado</dt><dd>{{ formatDate(proceso.fecha_radicado) }}</dd></div>
+                   <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Próxima Revisión</dt><dd><span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold" :class="getRevisionStatus(proceso.fecha_proxima_revision).classes">{{ getRevisionStatus(proceso.fecha_proxima_revision).text }}</span></dd></div>
+                   <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Fecha Revisión</dt><dd>{{ formatDate(proceso.fecha_revision) }}</dd></div>
+                   <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Fecha Radicado</dt><dd>{{ formatDate(proceso.fecha_radicado) }}</dd></div>
                 </dl>
               </div>
               <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg p-6">
-                 <h3 class="text-lg font-medium mb-4">Partes</h3>
+                 <h3 class="text-lg font-bold mb-4">Partes</h3>
                  <dl class="space-y-4 text-sm">
-                     <div><dt class="text-xs uppercase text-gray-500">Demandantes</dt><dd><ul class="list-disc list-inside"><li v-for="p in proceso.demandantes" :key="p.id">{{ p.nombre_completo }}</li></ul></dd></div>
-                     <div><dt class="text-xs uppercase text-gray-500">Demandados</dt><dd><ul class="list-disc list-inside"><li v-for="p in proceso.demandados" :key="p.id">{{ p.nombre_completo }}</li></ul></dd></div>
-                     <div><dt class="text-xs uppercase text-gray-500">Abogado</dt><dd>{{ proceso.abogado?.name || '—' }}</dd></div>
+                     <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Demandantes</dt><dd><ul class="list-disc list-inside"><li v-for="p in proceso.demandantes" :key="p.id">{{ p.nombre_completo }}</li></ul></dd></div>
+                     <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Demandados</dt><dd><ul class="list-disc list-inside"><li v-for="p in proceso.demandados" :key="p.id">{{ p.nombre_completo }}</li></ul></dd></div>
+                     <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Abogado</dt><dd>{{ proceso.abogado?.name || '—' }}</dd></div>
                  </dl>
               </div>
               <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg p-6">
-                 <h3 class="text-lg font-medium mb-4">Enlaces</h3>
+                 <h3 class="text-lg font-bold mb-4">Enlaces</h3>
                  <dl class="space-y-4 text-sm">
-                     <div><dt class="text-xs uppercase text-gray-500">Expediente Digital</dt><dd><a v-if="proceso.link_expediente" :href="proceso.link_expediente" target="_blank" class="text-indigo-600 hover:underline break-all">{{ proceso.link_expediente }}</a><span v-else>—</span></dd></div>
-                     <div><dt class="text-xs uppercase text-gray-500">Drive</dt><dd><a v-if="proceso.ubicacion_drive" :href="proceso.ubicacion_drive" target="_blank" class="text-indigo-600 hover:underline break-all">{{ proceso.ubicacion_drive }}</a><span v-else>—</span></dd></div>
+                     <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Expediente Digital</dt><dd><a v-if="proceso.link_expediente" :href="proceso.link_expediente" target="_blank" class="text-indigo-600 hover:underline break-all">{{ proceso.link_expediente }}</a><span v-else>—</span></dd></div>
+                     <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Drive</dt><dd><a v-if="proceso.ubicacion_drive" :href="proceso.ubicacion_drive" target="_blank" class="text-indigo-600 hover:underline break-all">{{ proceso.ubicacion_drive }}</a><span v-else>—</span></dd></div>
                  </dl>
               </div>
             </div>
@@ -359,7 +363,7 @@ const eliminarActuacion = (actuacionId) => {
              <h2 class="text-lg font-medium">Editar Actuación</h2>
              <div class="mt-6 space-y-4">
                  <div><InputLabel value="Descripción" /><Textarea v-model="editActuacionForm.nota" rows="4" class="w-full" required /></div>
-                 <div><InputLabel value="Fecha" /><TextInput type="date" v-model="editActuacionForm.fecha_actuacion" class="w-full" required /></div>
+                 <div><InputLabel value="Fecha" /><DatePicker v-model="editActuacionForm.fecha_actuacion" class="w-full" /></div>
              </div>
              <div class="mt-6 flex justify-end gap-3"><SecondaryButton @click="cerrarModalEditar">Cancelar</SecondaryButton><PrimaryButton type="submit">Guardar</PrimaryButton></div>
         </form>
@@ -371,12 +375,21 @@ const eliminarActuacion = (actuacionId) => {
             <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Actualizar Etapa Procesal</h2>
             <div class="mb-4">
                 <InputLabel for="nueva_etapa" value="Selecciona la nueva etapa" />
-                <select id="nueva_etapa" v-model="etapaForm.etapa_procesal_id" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
-                    <option value="" disabled>Seleccione...</option>
-                    <option v-for="etapa in etapas" :key="etapa.id" :value="etapa.id">
-                        {{ etapa.nombre }} (Riesgo: {{ etapa.riesgo }})
-                    </option>
-                </select>
+                <Dropdown align="left" width="full">
+                    <template #trigger>
+                        <button type="button" class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 dark:border-gray-700 dark:bg-gray-900 bg-white px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer dark:text-gray-300">
+                            <span>{{ etapaForm.etapa_procesal_id ? etapas.find(e => e.id === etapaForm.etapa_procesal_id)?.nombre : 'Seleccione...' }}</span>
+                            <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                        </button>
+                    </template>
+                    <template #content>
+                        <div class="py-1 bg-white dark:bg-gray-800 max-h-60 overflow-y-auto">
+                            <button v-for="etapa in etapas" :key="etapa.id" @click="etapaForm.etapa_procesal_id = etapa.id" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': etapaForm.etapa_procesal_id === etapa.id }">
+                                {{ etapa.nombre }} <span class="text-[10px] opacity-60">({{ etapa.riesgo }})</span>
+                            </button>
+                        </div>
+                    </template>
+                </Dropdown>
                 <p class="text-xs text-gray-500 mt-1">Al cambiar la etapa, se reiniciarán los contadores de vencimiento.</p>
             </div>
             <div class="mb-4">

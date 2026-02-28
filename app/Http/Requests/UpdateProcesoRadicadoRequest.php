@@ -14,7 +14,8 @@ class UpdateProcesoRadicadoRequest extends FormRequest
 
     public function rules(): array
     {
-        $procesoId = $this->route('proceso')->id;
+        $proceso = $this->route('proceso');
+        $procesoId = is_object($proceso) ? $proceso->id : $proceso;
 
         return [
             // --- CAMPOS REQUERIDOS ---

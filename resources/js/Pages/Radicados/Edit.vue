@@ -8,10 +8,12 @@ import DangerButton from '@/Components/DangerButton.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import InputError from '@/Components/InputError.vue';
 import TextInput from '@/Components/TextInput.vue';
+import DatePicker from '@/Components/DatePicker.vue';
 import Textarea from '@/Components/Textarea.vue';
 import AsyncSelect from '@/Components/AsyncSelect.vue';
 import Modal from '@/Components/Modal.vue';
-import { PlusIcon, TrashIcon } from '@heroicons/vue/24/outline';
+import Dropdown from '@/Components/Dropdown.vue';
+import { PlusIcon, TrashIcon, ChevronDownIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
   proceso: { type: Object, required: true },
@@ -34,16 +36,20 @@ const mapToSelectOption = (obj, labelKey = 'nombre_completo') => obj ? { id: obj
 
 const loadPersonasArray = (personas) => {
     if (!personas || personas.length === 0) return [{ 
-        id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '' 
+        id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', sin_info: false 
     }];
-    return personas.map(p => ({ 
-        id: p.id, 
-        selected: mapToSelectOption(p), 
-        is_new: false, 
-        nombre_completo: p.nombre_completo, 
-        tipo_documento: p.tipo_documento, 
-        numero_documento: p.numero_documento 
-    }));
+    return personas.map(p => {
+        const isIncomplete = p.nombre_completo === 'DEMANDADO POR IDENTIFICAR';
+        return { 
+            id: p.id, 
+            selected: mapToSelectOption(p), 
+            is_new: isIncomplete, // Si es incompleto, activamos modo registro rápido para corregir
+            nombre_completo: p.nombre_completo, 
+            tipo_documento: p.tipo_documento, 
+            numero_documento: p.numero_documento,
+            sin_info: isIncomplete
+        };
+    });
 };
 
 const form = useForm({
@@ -71,7 +77,7 @@ const form = useForm({
 });
 
 const addDemandante = () => form.demandantes.push({ 
-    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '' 
+    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', sin_info: false 
 });
 const removeDemandante = (index) => { if (form.demandantes.length > 1) form.demandantes.splice(index, 1); };
 const addDemandado = () => form.demandados.push({ 
@@ -142,7 +148,7 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
           <div class="lg:col-span-2 space-y-8">
             <fieldset :disabled="isClosed" :class="{ 'opacity-60': isClosed }">
               <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg p-6">
-                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Información del Proceso</h3>
+                <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Información del Proceso</h3>
                 <div class="border-t border-gray-200 dark:border-gray-700 pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                   
                   <div class="md:col-span-2 space-y-4">
@@ -235,12 +241,21 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                   <!-- CAMPO ETAPA -->
                   <div>
                       <InputLabel for="etapa" value="Etapa Procesal" />
-                      <select id="etapa" v-model="form.etapa_procesal_id" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
-                          <option value="" disabled>Seleccione etapa...</option>
-                          <option v-for="etapa in etapas" :key="etapa.id" :value="etapa.id">
-                              {{ etapa.nombre }}
-                          </option>
-                      </select>
+                      <Dropdown align="left" width="full">
+                          <template #trigger>
+                              <button type="button" class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 dark:border-gray-700 dark:bg-gray-900 bg-white px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer dark:text-gray-300">
+                                  <span>{{ form.etapa_procesal_id ? etapas.find(e => e.id === form.etapa_procesal_id)?.nombre : 'Seleccione etapa...' }}</span>
+                                  <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                              </button>
+                          </template>
+                          <template #content>
+                              <div class="py-1 bg-white dark:bg-gray-800 max-h-60 overflow-y-auto">
+                                  <button v-for="etapa in etapas" :key="etapa.id" @click="form.etapa_procesal_id = etapa.id" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': form.etapa_procesal_id === etapa.id }">
+                                      {{ etapa.nombre }}
+                                  </button>
+                              </div>
+                          </template>
+                      </Dropdown>
                       <InputError :message="form.errors.etapa_procesal_id" class="mt-2" />
                   </div>
 
@@ -256,12 +271,12 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
             <fieldset :disabled="isClosed" :class="{ 'opacity-60': isClosed }">
               <div class="sticky top-8 space-y-6">
                 <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg p-6">
-                  <h3 class="text-lg font-medium mb-4">Seguimiento y Fechas</h3>
+                  <h3 class="text-lg font-bold mb-4">Seguimiento y Fechas</h3>
                   <div class="border-t pt-6 space-y-6">
                       <div><InputLabel for="radicado" value="Radicado" /><TextInput id="radicado" v-model="form.radicado" class="mt-1 block w-full" /><InputError :message="form.errors.radicado" class="mt-2" /></div>
-                      <div><InputLabel for="fecha_radicado" value="Fecha de Radicado" /><TextInput id="fecha_radicado" v-model="form.fecha_radicado" type="date" class="mt-1 block w-full" /></div>
-                      <div><InputLabel for="fecha_revision" value="Fecha de Revisión" /><TextInput id="fecha_revision" v-model="form.fecha_revision" type="date" class="mt-1 block w-full" /></div>
-                      <div><InputLabel for="fecha_proxima_revision" value="Fecha Próxima Revisión" /><TextInput id="fecha_proxima_revision" v-model="form.fecha_proxima_revision" type="date" class="mt-1 block w-full" /></div>
+                      <div><InputLabel for="fecha_radicado" value="Fecha de Radicado" /><DatePicker id="fecha_radicado" v-model="form.fecha_radicado" class="mt-1 block w-full" /></div>
+                      <div><InputLabel for="fecha_revision" value="Fecha de Revisión" /><DatePicker id="fecha_revision" v-model="form.fecha_revision" class="mt-1 block w-full" /></div>
+                      <div><InputLabel for="fecha_proxima_revision" value="Fecha Próxima Revisión" /><DatePicker id="fecha_proxima_revision" v-model="form.fecha_proxima_revision" class="mt-1 block w-full" /></div>
                       <div><InputLabel for="abogado" value="Abogado / Gestor" /><AsyncSelect id="abogado" v-model="form.abogado_id" :endpoint="route('users.search')" /></div>
                       <div><InputLabel for="responsable" value="Responsable de Revisión" /><AsyncSelect id="responsable" v-model="form.responsable_revision_id" :endpoint="route('users.search')" /></div>
                       <div><InputLabel for="correo_radicacion" value="Correo de radicación" /><TextInput id="correo_radicacion" v-model="form.correo_radicacion" class="mt-1 block w-full" /></div>

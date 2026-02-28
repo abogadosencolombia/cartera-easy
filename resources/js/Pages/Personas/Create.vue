@@ -4,6 +4,7 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
+import DatePicker from '@/Components/DatePicker.vue';
 import Textarea from '@/Components/Textarea.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { PlusIcon, XMarkIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline';
@@ -121,7 +122,7 @@ const submit = () => {
             <form @submit.prevent="submit" class="space-y-8">
               
               <section>
-                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Datos de la Persona</h3>
+                <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Datos de la Persona</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                   
                   <div class="md:col-span-2">
@@ -156,12 +157,12 @@ const submit = () => {
                   
                   <div>
                     <InputLabel for="fecha_expedicion" value="Fecha de Expedición (Opcional)" />
-                    <TextInput v-model="form.fecha_expedicion" id="fecha_expedicion" type="date" class="mt-1 block w-full" :class="{'border-red-500': form.errors.fecha_expedicion}" />
+                    <DatePicker v-model="form.fecha_expedicion" id="fecha_expedicion" class="mt-1 block w-full" :class="{'border-red-500': form.errors.fecha_expedicion}" />
                     <InputError :message="form.errors.fecha_expedicion" class="mt-2" />
                   </div>
                   <div>
                     <InputLabel for="fecha_nacimiento" value="Fecha de Nacimiento (Opcional)" />
-                    <TextInput v-model="form.fecha_nacimiento" id="fecha_nacimiento" type="date" class="mt-1 block w-full" :class="{'border-red-500': form.errors.fecha_nacimiento}" />
+                    <DatePicker v-model="form.fecha_nacimiento" id="fecha_nacimiento" class="mt-1 block w-full" :class="{'border-red-500': form.errors.fecha_nacimiento}" />
                     <InputError :message="form.errors.fecha_nacimiento" class="mt-2" />
                   </div>
 
@@ -169,7 +170,7 @@ const submit = () => {
               </section>
 
               <section>
-                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Información de Contacto</h3>
+                <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Información de Contacto</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <InputLabel for="celular_1" value="Celular Principal (Opcional)" />
@@ -201,8 +202,8 @@ const submit = () => {
 
               <section>
                 <div class="flex items-center justify-between mb-2">
-                  <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Direcciones</h3>
-                  <button type="button" @click="addAddressRow" class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-white text-sm hover:bg-indigo-700 transition">
+                  <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Direcciones</h3>
+                  <button type="button" @click="addAddressRow" class="inline-flex items-center gap-2 rounded-md bg-blue-500 px-3 py-1.5 text-white text-sm hover:bg-blue-600 transition shadow-sm">
                     <PlusIcon class="h-4 w-4" /> Agregar dirección
                   </button>
                 </div>
@@ -245,7 +246,7 @@ const submit = () => {
               </section>
               
               <section>
-                  <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Información Adicional</h3>
+                  <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Información Adicional</h3>
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <InputLabel for="empresa" value="Empresa (Opcional)" />
@@ -321,8 +322,8 @@ const submit = () => {
 
               <section>
                 <div class="mb-2 flex items-center justify-between">
-                  <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Redes Sociales</h3>
-                  <button type="button" @click="addLinkRow" class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700">
+                  <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Redes Sociales</h3>
+                  <button type="button" @click="addLinkRow" class="inline-flex items-center gap-2 rounded-md bg-blue-500 px-3 py-1.5 text-sm text-white hover:bg-blue-600 transition shadow-sm">
                     <PlusIcon class="h-4 w-4" /> Agregar enlace
                   </button>
                 </div>

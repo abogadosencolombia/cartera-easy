@@ -6,6 +6,8 @@ import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
 import Textarea from '@/Components/Textarea.vue';
 import InputError from '@/Components/InputError.vue';
+import Dropdown from '@/Components/Dropdown.vue';
+import { ChevronDownIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     proceso: Object,
@@ -91,10 +93,24 @@ const submit = () => {
                                 </div>
                                 <div>
                                     <InputLabel for="etapa_procesal" value="Etapa Procesal" />
-                                    <select v-model="form.etapa_procesal" id="etapa_procesal" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
-                                        <option value="">-- Sin especificar --</option>
-                                        <option v-for="etapa in etapas_procesales" :key="etapa" :value="etapa">{{ etapa }}</option>
-                                    </select>
+                                    <Dropdown align="left" width="full">
+                                        <template #trigger>
+                                            <button type="button" class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 dark:border-gray-700 dark:bg-gray-900 bg-white px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer dark:text-gray-300">
+                                                <span>{{ form.etapa_procesal || '-- Sin especificar --' }}</span>
+                                                <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                            </button>
+                                        </template>
+                                        <template #content>
+                                            <div class="py-1 bg-white dark:bg-gray-800 max-h-60 overflow-y-auto">
+                                                <button @click="form.etapa_procesal = ''" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': form.etapa_procesal === '' }">
+                                                    -- Sin especificar --
+                                                </button>
+                                                <button v-for="etapa in etapas_procesales" :key="etapa" @click="form.etapa_procesal = etapa" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': form.etapa_procesal === etapa }">
+                                                    {{ etapa }}
+                                                </button>
+                                            </div>
+                                        </template>
+                                    </Dropdown>
                                     <InputError class="mt-2" :message="form.errors.etapa_procesal" />
                                 </div>
                                 <div>

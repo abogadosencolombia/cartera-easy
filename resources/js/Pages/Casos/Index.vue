@@ -4,9 +4,10 @@ import Modal from '@/Components/Modal.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import Dropdown from '@/Components/Dropdown.vue';
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import { ref, watch, reactive } from 'vue';
-import { TrashIcon, MagnifyingGlassIcon, InboxIcon, EyeIcon, ArrowDownTrayIcon, FunnelIcon, ArchiveBoxXMarkIcon } from '@heroicons/vue/24/outline'; 
+import { TrashIcon, MagnifyingGlassIcon, InboxIcon, EyeIcon, ArrowDownTrayIcon, FunnelIcon, ArchiveBoxXMarkIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'; 
 import { debounce } from 'lodash';
 
 const props = defineProps({
@@ -111,20 +112,27 @@ const formatLabel = (text) => {
                     <div class="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
                         
                         <!-- Filtro por Abogado -->
-                        <div class="relative w-full md:w-64" v-if="abogados && abogados.length > 0">
-                            <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
-                                <FunnelIcon class="w-5 h-5 text-gray-500 dark:text-gray-400" />
-                            </div>
-                            <select
-                                v-model="filterForm.abogado_id"
-                                class="block w-full p-2.5 ps-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none"
-                            >
-                                <option value="">Todos los abogados</option>
-                                <option v-for="abogado in abogados" :key="abogado.id" :value="abogado.id">
-                                    {{ abogado.name }}
-                                </option>
-                            </select>
-                        </div>
+                        <Dropdown align="left" width="64" v-if="abogados && abogados.length > 0">
+                            <template #trigger>
+                                <button type="button" class="w-full md:w-64 flex items-center justify-between gap-2 bg-gray-50 dark:bg-gray-700 px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-white hover:bg-white dark:hover:bg-gray-600 transition shadow-sm">
+                                    <div class="flex items-center gap-2 truncate">
+                                        <FunnelIcon class="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                                        <span>{{ filterForm.abogado_id ? abogados.find(a => a.id === filterForm.abogado_id)?.name : 'Todos los abogados' }}</span>
+                                    </div>
+                                    <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                </button>
+                            </template>
+                            <template #content>
+                                <div class="py-1 bg-white dark:bg-gray-800">
+                                    <button @click="filterForm.abogado_id = ''" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filterForm.abogado_id === '' }">
+                                        Todos los abogados
+                                    </button>
+                                    <button v-for="abogado in abogados" :key="abogado.id" @click="filterForm.abogado_id = abogado.id" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filterForm.abogado_id === abogado.id }">
+                                        {{ abogado.name }}
+                                    </button>
+                                </div>
+                            </template>
+                        </Dropdown>
 
                         <!-- Buscador -->
                         <div class="relative w-full md:w-72">

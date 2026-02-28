@@ -26,7 +26,8 @@ import {
     CheckCircleIcon,
     ClockIcon,
     ArrowPathIcon,
-    BuildingLibraryIcon 
+    BuildingLibraryIcon,
+    ChevronDownIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -169,10 +170,10 @@ const getVencimientoInfo = (proceso) => {
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Gestión y seguimiento de procesos radicados.</p>
                 </div>
                 <div class="flex items-center gap-3 w-full sm:w-auto">
-                    <SecondaryButton @click="exportarExcel" class="justify-center w-full sm:w-auto">
+                    <PrimaryButton @click="exportarExcel" class="justify-center w-full sm:w-auto">
                         <DocumentArrowDownIcon class="h-4 w-4 mr-2" />
                         Exportar
-                    </SecondaryButton>
+                    </PrimaryButton>
                     <Link :href="route('procesos.create')" class="w-full sm:w-auto">
                         <PrimaryButton class="justify-center w-full sm:w-auto">
                             <PlusIcon class="h-4 w-4 mr-2" />
@@ -207,31 +208,53 @@ const getVencimientoInfo = (proceso) => {
                         <div class="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
                             
                             <!-- Filtro Tipo de Entidad -->
-                            <div class="w-full sm:w-64 flex items-center gap-2 bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600">
-                                <BuildingLibraryIcon class="h-4 w-4 text-gray-500 flex-shrink-0" />
-                                <select 
-                                    v-model="tipoEntidad" 
-                                    class="bg-transparent border-none text-sm text-gray-700 dark:text-gray-300 focus:ring-0 p-0 cursor-pointer w-full truncate"
-                                >
-                                    <option value="">Todas las Entidades</option>
-                                    <option v-for="tipo in tiposEntidad" :key="tipo" :value="tipo">
-                                        {{ tipo }}s
-                                    </option>
-                                </select>
-                            </div>
+                            <Dropdown align="left" width="64">
+                                <template #trigger>
+                                    <button type="button" class="w-full sm:w-64 flex items-center justify-between gap-2 bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 transition shadow-sm">
+                                        <div class="flex items-center gap-2 truncate">
+                                            <BuildingLibraryIcon class="h-4 w-4 text-gray-500 flex-shrink-0" />
+                                            <span>{{ tipoEntidad ? tipoEntidad + 's' : 'Todas las Entidades' }}</span>
+                                        </div>
+                                        <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                    </button>
+                                </template>
+                                <template #content>
+                                    <div class="py-1 bg-white dark:bg-gray-800">
+                                        <button @click="tipoEntidad = ''" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': tipoEntidad === '' }">
+                                            Todas las Entidades
+                                        </button>
+                                        <button v-for="tipo in tiposEntidad" :key="tipo" @click="tipoEntidad = tipo" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': tipoEntidad === tipo }">
+                                            {{ tipo }}s
+                                        </button>
+                                    </div>
+                                </template>
+                            </Dropdown>
 
                             <!-- Filtro Estado -->
-                            <div class="w-full sm:w-auto flex items-center gap-2 bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 shrink-0">
-                                <FunnelIcon class="h-4 w-4 text-gray-500" />
-                                <select 
-                                    v-model="estado" 
-                                    class="bg-transparent border-none text-sm text-gray-700 dark:text-gray-300 focus:ring-0 p-0 cursor-pointer"
-                                >
-                                    <option value="TODOS">Todos los Estados</option>
-                                    <option value="ACTIVO">Activos</option>
-                                    <option value="CERRADO">Cerrados</option>
-                                </select>
-                            </div>
+                            <Dropdown align="right" width="48">
+                                <template #trigger>
+                                    <button type="button" class="w-full sm:w-auto flex items-center justify-between gap-2 bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 transition shadow-sm shrink-0">
+                                        <div class="flex items-center gap-2">
+                                            <FunnelIcon class="h-4 w-4 text-gray-500" />
+                                            <span>{{ estado === 'TODOS' ? 'Todos los Estados' : (estado === 'ACTIVO' ? 'Activos' : 'Cerrados') }}</span>
+                                        </div>
+                                        <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                    </button>
+                                </template>
+                                <template #content>
+                                    <div class="py-1 bg-white dark:bg-gray-800">
+                                        <button @click="estado = 'TODOS'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': estado === 'TODOS' }">
+                                            Todos los Estados
+                                        </button>
+                                        <button @click="estado = 'ACTIVO'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': estado === 'ACTIVO' }">
+                                            Activos
+                                        </button>
+                                        <button @click="estado = 'CERRADO'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': estado === 'CERRADO' }">
+                                            Cerrados
+                                        </button>
+                                    </div>
+                                </template>
+                            </Dropdown>
                         </div>
                     </div>
                 </div>
@@ -242,11 +265,11 @@ const getVencimientoInfo = (proceso) => {
                         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                             <thead class="bg-gray-50 dark:bg-gray-700/50">
                                 <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Radicado / Asunto</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Partes</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Juzgado/Entidad</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Seguimiento</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Etapa Procesal</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">Radicado / Asunto</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">Partes</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">Juzgado/Entidad</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">Seguimiento</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">Etapa Procesal</th>
                                     <th scope="col" class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
                                 </tr>
                             </thead>
@@ -400,13 +423,13 @@ const getVencimientoInfo = (proceso) => {
                         <!-- Fechas en Móvil -->
                         <div class="grid grid-cols-2 gap-2 mb-3">
                             <div class="flex flex-col p-2 bg-gray-50 dark:bg-gray-700/30 rounded">
-                                <span class="text-[10px] text-gray-500 uppercase font-bold">Última Rev.</span>
+                                <span class="text-[10px] text-gray-700 dark:text-gray-300 uppercase font-bold">Última Rev.</span>
                                 <span class="text-xs text-gray-700 dark:text-gray-300 font-medium flex items-center gap-1">
                                     <ArrowPathIcon class="w-3 h-3"/> {{ formatDate(proceso.fecha_revision) || '--' }}
                                 </span>
                             </div>
                             <div class="flex flex-col p-2 rounded border" :class="getRevisionStatus(proceso.fecha_proxima_revision)?.classes || ''">
-                                <span class="text-[10px] uppercase font-bold opacity-80">Próxima Rev.</span>
+                                <span class="text-[10px] uppercase font-bold opacity-80 text-gray-700 dark:text-gray-200">Próxima Rev.</span>
                                 <span class="text-xs font-bold flex items-center gap-1">
                                     <CalendarDaysIcon class="w-3 h-3"/> {{ formatDate(proceso.fecha_proxima_revision) || 'Pendiente' }}
                                 </span>
