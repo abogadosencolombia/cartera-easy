@@ -29,25 +29,26 @@ const props = defineProps([
 ]);
 
 // --- STATE ---
-const activeTab = ref('casos');
+const activeTab = ref(props.filters.active_tab || 'casos');
 const searchCasos = ref(props.filters.search_casos || '');
 const searchRadicados = ref(props.filters.search_radicados || '');
 const searchContratos = ref(props.filters.search_contratos || '');
 const startDate = ref(props.filters.start_date || '');
 const endDate = ref(props.filters.end_date || '');
-const abogadoId = ref(props.filters.abogado_id || ''); // <-- AÑADIDO: State para el nuevo filtro
+const abogadoId = ref(props.filters.abogado_id || '');
+const isLoading = ref(false);
 
 // --- COMPUTED ---
 
-// Ordena las listas
+// Ordena las listas (no revisados arriba, revisados abajo)
 const sortedCasos = computed(() =>
-    [...props.casos.data].sort((a, b) => a.revisadoHoy - b.revisadoHoy)
+    props.casos?.data ? [...props.casos.data].sort((a, b) => (a.revisadoHoy ? 1 : 0) - (b.revisadoHoy ? 1 : 0)) : []
 );
 const sortedRadicados = computed(() =>
-    [...props.radicados.data].sort((a, b) => a.revisadoHoy - b.revisadoHoy)
+    props.radicados?.data ? [...props.radicados.data].sort((a, b) => (a.revisadoHoy ? 1 : 0) - (b.revisadoHoy ? 1 : 0)) : []
 );
 const sortedContratos = computed(() =>
-    [...props.contratos.data].sort((a, b) => a.revisadoHoy - b.revisadoHoy)
+    props.contratos?.data ? [...props.contratos.data].sort((a, b) => (a.revisadoHoy ? 1 : 0) - (b.revisadoHoy ? 1 : 0)) : []
 );
 
 // Cálculo de progreso (sin cambios)
@@ -99,15 +100,11 @@ const exportUrl = computed(() => {
 
 // --- METHODS ---
 const toggleRevision = (item, tipo) => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const pageKey = (tipo === 'ProcesoRadicado' ? 'radicados' : tipo.toLowerCase() + 's') + '_page';
     const onlyKey = (tipo === 'ProcesoRadicado' ? 'radicados' : tipo.toLowerCase() + 's');
-    const currentPage = urlParams.get(pageKey) || 1;
-
+    
     router.post(route('revision.toggle'), {
         id: item.id,
         tipo: tipo,
-        [pageKey]: currentPage
     }, {
         preserveState: true,
         preserveScroll: true,
@@ -115,37 +112,43 @@ const toggleRevision = (item, tipo) => {
     });
 };
 
-// --- WATCHERS (Búsqueda) (MODIFICADO) ---
-const debouncedReload = debounce(() => {
+// --- RELOAD (Optimizado) ---
+const reload = () => {
+    isLoading.value = true;
     router.get(route('revision.index'), {
+        'active_tab': activeTab.value,
         'search_casos': searchCasos.value,
         'search_radicados': searchRadicados.value,
         'search_contratos': searchContratos.value,
         'start_date': startDate.value,
         'end_date': endDate.value,
-        'abogado_id': abogadoId.value, // <-- AÑADIDO: Nuevo filtro
+        'abogado_id': abogadoId.value,
     }, {
         preserveState: true,
         preserveScroll: true,
         replace: true,
-        only: ['casos', 'radicados', 'contratos', 'filters', 'pendientesCounts']
+        only: ['casos', 'radicados', 'contratos', 'filters', 'pendientesCounts'],
+        onFinish: () => { isLoading.value = false; }
     });
-}, 300);
+};
 
-watch(searchCasos, debouncedReload);
-watch(searchRadicados, debouncedReload);
-watch(searchContratos, debouncedReload);
-watch(startDate, debouncedReload);
-watch(endDate, debouncedReload);
-watch(abogadoId, debouncedReload); // <-- AÑADIDO: Watch para el nuevo filtro
+const debouncedReload = debounce(reload, 400);
+
+watch(activeTab, (newTab) => {
+    reload();
+});
+
+watch([searchCasos, searchRadicados, searchContratos, startDate, endDate, abogadoId], debouncedReload);
 
 
 // --- HELPERS (MODIFICADO) ---
 const formatNombre = (persona) => {
     if (!persona) return 'N/A';
-    if (persona.nombre_completo) return persona.nombre_completo; // Para Deudor, Cliente, etc.
-    if (persona.name) return persona.name; // <-- AÑADIDO: Para Abogado (User)
+    if (typeof persona === 'string') return persona;
+    if (persona.nombre_completo) return persona.nombre_completo;
+    if (persona.name) return persona.name;
     if (persona.nombre) return persona.nombre;
+    if (persona.razon_social) return persona.razon_social;
     const nombreCompleto = `${persona.nombres || ''} ${persona.apellidos || ''}`.trim();
     return nombreCompleto || 'N/A';
 };
