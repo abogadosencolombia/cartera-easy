@@ -494,6 +494,10 @@ class ContratosController extends Controller
             ]);
         });
 
+        // ✅ Acción cuenta como revisión
+        $contrato = Contrato::find($id);
+        $this->registrarRevisionAutomatica($contrato);
+
         return back()->with('success','Pago registrado y caso sincronizado.');
     }
 

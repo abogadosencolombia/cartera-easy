@@ -38,7 +38,8 @@ class RevisionDiariaController extends Controller
         // --- INICIO: Construir Consultas Base ---
         $casosQuery = Caso::query()->with(['deudor', 'cooperativa']);
         $radicadosQuery = ProcesoRadicado::query()->with(['demandantes', 'demandados']);
-        $contratosQuery = Contrato::query()->with(['cliente'])->where('estado', 'ACTIVO');
+        // Quitamos el filtro fijo de 'ACTIVO' para que aparezcan todos los contratos que el usuario necesite revisar
+        $contratosQuery = Contrato::query()->with(['cliente']);
         // --- FIN: Construir Consultas Base ---
 
         $applyFilters($casosQuery, 'casos', $filters);
@@ -184,9 +185,24 @@ class RevisionDiariaController extends Controller
     
     private function getApplyFiltersClosure(): \Closure
     {
-        // ... (Tu código original de getApplyFiltersClosure está bien, no lo toques) ...
-        return function (Builder $query, string $type, array $filters) {
-            $query->where(function (Builder $mainQuery) use ($type, $filters) {
+        $user = Auth::user();
+        return function (Builder $query, string $type, array $filters) use ($user) {
+            $query->where(function (Builder $mainQuery) use ($type, $filters, $user) {
+                // 0. Filtro base de seguridad: 
+                // Si no es admin, solo ve sus asignados. 
+                // Si es admin, ve los 60/60 casos.
+                if ($user->tipo_usuario !== 'admin') {
+                    if ($type === 'casos') {
+                        $mainQuery->where(function($q) use ($user) {
+                            $q->where('user_id', $user->id)
+                              ->orWhereHas('users', fn($sq) => $sq->where('users.id', $user->id));
+                        });
+                    } elseif ($type === 'radicados') {
+                        $mainQuery->where('abogado_id', $user->id)
+                                  ->orWhere('responsable_revision_id', $user->id);
+                    }
+                }
+
                 // 1. Filtro de Texto
                 $searchKey = "search_{$type}";
                 $searchTerm = $filters[$searchKey] ?? null;

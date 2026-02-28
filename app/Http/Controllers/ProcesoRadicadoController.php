@@ -406,6 +406,9 @@ class ProcesoRadicadoController extends Controller
         ]);
         $this->actualizarUltimaActuacion($proceso);
 
+        // ✅ Registro de revisión diaria por acción
+        $this->registrarRevisionAutomatica($proceso);
+
         AuditoriaEvento::create([
             'user_id' => Auth::id(),
             'evento' => 'NUEVA_ACTUACION',

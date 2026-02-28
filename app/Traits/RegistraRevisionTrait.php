@@ -20,9 +20,15 @@ trait RegistraRevisionTrait
             return;
         }
 
+        // Si el modelo es nulo o no tiene ID, no hacemos nada
+        if (!$model || !$model->id) {
+            return;
+        }
+
         $hoy = Carbon::today();
 
-        // Evitar duplicados para el mismo día
+        // Usamos updateOrCreate para asegurar que la fecha de actualización cambie
+        // y que no haya duplicados para el mismo usuario/item el mismo día.
         RevisionDiaria::updateOrCreate(
             [
                 'user_id' => $user->id,

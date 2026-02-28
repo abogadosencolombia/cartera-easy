@@ -18,7 +18,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DocumentoCasoController extends Controller
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, RegistraRevisionTrait;
 
     /**
      * Store a newly created resource in storage.
@@ -104,6 +104,9 @@ class DocumentoCasoController extends Controller
             'direccion_ip' => request()->ip(),
             'user_agent' => request()->userAgent(),
         ]);
+
+        // ✅ Registro de revisión diaria por acción
+        $this->registrarRevisionAutomatica($caso);
 
         return back()->with('success', '¡Documento subido exitosamente!');
     }
