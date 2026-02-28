@@ -82,7 +82,7 @@ const formatDate = (dateString) => {
     }
     return date.toLocaleDateString('es-CO', {
         year: 'numeric',
-        month: 'long',
+        month: 'short',
         day: 'numeric'
     });
 };
@@ -169,27 +169,24 @@ const formatLabel = (text) => {
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div class="overflow-x-auto custom-scrollbar-horizontal">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-fixed md:table-auto">
                             <thead class="bg-gray-50 dark:bg-gray-700/50">
                                 <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Deudor
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[200px]">
+                                        Deudor / Expediente
                                     </th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Nro. Caso
-                                    </th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider w-32">
                                         Estado
                                     </th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Abogado
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[150px]">
+                                        Responsable(s)
                                     </th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Fecha Creación
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider w-32">
+                                        Creado
                                     </th>
-                                    <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    <th scope="col" class="sticky right-0 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-right text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] w-24">
                                         Acciones
                                     </th>
                                 </tr>
@@ -197,7 +194,7 @@ const formatLabel = (text) => {
                             
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                 <tr v-if="!casos || !casos.data || casos.data.length === 0">
-                                    <td colspan="6" class="px-6 py-16 text-center">
+                                    <td colspan="5" class="px-6 py-16 text-center">
                                         <div class="flex flex-col items-center">
                                             <InboxIcon class="h-12 w-12 text-gray-400" />
                                             <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mt-2">Sin resultados</h3>
@@ -209,29 +206,28 @@ const formatLabel = (text) => {
                                     </td>
                                 </tr>
                                 
-                                <tr v-else v-for="caso in casos.data" :key="caso.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150">
-                                    <td class="px-6 py-5 whitespace-nowrap">
-                                        <Link :href="route('casos.show', caso.id)" class="text-indigo-600 dark:text-indigo-400 font-bold truncate hover:underline text-sm">
-                                            {{ caso.deudor?.nombre_completo ?? 'Sin deudor' }}
-                                        </Link>
-                                    </td>
-                                    <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                        <p class="font-medium text-gray-900 dark:text-gray-200">Caso #{{ caso.id }}</p>
-                                        <p v-if="caso.radicado" class="text-xs">Rad: {{ caso.radicado }}</p>
-                                        <span v-if="caso.clonado_de_id" class="text-xs italic text-yellow-600 dark:text-yellow-400">
-                                            (Clonado del #{{ caso.clonado_de_id }})
-                                        </span>
+                                <tr v-else v-for="caso in casos.data" :key="caso.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150 group">
+                                    <!-- Combinado Deudor + Caso ID + Radicado -->
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex flex-col">
+                                            <Link :href="route('casos.show', caso.id)" class="text-indigo-600 dark:text-indigo-400 font-bold truncate hover:underline text-sm mb-0.5">
+                                                {{ caso.deudor?.nombre_completo ?? 'Sin deudor' }}
+                                            </Link>
+                                            <div class="flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
+                                                <span class="font-semibold text-gray-700 dark:text-gray-300">#{{ caso.id }}</span>
+                                                <span v-if="caso.radicado">· Rad: {{ caso.radicado }}</span>
+                                                <span v-if="caso.clonado_de_id" class="italic text-amber-600 dark:text-amber-400">(Clonado del #{{ caso.clonado_de_id }})</span>
+                                            </div>
+                                        </div>
                                     </td>
 
-                                    <td class="px-6 py-5 whitespace-nowrap">
+                                    <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="flex flex-col items-start gap-1">
-                                            <!-- BADGE DE CERRADO (VISUALIZACIÓN) -->
-                                            <span v-if="caso.nota_cierre" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-800 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800">
-                                                <ArchiveBoxXMarkIcon class="w-3 h-3 mr-1"/> CERRADO
+                                            <span v-if="caso.nota_cierre" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-red-100 text-red-800 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800 uppercase">
+                                                CERRADO
                                             </span>
-
                                             <span
-                                                class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                                class="px-2 py-0.5 inline-flex text-[11px] leading-4 font-bold rounded-full border"
                                                 :class="statusProcessoClasses[caso.etapa_procesal || caso.estado_proceso] || statusProcessoClasses['default']"
                                             >
                                                 {{ formatLabel(caso.etapa_procesal || caso.estado_proceso) }}
@@ -239,37 +235,38 @@ const formatLabel = (text) => {
                                         </div>
                                     </td>
 
-                                    <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                        <div class="flex flex-wrap gap-1 max-w-[150px]">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex flex-wrap gap-1 max-w-[180px]">
                                             <template v-if="caso.users && caso.users.length > 0">
                                                 <span v-for="u in caso.users" :key="u.id" class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-[10px] font-medium truncate" :title="u.name">
                                                     {{ u.name }}
                                                 </span>
                                             </template>
-                                            <span v-else>{{ caso.user ? caso.user.name : 'N/A' }}</span>
+                                            <span v-else class="text-[10px] text-gray-400">{{ caso.user ? caso.user.name : 'N/A' }}</span>
                                         </div>
                                     </td>
-                                    <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+
+                                    <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
                                         {{ formatDate(caso.created_at) }}
                                     </td>
-                                    <td class="px-6 py-5 whitespace-nowrap text-right text-sm font-medium">
-                                        <div class="flex items-center justify-end gap-2">
+
+                                    <!-- Acciones Sticky -->
+                                    <td class="sticky right-0 bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700/50 px-6 py-4 whitespace-nowrap text-right text-sm font-medium z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)]">
+                                        <div class="flex items-center justify-end gap-1">
                                             <Link
                                                 :href="route('casos.show', caso.id)"
-                                                class="p-2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
-                                                title="Ver caso"
+                                                class="p-1.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                                                title="Ver detalle"
                                             >
-                                                <span class="sr-only">Ver</span>
                                                 <EyeIcon class="h-5 w-5" />
                                             </Link>
                                             
                                             <button
                                                 v-if="$page.props.auth.user.tipo_usuario === 'admin'"
                                                 @click="confirmCaseDeletion(caso)"
-                                                class="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition"
-                                                title="Eliminar caso"
+                                                class="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                                                title="Eliminar"
                                             >
-                                                <span class="sr-only">Eliminar</span>
                                                 <TrashIcon class="h-5 w-5" />
                                             </button>
                                         </div>
@@ -279,7 +276,8 @@ const formatLabel = (text) => {
                         </table>
                     </div>
                     
-                    <div v-if="casos && casos.links?.length > 1" class="p-4 flex flex-wrap justify-center gap-2 border-t dark:border-gray-700">
+                    <!-- Paginación -->
+                    <div v-if="casos && casos.links?.length > 3" class="p-4 flex flex-wrap justify-center gap-2 border-t dark:border-gray-700">
                         <Link
                             v-for="(link, idx) in casos.links"
                             :key="idx"
@@ -317,3 +315,39 @@ const formatLabel = (text) => {
         </Modal>
     </AuthenticatedLayout>
 </template>
+
+<style scoped>
+/* Elimina el scroll del contenedor padre si el hijo ya tiene scroll */
+.custom-scrollbar-horizontal {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+.custom-scrollbar-horizontal::-webkit-scrollbar {
+    height: 6px;
+}
+
+.custom-scrollbar-horizontal::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.custom-scrollbar-horizontal::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.5);
+    border-radius: 20px;
+}
+
+/* Soporte para sticky en navegadores que lo requieran */
+.sticky {
+    position: -webkit-sticky;
+    position: sticky;
+}
+
+/* Sombra sutil para la columna fija */
+.sticky.right-0 {
+    box-shadow: -4px 0 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.dark .sticky.right-0 {
+    box-shadow: -4px 0 6px -2px rgba(0, 0, 0, 0.3);
+}
+</style>

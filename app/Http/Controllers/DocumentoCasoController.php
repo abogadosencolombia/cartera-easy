@@ -6,7 +6,11 @@ use App\Models\Caso;
 use App\Models\DocumentoCaso;
 use App\Models\Persona;
 use App\Models\Codeudor;
+<<<<<<< HEAD
 use App\Models\AuditoriaEvento; // ✅ IMPORTANTE: Importamos el modelo de auditoría
+=======
+use App\Models\AuditoriaEvento;
+>>>>>>> d51ad2b2617743b381db90ad7a4afd847d563cb2
 use App\Traits\RegistraRevisionTrait;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
