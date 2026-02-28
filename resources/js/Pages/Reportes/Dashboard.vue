@@ -51,7 +51,18 @@ onMounted(() => { document.addEventListener('click', closeExportMenu); });
 onUnmounted(() => { document.removeEventListener('click', closeExportMenu); });
 
 // --- LÓGICA DE FILTROS ---
-// ELIMINADO: estado_proceso
+const searchTermCoop = ref('');
+const filteredCooperativas = computed(() => {
+    if (!searchTermCoop.value) return props.cooperativas;
+    return props.cooperativas.filter(c => c.nombre.toLowerCase().includes(searchTermCoop.value.toLowerCase()));
+});
+
+const searchTermAbogado = ref('');
+const filteredAbogados = computed(() => {
+    if (!searchTermAbogado.value) return props.abogadosYGestores;
+    return props.abogadosYGestores.filter(u => u.name.toLowerCase().includes(searchTermAbogado.value.toLowerCase()));
+});
+
 const filtroForm = ref({
     cooperativa_id: props.filtros.cooperativa_id || '',
     user_id: props.filtros.user_id || '',
@@ -238,7 +249,7 @@ const formatDateForCompliance = (dateString) => {
                 </div>
 
                 <!-- Filtros -->
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg">
                     <div class="p-6">
                         <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Filtros Globales del Reporte</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -252,9 +263,12 @@ const formatDateForCompliance = (dateString) => {
                                         </button>
                                     </template>
                                     <template #content>
+                                        <div class="p-2 border-b dark:border-gray-700">
+                                            <input v-model="searchTermCoop" type="text" placeholder="Buscar cooperativa..." class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-xs" @click.stop />
+                                        </div>
                                         <div class="py-1 bg-white dark:bg-gray-800 max-h-60 overflow-y-auto">
                                             <button @click="filtroForm.cooperativa_id = ''; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filtroForm.cooperativa_id === '' }">Todas</button>
-                                            <button v-for="coop in cooperativas" :key="coop.id" @click="filtroForm.cooperativa_id = coop.id; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filtroForm.cooperativa_id === coop.id }">
+                                            <button v-for="coop in filteredCooperativas" :key="coop.id" @click="filtroForm.cooperativa_id = coop.id; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filtroForm.cooperativa_id === coop.id }">
                                                 {{ coop.nombre }}
                                             </button>
                                         </div>
@@ -271,9 +285,12 @@ const formatDateForCompliance = (dateString) => {
                                         </button>
                                     </template>
                                     <template #content>
+                                        <div class="p-2 border-b dark:border-gray-700">
+                                            <input v-model="searchTermAbogado" type="text" placeholder="Buscar gestor..." class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-xs" @click.stop />
+                                        </div>
                                         <div class="py-1 bg-white dark:bg-gray-800 max-h-60 overflow-y-auto">
                                             <button @click="filtroForm.user_id = ''; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filtroForm.user_id === '' }">Todos</button>
-                                            <button v-for="user in abogadosYGestores" :key="user.id" @click="filtroForm.user_id = user.id; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filtroForm.user_id === user.id }">
+                                            <button v-for="user in filteredAbogados" :key="user.id" @click="filtroForm.user_id = user.id; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': filtroForm.user_id === user.id }">
                                                 {{ user.name }}
                                             </button>
                                         </div>
@@ -390,7 +407,7 @@ const formatDateForCompliance = (dateString) => {
                     </div>
 
                     <!-- Panel de Alertas -->
-                    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                    <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg">
                         <div class="p-6">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-6">Panel de Control de Alertas</h3>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -482,7 +499,7 @@ const formatDateForCompliance = (dateString) => {
                     </div>
 
                     <!-- Análisis de Riesgo -->
-                    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                    <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg">
                         <div class="p-6">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Análisis de Riesgo y Eficiencia</h3>
                             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

@@ -39,40 +39,35 @@ class ReporteController extends Controller
         // --- APLICACIÓN DE FILTROS DINÁMICOS ---
         $casosQuery->when($request->filled('cooperativa_id'), fn($q) => $q->where('cooperativa_id', $request->input('cooperativa_id')));
         $casosQuery->when($request->filled('user_id'), fn($q) => $q->where('user_id', $request->input('user_id')));
-        $casosQuery->when($request->filled('tipo_proceso'), fn($q) => $q->where('tipo_proceso', $request->input('tipo_proceso')));
+        $casosQuery->when($request->filled('tipo_proceso'), fn($q) => $q->where('tipo_proceso', 'ilike', "%{$request->input('tipo_proceso')}%"));
         // ELIMINADO: Filtro estado_proceso
         $casosQuery->when($request->filled('fecha_desde'), fn($q) => $q->whereDate('created_at', '>=', $request->input('fecha_desde')));
         $casosQuery->when($request->filled('fecha_hasta'), fn($q) => $q->whereDate('created_at', '<=', $request->input('fecha_hasta')));
 
-        // --- DEFINIR CONSULTAS DE PAGO ---
-        $pagosCasoQuery = PagoCaso::query()->whereHas('caso', function ($q) use ($casosQuery) {
-            $q->whereIn('id', (clone $casosQuery)->pluck('id'));
-        });
+        $casosIds = (clone $casosQuery)->pluck('id');
 
-        $pagosContratoQuery = GestionPagoContrato::query()->whereHas('contrato.caso', function ($q) use ($casosQuery) {
-            $q->whereIn('id', (clone $casosQuery)->pluck('id'));
+        // --- DEFINIR CONSULTAS DE PAGO ---
+        $pagosCasoQuery = PagoCaso::query()->whereIn('caso_id', $casosIds);
+
+        $pagosContratoQuery = GestionPagoContrato::query()->whereHas('contrato', function ($q) use ($casosIds) {
+            $q->whereIn('caso_id', $casosIds);
         });
 
         // --- CÁLCULO DE KPIs ESTRATÉGICOS ---
-        // ELIMINADO: $casosPorEstado
         
-        // CORRECCIÓN: Contamos casos activos simplemente si no están archivados/cerrados o simplemente el total si ya no usas estado
-        // Asumiendo que "cerrado" se manejará de otra forma o simplemente contamos el total de la consulta
         $totalCasosActivos = (clone $casosQuery)->count(); 
         
         $carteraEnMora = (clone $casosQuery)
+            ->whereNotNull('fecha_vencimiento')
             ->where('fecha_vencimiento', '<', now())
             ->sum('monto_total');
         
         $totalRecuperado = (clone $pagosCasoQuery)->sum('monto_pagado') + (clone $pagosContratoQuery)->sum('valor');
         
-        // ELIMINADO: Cálculo de promedio días basado en estado 'cerrado' antiguo
-        // Si tienes otro campo para saber si finalizó (ej. fecha_fin), úsalo aquí. 
-        // Por ahora lo dejamos en 0 para no romper el frontend.
         $promedioDiasRecuperacion = 0;
 
-        $casosActivosQuery = (clone $casosQuery); // Ya no filtramos por estado != cerrado
-        $casosSinPagare = (clone $casosActivosQuery)->whereDoesntHave('documentos', fn ($q) => $q->where('tipo_documento', 'pagaré'))->count();
+        $casosActivosQuery = (clone $casosQuery); 
+        $casosSinPagare = (clone $casosActivosQuery)->whereDoesntHave('documentos', fn ($q) => $q->where('tipo_documento', 'ilike', 'pagaré'))->count();
         $porcentajeSinPagare = ($totalCasosActivos > 0) ? ($casosSinPagare / $totalCasosActivos) * 100 : 0;
         $casosInactivos = (clone $casosActivosQuery)->where('updated_at', '<', Carbon::now()->subDays(60))->count();
         
@@ -82,7 +77,7 @@ class ReporteController extends Controller
             })->count();
             
         $casosLongevos = (clone $casosActivosQuery)->where('fecha_apertura', '<', Carbon::now()->subYear())->count();
-        $notificacionesQuery = NotificacionCaso::whereHas('caso', function ($q) use ($casosQuery) { $q->whereIn('id', (clone $casosQuery)->pluck('id')); });
+        $notificacionesQuery = NotificacionCaso::whereIn('caso_id', $casosIds);
         $alertasPorTipo = (clone $notificacionesQuery)->whereNull('atendida_en')->groupBy('tipo')->select('tipo', DB::raw('count(*) as total'))->pluck('total', 'tipo');
         $alertasVencidas = (clone $notificacionesQuery)->whereNull('atendida_en')->where('created_at', '<', now()->subDays(7))->count();
         $totalAlertasActivas = (clone $notificacionesQuery)->whereNull('atendida_en')->count();
@@ -96,7 +91,7 @@ class ReporteController extends Controller
                 $consolidadoCooperativa = [ 
                     'nombre' => $cooperativaSeleccionada->nombre, 
                     'casos_activos' => (clone $casosQuery)->count(), 
-                    'cartera_en_mora' => (clone $casosQuery)->where('fecha_vencimiento', '<', now())->sum('monto_total'), 
+                    'cartera_en_mora' => (clone $casosQuery)->whereNotNull('fecha_vencimiento')->where('fecha_vencimiento', '<', now())->sum('monto_total'), 
                     'total_recuperado' => $totalRecuperado, 
                 ];
             }
@@ -129,9 +124,22 @@ class ReporteController extends Controller
 
 
         // --- GRÁFICAS ---
-        $carteraPorEdad = (clone $casosQuery)->where('fecha_vencimiento', '<', now())->select(DB::raw("CASE WHEN (CURRENT_DATE - fecha_vencimiento::date) BETWEEN 31 AND 60 THEN '31-60 días' WHEN (CURRENT_DATE - fecha_vencimiento::date) BETWEEN 61 AND 90 THEN '61-90 días' WHEN (CURRENT_DATE - fecha_vencimiento::date) BETWEEN 91 AND 120 THEN '91-120 días' WHEN (CURRENT_DATE - fecha_vencimiento::date) > 120 THEN '>120 días' ELSE '1-30 días' END as rango_mora, SUM(monto_total) as total"))->groupBy('rango_mora')->get()->pluck('total', 'rango_mora');
+        $carteraPorEdad = (clone $casosQuery)
+            ->whereNotNull('fecha_vencimiento')
+            ->where('fecha_vencimiento', '<', now())
+            ->select(DB::raw("CASE 
+                WHEN (CURRENT_DATE - fecha_vencimiento::date) BETWEEN 0 AND 30 THEN '1-30 días' 
+                WHEN (CURRENT_DATE - fecha_vencimiento::date) BETWEEN 31 AND 60 THEN '31-60 días' 
+                WHEN (CURRENT_DATE - fecha_vencimiento::date) BETWEEN 61 AND 90 THEN '61-90 días' 
+                WHEN (CURRENT_DATE - fecha_vencimiento::date) BETWEEN 91 AND 120 THEN '91-120 días' 
+                ELSE '>120 días' 
+            END as rango_mora, SUM(monto_total) as total"))
+            ->groupBy('rango_mora')
+            ->get()
+            ->pluck('total', 'rango_mora');
         
         $vencimientosMensuales = (clone $casosQuery)
+            ->whereNotNull('fecha_vencimiento')
             ->select(DB::raw('EXTRACT(YEAR FROM fecha_vencimiento) as anio, EXTRACT(MONTH FROM fecha_vencimiento) as mes, SUM(monto_total) as total'))
             ->where('fecha_vencimiento', '>=', Carbon::now()->subYear())
             ->groupBy('anio', 'mes')
@@ -141,7 +149,7 @@ class ReporteController extends Controller
         
         // --- RANKING DE ABOGADOS ---
         $rankingAbogados = User::whereIn('tipo_usuario', ['abogado', 'gestor'])
-            ->withCount(['casos as casos_count' => fn($q) => $q->whereIn('casos.id', (clone $casosQuery)->pluck('id'))])
+            ->withCount(['casos as casos_count' => fn($q) => $q->whereIn('casos.id', $casosIds)])
             ->get();
 
         $pagosSumaCasos = (clone $pagosCasoQuery)
@@ -168,11 +176,11 @@ class ReporteController extends Controller
         $cooperativas = ($user->tipo_usuario === 'admin') ? Cooperativa::all(['id', 'nombre']) : $user->cooperativas;
         $abogadosYGestores = User::whereIn('tipo_usuario', ['abogado', 'gestor'])->get(['id', 'name']);
         
-        $baseValidacionesQuery = ValidacionLegal::whereIn('caso_id', (clone $casosQuery)->pluck('id'));
+        $baseValidacionesQuery = ValidacionLegal::whereIn('caso_id', $casosIds);
         $totalFallasActivas = (clone $baseValidacionesQuery)->where('estado', 'incumple')->count();
         $fallasPorRiesgo = (clone $baseValidacionesQuery)->where('estado', 'incumple')->select('nivel_riesgo', DB::raw('count(*) as total'))->groupBy('nivel_riesgo')->pluck('total', 'nivel_riesgo');
         $fallasPorCooperativa = (clone $baseValidacionesQuery)->where('validaciones_legales.estado', 'incumple')->join('casos', 'validaciones_legales.caso_id', '=', 'casos.id')->join('cooperativas', 'casos.cooperativa_id', '=', 'cooperativas.id')->select('cooperativas.nombre', DB::raw('count(*) as total_fallas'))->groupBy('cooperativas.nombre')->orderByDesc('total_fallas')->limit(5)->get();
-        $listadoFallas = (clone $baseValidacionesQuery)->where('estado', 'incumple')->with(['caso.deudor', 'caso.cooperativa'])->orderByRaw("CASE WHEN nivel_riesgo = 'alto' THEN 1 WHEN nivel_riesgo = 'medio' THEN 2 WHEN nivel_riesgo = 'bajo' THEN 3 ELSE 4 END")->latest('ultima_revision')->get();
+        $listadoFallas = (clone $baseValidacionesQuery)->where('estado', 'incumple')->with(['caso.deudor' => fn($q) => $q->withTrashed(), 'caso.cooperativa'])->orderByRaw("CASE WHEN nivel_riesgo = 'alto' THEN 1 WHEN nivel_riesgo = 'medio' THEN 2 WHEN nivel_riesgo = 'bajo' THEN 3 ELSE 4 END")->latest('ultima_revision')->get();
 
         return Inertia::render('Reportes/Dashboard', [
             'kpis' => [
@@ -221,7 +229,7 @@ class ReporteController extends Controller
         Gate::authorize('view-reports');
         $user = auth()->user();
 
-        $casosQuery = Caso::with(['cooperativa', 'deudor', 'user']);
+        $casosQuery = Caso::with(['cooperativa', 'deudor' => fn($q) => $q->withTrashed(), 'user']);
 
         // ELIMINADO: estado_proceso
         $filtros = $request->only(['cooperativa_id', 'user_id', 'tipo_proceso', 'fecha_desde', 'fecha_hasta']);
@@ -233,7 +241,7 @@ class ReporteController extends Controller
 
         $casosQuery->when($request->filled('cooperativa_id'), fn($q) => $q->where('cooperativa_id', $request->input('cooperativa_id')));
         $casosQuery->when($request->filled('user_id'), fn($q) => $q->where('user_id', $request->input('user_id')));
-        $casosQuery->when($request->filled('tipo_proceso'), fn($q) => $q->where('tipo_proceso', 'Ilike', '%' . $request->input('tipo_proceso') . '%'));
+        $casosQuery->when($request->filled('tipo_proceso'), fn($q) => $q->where('tipo_proceso', 'ilike', "%{$request->input('tipo_proceso')}%"));
         // ELIMINADO: Filtro estado_proceso
         $casosQuery->when($request->filled('fecha_desde'), fn($q) => $q->whereDate('created_at', '>=', $request->input('fecha_desde')));
         $casosQuery->when($request->filled('fecha_hasta'), fn($q) => $q->whereDate('created_at', '<=', $request->input('fecha_hasta')));
