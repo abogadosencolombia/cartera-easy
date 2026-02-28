@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { debounce } from 'lodash-es';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
@@ -139,6 +139,25 @@ watch(activeTab, (newTab) => {
 });
 
 watch([searchCasos, searchRadicados, searchContratos, startDate, endDate, abogadoId], debouncedReload);
+
+// --- AUTO-REFRESH AL VOLVER ---
+// Esta lógica fuerza a Inertia a pedir los datos frescos del servidor
+// cuando el usuario regresa a esta pestaña del navegador tras revisar un caso.
+const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+        reload();
+    }
+};
+
+onMounted(() => {
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    // También refrescamos al montar por si acaso venimos de "Atrás"
+    reload();
+});
+
+onUnmounted(() => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+});
 
 
 // --- HELPERS (MODIFICADO) ---

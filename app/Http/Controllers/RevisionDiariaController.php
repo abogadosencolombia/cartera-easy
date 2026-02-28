@@ -37,11 +37,7 @@ class RevisionDiariaController extends Controller
 
         // --- INICIO: Construir Consultas Base ---
         $casosQuery = Caso::query()->with(['deudor', 'cooperativa']);
-        
-        // CORRECCIÓN CRÍTICA AQUÍ: Cambiado 'demandante', 'demandado' por sus plurales
-        // Esto carga la relación real definida en el modelo.
         $radicadosQuery = ProcesoRadicado::query()->with(['demandantes', 'demandados']);
-        
         $contratosQuery = Contrato::query()->with(['cliente'])->where('estado', 'ACTIVO');
         // --- FIN: Construir Consultas Base ---
 
