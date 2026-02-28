@@ -7,6 +7,7 @@ use App\Models\DocumentoCaso;
 use App\Models\Persona;
 use App\Models\Codeudor;
 use App\Models\AuditoriaEvento; // ✅ IMPORTANTE: Importamos el modelo de auditoría
+use App\Traits\RegistraRevisionTrait;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
