@@ -20,6 +20,8 @@ class ProcesoRadicado extends Model
 
     protected $table = 'proceso_radicados';
 
+    protected $appends = ['demandante', 'demandado'];
+
     protected $fillable = [
         'radicado','fecha_radicado','naturaleza','asunto','correo_radicacion',
         'fecha_revision','fecha_proxima_revision','ultima_actuacion','link_expediente',

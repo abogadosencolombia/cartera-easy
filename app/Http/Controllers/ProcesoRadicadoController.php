@@ -17,12 +17,14 @@ use App\Imports\ProcesosImport;
 use Maatwebsite\Excel\Validators\ValidationException;
 use App\Exports\ProcesosExport;
 use App\Models\Actuacion;
+use App\Traits\RegistraRevisionTrait;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class ProcesoRadicadoController extends Controller
 {
+    use RegistraRevisionTrait;
     /**
      * Lista de procesos con filtros y paginación.
      */
@@ -175,6 +177,9 @@ class ProcesoRadicadoController extends Controller
 
     public function show(ProcesoRadicado $proceso): Response
     {
+        // Registro automático de revisión diaria
+        $this->registrarRevisionAutomatica($proceso);
+
         $proceso->load([
             'abogado', 'responsableRevision', 'juzgado', 'tipoProceso',
             'demandantes', 'demandados',

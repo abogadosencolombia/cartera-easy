@@ -18,9 +18,11 @@ use App\Models\Persona;
 use App\Models\ProcesoRadicado;
 use App\Models\Actuacion;
 use App\Models\AuditoriaEvento;
+use App\Traits\RegistraRevisionTrait;
 
 class ContratosController extends Controller
 {
+    use RegistraRevisionTrait;
     public function index(Request $request)
     {
         $q = trim((string)$request->input('q',''));
@@ -338,6 +340,9 @@ class ContratosController extends Controller
                 'caso:id',
             ])
             ->findOrFail($id);
+
+        // Registro automático de revisión diaria
+        $this->registrarRevisionAutomatica($contrato);
 
         $contratoOrigen = $contrato->contratoOrigen;
         $cliente = $contrato->cliente;

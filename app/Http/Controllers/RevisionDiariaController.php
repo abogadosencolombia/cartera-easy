@@ -28,7 +28,7 @@ class RevisionDiariaController extends Controller
         $filters = $request->only(
             'search_casos', 'search_radicados', 'search_contratos',
             'start_date', 'end_date',
-            'abogado_id'
+            'abogado_id', 'active_tab'
         );
 
         Log::debug('RevisionDiariaController: Filtros recibidos', $filters);

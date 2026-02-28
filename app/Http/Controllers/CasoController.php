@@ -26,10 +26,11 @@ use App\Models\Contrato;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\CasosExport;
+use App\Traits\RegistraRevisionTrait;
 
 class CasoController extends Controller
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, RegistraRevisionTrait;
 
     public function index(Request $request): Response
     {
@@ -190,6 +191,10 @@ class CasoController extends Controller
     public function show(Caso $caso): Response
     {
         $this->authorize('view', $caso);
+        
+        // Registro automático de revisión diaria
+        $this->registrarRevisionAutomatica($caso);
+
         $caso->load([
             'deudor:id,nombre_completo,numero_documento,tipo_documento,celular_1,celular_2,correo_1,correo_2,addresses',
             'codeudores',
