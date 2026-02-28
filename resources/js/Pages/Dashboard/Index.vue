@@ -59,14 +59,18 @@ const resetFilters = () => {
     form.fecha_hasta = '';
 };
 watch(() => form.data(), debounce(function (currentForm) {
-    router.get(route('dashboard'), pickBy(currentForm), { preserveState: true, replace: true });
-}, 500), { deep: true });
+    const filters = pickBy(currentForm, (value) => value !== '' && value !== null);
+    router.get(route('dashboard'), filters, { preserveState: true, replace: true, preserveScroll: true });
+}, 400), { deep: true });
 
 // --- Animación de Números ---
 const animatedKpis = ref({});
+const activeAnimations = new Set();
 const animateValue = (key, endValue, isCurrency = false, isPercent = false) => {
     const startValue = animatedKpis.value[key] || 0;
-    const duration = 1200;
+    if (startValue === endValue) return;
+    
+    const duration = 1000;
     let startTime = null;
     const animate = (timestamp) => {
         if (!startTime) startTime = timestamp;
@@ -75,18 +79,26 @@ const animateValue = (key, endValue, isCurrency = false, isPercent = false) => {
         const current = easeOut * (endValue - startValue) + startValue;
         
         animatedKpis.value[key] = isPercent ? parseFloat(current.toFixed(1)) : (isCurrency ? current : Math.floor(current));
-        if (progress < 1) requestAnimationFrame(animate);
-        else animatedKpis.value[key] = endValue;
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        } else {
+            animatedKpis.value[key] = endValue;
+            activeAnimations.delete(key);
+        }
     };
-    requestAnimationFrame(animate);
+    
+    if (!activeAnimations.has(key)) {
+        activeAnimations.add(key);
+        requestAnimationFrame(animate);
+    }
 };
 
 watch(() => props.kpis, (newKpis) => {
     if (newKpis) {
-        for (const key in newKpis) {
-            const val = newKpis[key]?.value ?? newKpis[key] ?? 0;
+        Object.entries(newKpis).forEach(([key, kpi]) => {
+            const val = kpi?.value ?? kpi ?? 0;
             animateValue(key, val, key.includes('saldo'), key.includes('tasa'));
-        }
+        });
     }
 }, { immediate: true, deep: true });
 
@@ -137,11 +149,14 @@ const barData = computed(() => ({
 
 const lineData = computed(() => {
     const raw = props.chartData?.recuperacionPorMes ?? {};
-    // Generar últimos 12 meses
+    // Generar últimos 12 meses de forma segura
     const labels = [], data = [];
+    const baseDate = new Date();
+    baseDate.setDate(1); // Evitar saltos si hoy es 31 y el mes anterior tiene 30
+    
     for (let i = 11; i >= 0; i--) {
-        const d = new Date();
-        d.setMonth(d.getMonth() - i);
+        const d = new Date(baseDate);
+        d.setMonth(baseDate.getMonth() - i);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         labels.push(d.toLocaleString('es-CO', { month: 'short' }));
         data.push(raw[key] || 0);
@@ -231,10 +246,15 @@ const lineData = computed(() => {
                             </div>
 
                             <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                                <button @click="mostrandoModalContacto = true" class="inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-200 dark:shadow-none transition-all">
+                                <button @click="mostrandoModalContacto = true" 
+                                        aria-label="Contactar con un gestor"
+                                        class="inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-200 dark:shadow-none transition-all">
                                     <EnvelopeIcon class="w-5 h-5 mr-2"/> Contactar Gestor
                                 </button>
-                                <a href="https://wa.me/573152819233" target="_blank" class="inline-flex justify-center items-center px-6 py-3 border border-gray-200 dark:border-gray-600 text-base font-medium rounded-xl text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-all">
+                                <a href="https://wa.me/573152819233" 
+                                   target="_blank" 
+                                   aria-label="Contactar por WhatsApp"
+                                   class="inline-flex justify-center items-center px-6 py-3 border border-gray-200 dark:border-gray-600 text-base font-medium rounded-xl text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-all">
                                     <ChatBubbleLeftRightIcon class="w-5 h-5 mr-2 text-green-500"/> WhatsApp
                                 </a>
                             </div>
@@ -349,10 +369,12 @@ const lineData = computed(() => {
                     <div>
                         <InputLabel value="Asunto" />
                         <TextInput v-model="contactForm.asunto" class="w-full mt-1" placeholder="Ej: Duda sobre mi saldo" />
+                        <InputError :message="contactForm.errors.asunto" class="mt-2" />
                     </div>
                     <div>
                         <InputLabel value="Mensaje" />
                         <Textarea v-model="contactForm.mensaje" class="w-full mt-1" rows="4" placeholder="Escriba su consulta aquí..." />
+                        <InputError :message="contactForm.errors.mensaje" class="mt-2" />
                     </div>
                     <div class="flex justify-end gap-3 mt-6">
                         <SecondaryButton @click="mostrandoModalContacto = false">Cancelar</SecondaryButton>
