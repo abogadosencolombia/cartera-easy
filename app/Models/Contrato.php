@@ -53,7 +53,7 @@ class Contrato extends Model
 
     public function cliente(): BelongsTo
     {
-        return $this->belongsTo(Persona::class, 'cliente_id');
+        return $this->belongsTo(Persona::class, 'cliente_id')->withTrashed();
     }
 
     public function contratoOrigen(): BelongsTo

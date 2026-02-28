@@ -77,7 +77,7 @@ class User extends Authenticatable
 
     public function persona(): BelongsTo
     {
-        return $this->belongsTo(Persona::class);
+        return $this->belongsTo(Persona::class)->withTrashed();
     }
 
     public function documentosGenerados(): HasMany
@@ -103,6 +103,7 @@ class User extends Authenticatable
     public function personasAsignadas(): BelongsToMany
     {
         return $this->belongsToMany(Persona::class, 'persona_user', 'abogado_id', 'persona_id')
+                    ->withTrashed()
                     ->withTimestamps();
     }
 

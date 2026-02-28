@@ -42,12 +42,14 @@ class Proceso extends Model
     public function demandados(): BelongsToMany
     {
         return $this->belongsToMany(Persona::class, 'proceso_radicado_personas', 'proceso_radicado_id', 'persona_id')
-                    ->wherePivot('tipo', 'DEMANDADO');
+                    ->wherePivot('tipo', 'DEMANDADO')
+                    ->withTrashed();
     }
 
     public function demandantes(): BelongsToMany
     {
         return $this->belongsToMany(Persona::class, 'proceso_radicado_personas', 'proceso_radicado_id', 'persona_id')
-                    ->wherePivot('tipo', 'DEMANDANTE');
+                    ->wherePivot('tipo', 'DEMANDANTE')
+                    ->withTrashed();
     }
 }

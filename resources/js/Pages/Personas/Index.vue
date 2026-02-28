@@ -52,7 +52,7 @@ const deletePersona = (id) => {
   Swal.fire({
     title: '¿Suspender persona?', text: "Se moverá a la papelera.", icon: 'warning',
     showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Sí, suspender'
-  }).then((res) => { if (result.isConfirmed) router.delete(route('personas.destroy', id)); });
+  }).then((res) => { if (res.isConfirmed) router.delete(route('personas.destroy', id)); });
 };
 
 const restorePersona = (id) => {

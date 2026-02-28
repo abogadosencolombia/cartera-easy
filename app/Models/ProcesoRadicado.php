@@ -57,6 +57,7 @@ class ProcesoRadicado extends Model
     {
         return $this->belongsToMany(Persona::class, 'proceso_radicado_personas')
                     ->wherePivot('tipo', 'DEMANDANTE')
+                    ->withTrashed()
                     ->withTimestamps();
     }
 
@@ -64,6 +65,7 @@ class ProcesoRadicado extends Model
     {
         return $this->belongsToMany(Persona::class, 'proceso_radicado_personas')
                     ->wherePivot('tipo', 'DEMANDADO')
+                    ->withTrashed()
                     ->withTimestamps();
     }
     

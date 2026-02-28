@@ -103,7 +103,7 @@ class Caso extends Model
     }
 
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
-    public function deudor(): BelongsTo { return $this->belongsTo(Persona::class, 'deudor_id'); }
+    public function deudor(): BelongsTo { return $this->belongsTo(Persona::class, 'deudor_id')->withTrashed(); }
     
     public function codeudores(): BelongsToMany
     {

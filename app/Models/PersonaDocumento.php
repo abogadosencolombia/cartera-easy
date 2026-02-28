@@ -18,7 +18,7 @@ class PersonaDocumento extends Model
 
     public function persona(): BelongsTo
     {
-        return $this->belongsTo(Persona::class);
+        return $this->belongsTo(Persona::class)->withTrashed();
     }
 
     public function uploader(): BelongsTo

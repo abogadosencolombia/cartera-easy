@@ -100,7 +100,7 @@ class DocumentoCaso extends Model
     public function persona(): BelongsTo
     {
         // Apunta a la tabla 'personas' a través de la FK 'persona_id'
-        return $this->belongsTo(Persona::class, 'persona_id');
+        return $this->belongsTo(Persona::class, 'persona_id')->withTrashed();
     }
 
     /**
