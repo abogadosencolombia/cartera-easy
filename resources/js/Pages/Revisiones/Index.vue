@@ -13,7 +13,7 @@ import {
     CheckCircleIcon,
     MagnifyingGlassIcon,
     PencilSquareIcon,
-    ArrowDownTrayIcon, // --- AÑADIDO: Icono para exportar ---
+    ArrowDownTrayIcon,
     ChevronDownIcon
 } from '@heroicons/vue/24/outline';
 import Dropdown from '@/Components/Dropdown.vue';
@@ -25,7 +25,7 @@ const props = defineProps([
     'contratos',
     'pendientesCounts',
     'filters',
-    'abogados' // <-- AÑADIDO: Lista de abogados
+    'abogados'
 ]);
 
 // --- STATE ---
@@ -40,7 +40,6 @@ const isLoading = ref(false);
 
 // --- COMPUTED ---
 
-// Ordena las listas (no revisados arriba, revisados abajo)
 const sortedCasos = computed(() =>
     props.casos?.data ? [...props.casos.data].sort((a, b) => (a.revisadoHoy ? 1 : 0) - (b.revisadoHoy ? 1 : 0)) : []
 );
@@ -51,7 +50,6 @@ const sortedContratos = computed(() =>
     props.contratos?.data ? [...props.contratos.data].sort((a, b) => (a.revisadoHoy ? 1 : 0) - (b.revisadoHoy ? 1 : 0)) : []
 );
 
-// Cálculo de progreso (sin cambios)
 const progresoActual = computed(() => {
     const defaultValue = { porcentaje: 0, texto: '0 / 0', totalItems: 0 };
     if (!props.casos || !props.radicados || !props.contratos || !props.pendientesCounts) return defaultValue;
@@ -75,33 +73,21 @@ const progresoActual = computed(() => {
     return { porcentaje, texto: `${revisados} / ${total}`, totalItems: total };
 });
 
-// --- INICIO: URL de Exportación Computada (MODIFICADA) ---
 const exportUrl = computed(() => {
     const params = new URLSearchParams();
-    params.append('active_tab', activeTab.value); // Pasar la pestaña activa
-
-    // Añadir filtros de búsqueda si existen
+    params.append('active_tab', activeTab.value);
     if (searchCasos.value) params.append('search_casos', searchCasos.value);
     if (searchRadicados.value) params.append('search_radicados', searchRadicados.value);
     if (searchContratos.value) params.append('search_contratos', searchContratos.value);
-
-    // Añadir filtros de fecha si existen
     if (startDate.value) params.append('start_date', startDate.value);
     if (endDate.value) params.append('end_date', endDate.value);
-
-    // --- AÑADIDO: Añadir filtro de abogado ---
     if (abogadoId.value) params.append('abogado_id', abogadoId.value);
-    // --- FIN AÑADIDO ---
-
     return route('revision.export.pendientes') + '?' + params.toString();
 });
-// --- FIN: URL de Exportación Computada ---
-
 
 // --- METHODS ---
 const toggleRevision = (item, tipo) => {
     const onlyKey = (tipo === 'ProcesoRadicado' ? 'radicados' : tipo.toLowerCase() + 's');
-    
     router.post(route('revision.toggle'), {
         id: item.id,
         tipo: tipo,
@@ -112,10 +98,8 @@ const toggleRevision = (item, tipo) => {
     });
 };
 
-// --- RELOAD (Optimizado) ---
 const reload = (resetPages = false) => {
     isLoading.value = true;
-    
     const params = {
         'active_tab': activeTab.value,
         'search_casos': searchCasos.value,
@@ -126,12 +110,10 @@ const reload = (resetPages = false) => {
         'abogado_id': abogadoId.value,
     };
 
-    // Si NO estamos reseteando páginas (ej. por auto-refresh),
-    // intentamos mantener las páginas actuales del servidor.
     if (!resetPages) {
-        if (props.casos?.current_page) params.casos_page = props.casos.current_page;
-        if (props.radicados?.current_page) params.radicados_page = props.radicados.current_page;
-        if (props.contratos?.current_page) params.contratos_page = props.contratos.current_page;
+        if (props.casos?.current_page > 1) params.casos_page = props.casos.current_page;
+        if (props.radicados?.current_page > 1) params.radicados_page = props.radicados.current_page;
+        if (props.contratos?.current_page > 1) params.contratos_page = props.contratos.current_page;
     }
 
     router.get(route('revision.index'), params, {
@@ -145,19 +127,15 @@ const reload = (resetPages = false) => {
 
 const debouncedReload = debounce(() => reload(true), 400);
 
-// Ya no necesitamos vigilar activeTab porque lo manejaremos en el click de los botones
-// watch(activeTab, (newTab) => {
-//     reload();
-// });
+watch([searchCasos, searchRadicados, searchContratos, startDate, endDate, abogadoId], (newVals, oldVals) => {
+    if (JSON.stringify(newVals) !== JSON.stringify(oldVals)) {
+        debouncedReload();
+    }
+});
 
-watch([searchCasos, searchRadicados, searchContratos, startDate, endDate, abogadoId], debouncedReload);
-
-// --- AUTO-REFRESH AL VOLVER ---
-// Esta lógica fuerza a Inertia a pedir los datos frescos del servidor
-// cuando el usuario regresa a esta pestaña del navegador tras revisar un caso.
 const handleVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
-        reload(false); // Mantener la página en el auto-refresh
+        reload(false);
     }
 };
 
@@ -169,94 +147,12 @@ onUnmounted(() => {
     document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 
-
-// --- HELPERS (MODIFICADO) ---
 const selectTab = (tab) => {
     activeTab.value = tab;
-    reload(true); // Al cambiar de pestaña, es razonable resetear la página a la 1
+    reload(true);
 };
-</script>
 
-<template>
-    <Head title="Revisión Diaria (Checklist)" />
-
-    <AuthenticatedLayout>
-        <template #header>
-             <!-- --- INICIO: MODIFICACIÓN HEADER --- -->
-             <div class="flex justify-between items-center">
-                <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-                    Revisión Diaria (Checklist)
-                </h2>
-                <!-- Botón de Exportar -->
-                 <a :href="exportUrl"
-                    class="inline-flex items-center px-4 py-2 bg-blue-500 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-600 active:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150 shadow-sm"
-                    download>
-                     <ArrowDownTrayIcon class="w-4 h-4 mr-2"/>
-                     Exportar Pendientes
-                 </a>
-             </div>
-             <!-- --- FIN: MODIFICACIÓN HEADER --- -->
-        </template>
-
-        <div class="py-10">
-            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-
-                <!-- Pestañas (Tabs) -->
-                <div class="mb-6 px-4 sm:px-0">
-                    <nav class="flex flex-wrap gap-2 sm:gap-4" aria-label="Tabs">
-                        <!-- Botón Casos -->
-                        <button @click="selectTab('casos')"
-                                :class="[
-                                    activeTab === 'casos'
-                                        ? 'bg-blue-500 text-white shadow-md'
-                                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/60',
-                                    'flex items-center py-2.5 px-4 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out'
-                                ]">
-                            <FolderIcon class="w-5 h-5 mr-2" />
-                            <span>Casos</span>
-                            <span :class="[
-                                    activeTab === 'casos' ? 'bg-blue-400 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200',
-                                    'ml-2 text-xs font-semibold py-0.5 px-2 rounded-full'
-                                ]">
-                                {{ pendientesCounts ? pendientesCounts.casos : 0 }}
-                            </span>
-                        </button>
-                        <!-- Botón Radicados -->
-                        <button @click="selectTab('radicados')"
-                                :class="[
-                                    activeTab === 'radicados'
-                                        ? 'bg-blue-500 text-white shadow-md'
-                                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/60',
-                                    'flex items-center py-2.5 px-4 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out'
-                                ]">
-                            <DocumentTextIcon class="w-5 h-5 mr-2" />
-                            <span>Radicados</span>
-                            <span :class="[
-                                    activeTab === 'radicados' ? 'bg-blue-400 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200',
-                                    'ml-2 text-xs font-semibold py-0.5 px-2 rounded-full'
-                                ]">
-                                {{ pendientesCounts ? pendientesCounts.radicados : 0 }}
-                            </span>
-                        </button>
-                        <!-- Botón Contratos -->
-                        <button @click="selectTab('contratos')"
-                                :class="[
-                                    activeTab === 'contratos'
-                                        ? 'bg-blue-500 text-white shadow-md'
-                                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/60',
-                                    'flex items-center py-2.5 px-4 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out'
-                                ]">
-                            <ClipboardDocumentCheckIcon class="w-5 h-5 mr-2" />
-                            <span>Contratos</span>
-                            <span :class="[
-                                    activeTab === 'contratos' ? 'bg-blue-400 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200',
-                                    'ml-2 text-xs font-semibold py-0.5 px-2 rounded-full'
-                                ]">
-                                {{ pendientesCounts ? pendientesCounts.contratos : 0 }}
-                            </span>
-                        </button>
-                    </nav>
-                </div>
+const formatNombre = (persona) => {
     if (!persona) return 'N/A';
     if (typeof persona === 'string') return persona;
     if (persona.nombre_completo) return persona.nombre_completo;
@@ -284,12 +180,10 @@ const formatFecha = (fechaISO) => {
 
     <AuthenticatedLayout>
         <template #header>
-             <!-- --- INICIO: MODIFICACIÓN HEADER --- -->
              <div class="flex justify-between items-center">
                 <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
                     Revisión Diaria (Checklist)
                 </h2>
-                <!-- Botón de Exportar -->
                  <a :href="exportUrl"
                     class="inline-flex items-center px-4 py-2 bg-blue-500 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-600 active:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150 shadow-sm"
                     download>
@@ -297,7 +191,6 @@ const formatFecha = (fechaISO) => {
                      Exportar Pendientes
                  </a>
              </div>
-             <!-- --- FIN: MODIFICACIÓN HEADER --- -->
         </template>
 
         <div class="py-10">
@@ -306,8 +199,7 @@ const formatFecha = (fechaISO) => {
                 <!-- Pestañas (Tabs) -->
                 <div class="mb-6 px-4 sm:px-0">
                     <nav class="flex flex-wrap gap-2 sm:gap-4" aria-label="Tabs">
-                        <!-- Botón Casos -->
-                        <button @click="activeTab = 'casos'"
+                        <button @click="selectTab('casos')"
                                 :class="[
                                     activeTab === 'casos'
                                         ? 'bg-blue-500 text-white shadow-md'
@@ -323,8 +215,7 @@ const formatFecha = (fechaISO) => {
                                 {{ pendientesCounts ? pendientesCounts.casos : 0 }}
                             </span>
                         </button>
-                        <!-- Botón Radicados -->
-                        <button @click="activeTab = 'radicados'"
+                        <button @click="selectTab('radicados')"
                                 :class="[
                                     activeTab === 'radicados'
                                         ? 'bg-blue-500 text-white shadow-md'
@@ -340,8 +231,7 @@ const formatFecha = (fechaISO) => {
                                 {{ pendientesCounts ? pendientesCounts.radicados : 0 }}
                             </span>
                         </button>
-                        <!-- Botón Contratos -->
-                        <button @click="activeTab = 'contratos'"
+                        <button @click="selectTab('contratos')"
                                 :class="[
                                     activeTab === 'contratos'
                                         ? 'bg-blue-500 text-white shadow-md'
@@ -387,33 +277,26 @@ const formatFecha = (fechaISO) => {
                     </div>
                 </div>
 
-                <!-- Filtros de Fecha y Abogado (MODIFICADO) -->
+                <!-- Filtros de Fecha y Abogado -->
                 <div class="mb-5 px-4 sm:px-0">
                     <div class="flex flex-col sm:flex-row gap-4">
-                        <!-- Fecha de Inicio -->
                         <div class="flex-1">
                             <label for="start_date" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 <span v-if="activeTab === 'casos'">Fecha Vencimiento (Desde)</span>
                                 <span v-if="activeTab === 'radicados'">Fecha Revisión (Desde)</span>
                                 <span v-if="activeTab === 'contratos'">Fecha Creación (Desde)</span>
                             </label>
-                            <DatePicker v-model="startDate"
-                                   id="start_date"
-                                   class="block w-full" />
+                            <DatePicker v-model="startDate" id="start_date" class="block w-full" />
                         </div>
-                        <!-- Fecha de Fin -->
                         <div class="flex-1">
                             <label for="end_date" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 <span v-if="activeTab === 'casos'">Fecha Vencimiento (Hasta)</span>
                                 <span v-if="activeTab === 'radicados'">Fecha Revisión (Hasta)</span>
                                 <span v-if="activeTab === 'contratos'">Fecha Creación (Hasta)</span>
                             </label>
-                            <DatePicker v-model="endDate"
-                                   id="end_date"
-                                   class="block w-full" />
+                            <DatePicker v-model="endDate" id="end_date" class="block w-full" />
                         </div>
 
-                        <!-- --- INICIO: FILTRO ABOGADO --- -->
                         <div class="flex-1">
                             <label for="abogado_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Abogado Responsable
@@ -437,8 +320,6 @@ const formatFecha = (fechaISO) => {
                                 </template>
                             </Dropdown>
                         </div>
-                        <!-- --- FIN: FILTRO ABOGADO --- -->
-
                     </div>
                 </div>
 
@@ -458,22 +339,19 @@ const formatFecha = (fechaISO) => {
                 <!-- Contenido de Pestañas -->
                 <div class="mt-4">
 
-                    <!-- Pestaña Casos (MODIFICADO V-IF) -->
+                    <!-- Pestaña Casos -->
                     <div v-show="activeTab === 'casos'">
-                        <!-- Estado 1: Sin resultados de búsqueda -->
                         <div v-if="casos.data.length === 0 && (filters.search_casos || filters.start_date || filters.end_date || filters.abogado_id)" class="text-center p-12 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
                                 <MagnifyingGlassIcon class="mx-auto h-16 w-16 text-gray-400" />
                             <h3 class="mt-4 text-xl font-semibold text-gray-900 dark:text-gray-100">Sin resultados</h3>
                             <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">No se encontraron casos que coincidan con tus filtros.</p>
                         </div>
-                        <!-- Estado 2: Todo al día (sin búsqueda) -->
                         <div v-else-if="casos.data.length === 0" class="text-center p-12 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
                             <CheckCircleIcon class="mx-auto h-16 w-16 text-green-500" />
                             <h3 class="mt-4 text-xl font-semibold text-gray-900 dark:text-gray-100">¡Todo al día!</h3>
                             <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">No hay casos activos para revisar hoy.</p>
                         </div>
 
-                        <!-- Estado 3: Lista de ítems -->
                         <TransitionGroup v-else tag="ul" name="list-item" class="space-y-3">
                             <li v-for="caso in sortedCasos" :key="`caso-${caso.id}`" class="list-item">
                                 <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg p-4 flex items-center space-x-4 transition-all duration-300 ease-in-out hover:shadow-md"
@@ -524,7 +402,7 @@ const formatFecha = (fechaISO) => {
                         <Pagination :links="casos.links" class="mt-6 flex justify-center" />
                     </div>
 
-                    <!-- Pestaña Radicados (MODIFICADO V-IF) -->
+                    <!-- Pestaña Radicados -->
                     <div v-show="activeTab === 'radicados'">
                         <div v-if="radicados.data.length === 0 && (filters.search_radicados || filters.start_date || filters.end_date || filters.abogado_id)" class="text-center p-12 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
                             <MagnifyingGlassIcon class="mx-auto h-16 w-16 text-gray-400" />
@@ -583,7 +461,7 @@ const formatFecha = (fechaISO) => {
                         <Pagination :links="radicados.links" class="mt-6 flex justify-center" />
                     </div>
 
-                    <!-- Pestaña Contratos (MODIFICADO V-IF) -->
+                    <!-- Pestaña Contratos -->
                     <div v-show="activeTab === 'contratos'">
                         <div v-if="contratos.data.length === 0 && (filters.search_contratos || filters.start_date || filters.end_date || filters.abogado_id)" class="text-center p-12 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
                             <MagnifyingGlassIcon class="mx-auto h-16 w-16 text-gray-400" />
@@ -657,7 +535,6 @@ const formatFecha = (fechaISO) => {
     </AuthenticatedLayout>
 </template>
 
-<!-- Estilos para la animación de la lista -->
 <style>
 .list-item-move,
 .list-item-enter-active,
@@ -673,4 +550,3 @@ const formatFecha = (fechaISO) => {
     position: absolute;
 }
 </style>
-
