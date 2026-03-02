@@ -113,9 +113,10 @@ const toggleRevision = (item, tipo) => {
 };
 
 // --- RELOAD (Optimizado) ---
-const reload = () => {
+const reload = (resetPages = false) => {
     isLoading.value = true;
-    router.get(route('revision.index'), {
+    
+    const params = {
         'active_tab': activeTab.value,
         'search_casos': searchCasos.value,
         'search_radicados': searchRadicados.value,
@@ -123,7 +124,17 @@ const reload = () => {
         'start_date': startDate.value,
         'end_date': endDate.value,
         'abogado_id': abogadoId.value,
-    }, {
+    };
+
+    // Si NO estamos reseteando páginas (ej. por auto-refresh),
+    // intentamos mantener las páginas actuales del servidor.
+    if (!resetPages) {
+        if (props.casos?.current_page) params.casos_page = props.casos.current_page;
+        if (props.radicados?.current_page) params.radicados_page = props.radicados.current_page;
+        if (props.contratos?.current_page) params.contratos_page = props.contratos.current_page;
+    }
+
+    router.get(route('revision.index'), params, {
         preserveState: true,
         preserveScroll: true,
         replace: true,
@@ -132,11 +143,12 @@ const reload = () => {
     });
 };
 
-const debouncedReload = debounce(reload, 400);
+const debouncedReload = debounce(() => reload(true), 400);
 
-watch(activeTab, (newTab) => {
-    reload();
-});
+// Ya no necesitamos vigilar activeTab porque lo manejaremos en el click de los botones
+// watch(activeTab, (newTab) => {
+//     reload();
+// });
 
 watch([searchCasos, searchRadicados, searchContratos, startDate, endDate, abogadoId], debouncedReload);
 
@@ -145,9 +157,7 @@ watch([searchCasos, searchRadicados, searchContratos, startDate, endDate, abogad
 // cuando el usuario regresa a esta pestaña del navegador tras revisar un caso.
 const handleVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
-        router.reload({
-            only: ['casos', 'radicados', 'contratos', 'filters', 'pendientesCounts'],
-        });
+        reload(false); // Mantener la página en el auto-refresh
     }
 };
 
@@ -161,7 +171,92 @@ onUnmounted(() => {
 
 
 // --- HELPERS (MODIFICADO) ---
-const formatNombre = (persona) => {
+const selectTab = (tab) => {
+    activeTab.value = tab;
+    reload(true); // Al cambiar de pestaña, es razonable resetear la página a la 1
+};
+</script>
+
+<template>
+    <Head title="Revisión Diaria (Checklist)" />
+
+    <AuthenticatedLayout>
+        <template #header>
+             <!-- --- INICIO: MODIFICACIÓN HEADER --- -->
+             <div class="flex justify-between items-center">
+                <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                    Revisión Diaria (Checklist)
+                </h2>
+                <!-- Botón de Exportar -->
+                 <a :href="exportUrl"
+                    class="inline-flex items-center px-4 py-2 bg-blue-500 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-600 active:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150 shadow-sm"
+                    download>
+                     <ArrowDownTrayIcon class="w-4 h-4 mr-2"/>
+                     Exportar Pendientes
+                 </a>
+             </div>
+             <!-- --- FIN: MODIFICACIÓN HEADER --- -->
+        </template>
+
+        <div class="py-10">
+            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+
+                <!-- Pestañas (Tabs) -->
+                <div class="mb-6 px-4 sm:px-0">
+                    <nav class="flex flex-wrap gap-2 sm:gap-4" aria-label="Tabs">
+                        <!-- Botón Casos -->
+                        <button @click="selectTab('casos')"
+                                :class="[
+                                    activeTab === 'casos'
+                                        ? 'bg-blue-500 text-white shadow-md'
+                                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/60',
+                                    'flex items-center py-2.5 px-4 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out'
+                                ]">
+                            <FolderIcon class="w-5 h-5 mr-2" />
+                            <span>Casos</span>
+                            <span :class="[
+                                    activeTab === 'casos' ? 'bg-blue-400 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200',
+                                    'ml-2 text-xs font-semibold py-0.5 px-2 rounded-full'
+                                ]">
+                                {{ pendientesCounts ? pendientesCounts.casos : 0 }}
+                            </span>
+                        </button>
+                        <!-- Botón Radicados -->
+                        <button @click="selectTab('radicados')"
+                                :class="[
+                                    activeTab === 'radicados'
+                                        ? 'bg-blue-500 text-white shadow-md'
+                                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/60',
+                                    'flex items-center py-2.5 px-4 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out'
+                                ]">
+                            <DocumentTextIcon class="w-5 h-5 mr-2" />
+                            <span>Radicados</span>
+                            <span :class="[
+                                    activeTab === 'radicados' ? 'bg-blue-400 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200',
+                                    'ml-2 text-xs font-semibold py-0.5 px-2 rounded-full'
+                                ]">
+                                {{ pendientesCounts ? pendientesCounts.radicados : 0 }}
+                            </span>
+                        </button>
+                        <!-- Botón Contratos -->
+                        <button @click="selectTab('contratos')"
+                                :class="[
+                                    activeTab === 'contratos'
+                                        ? 'bg-blue-500 text-white shadow-md'
+                                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/60',
+                                    'flex items-center py-2.5 px-4 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out'
+                                ]">
+                            <ClipboardDocumentCheckIcon class="w-5 h-5 mr-2" />
+                            <span>Contratos</span>
+                            <span :class="[
+                                    activeTab === 'contratos' ? 'bg-blue-400 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200',
+                                    'ml-2 text-xs font-semibold py-0.5 px-2 rounded-full'
+                                ]">
+                                {{ pendientesCounts ? pendientesCounts.contratos : 0 }}
+                            </span>
+                        </button>
+                    </nav>
+                </div>
     if (!persona) return 'N/A';
     if (typeof persona === 'string') return persona;
     if (persona.nombre_completo) return persona.nombre_completo;
