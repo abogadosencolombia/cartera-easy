@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('contratos', function (Blueprint $table) {
-            $table->string('frecuencia_pago')->nullable()->default('MENSUAL')->after('modalidad');
-        });
+        if (!Schema::hasColumn('contratos', 'frecuencia_pago')) {
+            Schema::table('contratos', function (Blueprint $table) {
+                $table->string('frecuencia_pago')->nullable()->default('MENSUAL')->after('modalidad');
+            });
+        }
     }
 
     /**
@@ -21,8 +23,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('contratos', function (Blueprint $table) {
-            $table->dropColumn('frecuencia_pago');
-        });
+        if (Schema::hasColumn('contratos', 'frecuencia_pago')) {
+            Schema::table('contratos', function (Blueprint $table) {
+                $table->dropColumn('frecuencia_pago');
+            });
+        }
     }
 };
