@@ -145,14 +145,14 @@ watch([searchCasos, searchRadicados, searchContratos, startDate, endDate, abogad
 // cuando el usuario regresa a esta pestaña del navegador tras revisar un caso.
 const handleVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
-        reload();
+        router.reload({
+            only: ['casos', 'radicados', 'contratos', 'filters', 'pendientesCounts'],
+        });
     }
 };
 
 onMounted(() => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    // También refrescamos al montar por si acaso venimos de "Atrás"
-    reload();
 });
 
 onUnmounted(() => {
