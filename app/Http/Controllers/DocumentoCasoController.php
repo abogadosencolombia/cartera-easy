@@ -34,7 +34,7 @@ class DocumentoCasoController extends Controller
                 'required', 
                 'string', 
                 'max:255',
-                'in:pagaré,carta instrucciones,certificación saldo,libranza,demanda,cédula deudor,cédula codeudor,otros'
+                Rule::in(['pagaré', 'carta instrucciones', 'certificación saldo', 'libranza', 'demanda', 'memorial', 'cédula deudor', 'cédula codeudor', 'otros'])
             ],
             'fecha_carga' => 'required|date',
             'archivo' => 'required|file|mimes:pdf,jpg,png,jpeg,doc,docx|max:131072', // 128MB
