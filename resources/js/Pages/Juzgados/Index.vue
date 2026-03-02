@@ -46,7 +46,7 @@ const deleteJuzgado = (id, nombre) => {
         <template v-slot:header>
             <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
-                    <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight flex items-center gap-2">
+                    <h2 class="font-semibold text-xl text-blue-500 leading-tight flex items-center gap-2">
                         <BuildingOffice2Icon class="h-6 w-6 text-indigo-600" />
                         Directorio de Juzgados
                     </h2>
@@ -63,7 +63,7 @@ const deleteJuzgado = (id, nombre) => {
                     
                     <!-- Botón Importar Excel -->
                     <Link :href="route('juzgados.import.form')" v-if="$page.props.auth.user.tipo_usuario === 'admin'">
-                        <PrimaryButton class="bg-blue-500 hover:bg-blue-600 flex items-center gap-2">
+                        <PrimaryButton class="bg-indigo-600 hover:bg-indigo-700 flex items-center gap-2">
                             <ArrowUpTrayIcon class="h-4 w-4" />
                             Subir Excel
                         </PrimaryButton>
@@ -76,8 +76,8 @@ const deleteJuzgado = (id, nombre) => {
             <div class="max-w-8xl mx-auto sm:px-6 lg:px-8 space-y-6">
                 
                 <!-- Buscador -->
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-100 dark:border-gray-700">
-                    <div class="relative max-w-xl">
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 border border-gray-100 dark:border-gray-700">
+                    <div class="relative max-w-md">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <MagnifyingGlassIcon class="h-5 w-5 text-gray-400" />
                         </div>
@@ -91,7 +91,7 @@ const deleteJuzgado = (id, nombre) => {
                 </div>
 
                 <!-- Tabla -->
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg border border-gray-100 dark:border-gray-700">
+                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-2xl border border-gray-100 dark:border-gray-700">
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
                             <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">

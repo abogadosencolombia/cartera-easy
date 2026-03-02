@@ -140,7 +140,7 @@ const submit = () => {
     <Head :title="casoAClonar ? 'Clonando Caso' : 'Registrar Nuevo Caso'" />
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+            <h2 class="font-semibold text-xl text-blue-500 leading-tight">
                 {{ casoAClonar ? `Clonando Caso #${casoAClonar.id}` : 'Registrar Nuevo Caso' }}
             </h2>
         </template>
@@ -402,7 +402,7 @@ const submit = () => {
 
                             <div class="flex items-center justify-end mt-8 border-t dark:border-gray-700 pt-6">
                                 <Link :href="route('casos.index')" class="text-sm text-gray-600 dark:text-gray-400 hover:underline mr-4">Cancelar</Link>
-                                <PrimaryButton :disabled="form.processing">Guardar Nuevo Caso</PrimaryButton>
+                                <PrimaryButton class="bg-blue-500 hover:bg-blue-600" :disabled="form.processing">Guardar Nuevo Caso</PrimaryButton>
                             </div>
                         </form>
                     </div>

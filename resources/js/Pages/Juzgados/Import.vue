@@ -42,7 +42,7 @@ const submit = () => {
 
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+            <h2 class="font-semibold text-xl text-blue-500 leading-tight">
                 Importar Juzgados
             </h2>
         </template>
@@ -90,7 +90,7 @@ const submit = () => {
                             </div>
 
                             <div class="flex items-center justify-end gap-4 border-t pt-4 border-gray-100 dark:border-gray-700">
-                                <Link :href="route('juzgados.index')" class="text-sm text-gray-600 hover:underline">
+                                <Link :href="route('juzgados.index')" class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
                                     Cancelar
                                 </Link>
                                 

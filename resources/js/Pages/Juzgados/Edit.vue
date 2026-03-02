@@ -28,7 +28,7 @@ const submit = () => {
 
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+            <h2 class="font-semibold text-xl text-blue-500 leading-tight">
                 Editar Juzgado
             </h2>
         </template>
@@ -45,8 +45,8 @@ const submit = () => {
                             <InputError class="mt-2" :message="form.errors.nombre" />
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="md:col-span-2">
                                 <InputLabel for="email" value="Correo Electrónico" />
                                 <TextInput id="email" type="email" class="mt-1 block w-full" v-model="form.email" />
                                 <InputError class="mt-2" :message="form.errors.email" />
@@ -75,8 +75,10 @@ const submit = () => {
                         </div>
 
                         <div class="flex items-center justify-end gap-4 border-t pt-4 border-gray-100 dark:border-gray-700">
-                            <Link :href="route('juzgados.index')" class="text-sm text-gray-600 hover:underline">Cancelar</Link>
-                            <PrimaryButton :disabled="form.processing">Guardar Cambios</PrimaryButton>
+                            <Link :href="route('juzgados.index')" class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                                Cancelar
+                            </Link>
+                            <PrimaryButton class="bg-indigo-600 hover:bg-indigo-700" :disabled="form.processing">Guardar Cambios</PrimaryButton>
                         </div>
                     </form>
 
