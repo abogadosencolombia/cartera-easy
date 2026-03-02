@@ -7,7 +7,7 @@ import {
     ArrowDownTrayIcon, DocumentPlusIcon, DocumentIcon,
     EyeIcon,
 } from '@heroicons/vue/24/outline';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 
 const props = defineProps({
   persona: {
@@ -30,6 +30,18 @@ const isViewable = (mimeType) => {
 
 // Helper para verificar si hay datos en arrays
 const hasData = (arr) => Array.isArray(arr) && arr.length > 0;
+
+// Lógica de Información Incompleta
+const missingInfo = computed(() => {
+    const p = props.persona;
+    const missing = [];
+    if (!p.celular_1 && !p.correo_1) missing.push('Información de contacto (Celular o Correo)');
+    if (!p.fecha_nacimiento) missing.push('Fecha de nacimiento');
+    if (!p.fecha_expedicion) missing.push('Fecha de expedición del documento');
+    if (!hasData(p.cooperativas)) missing.push('Asignación a Cooperativa/Empresa');
+    if (!hasData(p.abogados)) missing.push('Asignación de Abogado/Gestor');
+    return missing;
+});
 
 // Helper simple para formatear fecha
 const formatDate = (dateString) => {
@@ -112,6 +124,26 @@ const deleteDocument = (docId) => {
     <div class="py-12">
       <div class="mx-auto max-w-5xl sm:px-6 lg:px-8 space-y-6">
         
+        <!-- Alerta de Información Incompleta -->
+        <div v-if="missingInfo.length > 0" class="rounded-md bg-amber-50 p-4 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <ExclamationTriangleIcon class="h-5 w-5 text-amber-400" aria-hidden="true" />
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-bold text-amber-800 dark:text-amber-200 uppercase tracking-wide">
+                        Perfil con información pendiente
+                    </h3>
+                    <div class="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                        <p>Para una gestión óptima, se recomienda completar:</p>
+                        <ul role="list" class="list-disc pl-5 mt-1 space-y-1">
+                            <li v-for="item in missingInfo" :key="item">{{ item }}</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- TARJETA PRINCIPAL: DATOS PERSONALES -->
         <div class="overflow-hidden bg-white shadow-sm dark:bg-gray-800 sm:rounded-lg">
             <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">

@@ -230,6 +230,7 @@ const submit = () => {
                             <!-- Preferencias de Notificación -->
                             <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
                                 <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Preferencias de Notificación</h3>
+                                <InputError :message="form.errors.preferencias_notificacion" class="mt-2" />
                                 <div class="mt-4 space-y-3">
                                     <label class="flex items-center">
                                         <Checkbox v-model:checked="form.preferencias_notificacion['in-app']" />

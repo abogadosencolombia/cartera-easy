@@ -54,6 +54,8 @@ class StoreCasoRequest extends FormRequest
             'deudor.nombre_completo' => ['required_if:deudor.is_new,true', 'nullable', 'string', 'max:255'],
             'deudor.tipo_documento' => ['required_if:deudor.is_new,true', 'nullable', 'string', 'max:10'],
             'deudor.numero_documento' => ['required_if:deudor.is_new,true', 'nullable', 'string', 'max:50'],
+            'deudor.celular_1' => ['nullable', 'string', 'max:20'],
+            'deudor.correo_1' => ['nullable', 'email', 'max:255'],
             'deudor.cooperativas_ids' => ['nullable', 'array'],
             'deudor.abogados_ids' => ['nullable', 'array'],
             

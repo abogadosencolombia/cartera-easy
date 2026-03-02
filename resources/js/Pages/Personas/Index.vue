@@ -63,6 +63,13 @@ const getRandomColor = (id) => {
   const colors = ['bg-blue-100 text-blue-700', 'bg-green-100 text-green-700', 'bg-purple-100 text-purple-700', 'bg-amber-100 text-amber-700'];
   return colors[id % colors.length];
 };
+
+const checkIncompleta = (p) => {
+    const faltaContacto = !p.celular_1 && !p.correo_1;
+    const faltaFechas = !p.fecha_nacimiento || !p.fecha_expedicion;
+    const faltaAsignacion = !p.cooperativas?.length || !p.abogados?.length;
+    return faltaContacto || faltaFechas || faltaAsignacion;
+};
 </script>
 
 <template>
@@ -159,7 +166,13 @@ const getRandomColor = (id) => {
                     <div class="flex items-center gap-4">
                       <div :class="`h-10 w-10 rounded-xl flex items-center justify-center font-bold ${getRandomColor(p.id)} shadow-sm`">{{ p.nombre_completo[0] }}</div>
                       <div>
-                        <Link :href="route('personas.show', p.id)" class="font-bold text-gray-900 dark:text-gray-100 hover:text-indigo-600">{{ p.nombre_completo }}</Link>
+                        <div class="flex items-center gap-2">
+                            <Link :href="route('personas.show', p.id)" class="font-bold text-gray-900 dark:text-gray-100 hover:text-indigo-600">{{ p.nombre_completo }}</Link>
+                            <!-- Indicador de Información Incompleta -->
+                            <span v-if="checkIncompleta(p)" class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 text-amber-700 border border-amber-200 shadow-sm" title="Faltan datos de contacto, fechas o asignaciones">
+                                FALTA INFO
+                            </span>
+                        </div>
                         <div class="flex gap-2 mt-1">
                           <span v-if="p.es_demandado" class="text-[9px] font-black bg-red-100 text-red-700 px-1.5 py-0.5 rounded border border-red-200 uppercase">Demandado</span>
                           <span v-else class="text-[9px] font-black bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-200 uppercase">Deudor / Cliente</span>

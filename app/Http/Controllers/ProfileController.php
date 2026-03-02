@@ -44,7 +44,7 @@ class ProfileController extends Controller
             // Nos aseguramos de guardar 'true' o 'false'.
             $user->preferencias_notificacion = [
                 'email' => !empty($preferencias['email']),
-                'system' => !empty($preferencias['system']), // Usamos 'system' como en el validador
+                'in-app' => !empty($preferencias['in-app']), 
             ];
         }
 

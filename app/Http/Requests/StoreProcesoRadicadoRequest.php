@@ -32,6 +32,7 @@ class StoreProcesoRadicadoRequest extends FormRequest
             'responsable_revision_id' => ['nullable', 'exists:users,id'],
             'juzgado_id'              => ['nullable', 'exists:juzgados,id'],
             'tipo_proceso_id'         => ['required', 'exists:tipos_proceso,id'],
+            'etapa_procesal_id'       => ['nullable', 'exists:etapas_procesales,id'],
             
             // --- CAMBIO: AHORA SON ARRAYS DE OBJETOS O IDS ---
             'demandantes'             => ['required', 'array', 'min:1'],

@@ -278,6 +278,7 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                       <div><InputLabel value="Abogado / Gestor" /><AsyncSelect v-model="form.abogado_id" :endpoint="route('users.search')" placeholder="Asignar gestor..." label-key="name" /></div>
                       <div><InputLabel value="Responsable de Revisión" /><AsyncSelect v-model="form.responsable_revision_id" :endpoint="route('users.search')" placeholder="Asignar responsable..." label-key="name" /></div>
                       <div><InputLabel value="Correo Radicación" /><TextInput v-model="form.correo_radicacion" type="email" class="mt-1 block w-full" /></div>
+                      <div><InputLabel value="Correo(s) del Juzgado" /><TextInput v-model="form.correos_juzgado" class="mt-1 block w-full" placeholder="correo1@juzgado.com, correo2@..." /></div>
                       <div><InputLabel value="Link Expediente" /><TextInput v-model="form.link_expediente" type="url" class="mt-1 block w-full" /></div>
                       <div><InputLabel value="Ubicación Drive" /><TextInput v-model="form.ubicacion_drive" type="url" class="mt-1 block w-full" /></div>
                   </div>

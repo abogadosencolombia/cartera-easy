@@ -159,7 +159,7 @@ const submit = () => {
         </nav>
 
         <form @submit.prevent="submit" class="mt-16 bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg border border-gray-200 dark:border-gray-700">
-          <div class="relative overflow-hidden p-6 min-h-[550px]">
+          <div class="relative overflow-visible p-6 min-h-[550px]">
               <transition :name="transitionName" mode="out-in">
                 <!-- Step 1 -->
                 <div v-if="step === 1" key="step1" class="space-y-6">
@@ -201,19 +201,19 @@ const submit = () => {
                     </div>
                     <div><InputLabel value="Abogado / Gestor Principal" /><AsyncSelect v-model="form.abogado_id" :endpoint="route('users.search')" placeholder="Seleccionar abogado..." label-key="name" /><InputError :message="form.errors.abogado_id" /></div>
                     <div><InputLabel value="Responsable de Revisión" /><AsyncSelect v-model="form.responsable_revision_id" :endpoint="route('users.search')" placeholder="Seleccionar responsable..." label-key="name" /><InputError :message="form.errors.responsable_revision_id" /></div>
-                    <div><InputLabel value="Correo de radicación" /><TextInput v-model="form.correo_radicacion" type="email" class="mt-1 block w-full" /></div>
-                    <div><InputLabel value="Correo de la Entidad o Juzgado" /><TextInput v-model="form.correos_juzgado" class="mt-1 block w-full" /></div>
+                    <div><InputLabel value="Correo de radicación" /><TextInput v-model="form.correo_radicacion" type="email" class="mt-1 block w-full" /><InputError :message="form.errors.correo_radicacion" /></div>
+                    <div><InputLabel value="Correo de la Entidad o Juzgado" /><TextInput v-model="form.correos_juzgado" class="mt-1 block w-full" /><InputError :message="form.errors.correos_juzgado" /></div>
                   </div>
                 </div>
 
                 <!-- Step 3 -->
                 <div v-else-if="step === 3" key="step3" class="space-y-6">
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div><InputLabel value="Fecha de Revisión" /><DatePicker v-model="form.fecha_revision" class="mt-1 block w-full" /></div>
+                    <div><InputLabel value="Fecha de Revisión" /><DatePicker v-model="form.fecha_revision" class="mt-1 block w-full" /><InputError :message="form.errors.fecha_revision" /></div>
                     <div><InputLabel value="Fecha Próxima Revisión" /><DatePicker v-model="form.fecha_proxima_revision" class="mt-1 block w-full" /><InputError :message="form.errors.fecha_proxima_revision" /></div>
-                    <div class="md:col-span-2"><InputLabel value="Observaciones (opcional)" /><Textarea v-model="form.observaciones" rows="3" class="mt-1 block w-full" /></div>
-                    <div><InputLabel value="Link de expediente digital" /><TextInput v-model="form.link_expediente" type="url" class="mt-1 block w-full" placeholder="https://…" /></div>
-                    <div><InputLabel value="Ubicación en Drive" /><TextInput v-model="form.ubicacion_drive" type="url" class="mt-1 block w-full" placeholder="https://drive.google.com/…" /></div>
+                    <div class="md:col-span-2"><InputLabel value="Observaciones (opcional)" /><Textarea v-model="form.observaciones" rows="3" class="mt-1 block w-full" /><InputError :message="form.errors.observaciones" /></div>
+                    <div><InputLabel value="Link de expediente digital" /><TextInput v-model="form.link_expediente" type="url" class="mt-1 block w-full" placeholder="https://…" /><InputError :message="form.errors.link_expediente" /></div>
+                    <div><InputLabel value="Ubicación en Drive" /><TextInput v-model="form.ubicacion_drive" type="url" class="mt-1 block w-full" placeholder="https://drive.google.com/…" /><InputError :message="form.errors.ubicacion_drive" /></div>
                   </div>
                 </div>
               </transition>

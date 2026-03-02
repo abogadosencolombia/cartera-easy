@@ -1,5 +1,5 @@
 <script setup>
-import { useForm } from '@inertiajs/vue3';
+import { useForm, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
@@ -60,7 +60,10 @@ const notifForm = useForm({
 const submitNotification = () => {
     notifForm.post(route('casos.notificaciones.store', props.caso.id), {
         preserveScroll: true,
-        onSuccess: () => notifForm.reset(),
+        onSuccess: () => {
+            notifForm.reset();
+            router.reload({ only: ['auth'] });
+        },
     });
 };
 </script>
@@ -174,11 +177,17 @@ const submitNotification = () => {
                     <UsersIcon class="h-5 w-5 mr-2 text-indigo-500"/> Partes Involucradas
                 </h3>
                 <ul class="space-y-4">
-                    <li class="flex items-center">
-                        <UserCircleIcon class="h-6 w-6 mr-3 text-indigo-500" />
+                    <li class="flex items-start">
+                        <UserCircleIcon class="h-6 w-6 mr-3 text-indigo-500 flex-shrink-0" />
                         <div class="text-sm">
                             <span class="font-medium text-gray-900 dark:text-white">Deudor:</span>
-                            <div class="text-gray-600 dark:text-gray-300">{{ caso.deudor ? caso.deudor.nombre_completo : 'N/A' }}</div>
+                            <div class="text-gray-600 dark:text-gray-300 font-bold">{{ caso.deudor ? caso.deudor.nombre_completo : 'N/A' }}</div>
+                            <div v-if="caso.deudor?.celular_1" class="flex items-center text-xs text-gray-500 mt-1">
+                                <PhoneIcon class="h-3 w-3 mr-1 text-gray-400" /> {{ caso.deudor.celular_1 }}
+                            </div>
+                            <div v-if="caso.deudor?.correo_1" class="flex items-center text-xs text-gray-500">
+                                <EnvelopeIcon class="h-3 w-3 mr-1 text-gray-400" /> {{ caso.deudor.correo_1 }}
+                            </div>
                         </div>
                     </li>
                     

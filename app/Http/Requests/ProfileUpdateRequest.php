@@ -21,7 +21,7 @@ class ProfileUpdateRequest extends FormRequest
             // --- LÍNEAS NUEVAS AQUÍ ---
             'preferencias_notificacion' => ['sometimes', 'array'],
             'preferencias_notificacion.email' => ['boolean'],
-            'preferencias_notificacion.system' => ['boolean'],
+            'preferencias_notificacion.in-app' => ['boolean'],
             // ------------------------
         ];
     }

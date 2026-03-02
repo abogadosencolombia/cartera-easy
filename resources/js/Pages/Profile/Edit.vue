@@ -21,7 +21,7 @@ defineProps({
 
 // --- LÓGICA CENTRAL ---
 const user = usePage().props.auth.user;
-const isAdmin = computed(() => user.role === 'admin');
+const isAdmin = computed(() => user.tipo_usuario === 'admin');
 const activeTab = ref('profile'); // 'profile', 'password', 'notifications', 'admin'
 
 const setActiveTab = (tab) => {
@@ -39,7 +39,7 @@ const submitProfile = () => profileForm.patch(route('profile.update'), { preserv
 const notificationForm = useForm({
     preferencias_notificacion: {
         email: user.preferencias_notificacion?.email ?? true,
-        system: user.preferencias_notificacion?.system ?? true,
+        'in-app': user.preferencias_notificacion?.['in-app'] ?? true,
     },
 });
 const submitNotifications = () => notificationForm.patch(route('profile.update'), { preserveScroll: true });
@@ -213,7 +213,7 @@ const closeModal = () => {
                                     <form @submit.prevent="submitNotifications" class="mt-8 space-y-6">
                                         <div class="space-y-4">
                                             <label class="flex items-center p-3 rounded-lg transition-colors" :class="[isAdmin ? 'hover:bg-gray-100 dark:hover:bg-gray-700' : '']">
-                                                <Checkbox v-model:checked="notificationForm.preferencias_notificacion.system" :disabled="!isAdmin" />
+                                                <Checkbox v-model:checked="notificationForm.preferencias_notificacion['in-app']" :disabled="!isAdmin" />
                                                 <span class="ms-3 text-sm text-gray-700 dark:text-gray-300">Notificaciones del Sistema</span>
                                             </label>
                                             <label class="flex items-center p-3 rounded-lg transition-colors" :class="[isAdmin ? 'hover:bg-gray-100 dark:hover:bg-gray-700' : '']">

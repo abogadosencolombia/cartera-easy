@@ -43,6 +43,10 @@ class UpdateCasoRequest extends FormRequest
             'deudor' => ['required', 'array'],
             'deudor.is_new' => ['required', 'boolean'],
             'deudor.nombre_completo' => ['required_if:deudor.is_new,true', 'nullable', 'string'],
+            'deudor.tipo_documento' => ['required_if:deudor.is_new,true', 'nullable', 'string'],
+            'deudor.numero_documento' => ['required_if:deudor.is_new,true', 'nullable', 'string'],
+            'deudor.celular_1' => ['nullable', 'string', 'max:20'],
+            'deudor.correo_1' => ['nullable', 'email', 'max:255'],
             
             'codeudores' => ['nullable', 'array'],
             'juzgado_id' => ['nullable', 'integer', 'exists:juzgados,id'],

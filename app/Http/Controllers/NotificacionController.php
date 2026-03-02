@@ -193,17 +193,40 @@ class NotificacionController extends Controller
          
          $fechaEnvio = $request->filled('fecha_programada') ? Carbon::parse($validated['fecha_programada']) : now();
 
-         $caso->notificaciones()->create([
-            'user_id' => $caso->user_id,
-            'tipo' => 'alerta_manual',
-            'mensaje' => $validated['mensaje'],
-            'fecha_envio' => $fechaEnvio,
-            'prioridad' => $validated['prioridad'] ?? 'media',
-            'leido' => false 
-         ]);
+         // 1. Recopilar todos los IDs de usuarios que deben recibir la notificación
+         $userIds = collect();
+         
+         // El usuario que la crea
+         $userIds->push(Auth::id());
+         
+         // El responsable principal del caso
+         if ($caso->user_id) $userIds->push($caso->user_id);
+         
+         // Otros abogados/gestores asignados al caso
+         $assignedUsers = $caso->users()->pluck('users.id');
+         $userIds = $userIds->merge($assignedUsers);
+         
+         // Todos los administradores del sistema
+         $admins = User::where('tipo_usuario', 'admin')->pluck('id');
+         $userIds = $userIds->merge($admins);
 
-         // Enviar correo si es para hoy
-         if ($fechaEnvio->isToday()) {
+         // Limpiar duplicados y valores nulos
+         $targetUsers = $userIds->unique()->filter();
+
+         // 2. Crear un registro de notificación para cada usuario
+         foreach ($targetUsers as $uid) {
+             $caso->notificaciones()->create([
+                'user_id' => $uid,
+                'tipo' => 'alerta_manual',
+                'mensaje' => $validated['mensaje'],
+                'fecha_envio' => $fechaEnvio,
+                'prioridad' => $validated['prioridad'] ?? 'media',
+                'leido' => false 
+             ]);
+         }
+
+         // Enviar correo solo al responsable principal si es para hoy
+         if ($fechaEnvio->isToday() && $caso->user_id) {
              try {
                  $user = User::find($caso->user_id);
                  if ($user && $user->email) {
@@ -218,6 +241,6 @@ class NotificacionController extends Controller
              } catch (\Exception $e) {}
          }
 
-         return back()->with('success', 'Alerta creada.');
+         return back()->with('success', 'Alerta creada para todos los responsables y administradores.');
     }
 }

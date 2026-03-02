@@ -165,6 +165,9 @@ class ProcesoRadicadoController extends Controller
                 'user_id' => Auth::id(),
                 'evento' => 'CREAR_RADICADO',
                 'descripcion_breve' => "Creado radicado {$proceso->radicado}",
+                'auditable_id' => $proceso->id,
+                'auditable_type' => ProcesoRadicado::class,
+                'detalle_nuevo' => $proceso->getRawOriginal(),
                 'criticidad' => 'media',
                 'direccion_ip' => request()->ip(),
                 'user_agent' => request()->userAgent(),
@@ -182,8 +185,10 @@ class ProcesoRadicadoController extends Controller
 
         $proceso->load([
             'abogado', 'responsableRevision', 'juzgado', 'tipoProceso',
-            'demandantes', 'demandados',
+            'demandantes.cooperativas', 'demandantes.abogados',
+            'demandados.cooperativas', 'demandados.abogados',
             'etapaActual', 
+            'auditoria.usuario',
             'documentos' => fn($q) => $q->latest('created_at'),
             'actuaciones' => function ($query) {
                 $query->with('user:id,name')->orderBy('fecha_actuacion', 'desc')->orderBy('created_at', 'desc');
@@ -201,7 +206,8 @@ class ProcesoRadicadoController extends Controller
     {
         $proceso->load([
             'abogado', 'responsableRevision', 'juzgado', 'tipoProceso',
-            'demandantes', 'demandados',
+            'demandantes.cooperativas', 'demandantes.abogados',
+            'demandados.cooperativas', 'demandados.abogados',
             'etapaActual'
         ]);
 
@@ -228,18 +234,37 @@ class ProcesoRadicadoController extends Controller
 
             $data['info_incompleta'] = $resDte['info_incompleta'] || $resDdo['info_incompleta'];
 
+            $original = $proceso->getRawOriginal();
             $proceso->update($data);
+            $changes = $proceso->getChanges();
+
+            if (!empty($changes)) {
+                $anterior = [];
+                $nuevo = [];
+                foreach ($changes as $key => $val) {
+                    if (in_array($key, ['updated_at'])) continue;
+                    $anterior[$key] = $original[$key] ?? null;
+                    $nuevo[$key] = $val;
+                }
+
+                if (!empty($nuevo)) {
+                    AuditoriaEvento::create([
+                        'user_id' => Auth::id(),
+                        'evento' => 'EDITAR_RADICADO',
+                        'descripcion_breve' => "Actualización de datos del radicado {$proceso->radicado}",
+                        'auditable_id' => $proceso->id,
+                        'auditable_type' => ProcesoRadicado::class,
+                        'criticidad' => 'baja',
+                        'detalle_anterior' => $anterior,
+                        'detalle_nuevo' => $nuevo,
+                        'direccion_ip' => request()->ip(),
+                        'user_agent' => request()->userAgent(),
+                    ]);
+                }
+            }
+
             $proceso->demandantes()->syncWithPivotValues($resDte['ids'], ['tipo' => 'DEMANDANTE']);
             $proceso->demandados()->syncWithPivotValues($resDdo['ids'], ['tipo' => 'DEMANDADO']);
-
-            AuditoriaEvento::create([
-                'user_id' => Auth::id(),
-                'evento' => 'EDITAR_RADICADO',
-                'descripcion_breve' => "Actualizado radicado {$proceso->radicado}",
-                'criticidad' => 'baja',
-                'direccion_ip' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
         });
 
         return to_route('procesos.show', $proceso->id)

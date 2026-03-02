@@ -101,7 +101,7 @@ const estadoStyles = {
                     </template>
                     
                     <!-- Tarjetas de Estadísticas para Cliente -->
-                    <template v-if="user.tipo_usuario === 'cli'">
+                    <template v-if="user.tipo_usuario === 'cliente'">
                          <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center space-x-4">
                             <BriefcaseIcon class="h-10 w-10 text-sky-500" />
                             <div>

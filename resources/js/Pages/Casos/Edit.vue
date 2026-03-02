@@ -56,7 +56,7 @@ const form = useForm({
         id: props.caso.deudor_id,
         selected: props.caso.deudor ? { id: props.caso.deudor.id, nombre_completo: props.caso.deudor.nombre_completo, numero_documento: props.caso.deudor.numero_documento } : null,
         is_new: false,
-        nombre_completo: '', tipo_documento: 'CC', numero_documento: '', cooperativas_ids: [], abogados_ids: []
+        nombre_completo: '', tipo_documento: 'CC', numero_documento: '', celular_1: '', correo_1: '', cooperativas_ids: [], abogados_ids: []
     },
     codeudores: props.caso.codeudores?.map(c => ({
         id: c.id, nombre_completo: c.nombre_completo || '', tipo_documento: c.tipo_documento || 'CC', numero_documento: c.numero_documento || '',
@@ -96,19 +96,31 @@ const tiposDisponibles = ref([]);
 const subtiposDisponibles = ref([]);
 const subprocesosDisponibles = ref([]);
 
-watch(() => form.especialidad_id, (id) => {
+watch(() => form.especialidad_id, (id, oldId) => {
     const esp = especialidades.value.find(e => e.id === id);
     tiposDisponibles.value = esp ? esp.tipos_proceso : [];
+    if (oldId !== undefined) {
+        form.tipo_proceso = null;
+        form.subtipo_proceso = null;
+        form.subproceso = null;
+    }
 }, { immediate: true });
 
-watch(() => form.tipo_proceso, (val) => {
+watch(() => form.tipo_proceso, (val, oldVal) => {
     const t = tiposDisponibles.value.find(x => x.nombre === val);
     subtiposDisponibles.value = t ? t.subtipos : [];
+    if (oldVal !== undefined) {
+        form.subtipo_proceso = null;
+        form.subproceso = null;
+    }
 }, { immediate: true });
 
-watch(() => form.subtipo_proceso, (val) => {
+watch(() => form.subtipo_proceso, (val, oldVal) => {
     const s = subtiposDisponibles.value.find(x => x.nombre === val);
     subprocesosDisponibles.value = s ? s.subprocesos : [];
+    if (oldVal !== undefined) {
+        form.subproceso = null;
+    }
 }, { immediate: true });
 
 const submit = () => {
@@ -117,7 +129,12 @@ const submit = () => {
         cooperativa_id: data.cooperativa_id?.id ?? null,
         user_id: Array.isArray(data.user_id) ? data.user_id.map(u => u.id) : [],
         juzgado_id: data.juzgado_id?.id ?? null,
-        deudor: data.deudor.is_new ? { ...data.deudor, cooperativas_ids: data.deudor.cooperativas_ids.map(c => c.id), abogados_ids: data.deudor.abogados_ids.map(a => a.id) } : { id: data.deudor.selected?.id },
+        deudor: data.deudor.is_new ? { 
+            ...data.deudor, 
+            is_new: true,
+            cooperativas_ids: data.deudor.cooperativas_ids.map(c => c.id), 
+            abogados_ids: data.deudor.abogados_ids.map(a => a.id) 
+        } : { is_new: false, id: data.deudor.selected?.id },
         deudor_id: data.deudor.is_new ? null : data.deudor.selected?.id,
     })).patch(route('casos.update', props.caso.id));
 };
@@ -138,7 +155,7 @@ const submit = () => {
 
         <div class="py-12">
             <div class="max-w-5xl mx-auto sm:px-6 lg:px-8 space-y-8">
-                <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg overflow-hidden">
+                <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg overflow-visible">
                     <div class="border-b border-gray-200 dark:border-gray-700">
                         <nav class="-mb-px flex space-x-6 px-6 overflow-x-auto">
                             <button @click="activeTab = 'info-principal'" :class="[activeTab === 'info-principal' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500']" class="py-4 px-1 border-b-2 font-medium text-sm flex items-center"><InformationCircleIcon class="h-5 w-5 mr-2"/> Info Principal</button>
@@ -153,15 +170,36 @@ const submit = () => {
                             <!-- TAB 1 -->
                             <section v-show="activeTab === 'info-principal'" class="space-y-8">
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div><InputLabel value="Cooperativa / Empresa *" /><AsyncSelect v-model="form.cooperativa_id" :endpoint="route('cooperativas.search')" placeholder="Asignar a..." label-key="nombre" /></div>
-                                    <div><InputLabel value="Abogado(s) a Cargo *" /><AsyncSelect v-model="form.user_id" :endpoint="route('users.search')" multiple placeholder="Asignar gestores..." label-key="name" /></div>
+                                    <div><InputLabel value="Cooperativa / Empresa *" /><AsyncSelect v-model="form.cooperativa_id" :endpoint="route('cooperativas.search')" placeholder="Asignar a..." label-key="nombre" /><InputError :message="form.errors.cooperativa_id" /></div>
+                                    <div><InputLabel value="Abogado(s) a Cargo *" /><AsyncSelect v-model="form.user_id" :endpoint="route('users.search')" multiple placeholder="Asignar gestores..." label-key="name" /><InputError :message="form.errors.user_id" /></div>
                                     <div class="md:col-span-2 space-y-4">
                                         <div class="flex justify-between items-center"><InputLabel value="Deudor Principal *" /><button type="button" @click="form.deudor.is_new = !form.deudor.is_new" class="text-[10px] font-bold text-indigo-600 uppercase">{{ form.deudor.is_new ? '← Buscar' : '+ Nuevo' }}</button></div>
-                                        <div v-if="!form.deudor.is_new"><AsyncSelect v-model="form.deudor.selected" :endpoint="route('personas.search')" label-key="nombre_completo" /></div>
-                                        <div v-else class="grid grid-cols-3 gap-4 p-4 border rounded-lg dark:border-gray-700">
-                                            <TextInput v-model="form.deudor.nombre_completo" placeholder="Nombre completo" class="col-span-1" />
-                                            <select v-model="form.deudor.tipo_documento" class="rounded-md border-gray-300 dark:bg-gray-900"><option>CC</option><option>NIT</option></select>
-                                            <TextInput v-model="form.deudor.numero_documento" placeholder="Documento" />
+                                        <div v-if="!form.deudor.is_new">
+                                            <AsyncSelect v-model="form.deudor.selected" :endpoint="route('personas.search')" label-key="nombre_completo" />
+                                            <InputError :message="form.errors.deudor_id" />
+                                            <InputError :message="form.errors['deudor.id']" />
+                                        </div>
+                                        <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg dark:border-gray-700">
+                                            <div>
+                                                <TextInput v-model="form.deudor.nombre_completo" placeholder="Nombre completo" class="w-full" />
+                                                <InputError :message="form.errors['deudor.nombre_completo']" />
+                                            </div>
+                                            <div>
+                                                <select v-model="form.deudor.tipo_documento" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option>CC</option><option>NIT</option><option>CE</option></select>
+                                                <InputError :message="form.errors['deudor.tipo_documento']" />
+                                            </div>
+                                            <div>
+                                                <TextInput v-model="form.deudor.numero_documento" placeholder="Documento" class="w-full" />
+                                                <InputError :message="form.errors['deudor.numero_documento']" />
+                                            </div>
+                                            <div>
+                                                <TextInput v-model="form.deudor.celular_1" placeholder="Celular" class="w-full" />
+                                                <InputError :message="form.errors['deudor.celular_1']" />
+                                            </div>
+                                            <div class="md:col-span-2">
+                                                <TextInput v-model="form.deudor.correo_1" type="email" placeholder="Correo Electrónico" class="w-full" />
+                                                <InputError :message="form.errors['deudor.correo_1']" />
+                                            </div>
                                             <div class="col-span-3 grid grid-cols-2 gap-4 mt-2">
                                                 <AsyncSelect v-model="form.deudor.cooperativas_ids" :endpoint="route('cooperativas.search')" multiple label-key="nombre" placeholder="Cooperativas..." />
                                                 <AsyncSelect v-model="form.deudor.abogados_ids" :endpoint="route('users.search')" multiple label-key="name" placeholder="Abogados..." />
@@ -170,37 +208,52 @@ const submit = () => {
                                     </div>
                                 </div>
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t dark:border-gray-700">
-                                    <div><InputLabel value="Número Pagaré" /><TextInput v-model="form.referencia_credito" class="w-full" /></div>
-                                    <div><InputLabel value="Monto Inicial" /><TextInput v-model="form.monto_total" type="number" class="w-full" /></div>
-                                    <div><InputLabel value="Fecha Apertura" /><DatePicker v-model="form.fecha_apertura" class="w-full" /></div>
+                                    <div><InputLabel value="Número De Pagaré" /><TextInput v-model="form.referencia_credito" class="w-full" /><InputError :message="form.errors.referencia_credito" /></div>
+                                    <div><InputLabel value="Monto de Crédito *" /><TextInput v-model="form.monto_total" type="number" step="0.01" class="w-full" /><InputError :message="form.errors.monto_total" /></div>
+                                    <div><InputLabel value="Monto Deuda Actual" /><TextInput v-model="form.monto_deuda_actual" type="number" step="0.01" class="w-full" /><InputError :message="form.errors.monto_deuda_actual" /></div>
+                                    <div><InputLabel value="Total Pagado" /><TextInput v-model="form.monto_total_pagado" type="number" step="0.01" class="w-full" /><InputError :message="form.errors.monto_total_pagado" /></div>
+                                    <div><InputLabel value="Tasa Interés Corriente *" /><TextInput v-model="form.tasa_interes_corriente" type="number" step="0.01" class="w-full" /><InputError :message="form.errors.tasa_interes_corriente" /></div>
+                                    <div><InputLabel value="Fecha de Demanda *" /><DatePicker v-model="form.fecha_apertura" class="w-full" /><InputError :message="form.errors.fecha_apertura" /></div>
+                                    <div><InputLabel value="Fecha Vencimiento" /><DatePicker v-model="form.fecha_vencimiento" class="w-full" /><InputError :message="form.errors.fecha_vencimiento" /></div>
+                                    <div><InputLabel value="Fecha Inicio Crédito" /><DatePicker v-model="form.fecha_inicio_credito" class="w-full" /><InputError :message="form.errors.fecha_inicio_credito" /></div>
                                 </div>
                             </section>
 
                             <!-- TAB 2 -->
                             <section v-show="activeTab === 'proceso-judicial'" class="space-y-8">
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div><InputLabel value="Radicado" /><TextInput v-model="form.radicado" class="w-full" /></div>
-                                    <div><InputLabel value="Juzgado" /><AsyncSelect v-model="form.juzgado_id" :endpoint="route('juzgados.search')" label-key="nombre" /></div>
-                                    <div><InputLabel value="Especialidad" /><select v-model="form.especialidad_id" class="w-full rounded-md border-gray-300 dark:bg-gray-900"><option v-for="e in especialidades" :key="e.id" :value="e.id">{{ formatLabel(e.nombre) }}</option></select></div>
-                                    <div><InputLabel value="Etapa" /><Dropdown align="left" width="full"><template #trigger><button type="button" class="w-full flex justify-between border rounded-md p-2 dark:bg-gray-900"><span>{{ formatLabel(form.etapa_procesal) || '--' }}</span><ChevronDownIcon class="h-4 w-4"/></button></template><template #content><button v-for="e in etapas_procesales" :key="e" @click="form.etapa_procesal = e" class="block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">{{ formatLabel(e) }}</button></template></Dropdown></div>
+                                    <div><InputLabel value="Radicado" /><TextInput v-model="form.radicado" class="w-full" /><InputError :message="form.errors.radicado" /></div>
+                                    <div><InputLabel value="Juzgado" /><AsyncSelect v-model="form.juzgado_id" :endpoint="route('juzgados.search')" label-key="nombre" /><InputError :message="form.errors.juzgado_id" /></div>
+                                    <div><InputLabel value="Especialidad *" /><select v-model="form.especialidad_id" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option :value="null">Seleccione...</option><option v-for="e in especialidades" :key="e.id" :value="e.id">{{ formatLabel(e.nombre) }}</option></select><InputError :message="form.errors.especialidad_id" /></div>
+                                    <div><InputLabel value="Tipo de Proceso *" /><select v-model="form.tipo_proceso" :disabled="!form.especialidad_id" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option :value="null">Seleccione...</option><option v-for="t in tiposDisponibles" :key="t.id" :value="t.nombre">{{ formatLabel(t.nombre) }}</option></select><InputError :message="form.errors.tipo_proceso" /></div>
+                                    <div><InputLabel value="Proceso *" /><select v-model="form.subtipo_proceso" :disabled="!form.tipo_proceso" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option :value="null">Seleccione...</option><option v-for="s in subtiposDisponibles" :key="s.id" :value="s.nombre">{{ formatLabel(s.nombre) }}</option></select><InputError :message="form.errors.subtipo_proceso" /></div>
+                                    <div><InputLabel value="Subproceso (Detalle)" /><select v-model="form.subproceso" :disabled="!form.subtipo_proceso" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option :value="null">Seleccione...</option><option v-for="sp in subprocesosDisponibles" :key="sp.id" :value="sp.nombre">{{ sp.nombre }}</option></select><InputError :message="form.errors.subproceso" /></div>
+                                    <div><InputLabel value="Etapa Procesal" /><Dropdown align="left" width="full"><template #trigger><button type="button" class="w-full flex justify-between border border-gray-300 dark:border-gray-700 rounded-md p-2 dark:bg-gray-900"><span>{{ formatLabel(form.etapa_procesal) || '--' }}</span><ChevronDownIcon class="h-4 w-4"/></button></template><template #content><div class="py-1 bg-white dark:bg-gray-800 max-h-60 overflow-y-auto"><button type="button" v-for="e in etapas_procesales" :key="e" @click="form.etapa_procesal = e" class="block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">{{ formatLabel(e) }}</button></div></template></Dropdown><InputError :message="form.errors.etapa_procesal" /></div>
+                                    <div><InputLabel value="Tipo de Garantía *" /><select v-model="form.tipo_garantia_asociada" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option value="codeudor">Codeudor</option><option value="hipotecaria">Hipotecaria</option><option value="prendaria">Prendaria</option><option value="sin garantía">Sin garantía</option></select><InputError :message="form.errors.tipo_garantia_asociada" /></div>
+                                    <div><InputLabel value="Origen Documental *" /><select v-model="form.origen_documental" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option value="pagaré">Pagaré</option><option value="libranza">Libranza</option><option value="contrato">Contrato</option><option value="otro">Otro</option></select><InputError :message="form.errors.origen_documental" /></div>
+                                    <div><InputLabel value="Medio de Contacto" /><select v-model="form.medio_contacto" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option :value="null">-- Seleccione --</option><option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="telefono">Teléfono</option></select><InputError :message="form.errors.medio_contacto" /></div>
+                                    <div class="md:col-span-2"><InputLabel value="URL Carpeta Drive (Opcional)" /><TextInput v-model="form.link_drive" type="url" class="w-full" placeholder="https://drive.google.com/..." /><InputError :message="form.errors.link_drive" /></div>
                                 </div>
                             </section>
 
                             <!-- TAB 3 -->
                             <section v-show="activeTab === 'codeudores'" class="space-y-6">
                                 <div class="flex justify-between items-center"><h3 class="font-bold">Lista de Codeudores</h3><PrimaryButton type="button" @click="addCodeudor">+ Añadir</PrimaryButton></div>
-                                <div v-for="(c, i) in form.codeudores" :key="i" class="p-4 border rounded-lg dark:border-gray-700 relative">
-                                    <div class="grid grid-cols-2 gap-4">
-                                        <div><InputLabel value="Nombre" /><TextInput v-model="c.nombre_completo" class="w-full"/></div>
-                                        <div><InputLabel value="Documento" /><TextInput v-model="c.numero_documento" class="w-full"/></div>
+                                <div v-for="(c, i) in form.codeudores" :key="i" class="p-6 border rounded-lg dark:border-gray-700 bg-gray-50/20 relative">
+                                    <button @click="removeCodeudor(i)" class="absolute top-4 right-4 text-red-500 hover:text-red-700"><TrashIcon class="h-5 w-5"/></button>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div class="md:col-span-1"><InputLabel value="Nombre Completo *" /><TextInput v-model="c.nombre_completo" class="mt-1 block w-full" required/><InputError :message="form.errors[`codeudores.${i}.nombre_completo`]" /></div>
+                                        <div><InputLabel value="Tipo Documento" /><select v-model="c.tipo_documento" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option value="CC">Cédula de Ciudadanía</option><option value="NIT">NIT</option><option value="CE">Cédula de Extranjería</option></select></div>
+                                        <div><InputLabel value="Número Documento *" /><TextInput v-model="c.numero_documento" class="mt-1 block w-full" required/><InputError :message="form.errors[`codeudores.${i}.numero_documento`]" /></div>
+                                        <div><InputLabel value="Celular" /><TextInput v-model="c.celular" class="mt-1 block w-full" placeholder="Ej: 3001234567" /></div>
+                                        <div class="md:col-span-2"><InputLabel value="Correo Electrónico" /><TextInput v-model="c.correo" type="email" class="mt-1 block w-full" placeholder="correo@ejemplo.com" /></div>
                                     </div>
-                                    <button @click="removeCodeudor(i)" class="absolute top-2 right-2 text-red-500"><TrashIcon class="h-4 w-4"/></button>
                                 </div>
                             </section>
 
                             <!-- TAB 4 -->
                             <section v-show="activeTab === 'control-notas'" class="space-y-8">
-                                <div><InputLabel value="Notas Legales / Internas" /><Textarea v-model="form.notas_legales" rows="4" class="w-full" /></div>
+                                <div><InputLabel value="Notas Legales / Internas" /><Textarea v-model="form.notas_legales" rows="4" class="w-full" /><InputError :message="form.errors.notas_legales" /></div>
                                 <div v-if="user.tipo_usuario === 'admin'" class="p-4 border border-red-200 rounded-lg bg-red-50 dark:bg-red-900/20">
                                     <div class="flex items-center justify-between">
                                         <div><h4 class="font-bold text-red-800 dark:text-red-200">{{ caso.nota_cierre ? 'Reabrir' : 'Cerrar' }} Caso</h4></div>

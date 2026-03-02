@@ -27,7 +27,7 @@ class CasoPolicy
         if (in_array($user->tipo_usuario, ['gestor', 'abogado'])) {
             return $user->cooperativas->contains($caso->cooperativa_id);
         }
-        if ($user->tipo_usuario === 'cli') {
+        if ($user->tipo_usuario === 'cliente') {
             return in_array($user->persona_id, [$caso->deudor_id, $caso->codeudor1_id, $caso->codeudor2_id]);
         }
         return false;

@@ -274,7 +274,7 @@ class GeneradorDocumentoController extends Controller
         if (in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
             return true;
         }
-        if ($user->tipo_usuario === 'cli') {
+        if ($user->tipo_usuario === 'cliente') {
             if ($documento->es_confidencial) abort(403);
             $caso = $documento->caso;
             if ($caso->deudor_id !== $user->persona_id) abort(403);

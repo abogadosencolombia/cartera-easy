@@ -191,10 +191,17 @@ watch(
     ],
     () => {
         if (form.modalidad === 'LITIS') {
-            form.monto_total = null;
+            // No borramos monto_total para no perderlo si el usuario se arrepiente,
+            // especialmente útil cuando viene de un caso y el campo está bloqueado.
             form.cuotas = 1;
             manualCuotas.value = [];
         } else {
+            // Si el monto quedó vacío y tenemos una fuente (caso o plantilla), lo restauramos
+            if (!form.monto_total) {
+                if (props.datosCaso) form.monto_total = props.datosCaso.monto_total;
+                else if (props.plantilla) form.monto_total = props.plantilla.monto_total;
+            }
+
             if (form.modalidad === 'PAGO_UNICO') form.cuotas = 1;
             // Regeneramos siempre para asegurar coherencia matemática
             generarCuotasAutomaticas(); 

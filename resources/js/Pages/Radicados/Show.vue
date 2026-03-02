@@ -221,9 +221,11 @@ const eliminarActuacion = (actuacionId) => {
                   <span>Información del Proceso</span>
                 </h3>
                 <dl class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
-                    <div class="md:col-span-2"><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Juzgado</dt><dd class="text-gray-900 dark:text-gray-100 mt-1">{{ proceso.juzgado?.nombre || '—' }}</dd></div>
-                    <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Tipo</dt><dd class="text-gray-900 dark:text-gray-100 mt-1">{{ proceso.tipo_proceso?.nombre || '—' }}</dd></div>
+                    <div class="md:col-span-2"><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Juzgado / Entidad</dt><dd class="text-gray-900 dark:text-gray-100 mt-1">{{ proceso.juzgado?.nombre || '—' }}</dd></div>
+                    <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Tipo de Proceso</dt><dd class="text-gray-900 dark:text-gray-100 mt-1">{{ proceso.tipo_proceso?.nombre || '—' }}</dd></div>
                     <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Naturaleza</dt><dd class="text-gray-900 dark:text-gray-100 mt-1">{{ asText(proceso.naturaleza) }}</dd></div>
+                    <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Correo de Radicación</dt><dd class="text-gray-900 dark:text-gray-100 mt-1">{{ asText(proceso.correo_radicacion) }}</dd></div>
+                    <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Correo(s) del Juzgado</dt><dd class="text-gray-900 dark:text-gray-100 mt-1">{{ asText(proceso.correos_juzgado) }}</dd></div>
                     <div class="md:col-span-2"><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Observaciones</dt><dd class="text-gray-900 dark:text-gray-100 mt-1 whitespace-pre-wrap">{{ asText(proceso.observaciones) }}</dd></div>
                 </dl>
               </div>
@@ -304,16 +306,38 @@ const eliminarActuacion = (actuacionId) => {
                 <h3 class="text-lg font-bold mb-4">Seguimiento</h3>
                 <dl class="space-y-4 text-sm">
                    <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Próxima Revisión</dt><dd><span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold" :class="getRevisionStatus(proceso.fecha_proxima_revision).classes">{{ getRevisionStatus(proceso.fecha_proxima_revision).text }}</span></dd></div>
-                   <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Fecha Revisión</dt><dd>{{ formatDate(proceso.fecha_revision) }}</dd></div>
+                   <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Última Revisión</dt><dd>{{ formatDate(proceso.fecha_revision) }}</dd></div>
                    <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Fecha Radicado</dt><dd>{{ formatDate(proceso.fecha_radicado) }}</dd></div>
+                   <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Responsable Revisión</dt><dd>{{ proceso.responsable_revision?.name || '—' }}</dd></div>
                 </dl>
               </div>
               <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg p-6">
                  <h3 class="text-lg font-bold mb-4">Partes</h3>
                  <dl class="space-y-4 text-sm">
-                     <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Demandantes</dt><dd><ul class="list-disc list-inside"><li v-for="p in proceso.demandantes" :key="p.id">{{ p.nombre_completo }}</li></ul></dd></div>
-                     <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Demandados</dt><dd><ul class="list-disc list-inside"><li v-for="p in proceso.demandados" :key="p.id">{{ p.nombre_completo }}</li></ul></dd></div>
-                     <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Abogado</dt><dd>{{ proceso.abogado?.name || '—' }}</dd></div>
+                     <div>
+                        <dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300 mb-2">Demandantes</dt>
+                        <dd>
+                            <ul class="space-y-2">
+                                <li v-for="p in proceso.demandantes" :key="p.id" class="flex flex-col">
+                                    <span class="font-medium text-gray-900 dark:text-gray-100">{{ p.nombre_completo }}</span>
+                                    <span class="text-xs text-gray-500">{{ p.tipo_documento }} {{ p.numero_documento }}</span>
+                                </li>
+                            </ul>
+                        </dd>
+                    </div>
+                     <div>
+                        <dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300 mb-2">Demandados</dt>
+                        <dd>
+                            <ul class="space-y-2">
+                                <li v-for="p in proceso.demandados" :key="p.id" class="flex flex-col">
+                                    <span class="font-medium text-gray-900 dark:text-gray-100">{{ p.nombre_completo }}</span>
+                                    <span v-if="p.numero_documento && !p.numero_documento.startsWith('TEMP-')" class="text-xs text-gray-500">{{ p.tipo_documento }} {{ p.numero_documento }}</span>
+                                    <span v-else class="text-xs text-amber-600 font-bold uppercase">Por identificar</span>
+                                </li>
+                            </ul>
+                        </dd>
+                    </div>
+                     <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Abogado / Gestor Principal</dt><dd>{{ proceso.abogado?.name || '—' }}</dd></div>
                  </dl>
               </div>
               <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg p-6">

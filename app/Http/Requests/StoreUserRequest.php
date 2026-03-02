@@ -29,11 +29,11 @@ class StoreUserRequest extends FormRequest
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:users,email',
             'password' => ['required', 'confirmed', Password::defaults()],
-            'tipo_usuario' => ['required', Rule::in(['admin', 'gestor', 'abogado', 'cli'])],
+            'tipo_usuario' => ['required', Rule::in(['admin', 'gestor', 'abogado', 'cliente'])],
             'estado_activo' => 'required|boolean',
-            // La cooperativa solo es obligatoria si el tipo de usuario es 'cli'.
+            // La cooperativa solo es obligatoria si el tipo de usuario es 'cliente'.
             'cooperativa_id' => [
-                Rule::requiredIf($this->tipo_usuario === 'cli'),
+                Rule::requiredIf($this->tipo_usuario === 'cliente'),
                 'nullable',
                 'exists:cooperativas,id' // Asegura que la cooperativa seleccionada exista en la BD.
             ],

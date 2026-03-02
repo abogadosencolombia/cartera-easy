@@ -52,7 +52,28 @@ const getIcon = (evento) => {
                             </div>
                             <div>
                                 <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ evento.descripcion_breve }}</p>
-                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                
+                                <!-- Detalles de cambios (NUEVO) -->
+                                <div v-if="evento.detalle_nuevo && Object.keys(evento.detalle_nuevo).length > 0" class="mt-3 overflow-x-auto">
+                                    <table class="min-w-full text-[10px] border dark:border-gray-700 rounded-lg overflow-hidden">
+                                        <thead class="bg-gray-100 dark:bg-gray-700">
+                                            <tr>
+                                                <th class="px-2 py-1 text-left font-bold">Campo</th>
+                                                <th class="px-2 py-1 text-left font-bold">Anterior</th>
+                                                <th class="px-2 py-1 text-left font-bold">Nuevo</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y dark:divide-gray-700">
+                                            <tr v-for="(val, key) in evento.detalle_nuevo" :key="key" class="bg-white dark:bg-gray-800">
+                                                <td class="px-2 py-1 font-medium text-gray-500 uppercase">{{ key.replace(/_/g, ' ') }}</td>
+                                                <td class="px-2 py-1 text-red-600 dark:text-red-400 italic line-through">{{ evento.detalle_anterior ? (evento.detalle_anterior[key] ?? '—') : '—' }}</td>
+                                                <td class="px-2 py-1 text-green-600 dark:text-green-400 font-bold">{{ val ?? '—' }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
                                     Por <span class="font-medium">{{ evento.usuario ? evento.usuario.name : 'Sistema' }}</span> desde la IP {{ evento.direccion_ip }}
                                 </p>
                                 <time class="text-xs text-gray-400 dark:text-gray-500">{{ formatDateTime(evento.created_at) }}</time>

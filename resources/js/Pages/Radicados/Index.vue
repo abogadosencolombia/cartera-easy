@@ -260,13 +260,14 @@ const getVencimientoInfo = (proceso) => {
                 </div>
 
                 <!-- TABLA DE DATOS (DESKTOP) -->
-                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden hidden md:block">
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden md:block hidden">
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 mb-32">
                             <thead class="bg-gray-50 dark:bg-gray-700/50">
                                 <tr>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">Radicado / Asunto</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">Partes</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">Responsables</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">Juzgado/Entidad</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">Seguimiento</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">Etapa Procesal</th>
@@ -274,7 +275,9 @@ const getVencimientoInfo = (proceso) => {
                                 </tr>
                             </thead>
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                <tr v-for="proceso in procesos.data" :key="proceso.id" class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors group">
+                                <tr v-for="(proceso, index) in procesos.data" :key="proceso.id" 
+                                    class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors group relative"
+                                    :style="{ zIndex: procesos.data.length - index }">
                                     
                                     <!-- Radicado -->
                                     <td class="px-6 py-4">
@@ -313,6 +316,20 @@ const getVencimientoInfo = (proceso) => {
                                                 <span class="text-xs text-gray-700 dark:text-gray-300 line-clamp-2">
                                                     {{ formatNames(proceso.demandados) }}
                                                 </span>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <!-- Responsables -->
+                                    <td class="px-6 py-4">
+                                        <div class="flex flex-col gap-1">
+                                            <div class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300">
+                                                <span class="font-bold text-[10px] text-gray-400 uppercase w-8">Abog:</span>
+                                                <span class="truncate max-w-[120px]" :title="proceso.abogado?.name">{{ proceso.abogado?.name || '—' }}</span>
+                                            </div>
+                                            <div class="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+                                                <span class="font-bold text-[10px] text-gray-400 uppercase w-8">Rev:</span>
+                                                <span class="truncate max-w-[120px]" :title="proceso.responsable_revision?.name">{{ proceso.responsable_revision?.name || '—' }}</span>
                                             </div>
                                         </div>
                                     </td>
@@ -368,7 +385,7 @@ const getVencimientoInfo = (proceso) => {
                                     </td>
 
                                     <!-- Acciones -->
-                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative z-50">
                                         <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                             <Link :href="route('procesos.show', proceso.id)" class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 p-1.5 rounded-md hover:bg-indigo-100">
                                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">

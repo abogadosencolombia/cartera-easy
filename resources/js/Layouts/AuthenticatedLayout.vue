@@ -277,9 +277,13 @@ onMounted(() => {
                               class="relative p-2 mr-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none transition duration-150 ease-in-out" 
                               title="Notificaciones">
                             <BellIcon class="h-6 w-6" />
+                            <span v-if="unreadCount > 0" class="absolute top-1.5 right-1.5 flex h-3 w-3">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
+                            </span>
                             <span v-if="unreadCount > 0" 
-                                  class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 transform translate-x-1/4 -translate-y-1/4 bg-red-600 rounded-full">
-                                {{ unreadCount }}
+                                  class="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 py-0.5 text-[11px] font-black leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-red-600 rounded-full border-2 border-white dark:border-gray-800 shadow-sm">
+                                {{ unreadCount > 99 ? '99+' : unreadCount }}
                             </span>
                         </Link>
 
@@ -305,7 +309,22 @@ onMounted(() => {
                     </div>
 
                     <!-- Botón de Hamburguesa (Móvil) -->
-                    <div class="-me-2 flex items-center sm:hidden">
+                    <div class="-me-2 flex items-center sm:hidden gap-2">
+                        <!-- Campana en Móvil -->
+                        <Link :href="route('notificaciones.index')" 
+                              class="relative p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none transition duration-150 ease-in-out" 
+                              title="Notificaciones">
+                            <BellIcon class="h-6 w-6" />
+                            <span v-if="unreadCount > 0" class="absolute top-1.5 right-1.5 flex h-3 w-3">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
+                            </span>
+                            <span v-if="unreadCount > 0" 
+                                  class="absolute -top-0 -right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-white bg-red-600 rounded-full border border-white dark:border-gray-800">
+                                {{ unreadCount > 99 ? '99+' : unreadCount }}
+                            </span>
+                        </Link>
+
                         <button
                             @click="showingNavigationDropdown = !showingNavigationDropdown"
                             class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900 focus:outline-none focus:bg-gray-100 dark:focus:bg-gray-900 focus:text-gray-500 dark:focus:text-gray-400 transition duration-150 ease-in-out"

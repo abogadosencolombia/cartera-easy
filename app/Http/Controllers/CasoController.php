@@ -56,7 +56,7 @@ class CasoController extends Controller
                 // Opción C: Casos donde es el responsable legacy (por si acaso)
                 $q->orWhere('user_id', $user->id);
             });
-        } elseif ($user->tipo_usuario === 'cli') {
+        } elseif ($user->tipo_usuario === 'cliente') {
             $query->where('deudor_id', $user->persona_id);
         }
 
@@ -153,6 +153,8 @@ class CasoController extends Controller
                     'nombre_completo' => $datosDeudor['nombre_completo'],
                     'tipo_documento' => $datosDeudor['tipo_documento'],
                     'numero_documento' => $datosDeudor['numero_documento'],
+                    'celular_1' => $datosDeudor['celular_1'] ?? null,
+                    'correo_1' => $datosDeudor['correo_1'] ?? null,
                 ]);
                 if (!empty($datosDeudor['cooperativas_ids'])) $deudor->cooperativas()->sync($datosDeudor['cooperativas_ids']);
                 if (!empty($datosDeudor['abogados_ids'])) $deudor->abogados()->sync($datosDeudor['abogados_ids']);
@@ -180,6 +182,9 @@ class CasoController extends Controller
                 'evento' => 'CREAR_CASO',
                 'descripcion_breve' => "Caso #{$caso->id} creado para {$caso->deudor?->nombre_completo}",
                 'criticidad' => 'media',
+                'auditable_id' => $caso->id,
+                'auditable_type' => Caso::class,
+                'detalle_nuevo' => $caso->getRawOriginal(),
                 'direccion_ip' => request()->ip(),
                 'user_agent' => request()->userAgent(),
             ]);
@@ -204,6 +209,7 @@ class CasoController extends Controller
             'documentos.persona:id,nombre_completo',
             'documentosGenerados.plantilla',
             'bitacoras.user',
+            'auditoria.usuario',
             'actuaciones' => fn($q) => $q->with('user:id,name')->orderBy('fecha_actuacion', 'desc'),
             'juzgado:id,nombre',
             'especialidad:id,nombre',
@@ -270,8 +276,37 @@ class CasoController extends Controller
                 $deudor = Persona::create(['nombre_completo' => $datosDeudor['nombre_completo'], 'tipo_documento' => $datosDeudor['tipo_documento'] ?? 'CC', 'numero_documento' => $datosDeudor['numero_documento']]);
                 $validated['deudor_id'] = $deudor->id;
             }
+            
+            $original = $caso->getRawOriginal();
             $validated['user_id'] = $userIds[0] ?? null;
             $caso->update($validated);
+            $changes = $caso->getChanges();
+
+            if (!empty($changes)) {
+                $anterior = [];
+                $nuevo = [];
+                foreach ($changes as $key => $val) {
+                    if (in_array($key, ['updated_at', 'ultima_actividad'])) continue;
+                    $anterior[$key] = $original[$key] ?? null;
+                    $nuevo[$key] = $val;
+                }
+
+                if (!empty($nuevo)) {
+                    AuditoriaEvento::create([
+                        'user_id' => Auth::id(),
+                        'evento' => 'ACTUALIZAR_CASO',
+                        'descripcion_breve' => "Actualización de datos del Caso #{$caso->id}",
+                        'auditable_id' => $caso->id,
+                        'auditable_type' => Caso::class,
+                        'criticidad' => 'baja',
+                        'detalle_anterior' => $anterior,
+                        'detalle_nuevo' => $nuevo,
+                        'direccion_ip' => request()->ip(),
+                        'user_agent' => request()->userAgent(),
+                    ]);
+                }
+            }
+
             $caso->users()->sync($userIds);
             $this->sincronizarCodeudores($caso, $datosCodeudores);
             $caso->bitacoras()->create(['user_id' => auth()->id(), 'accion' => 'Actualización de Caso', 'comentario' => 'Se actualizaron los datos y responsables.']);
