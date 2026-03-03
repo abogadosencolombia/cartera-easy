@@ -1,7 +1,7 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/vue';
-import { ChevronLeftIcon, ChevronRightIcon, CalendarDaysIcon, XMarkIcon } from '@heroicons/vue/20/solid';
+import { ChevronLeftIcon, ChevronRightIcon, CalendarDaysIcon, XMarkIcon, ChevronDownIcon } from '@heroicons/vue/20/solid';
 
 const props = defineProps({
     modelValue: {
@@ -23,6 +23,11 @@ const monthNames = [
 ];
 const daysOfWeek = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
 
+// Estados para dropdowns internos
+const showMonthSelector = ref(false);
+const showYearSelector = ref(false);
+const yearScrollContainer = ref(null);
+
 // Lógica de fecha
 const parseDate = (dateStr) => {
     if (!dateStr) return null;
@@ -43,6 +48,40 @@ const viewDate = ref(selectedDate.value || new Date());
 
 const currentMonth = computed(() => viewDate.value.getMonth());
 const currentYear = computed(() => viewDate.value.getFullYear());
+
+const years = computed(() => {
+    const currentYearNum = new Date().getFullYear();
+    const startYear = 1900;
+    const endYear = currentYearNum + 50;
+    const yearsArray = [];
+    for (let i = endYear; i >= startYear; i--) {
+        yearsArray.push(i);
+    }
+    return yearsArray;
+});
+
+const updateMonth = (month) => {
+    const newDate = new Date(viewDate.value);
+    newDate.setMonth(month);
+    viewDate.value = newDate;
+    showMonthSelector.value = false;
+};
+
+const updateYear = (year) => {
+    const newDate = new Date(viewDate.value);
+    newDate.setFullYear(year);
+    viewDate.value = newDate;
+    showYearSelector.value = false;
+};
+
+const scrollToCurrentYear = () => {
+    if (showYearSelector.value && yearScrollContainer.value) {
+        const activeYear = yearScrollContainer.value.querySelector('.active-year');
+        if (activeYear) {
+            activeYear.scrollIntoView({ block: 'center' });
+        }
+    }
+};
 
 const days = computed(() => {
     const year = currentYear.value;
@@ -156,17 +195,69 @@ const displayValue = computed(() => {
                 class="absolute z-50 mt-2 w-72 transform -translate-x-1/2 left-1/2 sm:left-auto sm:right-0 sm:translate-x-0"
             >
                 <div class="overflow-hidden rounded-xl shadow-2xl ring-1 ring-black ring-opacity-5 bg-white dark:bg-gray-800 border dark:border-gray-700">
-                    <!-- Cabecera -->
-                    <div class="flex items-center justify-between px-4 py-3 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                        <button @click="prevMonth" type="button" class="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-400">
-                            <ChevronLeftIcon class="h-5 w-5" />
-                        </button>
-                        <div class="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-tight">
-                            {{ monthNames[currentMonth] }} {{ currentYear }}
+                    <!-- Cabecera Premium -->
+                    <div class="px-2 py-3 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 relative">
+                        <div class="flex items-center justify-between">
+                            <button @click="prevMonth" type="button" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-400">
+                                <ChevronLeftIcon class="h-4 w-4" />
+                            </button>
+                            
+                            <div class="flex items-center gap-1.5">
+                                <!-- Selector de Mes -->
+                                <div class="relative">
+                                    <button 
+                                        @click="showMonthSelector = !showMonthSelector; showYearSelector = false"
+                                        type="button"
+                                        class="flex items-center gap-1 px-2 py-1 text-xs font-bold text-gray-900 dark:text-white uppercase hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-all"
+                                    >
+                                        {{ monthNames[currentMonth] }}
+                                        <ChevronDownIcon class="h-3 w-3 opacity-50" />
+                                    </button>
+                                    
+                                    <div v-if="showMonthSelector" class="absolute z-[70] mt-1 w-32 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 left-0 max-h-48 overflow-y-auto">
+                                        <button 
+                                            v-for="(name, idx) in monthNames" 
+                                            :key="idx"
+                                            @click="updateMonth(idx)"
+                                            class="w-full text-left px-3 py-1.5 text-xs hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400"
+                                            :class="idx === currentMonth ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-bold' : 'text-gray-700 dark:text-gray-300'"
+                                        >
+                                            {{ name }}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Selector de Año -->
+                                <div class="relative">
+                                    <button 
+                                        @click="showYearSelector = !showYearSelector; showMonthSelector = false; setTimeout(scrollToCurrentYear, 0)"
+                                        type="button"
+                                        class="flex items-center gap-1 px-2 py-1 text-xs font-bold text-gray-900 dark:text-white uppercase hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-all"
+                                    >
+                                        {{ currentYear }}
+                                        <ChevronDownIcon class="h-3 w-3 opacity-50" />
+                                    </button>
+
+                                    <div v-if="showYearSelector" ref="yearScrollContainer" class="absolute z-[70] mt-1 w-24 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 left-1/2 -translate-x-1/2 max-h-48 overflow-y-auto">
+                                        <button 
+                                            v-for="year in years" 
+                                            :key="year"
+                                            @click="updateYear(year)"
+                                            class="w-full text-center px-3 py-1.5 text-xs hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400"
+                                            :class="[
+                                                year === currentYear ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-bold active-year' : 'text-gray-700 dark:text-gray-300',
+                                            ]"
+                                        >
+                                            {{ year }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button @click="nextMonth" type="button" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-400">
+                                <ChevronRightIcon class="h-4 w-4" />
+                            </button>
                         </div>
-                        <button @click="nextMonth" type="button" class="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-400">
-                            <ChevronRightIcon class="h-5 w-5" />
-                        </button>
                     </div>
 
                     <!-- Cuadrícula de días -->

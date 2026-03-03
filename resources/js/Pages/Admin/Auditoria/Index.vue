@@ -107,7 +107,7 @@ const getCriticidadConfig = (nivel) => {
         <template #header>
             <div class="flex items-center gap-2">
                 <ShieldCheckIcon class="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-                <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                <h2 class="font-semibold text-xl text-blue-500 dark:text-gray-200 leading-tight">
                     Auditoría Global y Seguridad
                 </h2>
             </div>

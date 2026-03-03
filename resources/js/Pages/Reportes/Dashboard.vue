@@ -205,7 +205,7 @@ const formatDateForCompliance = (dateString) => {
     <AuthenticatedLayout>
         <template #header>
             <div class="flex justify-between items-center">
-                <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                <h2 class="font-semibold text-xl text-blue-500 dark:text-gray-200 leading-tight">
                     Centro de Mando Estratégico
                 </h2>
                 <div class="relative" ref="exportMenu">

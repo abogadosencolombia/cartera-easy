@@ -147,7 +147,7 @@ const handleFileUpload = (event) => {
     <AuthenticatedLayout>
         <template #header>
             <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
-                <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight flex items-center gap-2">
+                <h2 class="font-semibold text-xl text-blue-500 dark:text-gray-200 leading-tight flex items-center gap-2">
                     <DocumentTextIcon class="w-6 h-6 text-indigo-500" />
                     Plantillas de Documentos
                 </h2>

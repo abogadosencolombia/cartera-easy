@@ -163,7 +163,7 @@ const esNotificacionDeSistema = (notificacion) => {
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <div class="flex items-center gap-2">
-                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+                        <h2 class="text-2xl font-bold text-blue-500 dark:text-white tracking-tight">
                             Hola, {{ user.name.split(' ')[0] }}
                         </h2>
                         <SparklesIcon class="h-5 w-5 text-amber-400" />
