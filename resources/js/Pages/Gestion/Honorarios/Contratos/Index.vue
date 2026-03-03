@@ -100,7 +100,7 @@ const calcularProgreso = (contrato) => {
     <AuthenticatedLayout>
         <template #header>
             <div class="flex flex-col md:flex-row items-center justify-between gap-4">
-                <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                <h2 class="font-semibold text-xl text-blue-500 dark:text-gray-200 leading-tight">
                     Gestión de Contratos de Honorarios
                 </h2>
                 <Link :href="route('honorarios.contratos.create')"

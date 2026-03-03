@@ -37,7 +37,7 @@ const submit = () => {
 
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+            <h2 class="font-semibold text-xl text-blue-500 dark:text-gray-200 leading-tight">
                 Registrar Nueva Cooperativa
             </h2>
         </template>

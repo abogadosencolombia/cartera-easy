@@ -584,7 +584,7 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
         <template #header>
             <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
-                    <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">Detalle del Contrato</h2>
+                    <h2 class="font-semibold text-xl text-blue-500 dark:text-gray-200 leading-tight">Detalle del Contrato</h2>
                     <p class="text-sm text-gray-500 dark:text-gray-400">
                         Contrato <span class="font-mono">#{{ props.contrato?.id }}</span><span class="mx-2">|</span>
                         <span class="px-2 py-0.5 rounded-full text-xs font-semibold" :class="contractStatusClasses[props.contrato?.estado] || contractStatusClasses['CERRADO']">

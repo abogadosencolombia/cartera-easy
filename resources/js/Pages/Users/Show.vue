@@ -105,7 +105,7 @@ const getDocumentUrl = (path) => {
                  <Link :href="route('admin.users.index')" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-2 rounded-full">
                      <ArrowLeftIcon class="h-6 w-6" />
                  </Link>
-                <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                <h2 class="font-semibold text-xl text-blue-500 dark:text-gray-200 leading-tight">
                     Perfil de Usuario
                 </h2>
             </div>
@@ -193,7 +193,7 @@ const getDocumentUrl = (path) => {
                                     </div>
                                     <div class="flex items-center space-x-2 mt-1">
                                         <input type="file" @input="cardForm.tarjeta_profesional = $event.target.files[0]" class="block w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:bg-gray-100 dark:file:bg-gray-700 file:text-gray-700 dark:file:text-gray-200 hover:file:bg-gray-200"/>
-                                        <button type="submit" :disabled="cardForm.processing" class="inline-flex items-center p-2 bg-gray-800 border rounded-md font-semibold text-xs text-white hover:bg-gray-700 disabled:opacity-25"><ArrowUpOnSquareIcon class="h-4 w-4"/></button>
+                                        <button type="submit" :disabled="cardForm.processing" class="inline-flex items-center p-2 bg-blue-600 border rounded-md font-semibold text-xs text-white hover:bg-blue-700 disabled:opacity-25"><ArrowUpOnSquareIcon class="h-4 w-4"/></button>
                                     </div>
                                     <div v-if="cardForm.errors.tarjeta_profesional" class="text-red-500 text-xs mt-1">{{ cardForm.errors.tarjeta_profesional }}</div>
                                 </form>

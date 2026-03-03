@@ -102,7 +102,7 @@ const roleBadgeClass = (role) => {
     <AuthenticatedLayout>
         <template #header>
             <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
-                <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight flex items-center">
+                <h2 class="font-semibold text-xl text-blue-500 dark:text-gray-200 leading-tight flex items-center">
                     <TrophyIcon class="h-6 w-6 mr-3 text-yellow-500" />
                     Muro de Campeones
                 </h2>

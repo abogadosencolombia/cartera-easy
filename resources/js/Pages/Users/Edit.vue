@@ -106,9 +106,11 @@ const submit = () => {
     <AuthenticatedLayout>
         <!-- Encabezado de la página -->
         <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-                Editando Usuario: <span class="font-bold">{{ user.name }}</span>
-            </h2>
+    <h2 class="font-semibold text-xl text-indigo-600 leading-tight">
+        Editando Usuario: 
+        <span class="text-gray-800">{{ user.name }}</span>
+    </h2>
+           
         </template>
 
         <div class="py-12">
