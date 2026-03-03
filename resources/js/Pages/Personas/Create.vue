@@ -89,7 +89,7 @@ const submit = () => {
   <AuthenticatedLayout>
     <template #header>
       <div class="flex items-center justify-between">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+        <h2 class="font-semibold text-xl text-blue-500 dark:text-gray-200 leading-tight">
           Registrar Nueva Persona
         </h2>
         <Link :href="route('personas.index')" class="text-sm text-gray-600 hover:underline">&larr; Volver</Link>
@@ -366,11 +366,15 @@ const submit = () => {
               </section>
 
               <div class="flex justify-end pt-6">
-                <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing" class="w-full sm:w-auto flex justify-center">
-                   <span v-if="form.processing" class="mr-2 animate-spin">⏳</span>
-                   Guardar Persona
+                <PrimaryButton 
+                    :class="{ 'opacity-25': form.processing }" 
+                    :disabled="form.processing" 
+                    class="w-full sm:w-auto flex justify-center !bg-indigo-600 hover:!bg-indigo-700"
+                >
+                    <span v-if="form.processing" class="mr-2 animate-spin">⏳</span>
+                    Guardar Persona
                 </PrimaryButton>
-              </div>
+            </div>
             </form>
           </div>
         </div>

@@ -189,7 +189,7 @@ const lineData = computed(() => {
         <!-- Header Minimalista -->
         <template #header>
             <div class="flex justify-between items-center">
-                <h2 class="font-bold text-2xl text-gray-800 dark:text-gray-100 tracking-tight">
+                <h2 class="font-bold text-2xl text-blue-500 dark:text-gray-100 tracking-tight">
                     Resumen General
                 </h2>
                 <div class="hidden sm:flex items-center text-sm text-gray-500 bg-white dark:bg-gray-800 px-3 py-1 rounded-full shadow-sm">
@@ -268,7 +268,7 @@ const lineData = computed(() => {
                     <!-- Barra de Filtros Flotante -->
                     <div class="sticky top-4 z-10 bg-white/80 dark:bg-gray-800/90 backdrop-blur-md rounded-2xl shadow-sm border border-gray-200/60 dark:border-gray-700 p-4 mb-8 flex flex-col md:flex-row gap-4 justify-between items-center transition-all duration-300" :class="isMounted ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0'">
                         <div class="flex items-center gap-2 w-full md:w-auto">
-                            <BuildingLibraryIcon class="w-5 h-5 text-gray-400"/>
+                            <BuildingLibraryIcon class="w-5 h-5 text-indigo-600"/>
                             <select v-model="form.cooperativa_id" class="form-select-minimal w-full md:w-64">
                                 <option value="">Todas las Cooperativas</option>
                                 <option v-for="c in cooperativas" :key="c.id" :value="c.id">{{ c.nombre }}</option>
@@ -328,7 +328,7 @@ const lineData = computed(() => {
 
                         <!-- Ranking Gestores -->
                         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col" :class="isMounted ? 'animate-in' : 'opacity-0'" style="animation-delay: 500ms">
-                            <h3 class="font-semibold text-gray-800 dark:text-white mb-4 flex items-center">
+                            <h3 class="font-semibold text-blue-500 dark:text-white mb-4 flex items-center">
                                 <TrophyIcon class="w-5 h-5 text-amber-400 mr-2"/> Top Gestores
                             </h3>
                             <div class="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">

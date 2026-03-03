@@ -106,7 +106,7 @@ const formatLabel = (text) => {
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
                 
                 <div class="flex flex-col md:flex-row justify-between items-center gap-4 px-4 sm:px-0">
-                    <h2 class="font-semibold text-2xl text-gray-800 dark:text-gray-200 leading-tight">
+                    <h2 class="font-semibold text-2xl text-blue-500 dark:text-gray-200 leading-tight">
                         Gestión de Casos
                     </h2>
                     <div class="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">

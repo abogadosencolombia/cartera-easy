@@ -15,6 +15,7 @@ const props = defineProps({
   multiple: { type: Boolean, default: false },
   placeholder: { type: String, default: 'Seleccione opciones...' },
   labelKey: { type: String, default: 'nombre' }, // Puede ser 'nombre', 'name', 'nombre_completo'
+  clearable: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(['update:modelValue']);
@@ -95,6 +96,11 @@ const removeItem = (item) => {
     }
 };
 
+const clearSelection = () => {
+    emit('update:modelValue', props.multiple ? [] : null);
+    query.value = '';
+};
+
 const toggle = () => {
     isOpen.value = !isOpen.value;
     if (isOpen.value) {
@@ -139,6 +145,15 @@ const toggle = () => {
         
         <div class="flex items-center gap-2 shrink-0 ml-2">
             <ArrowPathIcon v-if="loading" class="h-4 w-4 text-indigo-500 animate-spin" />
+            
+            <!-- Botón para limpiar (Simple) -->
+            <XMarkIcon 
+                v-if="!multiple && modelValue && clearable" 
+                @click.stop="clearSelection" 
+                class="h-4 w-4 text-gray-400 hover:text-red-500 transition-colors"
+                title="Quitar selección"
+            />
+
             <ChevronDownIcon class="h-4 w-4 text-gray-400 transition-transform duration-300" :class="{'rotate-180': isOpen}" />
         </div>
     </div>
