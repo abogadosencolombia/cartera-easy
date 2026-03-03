@@ -131,7 +131,7 @@ const submit = () => {
     <template #header>
       <div class="flex flex-col md:flex-row items-center justify-between gap-4">
         <div>
-          <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">Registrar Nuevo Radicado</h2>
+          <h2 class="font-semibold text-xl text-blue-500 dark:text-gray-200 leading-tight">Registrar Nuevo Radicado</h2>
           <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Paso {{ step }}: {{ currentStep.name }}</p>
         </div>
         <div class="flex items-center gap-3">
@@ -222,9 +222,24 @@ const submit = () => {
             <SecondaryButton @click="prevStep" v-if="step > 1" type="button">Anterior</SecondaryButton>
             <div class="flex items-center gap-3">
               <span class="text-xs text-gray-500">Paso {{ step }} de {{ totalSteps }}</span>
-              <PrimaryButton @click="nextStep" v-if="step < totalSteps" type="button">Siguiente</PrimaryButton>
-              <PrimaryButton type="submit" v-if="step === totalSteps" :disabled="form.processing">{{ form.processing ? 'Guardando...' : 'Guardar Radicado' }}</PrimaryButton>
-            </div>
+              
+              <PrimaryButton 
+                  @click="nextStep" 
+                  v-if="step < totalSteps" 
+                  type="button" 
+                  class="!bg-indigo-600 hover:!bg-indigo-700"
+              >
+                  Siguiente
+              </PrimaryButton>
+
+              <PrimaryButton 
+                  type="submit" 
+                  v-if="step === totalSteps" 
+                  :disabled="form.processing"
+              >
+                  {{ form.processing ? 'Guardando...' : 'Guardar Radicado' }}
+              </PrimaryButton>
+          </div>
           </div>
         </form>
       </div>

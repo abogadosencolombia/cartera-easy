@@ -396,6 +396,53 @@ const submit = () => {
                                                 <TextInput :id="'co_email_' + index" v-model="codeudor.correo" type="email" class="mt-1 block w-full" placeholder="correo@ejemplo.com" />
                                             </div>
                                         </div>
+
+                                        <!-- --- DETALLE ADICIONAL: DIRECCIONES Y REDES --- -->
+                                        <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-8 border-t dark:border-gray-700 pt-6">
+                                            <!-- Direcciones -->
+                                            <div class="space-y-4">
+                                                <div class="flex justify-between items-center">
+                                                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Direcciones</h4>
+                                                    <button type="button" @click="addAddress(index)" class="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded font-bold hover:bg-indigo-100 transition">
+                                                        + Añadir Dirección
+                                                    </button>
+                                                </div>
+                                                <div v-for="(addr, aIdx) in codeudor.addresses" :key="aIdx" class="grid grid-cols-3 gap-2 items-end bg-white dark:bg-gray-800 p-2 rounded border dark:border-gray-700 shadow-sm relative group">
+                                                    <div class="col-span-1">
+                                                        <InputLabel value="Etiqueta" class="!text-[10px]" />
+                                                        <TextInput v-model="addr.label" placeholder="Ej: Oficina" class="!text-xs w-full" />
+                                                    </div>
+                                                    <div class="col-span-2">
+                                                        <InputLabel value="Dirección y Ciudad" class="!text-[10px]" />
+                                                        <TextInput v-model="addr.address" placeholder="Calle... Medellín" class="!text-xs w-full" />
+                                                    </div>
+                                                    <button type="button" @click="removeAddress(index, aIdx)" class="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition">
+                                                        <TrashIcon class="h-3 w-3" />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <!-- Redes Sociales -->
+                                            <div class="space-y-4">
+                                                <div class="flex justify-between items-center">
+                                                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Redes / Otros Enlaces</h4>
+                                                    <button type="button" @click="codeudor.social_links.push({ label: 'Facebook', url: '' })" class="text-[10px] bg-blue-50 text-blue-600 px-2 py-1 rounded font-bold hover:bg-blue-100 transition">
+                                                        + Añadir Enlace
+                                                    </button>
+                                                </div>
+                                                <div v-for="(link, sIdx) in codeudor.social_links" :key="sIdx" class="grid grid-cols-3 gap-2 items-end bg-white dark:bg-gray-800 p-2 rounded border dark:border-gray-700 shadow-sm relative group">
+                                                    <div class="col-span-1">
+                                                        <TextInput v-model="link.label" placeholder="Red" class="!text-xs w-full" />
+                                                    </div>
+                                                    <div class="col-span-2">
+                                                        <TextInput v-model="link.url" type="url" placeholder="https://..." class="!text-xs w-full" />
+                                                    </div>
+                                                    <button type="button" @click="codeudor.social_links.splice(sIdx, 1)" class="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition">
+                                                        <TrashIcon class="h-3 w-3" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </section>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Juzgado;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Auth;
 use App\Imports\JuzgadosImport; 
 use Maatwebsite\Excel\Facades\Excel; 
 

@@ -24,8 +24,8 @@ const props = defineProps({
 const { formatDate, getRevisionStatus } = useProcesos();
 
 // --- Helpers Fecha ---
-const fmtDateTime = (d) => d ? new Date(String(d).replace(' ', 'T')).toLocaleString('es-CO', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'UTC' }) : 'N/A';
-const fmtDateSimple = (d) => d ? new Date(String(d).replace(' ', 'T')).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) : 'N/A';
+const fmtDateTime = (d) => d ? new Date(String(d).replace(' ', 'T')).toLocaleString('es-CO', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : 'N/A';
+const fmtDateSimple = (d) => d ? new Date(String(d).replace(' ', 'T')).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
 
 const isClosed = computed(() => props.proceso.estado === 'CERRADO');
 const files = computed(() => props.proceso?.documentos ?? []);
@@ -275,8 +275,16 @@ const eliminarActuacion = (actuacionId) => {
                         <form @submit.prevent="guardarActuacion" class="mb-6 pb-6 border-b dark:border-gray-700">
                             <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">Nueva Actuación</h3>
                             <div class="grid md:grid-cols-4 gap-4 mb-4">
-                                <div class="md:col-span-3"><InputLabel value="Descripción" /><Textarea v-model="actuacionForm.nota" rows="3" class="mt-1 block w-full" required /></div>
-                                <div><InputLabel value="Fecha" /><DatePicker v-model="actuacionForm.fecha_actuacion" class="mt-1 block w-full" /></div>
+                                <div class="md:col-span-3">
+                                    <InputLabel value="Descripción" />
+                                    <Textarea v-model="actuacionForm.nota" rows="3" class="mt-1 block w-full" required />
+                                    <InputError :message="actuacionForm.errors.nota" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel value="Fecha" />
+                                    <DatePicker v-model="actuacionForm.fecha_actuacion" class="mt-1 block w-full" />
+                                    <InputError :message="actuacionForm.errors.fecha_actuacion" class="mt-2" />
+                                </div>
                             </div>
                             <div class="flex justify-end"><PrimaryButton :disabled="actuacionForm.processing">Registrar</PrimaryButton></div>
                         </form>

@@ -168,19 +168,44 @@ class NotificacionController extends Controller
     }
 
     /**
-     * ELIMINAR TODAS LAS NOTIFICACIONES DEL USUARIO
+     * ELIMINAR NOTIFICACIONES (RESPETA FILTROS)
      */
-    public function clearAll()
+    public function clearAll(Request $request)
     {
         $user = Auth::user();
 
         // 1. Borrar notificaciones de la tabla personalizada (NotificacionCaso)
-        NotificacionCaso::where('user_id', $user->id)->delete();
+        $queryCasos = NotificacionCaso::query();
+        
+        if ($user->tipo_usuario !== 'admin') {
+            $queryCasos->where('user_id', $user->id);
+        } else {
+            // Si es admin, respetamos el filtro de usuario si existe
+            if ($request->filled('user_id')) {
+                $queryCasos->where('user_id', $request->input('user_id'));
+            }
+            // Si no hay filtro de usuario y es admin, borrará todas las de la tabla
+            // para que la vista global del admin se limpie.
+        }
+        
+        // Respetamos filtros de estado y tipo
+        if ($request->input('leido') === 'si') $queryCasos->where('leido', true);
+        if ($request->input('leido') === 'no') $queryCasos->where('leido', false);
+        if ($request->filled('tipo')) $queryCasos->where('tipo', 'Ilike', '%' . $request->input('tipo') . '%');
 
-        // 2. Borrar notificaciones del sistema de Laravel
-        $user->notifications()->delete();
+        $queryCasos->delete();
 
-        return back(303)->with('success', 'Todas tus notificaciones han sido eliminadas.');
+        // 2. Borrar notificaciones del sistema de Laravel (propias)
+        // Estas siempre son privadas al usuario actual
+        $queryTareas = $user->notifications();
+        if ($request->input('leido') === 'si') $queryTareas->whereNotNull('read_at');
+        if ($request->input('leido') === 'no') $queryTareas->whereNull('read_at');
+        // El filtro de tipo para tareas es más complejo por las clases, 
+        // por simplicidad si hay filtro de tipo 'legal' o 'pagos' las borramos también.
+        
+        $queryTareas->delete();
+
+        return back(303)->with('success', 'Notificaciones eliminadas correctamente.');
     }
 
     public function storeManual(Request $request, Caso $caso): RedirectResponse

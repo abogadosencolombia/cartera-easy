@@ -163,19 +163,23 @@ const getVencimientoInfo = (proceso) => {
         <template #header>
             <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                    <h2 class="font-bold text-2xl text-gray-800 dark:text-gray-100 leading-tight flex items-center gap-2">
+                    <h2 class="font-bold text-2xl text-blue-500 dark:text-gray-100 leading-tight flex items-center gap-2">
                         <ScaleIcon class="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
                         Expedientes Judiciales
                     </h2>
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Gestión y seguimiento de procesos radicados.</p>
                 </div>
                 <div class="flex items-center gap-3 w-full sm:w-auto">
-                    <PrimaryButton @click="exportarExcel" class="justify-center w-full sm:w-auto">
+                    <PrimaryButton 
+                        @click="exportarExcel" 
+                        class="justify-center w-full sm:w-auto !bg-blue-500 hover:!bg-blue-600"
+                    >
                         <DocumentArrowDownIcon class="h-4 w-4 mr-2" />
                         Exportar
                     </PrimaryButton>
+
                     <Link :href="route('procesos.create')" class="w-full sm:w-auto">
-                        <PrimaryButton class="justify-center w-full sm:w-auto">
+                        <PrimaryButton class="justify-center w-full sm:w-auto !bg-indigo-500 hover:!bg-indigo-600">
                             <PlusIcon class="h-4 w-4 mr-2" />
                             Nuevo Radicado
                         </PrimaryButton>

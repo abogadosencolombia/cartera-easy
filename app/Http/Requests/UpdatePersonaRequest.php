@@ -14,7 +14,8 @@ class UpdatePersonaRequest extends FormRequest
 
     public function rules(): array
     {
-        $personaId = $this->route('persona')->id;
+        $persona = $this->route('persona');
+        $personaId = $persona instanceof \App\Models\Persona ? $persona->id : $persona;
 
         return [
             'nombre_completo'    => 'required|string|max:255',

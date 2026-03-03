@@ -80,12 +80,24 @@ const checkIncompleta = (p) => {
         
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h2 class="font-bold text-2xl text-gray-800 dark:text-gray-200">Directorio de Personas</h2>
+            <h2 class="font-bold text-2xl text-blue-500 dark:text-gray-200">Directorio de Personas</h2>
             <p class="text-sm text-gray-500 mt-1">Gestión centralizada de deudores, codeudores y demandados.</p>
           </div>
           <div class="flex items-center gap-3">
-            <SecondaryButton @click="exportExcel"><ArrowDownTrayIcon class="w-4 h-4 mr-2" /> Exportar</SecondaryButton>
-            <Link :href="route('personas.create')"><PrimaryButton><PlusIcon class="w-4 h-4 mr-2" /> Nueva Persona</PrimaryButton></Link>
+              <SecondaryButton 
+                  @click="exportExcel" 
+                  class="!bg-blue-500 hover:!bg-blue-600 !text-white border-none"
+              >
+                  <ArrowDownTrayIcon class="w-4 h-4 mr-2" /> 
+                  Exportar
+              </SecondaryButton>
+
+              <Link :href="route('personas.create')">
+                  <PrimaryButton class="!bg-indigo-600 hover:!bg-indigo-700">
+                      <PlusIcon class="w-4 h-4 mr-2" /> 
+                      Nueva Persona
+                  </PrimaryButton>
+              </Link>
           </div>
         </div>
 

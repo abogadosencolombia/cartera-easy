@@ -96,7 +96,7 @@ const getInitials = (name) => {
                     <span class="block sm:inline">{{ flash.error }}</span>
                 </div>
                 
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
+                <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg mb-6">
                     <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                         <TextInput 
                             id="search" 

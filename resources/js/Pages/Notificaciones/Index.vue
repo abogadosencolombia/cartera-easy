@@ -66,7 +66,7 @@ const limpiarTodas = () => {
 };
 
 const confirmClearAll = () => {
-    router.delete(route('notificaciones.clearAll'), {
+    router.delete(route('notificaciones.clearAll', localFiltros.value), {
         preserveScroll: true,
         onSuccess: () => {
             confirmingAllDeletion.value = false;
@@ -78,6 +78,7 @@ const confirmClearAll = () => {
 const localFiltros = ref({
     leido: props.filtros.leido || '',
     tipo: props.filtros.tipo || '',
+    user_id: props.filtros.user_id || '',
 });
 
 const setFiltro = (campo, valor) => {

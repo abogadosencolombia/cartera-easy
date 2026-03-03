@@ -276,6 +276,9 @@ const submit = () => {
     form.manual_cuotas = manualCuotas.value;
     form.post(route('honorarios.contratos.store'), {
         preserveScroll: true,
+        onError: (errors) => {
+            console.error("Errores al guardar contrato:", errors);
+        }
     });
 };
 
@@ -369,6 +372,23 @@ onMounted(() => {
         <div class="py-8">
             <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
+                <!-- ALERTA DE ERRORES GENERALES -->
+                <div v-if="Object.keys(form.errors).length > 0" class="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 p-4 rounded-md">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <ExclamationTriangleIcon class="h-5 w-5 text-red-400" aria-hidden="true" />
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-bold text-red-800 dark:text-red-200">Se encontraron errores de validación</h3>
+                            <div class="mt-2 text-sm text-red-700 dark:text-red-300">
+                                <ul role="list" class="list-disc space-y-1 pl-5">
+                                    <li v-for="(error, field) in form.errors" :key="field">{{ error }}</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Card 1: Información Principal -->
                 <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
                     <div class="p-6 border-b dark:border-gray-700 flex items-center gap-3">
@@ -401,7 +421,7 @@ onMounted(() => {
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha de Inicio *</label>
                             <input type="date" v-model="form.inicio" class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
-                            <p v-if="form.errors.inicio" class="mt-1 text-sm text-red-600">{{ form.errors.inicio }}</p>
+                            <p v-if="form.errors.inicio" class="mt-1 text-sm text-red-600 font-bold">{{ form.errors.inicio }}</p>
                         </div>
 
                         <div>
@@ -410,7 +430,7 @@ onMounted(() => {
                                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">COP</div>
                                 <input type="number" v-model.number="form.anticipo" placeholder="0" class="pl-12 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
                             </div>
-                            <p v-if="form.errors.anticipo" class="mt-1 text-sm text-red-600">{{ form.errors.anticipo }}</p>
+                            <p v-if="form.errors.anticipo" class="mt-1 text-sm text-red-600 font-bold">{{ form.errors.anticipo }}</p>
                         </div>
                     </div>
                 </div>
@@ -432,6 +452,7 @@ onMounted(() => {
                                     </label>
                                 </div>
                             </fieldset>
+                            <p v-if="form.errors.modalidad" class="mt-1 text-sm text-red-600 font-bold">{{ form.errors.modalidad }}</p>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t dark:border-gray-700">
@@ -446,12 +467,13 @@ onMounted(() => {
                                            placeholder="5000000" 
                                            class="pl-12 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 dark:disabled:bg-gray-800/50" />
                                 </div>
-                                <p v-if="form.errors.monto_total" class="mt-1 text-sm text-red-600">{{ form.errors.monto_total }}</p>
+                                <p v-if="form.errors.monto_total" class="mt-1 text-sm text-red-600 font-bold">{{ form.errors.monto_total }}</p>
                             </div>
 
                             <div v-if="form.modalidad === 'CUOTAS' || form.modalidad === 'CUOTA_MIXTA'">
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Número de Cuotas Base *</label>
                                 <input type="number" v-model.number="form.cuotas" min="1" max="120" step="1" class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
+                                <p v-if="form.errors.cuotas" class="mt-1 text-sm text-red-600 font-bold">{{ form.errors.cuotas }}</p>
                                 <p class="text-xs text-gray-500 mt-1">Si editas la tabla inferior manualmente, este número se actualizará.</p>
                             </div>
 
@@ -461,6 +483,7 @@ onMounted(() => {
                                 <select v-model="form.frecuencia_pago" class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
                                     <option v-for="freq in frecuencias" :key="freq.value" :value="freq.value">{{ freq.label }}</option>
                                 </select>
+                                <p v-if="form.errors.frecuencia_pago" class="mt-1 text-sm text-red-600 font-bold">{{ form.errors.frecuencia_pago }}</p>
                             </div>
 
                             <div v-if="form.modalidad === 'LITIS' || form.modalidad === 'CUOTA_MIXTA'">
@@ -469,6 +492,7 @@ onMounted(() => {
                                     <input type="number" v-model.number="form.porcentaje_litis" placeholder="30" class="pr-8 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
                                     <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-500">%</div>
                                 </div>
+                                <p v-if="form.errors.porcentaje_litis" class="mt-1 text-sm text-red-600 font-bold">{{ form.errors.porcentaje_litis }}</p>
                             </div>
                         </div>
 
@@ -518,6 +542,7 @@ onMounted(() => {
                                         <td class="px-4 py-2">
                                             <input type="date" v-model="fila.fecha" 
                                                    class="text-sm rounded border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-1 px-2 w-full focus:ring-1 focus:ring-indigo-500" />
+                                            <p v-if="form.errors[`manual_cuotas.${idx}.fecha`]" class="text-[10px] text-red-600 mt-1">{{ form.errors[`manual_cuotas.${idx}.fecha`] }}</p>
                                         </td>
                                         <td class="px-4 py-2">
                                             <div class="relative">
@@ -525,6 +550,7 @@ onMounted(() => {
                                                 <input type="number" v-model.number="fila.valor"
                                                        class="text-sm text-right font-mono rounded border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-1 px-2 w-full focus:ring-1 focus:ring-indigo-500" />
                                             </div>
+                                            <p v-if="form.errors[`manual_cuotas.${idx}.valor`]" class="text-[10px] text-red-600 mt-1 text-right">{{ form.errors[`manual_cuotas.${idx}.valor`] }}</p>
                                         </td>
                                         <td class="px-4 py-2 text-center">
                                             <button type="button" @click="removeManualRow(idx)" class="text-gray-400 hover:text-red-500 transition">

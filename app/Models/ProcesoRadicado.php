@@ -13,6 +13,7 @@ use App\Models\RevisionDiaria;
 use App\Models\Contrato; 
 use App\Models\Tarea;
 use App\Models\EtapaProcesal; 
+use App\Models\AuditoriaEvento;
 
 class ProcesoRadicado extends Model
 {
@@ -97,6 +98,11 @@ class ProcesoRadicado extends Model
     public function tareas(): MorphMany
     {
         return $this->morphMany(Tarea::class, 'tarea');
+    }
+
+    public function auditoria(): MorphMany
+    {
+        return $this->morphMany(AuditoriaEvento::class, 'auditable')->latest();
     }
 
     // --- LÓGICA INTELIGENTE ---

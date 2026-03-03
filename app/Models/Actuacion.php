@@ -27,11 +27,13 @@ class Actuacion extends Model
     protected $fillable = [
         'actuable_type',
         'actuable_id',
-        'user_id', // Quién creó
+        'user_id',
         'nota',
-        'fecha_actuacion', // <-- Añadido
-        'verified_by_user_id', // Quién verificó
-        'verified_at', // Cuándo verificó
+        'fecha_actuacion',
+        'verified_by_user_id',
+        'verified_at',
+        'created_at',
+        'updated_at',
     ];
 
     /**

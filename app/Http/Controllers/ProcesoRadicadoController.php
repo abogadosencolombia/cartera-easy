@@ -62,6 +62,9 @@ class ProcesoRadicadoController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('radicado', 'ilike', "%{$search}%")
                     ->orWhere('asunto', 'ilike', "%{$search}%")
+                    ->orWhere('naturaleza', 'ilike', "%{$search}%")
+                    ->orWhere('ultima_actuacion', 'ilike', "%{$search}%")
+                    ->orWhere('observaciones', 'ilike', "%{$search}%")
                     ->orWhereHas('demandantes', function($sq) use ($search) {
                         $sq->where('nombre_completo', 'Ilike', "%{$search}%")
                            ->orWhere('numero_documento', 'Ilike', "%{$search}%");
@@ -72,7 +75,8 @@ class ProcesoRadicadoController extends Controller
                     })
                     ->orWhereHas('abogado', fn($sq) => $sq->where('name', 'Ilike', "%{$search}%"))
                     ->orWhereHas('juzgado', fn($sq) => $sq->where('nombre', 'Ilike', "%{$search}%"))
-                    ->orWhereHas('etapaActual', fn($sq) => $sq->where('nombre', 'Ilike', "%{$search}%"));
+                    ->orWhereHas('etapaActual', fn($sq) => $sq->where('nombre', 'Ilike', "%{$search}%"))
+                    ->orWhereHas('tipoProceso', fn($sq) => $sq->where('nombre', 'Ilike', "%{$search}%"));
             });
         }
 
@@ -424,24 +428,27 @@ class ProcesoRadicadoController extends Controller
             'nota' => ['required', 'string', 'max:5000'],
             'fecha_actuacion' => ['required', 'date', 'before_or_equal:today'],
         ]);
-        $proceso->actuaciones()->create([
-            'nota' => $validated['nota'],
-            'fecha_actuacion' => $validated['fecha_actuacion'],
-            'user_id' => Auth::id(),
-        ]);
-        $this->actualizarUltimaActuacion($proceso);
 
-        // ✅ Registro de revisión diaria por acción
-        $this->registrarRevisionAutomatica($proceso);
+        DB::transaction(function () use ($proceso, $validated) {
+            $proceso->actuaciones()->create([
+                'nota' => $validated['nota'],
+                'fecha_actuacion' => $validated['fecha_actuacion'],
+                'user_id' => Auth::id(),
+            ]);
+            $this->actualizarUltimaActuacion($proceso);
 
-        AuditoriaEvento::create([
-            'user_id' => Auth::id(),
-            'evento' => 'NUEVA_ACTUACION',
-            'descripcion_breve' => "Nueva actuación radicado {$proceso->radicado}",
-            'criticidad' => 'baja',
-            'direccion_ip' => request()->ip(),
-            'user_agent' => request()->userAgent(),
-        ]);
+            // ✅ Registro de revisión diaria por acción
+            $this->registrarRevisionAutomatica($proceso);
+
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'NUEVA_ACTUACION',
+                'descripcion_breve' => "Nueva actuación radicado {$proceso->radicado}",
+                'criticidad' => 'baja',
+                'direccion_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+        });
 
         return back()->with('success', 'Registrado.');
     }
@@ -480,7 +487,6 @@ class ProcesoRadicadoController extends Controller
     private function actualizarUltimaActuacion(ProcesoRadicado $proceso)
     {
         if (!$proceso) return;
-        $proceso->load('actuaciones');
         $fechaMasReciente = $proceso->actuaciones()->max('fecha_actuacion');
         $textoUltimaActuacion = $fechaMasReciente
             ? Carbon::parse($fechaMasReciente)->isoFormat('DD [de] MMMM [de] YYYY')

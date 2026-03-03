@@ -114,8 +114,9 @@ class PersonaController extends Controller
         return Inertia::render('Personas/Show', ['persona' => $persona]);
     }
 
-    public function edit(Persona $persona): Response
+    public function edit($id): Response
     {
+        $persona = Persona::withTrashed()->findOrFail($id);
         $persona->load(['cooperativas', 'abogados']);
         return Inertia::render('Personas/Edit', [
             'persona' => $persona,
@@ -124,8 +125,9 @@ class PersonaController extends Controller
         ]);
     }
 
-    public function update(UpdatePersonaRequest $request, Persona $persona)
+    public function update(UpdatePersonaRequest $request, $id)
     {
+        $persona = Persona::withTrashed()->findOrFail($id);
         $persona->update($request->validated());
         if ($request->has('cooperativas_ids')) $persona->cooperativas()->sync($request->input('cooperativas_ids'));
         if ($request->has('abogados_ids')) $persona->abogados()->sync($request->input('abogados_ids'));
@@ -139,8 +141,9 @@ class PersonaController extends Controller
         return redirect()->route('personas.index')->with('success', 'Persona actualizada correctamente.');
     }
 
-    public function destroy(Persona $persona)
+    public function destroy($id)
     {
+        $persona = Persona::withTrashed()->findOrFail($id);
         if (!Auth::user()->can('delete', $persona)) return back()->with('error', 'Sin permiso.');
         $nombre = $persona->nombre_completo;
         $persona->delete();

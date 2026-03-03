@@ -11,13 +11,23 @@ use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
-class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithStyles, ShouldAutoSize
+use Maatwebsite\Excel\Concerns\WithColumnFormatting;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+
+class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithStyles, ShouldAutoSize, WithColumnFormatting
 {
     protected $filtros;
 
     public function __construct($filtros = [])
     {
         $this->filtros = $filtros;
+    }
+
+    public function columnFormats(): array
+    {
+        return [
+            'B' => NumberFormat::FORMAT_TEXT,
+        ];
     }
 
     public function query()
@@ -208,7 +218,7 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithStyles
 
         return [
             $proceso->id,
-            $proceso->radicado,
+            (string) $proceso->radicado,
             $this->formatDate($proceso->fecha_radicado),
             $proceso->estado ?? 'ACTIVO',
             $proceso->etapaActual ? $proceso->etapaActual->nombre : 'Inicial',

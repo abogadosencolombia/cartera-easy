@@ -86,8 +86,10 @@ const form = useForm({
     link_drive: props.caso.link_drive || '',
 });
 
-const addCodeudor = () => { form.codeudores.push({ id: null, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', showDetails: true }); activeTab.value = 'codeudores'; };
+const addCodeudor = () => { form.codeudores.push({ id: null, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', celular: '', correo: '', addresses: [], social_links: [], showDetails: true }); activeTab.value = 'codeudores'; };
 const removeCodeudor = (idx) => form.codeudores.splice(idx, 1);
+const addAddress = (idx) => form.codeudores[idx].addresses.push({ label: 'Casa', address: '', city: '' });
+const removeAddress = (idx, addrIdx) => form.codeudores[idx].addresses.splice(addrIdx, 1);
 
 // --- CASCADA ---
 const formatLabel = (text) => text?.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) || '';

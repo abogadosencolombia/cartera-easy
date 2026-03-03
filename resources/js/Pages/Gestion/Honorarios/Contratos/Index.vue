@@ -156,7 +156,7 @@ const calcularProgreso = (contrato) => {
                         <Dropdown align="right" width="48">
                             <template #trigger>
                                 <button type="button" class="w-full md:w-auto flex items-center justify-between gap-2 bg-white dark:bg-gray-900 px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition shadow-sm min-w-[160px]">
-                                    <span>{{ estado === '' ? 'Todos los Estados' : (estado === 'ACTIVO' ? 'Activo' : (estado === 'PAGOS_PENDIENTES' ? 'Pagos Pendientes' : (estado === 'EN_MORA' ? 'En Mora' : 'Cerrado'))) }}</span>
+                                    <span>{{ estado === '' ? 'Todos los Estados' : (estado === 'ACTIVO' ? 'Activo' : (estado === 'EN_MORA' ? 'En Mora' : 'Cerrado')) }}</span>
                                     <ChevronDownIcon class="h-4 w-4 text-gray-400" />
                                 </button>
                             </template>
@@ -167,9 +167,6 @@ const calcularProgreso = (contrato) => {
                                     </button>
                                     <button @click="estado = 'ACTIVO'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': estado === 'ACTIVO' }">
                                         Activo
-                                    </button>
-                                    <button @click="estado = 'PAGOS_PENDIENTES'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': estado === 'PAGOS_PENDIENTES' }">
-                                        Pagos Pendientes
                                     </button>
                                     <button @click="estado = 'EN_MORA'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': estado === 'EN_MORA' }">
                                         En Mora

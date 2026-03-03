@@ -64,6 +64,8 @@ class StoreCasoRequest extends FormRequest
             'codeudores.*.nombre_completo' => ['required', 'string', 'max:255'],
             'codeudores.*.numero_documento' => ['required', 'string', 'max:50'],
             'codeudores.*.tipo_documento' => ['nullable', 'string', 'max:10'],
+            'codeudores.*.celular' => ['nullable', 'string', 'max:20'],
+            'codeudores.*.correo' => ['nullable', 'email', 'max:255'],
             'codeudores.*.addresses' => ['nullable', 'array'],
             'codeudores.*.social_links' => ['nullable', 'array'],
 

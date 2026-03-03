@@ -74,9 +74,22 @@ class CasoController extends Controller
                     ->orWhere('etapa_actual', 'ilike', "%{$search}%")
                     ->orWhere('referencia_credito', 'ilike', "%{$search}%")
                     ->orWhere('radicado', 'ilike', "%{$search}%")
+                    ->orWhere('subtipo_proceso', 'ilike', "%{$search}%")
+                    ->orWhere('subproceso', 'ilike', "%{$search}%")
+                    ->orWhere('etapa_procesal', 'ilike', "%{$search}%")
                     ->orWhereHas('deudor', function ($deudorQuery) use ($search) {
                         $deudorQuery->where('nombre_completo', 'ilike', "%{$search}%")
                             ->orWhere('numero_documento', 'ilike', "%{$search}%");
+                    })
+                    ->orWhereHas('codeudores', function ($codeudorQuery) use ($search) {
+                        $codeudorQuery->where('nombre_completo', 'ilike', "%{$search}%")
+                            ->orWhere('numero_documento', 'ilike', "%{$search}%");
+                    })
+                    ->orWhereHas('juzgado', function ($juzgadoQuery) use ($search) {
+                        $juzgadoQuery->where('nombre', 'ilike', "%{$search}%");
+                    })
+                    ->orWhereHas('cooperativa', function ($coopQuery) use ($search) {
+                        $coopQuery->where('nombre', 'ilike', "%{$search}%");
                     });
             });
         });
@@ -376,9 +389,12 @@ class CasoController extends Controller
         $ids = [];
         foreach ($datosCodeudores as $d) {
             $c = Codeudor::updateOrCreate(['numero_documento' => $d['numero_documento']], [
-                'nombre_completo' => $d['nombre_completo'], 'tipo_documento' => $d['tipo_documento'] ?? 'CC',
-                'celular' => $d['celular'] ?? null, 'correo' => $d['correo'] ?? null,
-                'addresses' => $d['addresses'] ?? null, 'social_links' => $d['social_links'] ?? null,
+                'nombre_completo' => $d['nombre_completo'],
+                'tipo_documento' => $d['tipo_documento'] ?? 'CC',
+                'celular' => $d['celular'] ?? null,
+                'correo' => $d['correo'] ?? null,
+                'addresses' => $d['addresses'] ?? null,
+                'social_links' => $d['social_links'] ?? null,
             ]);
             $ids[] = $c->id;
         }
