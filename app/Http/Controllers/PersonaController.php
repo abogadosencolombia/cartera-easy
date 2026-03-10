@@ -17,12 +17,26 @@ use Inertia\Response;
 use Illuminate\Support\Facades\Redirect;
 use App\Exports\PersonasExport; 
 use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class PersonaController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request): Response
     {
+        $this->authorize('viewAny', Persona::class);
+
+        $user = Auth::user();
         $query = Persona::with(['cooperativas', 'abogados']);
+
+        // --- FILTRO DE SEGURIDAD POR COOPERATIVA ---
+        if ($user->tipo_usuario !== 'admin') {
+            $cooperativaIds = $user->cooperativas->pluck('id');
+            $query->whereHas('cooperativas', function ($q) use ($cooperativaIds) {
+                $q->whereIn('cooperativas.id', $cooperativaIds);
+            });
+        }
 
         // --- 1. Filtro de Estado (Activos / Suspendidos) ---
         if ($request->input('status') === 'suspended') {
@@ -76,6 +90,8 @@ class PersonaController extends Controller
 
     public function create(): Response
     {
+        $this->authorize('create', Persona::class);
+
         return Inertia::render('Personas/Create', [
             'allCooperativas' => Cooperativa::orderBy('nombre')->get(['id', 'nombre']),
             'allAbogados' => User::whereIn('tipo_usuario', ['abogado', 'gestor'])->orderBy('name')->get(['id', 'name']),
@@ -84,32 +100,42 @@ class PersonaController extends Controller
 
     public function store(StorePersonaRequest $request)
     {
-        $persona = Persona::create($request->validated());
+        $this->authorize('create', Persona::class);
+
+        $validated = $request->validated();
+
+        $persona = Persona::withTrashed()->updateOrCreate(
+            ['numero_documento' => $validated['numero_documento']],
+            array_merge($validated, ['deleted_at' => null])
+        );
         
         if ($request->has('cooperativas_ids')) $persona->cooperativas()->sync($request->input('cooperativas_ids'));
         if ($request->has('abogados_ids')) $persona->abogados()->sync($request->input('abogados_ids'));
 
         AuditoriaEvento::create([
             'user_id' => Auth::id(), 'evento' => 'CREAR_PERSONA',
-            'descripcion_breve' => "Creada persona: {$persona->nombre_completo} ({$persona->numero_documento})",
+            'descripcion_breve' => "Creada o reactivada persona: {$persona->nombre_completo} ({$persona->numero_documento})",
             'criticidad' => 'media', 'direccion_ip' => request()->ip(), 'user_agent' => request()->userAgent(),
         ]);
 
-        return redirect()->route('personas.index')->with('success', 'Persona creada exitosamente.');
+        return redirect()->route('personas.index')->with('success', 'Persona registrada exitosamente.');
     }
 
     public function show($id): Response
     {
-        $persona = Persona::withTrashed()
-            ->with([
-                'cooperativas', 
-                'abogados',
-                'casos' => fn($q) => $q->with('user:id,name')->latest()->take(10),
-                'procesos' => fn($q) => $q->latest('fecha_radicado')->take(10),
-                'documentos.uploader'
-            ])
-            ->withCount(['casos', 'procesos', 'documentos'])
-            ->findOrFail($id);
+        $persona = Persona::withTrashed()->findOrFail($id);
+        
+        $this->authorize('view', $persona);
+
+        $persona->load([
+            'cooperativas', 
+            'abogados',
+            'casos' => fn($q) => $q->with('user:id,name')->latest()->take(10),
+            'procesos' => fn($q) => $q->latest('fecha_radicado')->take(10),
+            'documentos.uploader'
+        ]);
+        
+        $persona->loadCount(['casos', 'procesos', 'documentos']);
 
         return Inertia::render('Personas/Show', ['persona' => $persona]);
     }
@@ -117,6 +143,9 @@ class PersonaController extends Controller
     public function edit($id): Response
     {
         $persona = Persona::withTrashed()->findOrFail($id);
+        
+        $this->authorize('update', $persona);
+
         $persona->load(['cooperativas', 'abogados']);
         return Inertia::render('Personas/Edit', [
             'persona' => $persona,
@@ -128,6 +157,9 @@ class PersonaController extends Controller
     public function update(UpdatePersonaRequest $request, $id)
     {
         $persona = Persona::withTrashed()->findOrFail($id);
+        
+        $this->authorize('update', $persona);
+
         $persona->update($request->validated());
         if ($request->has('cooperativas_ids')) $persona->cooperativas()->sync($request->input('cooperativas_ids'));
         if ($request->has('abogados_ids')) $persona->abogados()->sync($request->input('abogados_ids'));
@@ -144,7 +176,9 @@ class PersonaController extends Controller
     public function destroy($id)
     {
         $persona = Persona::withTrashed()->findOrFail($id);
-        if (!Auth::user()->can('delete', $persona)) return back()->with('error', 'Sin permiso.');
+        
+        $this->authorize('delete', $persona);
+
         $nombre = $persona->nombre_completo;
         $persona->delete();
         AuditoriaEvento::create([
@@ -158,7 +192,9 @@ class PersonaController extends Controller
     public function restore($id)
     {
         $persona = Persona::withTrashed()->findOrFail($id);
-        if (!Auth::user()->can('restore', $persona)) return back()->with('error', 'Sin permiso.');
+        
+        $this->authorize('restore', $persona);
+
         $persona->restore();
         AuditoriaEvento::create([
             'user_id' => Auth::id(), 'evento' => 'REACTIVAR_PERSONA',
@@ -170,20 +206,24 @@ class PersonaController extends Controller
     
     public function exportExcel(Request $request) 
     {
+        $this->authorize('viewAny', Persona::class);
+
         AuditoriaEvento::create([
             'user_id' => Auth::id(), 'evento' => 'EXPORTAR_PERSONAS',
             'descripcion_breve' => "Descarga Excel de personas con filtros activos",
             'criticidad' => 'media', 'direccion_ip' => $request->ip(), 'user_agent' => $request->userAgent(),
         ]);
 
-        // ✅ Pasamos todos los parámetros del query para que el exportador los use
         return Excel::download(new PersonasExport($request->query()), 'listado_personas_' . now()->format('Ymd_His') . '.xlsx');
     }
 
     public function uploadDocument(Request $request, $personaId)
     {
-        $request->validate(['documento' => 'required|file|max:20480']);
         $persona = Persona::findOrFail($personaId);
+        
+        $this->authorize('update', $persona);
+
+        $request->validate(['documento' => 'required|file|max:20480']);
         $file = $request->file('documento');
         $nombreOriginal = $file->getClientOriginalName();
         $path = $file->storeAs("personas/{$persona->id}", time() . '_' . $nombreOriginal);
@@ -194,10 +234,21 @@ class PersonaController extends Controller
         return back()->with('success', 'Archivo subido.');
     }
 
-    public function downloadDocument($id) { $doc = PersonaDocumento::findOrFail($id); return Storage::download($doc->ruta_archivo, $doc->nombre_original); }
-    public function viewDocument($id) { $doc = PersonaDocumento::findOrFail($id); return Storage::response($doc->ruta_archivo); }
+    public function downloadDocument($id) { 
+        $doc = PersonaDocumento::findOrFail($id); 
+        $this->authorize('view', $doc->persona);
+        return Storage::download($doc->ruta_archivo, $doc->nombre_original); 
+    }
+
+    public function viewDocument($id) { 
+        $doc = PersonaDocumento::findOrFail($id); 
+        $this->authorize('view', $doc->persona);
+        return Storage::response($doc->ruta_archivo); 
+    }
+
     public function deleteDocument($id) { 
         $doc = PersonaDocumento::findOrFail($id); 
+        $this->authorize('update', $doc->persona);
         Storage::delete($doc->ruta_archivo); 
         $doc->delete(); 
         return back()->with('success', 'Documento eliminado.'); 

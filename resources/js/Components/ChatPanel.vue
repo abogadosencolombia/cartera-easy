@@ -99,18 +99,37 @@ const sendMessage = async () => {
 };
 
 // --- CICLO DE VIDA Y WATCHERS ---
+let activeChannel = null;
+let lastMountTime = Date.now();
+let totalMountsInSession = 0;
+
 onMounted(() => {
-  console.log('[Chat] Componente montado');
+  totalMountsInSession++;
+  const now = Date.now();
+  const timeSinceLastMount = now - lastMountTime;
+  lastMountTime = now;
+
+  console.log(`[Chat] Componente montado (#${totalMountsInSession}). Tiempo desde último montaje: ${timeSinceLastMount}ms`);
   
+  if (timeSinceLastMount < 500 && totalMountsInSession > 1) {
+    console.error('[Chat] 🛑 ¡Bucle de montaje detectado! Abortando suscripción para evitar saturar el servidor.');
+    return;
+  }
+
+  if (activeChannel) {
+    console.warn('[Chat] ⚠️ Ya existe una suscripción activa, ignorando duplicado');
+    return;
+  }
+
   if (user.value && window.Echo) {
     const userId = user.value.id;
     const channelName = `App.Models.User.${userId}`;
     
     console.log(`[Chat] Intentando suscribirse al canal: ${channelName}`);
     
-    const channel = window.Echo.private(channelName);
+    activeChannel = window.Echo.private(channelName);
 
-    channel
+    activeChannel
       .subscribed(() => {
         console.log(`[Chat] ✅ Suscrito correctamente a ${channelName}`);
       })
@@ -132,9 +151,26 @@ onMounted(() => {
       });
 
   } else {
-    if (!user.value) console.warn('[Chat] ⚠️ No hay usuario autenticado');
-    if (!window.Echo) console.warn('[Chat] ⚠️ Echo no está disponible');
+    if (!user.value) console.warn('[Chat] ⚠️ No hay usuario autenticado para el chat');
+    if (!window.Echo) console.warn('[Chat] ⚠️ Echo no está disponible en este momento');
   }
+});
+
+onUnmounted(() => {
+  console.log('[Chat] Componente desmontado');
+  if (activeChannel && window.Echo) {
+    const userId = user.value?.id;
+    if (userId) {
+        const channelName = `App.Models.User.${userId}`;
+        console.log(`[Chat] Cancelando suscripción a ${channelName}`);
+        window.Echo.leave(channelName);
+    }
+    activeChannel = null;
+  }
+});
+
+watch(user, (newUser, oldUser) => {
+    console.log('[Chat] El usuario cambió:', { old: oldUser?.id, new: newUser?.id });
 });
 
 watch(isOpen, (newVal) => {
@@ -270,6 +306,7 @@ watch(isOpen, (newVal) => {
           </div>
         </div>
         
+
         <!-- Input Area -->
         <div class="p-3 bg-white border-t border-slate-100">
           <form @submit.prevent="sendMessage" class="flex items-center gap-2 p-1 relative">

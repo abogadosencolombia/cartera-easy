@@ -25,7 +25,7 @@ class DocumentoProceso extends Model
         return $this->belongsTo(ProcesoRadicado::class, 'proceso_radicado_id');
     }
 
-    public function usuario(): BelongsTo
+    public function uploader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
     }

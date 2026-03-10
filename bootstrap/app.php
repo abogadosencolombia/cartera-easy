@@ -9,6 +9,7 @@ use Illuminate\Auth\AuthenticationException;
 use Inertia\Inertia;
 // ===== INICIO DE LA NUEVA CORRECCIÓN =====
 // Importamos la excepción de Conflicto (Error 409)
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 // ===== FIN DE LA NUEVA CORRECCIÓN =====
 
@@ -40,6 +41,13 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions) {
         
+        // --- MANEJADOR DE AUTORIZACIÓN (403) ---
+        $exceptions->renderable(function (AccessDeniedHttpException $e, $request) {
+            if ($request->header('X-Inertia')) {
+                return back()->with('error', 'Acceso denegado: No tienes permiso para este recurso.');
+            }
+        });
+
         // --- MANEJADOR DE SESIÓN EXPIRADA ---
         $exceptions->renderable(function (AuthenticationException $e, $request) {
             if ($request->header('X-Inertia')) {

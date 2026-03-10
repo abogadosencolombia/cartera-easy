@@ -44,17 +44,9 @@ class CasoController extends Controller
             // Admin ve todo
         } elseif (in_array($user->tipo_usuario, ['gestor', 'abogado'])) {
             $query->where(function($q) use ($user) {
-                // Opción A: Casos de sus cooperativas asignadas
-                if (method_exists($user, 'cooperativas')) {
-                    $cooperativaIds = $user->cooperativas->pluck('id');
-                    $q->whereIn('cooperativa_id', $cooperativaIds);
-                }
-                // Opción B: Casos donde es responsable directo (Nueva tabla pivote)
-                $q->orWhereHas('users', function($uq) use ($user) {
-                    $uq->where('users.id', $user->id);
-                });
-                // Opción C: Casos donde es el responsable legacy (por si acaso)
-                $q->orWhere('user_id', $user->id);
+                // Estrictamente Casos de sus cooperativas asignadas
+                $cooperativaIds = $user->cooperativas->pluck('id');
+                $q->whereIn('cooperativa_id', $cooperativaIds);
             });
         } elseif ($user->tipo_usuario === 'cliente') {
             $query->where('deudor_id', $user->persona_id);
@@ -159,49 +151,61 @@ class CasoController extends Controller
         unset($validated['deudor'], $validated['codeudores'], $validated['user_id']);
 
         $caso = null;
-        DB::transaction(function () use ($validated, $datosDeudor, $datosCodeudores, $userIds, $request, &$caso) {
-            // 1. Manejo del Deudor Híbrido
-            if ($datosDeudor['is_new']) {
-                $deudor = Persona::create([
-                    'nombre_completo' => $datosDeudor['nombre_completo'],
-                    'tipo_documento' => $datosDeudor['tipo_documento'],
-                    'numero_documento' => $datosDeudor['numero_documento'],
-                    'celular_1' => $datosDeudor['celular_1'] ?? null,
-                    'correo_1' => $datosDeudor['correo_1'] ?? null,
+        try {
+            DB::transaction(function () use ($validated, $datosDeudor, $datosCodeudores, $userIds, $request, &$caso) {
+                // 1. Manejo del Deudor Híbrido
+                if ($datosDeudor['is_new']) {
+                    $deudor = Persona::withTrashed()->updateOrCreate(
+                        ['numero_documento' => $datosDeudor['numero_documento']],
+                        [
+                            'nombre_completo' => $datosDeudor['nombre_completo'],
+                            'tipo_documento' => $datosDeudor['tipo_documento'],
+                            'celular_1' => $datosDeudor['celular_1'] ?? null,
+                            'correo_1' => $datosDeudor['correo_1'] ?? null,
+                            'deleted_at' => null,
+                        ]
+                    );
+                    if (!empty($datosDeudor['cooperativas_ids'])) $deudor->cooperativas()->sync($datosDeudor['cooperativas_ids']);
+                    if (!empty($datosDeudor['abogados_ids'])) $deudor->abogados()->sync($datosDeudor['abogados_ids']);
+                    $validated['deudor_id'] = $deudor->id;
+                }
+
+                // 2. Crear Caso (usamos el primer abogado para la columna legacy user_id)
+                $validated['user_id'] = $userIds[0] ?? null;
+                $caso = Caso::create($validated);
+
+                // 3. Sincronizar múltiples abogados
+                $caso->users()->sync($userIds);
+
+                // 4. Sincronizar Codeudores
+                $this->sincronizarCodeudores($caso, $datosCodeudores);
+
+                $caso->bitacoras()->create([
+                    'user_id' => auth()->id(),
+                    'accion' => $request->clonado_de_id ? 'Clonación de Caso' : 'Creación del Caso',
+                    'comentario' => 'Caso registrado con asignación múltiple.',
                 ]);
-                if (!empty($datosDeudor['cooperativas_ids'])) $deudor->cooperativas()->sync($datosDeudor['cooperativas_ids']);
-                if (!empty($datosDeudor['abogados_ids'])) $deudor->abogados()->sync($datosDeudor['abogados_ids']);
-                $validated['deudor_id'] = $deudor->id;
-            }
 
-            // 2. Crear Caso (usamos el primer abogado para la columna legacy user_id)
-            $validated['user_id'] = $userIds[0] ?? null;
-            $caso = Caso::create($validated);
-
-            // 3. Sincronizar múltiples abogados
-            $caso->users()->sync($userIds);
-
-            // 4. Sincronizar Codeudores
-            $this->sincronizarCodeudores($caso, $datosCodeudores);
-
-            $caso->bitacoras()->create([
-                'user_id' => auth()->id(),
-                'accion' => $request->clonado_de_id ? 'Clonación de Caso' : 'Creación del Caso',
-                'comentario' => 'Caso registrado con asignación múltiple.',
-            ]);
-
-            AuditoriaEvento::create([
+                AuditoriaEvento::create([
+                    'user_id' => Auth::id(),
+                    'evento' => 'CREAR_CASO',
+                    'descripcion_breve' => "Caso #{$caso->id} creado para {$caso->deudor?->nombre_completo}",
+                    'criticidad' => 'media',
+                    'auditable_id' => $caso->id,
+                    'auditable_type' => Caso::class,
+                    'detalle_nuevo' => $caso->getRawOriginal(),
+                    'direccion_ip' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
+                ]);
+            });
+        } catch (\Exception $e) {
+            Log::error("Error al crear caso: " . $e->getMessage(), [
+                'exception' => $e,
                 'user_id' => Auth::id(),
-                'evento' => 'CREAR_CASO',
-                'descripcion_breve' => "Caso #{$caso->id} creado para {$caso->deudor?->nombre_completo}",
-                'criticidad' => 'media',
-                'auditable_id' => $caso->id,
-                'auditable_type' => Caso::class,
-                'detalle_nuevo' => $caso->getRawOriginal(),
-                'direccion_ip' => request()->ip(),
-                'user_agent' => request()->userAgent(),
+                'data' => $request->all()
             ]);
-        });
+            return back()->withInput()->with('error', 'Ocurrió un error al registrar el caso: ' . $e->getMessage());
+        }
 
         return to_route('casos.show', $caso->id)->with('success', '¡Caso registrado exitosamente!');
     }
@@ -284,46 +288,65 @@ class CasoController extends Controller
 
         unset($validated['deudor'], $validated['codeudores'], $validated['user_id']);
 
-        DB::transaction(function () use ($caso, $validated, $datosDeudor, $datosCodeudores, $userIds) {
-            if ($datosDeudor['is_new']) {
-                $deudor = Persona::create(['nombre_completo' => $datosDeudor['nombre_completo'], 'tipo_documento' => $datosDeudor['tipo_documento'] ?? 'CC', 'numero_documento' => $datosDeudor['numero_documento']]);
-                $validated['deudor_id'] = $deudor->id;
-            }
-            
-            $original = $caso->getRawOriginal();
-            $validated['user_id'] = $userIds[0] ?? null;
-            $caso->update($validated);
-            $changes = $caso->getChanges();
+        try {
+            DB::transaction(function () use ($caso, $validated, $datosDeudor, $datosCodeudores, $userIds) {
+                if ($datosDeudor['is_new']) {
+                    $deudor = Persona::withTrashed()->updateOrCreate(
+                        ['numero_documento' => $datosDeudor['numero_documento']],
+                        [
+                            'nombre_completo' => $datosDeudor['nombre_completo'],
+                            'tipo_documento' => $datosDeudor['tipo_documento'] ?? 'CC',
+                            'celular_1' => $datosDeudor['celular_1'] ?? null,
+                            'correo_1' => $datosDeudor['correo_1'] ?? null,
+                            'deleted_at' => null,
+                        ]
+                    );
+                    $validated['deudor_id'] = $deudor->id;
+                }
+                
+                $original = $caso->getRawOriginal();
+                $validated['user_id'] = $userIds[0] ?? null;
+                $caso->update($validated);
+                $changes = $caso->getChanges();
 
-            if (!empty($changes)) {
-                $anterior = [];
-                $nuevo = [];
-                foreach ($changes as $key => $val) {
-                    if (in_array($key, ['updated_at', 'ultima_actividad'])) continue;
-                    $anterior[$key] = $original[$key] ?? null;
-                    $nuevo[$key] = $val;
+                if (!empty($changes)) {
+                    $anterior = [];
+                    $nuevo = [];
+                    foreach ($changes as $key => $val) {
+                        if (in_array($key, ['updated_at', 'ultima_actividad'])) continue;
+                        $anterior[$key] = $original[$key] ?? null;
+                        $nuevo[$key] = $val;
+                    }
+
+                    if (!empty($nuevo)) {
+                        AuditoriaEvento::create([
+                            'user_id' => Auth::id(),
+                            'evento' => 'ACTUALIZAR_CASO',
+                            'descripcion_breve' => "Actualización de datos del Caso #{$caso->id}",
+                            'auditable_id' => $caso->id,
+                            'auditable_type' => Caso::class,
+                            'criticidad' => 'baja',
+                            'detalle_anterior' => $anterior,
+                            'detalle_nuevo' => $nuevo,
+                            'direccion_ip' => request()->ip(),
+                            'user_agent' => request()->userAgent(),
+                        ]);
+                    }
                 }
 
-                if (!empty($nuevo)) {
-                    AuditoriaEvento::create([
-                        'user_id' => Auth::id(),
-                        'evento' => 'ACTUALIZAR_CASO',
-                        'descripcion_breve' => "Actualización de datos del Caso #{$caso->id}",
-                        'auditable_id' => $caso->id,
-                        'auditable_type' => Caso::class,
-                        'criticidad' => 'baja',
-                        'detalle_anterior' => $anterior,
-                        'detalle_nuevo' => $nuevo,
-                        'direccion_ip' => request()->ip(),
-                        'user_agent' => request()->userAgent(),
-                    ]);
-                }
-            }
-
-            $caso->users()->sync($userIds);
-            $this->sincronizarCodeudores($caso, $datosCodeudores);
-            $caso->bitacoras()->create(['user_id' => auth()->id(), 'accion' => 'Actualización de Caso', 'comentario' => 'Se actualizaron los datos y responsables.']);
-        });
+                $caso->users()->sync($userIds);
+                $this->sincronizarCodeudores($caso, $datosCodeudores);
+                $caso->bitacoras()->create(['user_id' => auth()->id(), 'accion' => 'Actualización de Caso', 'comentario' => 'Se actualizaron los datos y responsables.']);
+            });
+        } catch (\Exception $e) {
+            Log::error("Error al actualizar caso: " . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => Auth::id(),
+                'caso_id' => $caso->id,
+                'data' => $request->all()
+            ]);
+            return back()->withInput()->with('error', 'Ocurrió un error al actualizar el caso: ' . $e->getMessage());
+        }
 
         return to_route('casos.show', $caso->id)->with('success', '¡Caso actualizado exitosamente!');
     }

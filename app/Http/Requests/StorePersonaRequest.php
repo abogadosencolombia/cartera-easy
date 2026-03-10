@@ -14,6 +14,7 @@ class StorePersonaRequest extends FormRequest
 
     public function rules(): array
     {
+        $user = $this->user();
         return [
             'nombre_completo'    => 'required|string|max:255',
             'tipo_documento'     => 'required|string|max:255',
@@ -54,7 +55,20 @@ class StorePersonaRequest extends FormRequest
             'social_links.*.url'    => ['nullable','url','max:2048'],
 
             // Relaciones
-            'cooperativas_ids'      => ['nullable', 'array'],
+            'cooperativas_ids'      => [
+                'nullable', 
+                'array',
+                function ($attribute, $value, $fail) use ($user) {
+                    if ($user->tipo_usuario !== 'admin') {
+                        $allowed = $user->cooperativas->pluck('id')->toArray();
+                        foreach ($value as $id) {
+                            if (!in_array($id, $allowed)) {
+                                $fail('No tienes permiso para asignar personas a la cooperativa con ID: ' . $id);
+                            }
+                        }
+                    }
+                }
+            ],
             'cooperativas_ids.*'    => ['integer', 'exists:cooperativas,id'],
             'abogados_ids'          => ['nullable', 'array'],
             'abogados_ids.*'        => ['integer', 'exists:users,id'],

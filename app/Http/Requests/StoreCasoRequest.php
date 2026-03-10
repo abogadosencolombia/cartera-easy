@@ -14,9 +14,21 @@ class StoreCasoRequest extends FormRequest
 
     public function rules(): array
     {
+        $user = $this->user();
         return [
             // --- DATOS BÁSICOS DEL CASO ---
-            'cooperativa_id' => ['required', 'exists:cooperativas,id'],
+            'cooperativa_id' => [
+                'required', 
+                'exists:cooperativas,id',
+                function ($attribute, $value, $fail) use ($user) {
+                    if ($user->tipo_usuario !== 'admin') {
+                        $allowed = $user->cooperativas->pluck('id')->toArray();
+                        if (!in_array($value, $allowed)) {
+                            $fail('No tienes permiso para asignar casos a esta cooperativa/empresa.');
+                        }
+                    }
+                }
+            ],
             'user_id' => ['required', 'array', 'min:1'],
             'user_id.*' => ['exists:users,id'],
             'referencia_credito' => ['nullable', 'string', 'max:255'],

@@ -7,7 +7,6 @@
 import { ref, computed, onMounted } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { initPush } from '@/push';
-import ChatPanel from '@/Components/ChatPanel.vue';
 
 import ApplicationLogo from '@/Components/ApplicationLogo.vue';
 import Dropdown from '@/Components/Dropdown.vue';
@@ -403,6 +402,5 @@ onMounted(() => {
         </main>
 
         <ToastList />
-        <ChatPanel />
     </div>
 </template>

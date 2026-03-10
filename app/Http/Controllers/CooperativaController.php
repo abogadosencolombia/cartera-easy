@@ -100,4 +100,22 @@ class CooperativaController extends Controller
         $cooperativa->delete();
         return to_route('cooperativas.index')->with('success', '¡Cooperativa eliminada exitosamente!');
     }
+
+    public function search(Request $request)
+    {
+        $user = Auth::user();
+        $term = $request->input('term', '');
+
+        $query = ($user->tipo_usuario === 'admin')
+            ? Cooperativa::query()
+            : $user->cooperativas()->getQuery();
+
+        $cooperativas = $query->when($term, function($q) use ($term) {
+                $q->where('nombre', 'ilike', "%{$term}%");
+            })
+            ->limit(20)
+            ->get(['id', 'nombre']);
+
+        return response()->json($cooperativas);
+    }
 }

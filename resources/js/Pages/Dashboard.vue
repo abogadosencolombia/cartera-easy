@@ -1,7 +1,6 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
 import { 
     BuildingOffice2Icon, 
     UsersIcon, 

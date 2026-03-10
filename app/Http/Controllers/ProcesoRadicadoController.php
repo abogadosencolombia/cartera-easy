@@ -21,15 +21,19 @@ use App\Traits\RegistraRevisionTrait;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class ProcesoRadicadoController extends Controller
 {
-    use RegistraRevisionTrait;
+    use RegistraRevisionTrait, AuthorizesRequests;
+
     /**
      * Lista de procesos con filtros y paginación.
      */
     public function index(Request $request): Response
     {
+        $this->authorize('viewAny', ProcesoRadicado::class);
+        
         $user = Auth::user();
         $query = ProcesoRadicado::with([
             'abogado', 
@@ -41,7 +45,7 @@ class ProcesoRadicadoController extends Controller
             'etapaActual'
         ]);
 
-        // --- FILTRO DE SEGURIDAD POR ROL ---
+        // --- FILTRO DE SEGURIDAD POR ROL Y COOPERATIVA ---
         if ($user->tipo_usuario !== 'admin') {
             $query->where(function($q) use ($user) {
                 // 1. Donde es el abogado/gestor principal
@@ -84,11 +88,9 @@ class ProcesoRadicadoController extends Controller
             $query->where('estado', $request->input('estado'));
         }
 
-        // ✅ FILTRO INTELIGENTE POR TIPO DE ENTIDAD (Busca en el nombre del juzgado)
         if ($request->filled('tipo_entidad')) {
             $tipo = $request->input('tipo_entidad');
             $query->whereHas('juzgado', function ($q) use ($tipo) {
-                // Buscamos si el nombre contiene la palabra clave (Ej: 'Fiscalía')
                 $q->where('nombre', 'ilike', "%{$tipo}%");
             });
         }
@@ -100,45 +102,31 @@ class ProcesoRadicadoController extends Controller
             $query->whereDate('fecha_proxima_revision', '<=', $hasta);
         }
 
-        $today = Carbon::today()->toDateString();
-        $query->orderByRaw(DB::raw("
-            CASE
-                WHEN estado = 'CERRADO' THEN 4
-                WHEN fecha_proxima_revision IS NULL THEN 3
-                WHEN fecha_proxima_revision <= '{$today}' THEN 1
-                ELSE 2
-            END ASC
-        "));
-        $query->orderBy('fecha_proxima_revision', 'asc');
-        $query->orderBy('radicado', 'asc');
-
-        $abogadoIds = ProcesoRadicado::query()->whereNotNull('abogado_id')->distinct()->pluck('abogado_id');
-        $abogadosParaFiltro = User::query()->whereIn('id', $abogadoIds)->orderBy('name')->get(['id', 'name']);
+        $procesos = $query->latest('updated_at')->paginate(15)->withQueryString();
 
         return Inertia::render('Radicados/Index', [
-            'procesos' => $query->paginate(15)->withQueryString(),
-            'filtros'  => $request->only(['search', 'rev_desde', 'rev_hasta', 'estado', 'tipo_entidad']),
-            'abogados' => $abogadosParaFiltro,
+            'procesos' => $procesos,
+            'filtros'  => $request->all(),
         ]);
     }
 
     public function create(): Response
     {
+        $this->authorize('create', ProcesoRadicado::class);
         return Inertia::render('Radicados/Create', [
-            'etapas' => EtapaProcesal::orderBy('orden')->get(['id', 'nombre', 'riesgo'])
+            'etapas' => EtapaProcesal::orderBy('orden')->get(['id', 'nombre'])
         ]);
     }
 
     public function store(StoreProcesoRadicadoRequest $request)
     {
+        $this->authorize('create', ProcesoRadicado::class);
         $data = $request->validated();
-        $data['created_by'] = $request->user()->id;
-        $data['estado'] = 'ACTIVO';
         
-        if (empty($data['etapa_procesal_id'])) {
-            $etapaInicial = EtapaProcesal::orderBy('orden', 'asc')->first();
-            if ($etapaInicial) {
-                $data['etapa_procesal_id'] = $etapaInicial->id;
+        if ($user = Auth::user()) {
+            $data['created_by'] = $user->id;
+            if (empty($data['abogado_id'])) {
+                $data['abogado_id'] = $user->id;
             }
         }
         
@@ -150,33 +138,41 @@ class ProcesoRadicadoController extends Controller
 
         $proceso = null;
 
-        DB::transaction(function () use ($data, $demandantesRaw, $demandadosRaw, &$proceso) {
-            $resDte = $this->procesarPartes($demandantesRaw, 'DEMANDANTE');
-            $resDdo = $this->procesarPartes($demandadosRaw, 'DEMANDADO');
+        try {
+            DB::transaction(function () use ($data, $demandantesRaw, $demandadosRaw, &$proceso) {
+                $resDte = $this->procesarPartes($demandantesRaw, 'DEMANDANTE');
+                $resDdo = $this->procesarPartes($demandadosRaw, 'DEMANDADO');
 
-            $data['info_incompleta'] = $resDte['info_incompleta'] || $resDdo['info_incompleta'];
+                $data['info_incompleta'] = $resDte['info_incompleta'] || $resDdo['info_incompleta'];
 
-            $proceso = ProcesoRadicado::create($data);
+                $proceso = ProcesoRadicado::create($data);
 
-            if (!empty($resDte['ids'])) {
-                $proceso->demandantes()->attach($resDte['ids'], ['tipo' => 'DEMANDANTE']);
-            }
-            if (!empty($resDdo['ids'])) {
-                $proceso->demandados()->attach($resDdo['ids'], ['tipo' => 'DEMANDADO']);
-            }
+                if (!empty($resDte['ids'])) {
+                    $proceso->demandantes()->attach($resDte['ids'], ['tipo' => 'DEMANDANTE']);
+                }
+                if (!empty($resDdo['ids'])) {
+                    $proceso->demandados()->attach($resDdo['ids'], ['tipo' => 'DEMANDADO']);
+                }
 
-            AuditoriaEvento::create([
-                'user_id' => Auth::id(),
-                'evento' => 'CREAR_RADICADO',
-                'descripcion_breve' => "Creado radicado {$proceso->radicado}",
-                'auditable_id' => $proceso->id,
-                'auditable_type' => ProcesoRadicado::class,
-                'detalle_nuevo' => $proceso->getRawOriginal(),
-                'criticidad' => 'media',
-                'direccion_ip' => request()->ip(),
-                'user_agent' => request()->userAgent(),
+                AuditoriaEvento::create([
+                    'user_id' => Auth::id(),
+                    'evento' => 'CREAR_RADICADO',
+                    'descripcion_breve' => "Creado radicado {$proceso->radicado}",
+                    'auditable_id' => $proceso->id,
+                    'auditable_type' => ProcesoRadicado::class,
+                    'detalle_nuevo' => $proceso->getRawOriginal(),
+                    'criticidad' => 'media',
+                    'direccion_ip' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
+                ]);
+            });
+        } catch (\Exception $e) {
+            \Log::error("Error al crear radicado: " . $e->getMessage(), [
+                'exception' => $e,
+                'data' => $request->all()
             ]);
-        });
+            return back()->withInput()->with('error', 'No se pudo crear el radicado: ' . $e->getMessage());
+        }
 
         return to_route('procesos.show', $proceso)
             ->with('success', 'Radicado creado exitosamente.');
@@ -184,30 +180,28 @@ class ProcesoRadicadoController extends Controller
 
     public function show(ProcesoRadicado $proceso): Response
     {
-        // Registro automático de revisión diaria
+        $this->authorize('view', $proceso);
+        
         $this->registrarRevisionAutomatica($proceso);
 
         $proceso->load([
             'abogado', 'responsableRevision', 'juzgado', 'tipoProceso',
             'demandantes.cooperativas', 'demandantes.abogados',
             'demandados.cooperativas', 'demandados.abogados',
-            'etapaActual', 
-            'auditoria.usuario',
-            'documentos' => fn($q) => $q->latest('created_at'),
-            'actuaciones' => function ($query) {
-                $query->with('user:id,name')->orderBy('fecha_actuacion', 'desc')->orderBy('created_at', 'desc');
-            },
-            'contrato:id,proceso_id'
+            'documentos.uploader',
+            'actuaciones.user',
+            'etapaActual'
         ]);
 
         return Inertia::render('Radicados/Show', [
             'proceso' => $proceso,
-            'etapas' => EtapaProcesal::orderBy('orden')->get(['id', 'nombre', 'riesgo'])
+            'etapas'  => EtapaProcesal::orderBy('orden')->get(['id', 'nombre', 'riesgo'])
         ]);
     }
 
     public function edit(ProcesoRadicado $proceso): Response
     {
+        $this->authorize('update', $proceso);
         $proceso->load([
             'abogado', 'responsableRevision', 'juzgado', 'tipoProceso',
             'demandantes.cooperativas', 'demandantes.abogados',
@@ -223,53 +217,63 @@ class ProcesoRadicadoController extends Controller
 
     public function update(UpdateProcesoRadicadoRequest $request, ProcesoRadicado $proceso)
     {
+        $this->authorize('update', $proceso);
         $data = $request->validated();
         $demandantesRaw = $request->input('demandantes', []);
         $demandadosRaw = $request->input('demandados', []);
         unset($data['demandantes'], $data['demandados']);
 
-        DB::transaction(function () use ($proceso, $data, $demandantesRaw, $demandadosRaw) {
-            if (isset($data['etapa_procesal_id']) && $data['etapa_procesal_id'] != $proceso->etapa_procesal_id) {
-                $data['fecha_cambio_etapa'] = now();
-            }
-
-            $resDte = $this->procesarPartes($demandantesRaw, 'DEMANDANTE');
-            $resDdo = $this->procesarPartes($demandadosRaw, 'DEMANDADO');
-
-            $data['info_incompleta'] = $resDte['info_incompleta'] || $resDdo['info_incompleta'];
-
-            $original = $proceso->getRawOriginal();
-            $proceso->update($data);
-            $changes = $proceso->getChanges();
-
-            if (!empty($changes)) {
-                $anterior = [];
-                $nuevo = [];
-                foreach ($changes as $key => $val) {
-                    if (in_array($key, ['updated_at'])) continue;
-                    $anterior[$key] = $original[$key] ?? null;
-                    $nuevo[$key] = $val;
+        try {
+            DB::transaction(function () use ($proceso, $data, $demandantesRaw, $demandadosRaw) {
+                if (isset($data['etapa_procesal_id']) && $data['etapa_procesal_id'] != $proceso->etapa_procesal_id) {
+                    $data['fecha_cambio_etapa'] = now();
                 }
 
-                if (!empty($nuevo)) {
-                    AuditoriaEvento::create([
-                        'user_id' => Auth::id(),
-                        'evento' => 'EDITAR_RADICADO',
-                        'descripcion_breve' => "Actualización de datos del radicado {$proceso->radicado}",
-                        'auditable_id' => $proceso->id,
-                        'auditable_type' => ProcesoRadicado::class,
-                        'criticidad' => 'baja',
-                        'detalle_anterior' => $anterior,
-                        'detalle_nuevo' => $nuevo,
-                        'direccion_ip' => request()->ip(),
-                        'user_agent' => request()->userAgent(),
-                    ]);
-                }
-            }
+                $resDte = $this->procesarPartes($demandantesRaw, 'DEMANDANTE');
+                $resDdo = $this->procesarPartes($demandadosRaw, 'DEMANDADO');
 
-            $proceso->demandantes()->syncWithPivotValues($resDte['ids'], ['tipo' => 'DEMANDANTE']);
-            $proceso->demandados()->syncWithPivotValues($resDdo['ids'], ['tipo' => 'DEMANDADO']);
-        });
+                $data['info_incompleta'] = $resDte['info_incompleta'] || $resDdo['info_incompleta'];
+
+                $original = $proceso->getRawOriginal();
+                $proceso->update($data);
+                $changes = $proceso->getChanges();
+
+                if (!empty($changes)) {
+                    $anterior = [];
+                    $nuevo = [];
+                    foreach ($changes as $key => $val) {
+                        if (in_array($key, ['updated_at'])) continue;
+                        $anterior[$key] = $original[$key] ?? null;
+                        $nuevo[$key] = $val;
+                    }
+
+                    if (!empty($nuevo)) {
+                        AuditoriaEvento::create([
+                            'user_id' => Auth::id(),
+                            'evento' => 'EDITAR_RADICADO',
+                            'descripcion_breve' => "Actualización de datos del radicado {$proceso->radicado}",
+                            'auditable_id' => $proceso->id,
+                            'auditable_type' => ProcesoRadicado::class,
+                            'criticidad' => 'baja',
+                            'detalle_anterior' => $anterior,
+                            'detalle_nuevo' => $nuevo,
+                            'direccion_ip' => request()->ip(),
+                            'user_agent' => request()->userAgent(),
+                        ]);
+                    }
+                }
+
+                $proceso->demandantes()->syncWithPivotValues($resDte['ids'], ['tipo' => 'DEMANDANTE']);
+                $proceso->demandados()->syncWithPivotValues($resDdo['ids'], ['tipo' => 'DEMANDADO']);
+            });
+        } catch (\Exception $e) {
+            \Log::error("Error al actualizar radicado: " . $e->getMessage(), [
+                'exception' => $e,
+                'proceso_id' => $proceso->id,
+                'data' => $request->all()
+            ]);
+            return back()->withInput()->with('error', 'No se pudo actualizar el radicado: ' . $e->getMessage());
+        }
 
         return to_route('procesos.show', $proceso->id)
             ->with('success', 'Radicado actualizado correctamente.');
@@ -277,6 +281,7 @@ class ProcesoRadicadoController extends Controller
 
     public function updateEtapa(Request $request, ProcesoRadicado $proceso)
     {
+        $this->authorize('update', $proceso);
         $validated = $request->validate([
             'etapa_procesal_id' => 'required|exists:etapas_procesales,id',
             'observacion' => 'nullable|string|max:500'
@@ -296,322 +301,160 @@ class ProcesoRadicadoController extends Controller
             }
 
             $proceso->actuaciones()->create([
-                'nota' => $nota,
-                'fecha_actuacion' => now(),
                 'user_id' => Auth::id(),
+                'nota'    => $nota,
+                'fecha_actuacion' => now()
             ]);
 
             AuditoriaEvento::create([
                 'user_id' => Auth::id(),
-                'evento' => 'CAMBIO_ETAPA',
-                'descripcion_breve' => "Proceso {$proceso->radicado} movido a {$nuevaEtapa->nombre}",
+                'evento' => 'CAMBIO_ETAPA_RADICADO',
+                'descripcion_breve' => "Radicado {$proceso->radicado} movido a etapa {$nuevaEtapa->nombre}",
+                'auditable_id' => $proceso->id,
+                'auditable_type' => ProcesoRadicado::class,
                 'criticidad' => 'media',
                 'direccion_ip' => request()->ip(),
                 'user_agent' => request()->userAgent(),
             ]);
         });
 
-        return back()->with('success', "Etapa actualizada a: {$nuevaEtapa->nombre}");
+        return back()->with('success', "Etapa actualizada a {$nuevaEtapa->nombre}");
     }
 
     public function destroy(ProcesoRadicado $proceso)
     {
-        if (!Auth::user()->can('delete', $proceso)) {
-            AuditoriaEvento::create([
-                'user_id' => Auth::id(),
-                'evento' => 'INTENTO_ELIMINAR_RADICADO_NO_AUTORIZADO',
-                'descripcion_breve' => "Usuario no autorizado intentó eliminar radicado {$proceso->radicado}",
-                'criticidad' => 'alta',
-                'direccion_ip' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
-            return back()->with('error', 'Acción no autorizada.');
-        }
+        $this->authorize('delete', $proceso);
+        $radicado = $proceso->radicado;
+        $proceso->delete();
 
-        $radicadoTemp = $proceso->radicado; 
         AuditoriaEvento::create([
             'user_id' => Auth::id(),
             'evento' => 'ELIMINAR_RADICADO',
-            'descripcion_breve' => "Eliminado radicado {$radicadoTemp}",
+            'descripcion_breve' => "Eliminado radicado {$radicado}",
             'criticidad' => 'alta',
             'direccion_ip' => request()->ip(),
             'user_agent' => request()->userAgent(),
         ]);
 
-        $proceso->actuaciones()->delete();
-        $proceso->documentos()->delete();
-        $proceso->delete();
-
-        return to_route('procesos.index')
-            ->with('success', 'Radicado eliminado.');
+        return to_route('procesos.index')->with('success', 'Radicado eliminado.');
     }
 
-    public function showImportForm(): Response { return Inertia::render('Radicados/Import'); }
-    
-    public function handleImport(Request $request)
-    {
-        if (!Auth::user()->isAdmin()) {
-            abort(403);
-        }
-        $request->validate(['file' => ['required', 'file', 'mimes:xlsx,xls,csv']]);
-        try {
-            Excel::import(new ProcesosImport, $request->file('file'));
-            AuditoriaEvento::create([
-                'user_id' => Auth::id(),
-                'evento' => 'IMPORTAR_RADICADOS',
-                'descripcion_breve' => "Importación masiva realizada",
-                'criticidad' => 'alta',
-                'direccion_ip' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
-        } catch (ValidationException $e) {
-            $failures = $e->failures();
-            $errors = [];
-            foreach ($failures as $failure) {
-                $errors[] = 'Fila '.$failure->row().': '.implode(', ', $failure->errors());
-            }
-            return back()->withErrors(['file' => implode(' | ', $errors)]);
-        } catch (\Exception $e) {
-            return back()->withErrors(['file' => 'Error: '.$e->getMessage()]);
-        }
-        return to_route('procesos.index')->with('success', 'Importado correctamente.');
-    }
-
-    public function close(Request $request, ProcesoRadicado $proceso)
-    {
-        $request->validate(['nota_cierre' => ['required', 'string', 'max:5000']]);
-        $proceso->update(['estado' => 'CERRADO', 'nota_cierre' => $request->input('nota_cierre')]);
-        
-        AuditoriaEvento::create([
-            'user_id' => Auth::id(),
-            'evento' => 'CERRAR_RADICADO',
-            'descripcion_breve' => "Cierre radicado {$proceso->radicado}",
-            'criticidad' => 'media',
-            'direccion_ip' => request()->ip(),
-            'user_agent' => request()->userAgent(),
-        ]);
-
-        return back()->with('success', 'Caso cerrado.');
-    }
-
-    public function reopen(ProcesoRadicado $proceso)
-    {
-        if (!Auth::user()->can('restore', $proceso)) {
-            AuditoriaEvento::create([
-                'user_id' => Auth::id(),
-                'evento' => 'INTENTO_REABRIR_RADICADO_NO_AUTORIZADO',
-                'descripcion_breve' => "Usuario no autorizado intentó reabrir radicado {$proceso->radicado}",
-                'criticidad' => 'alta',
-                'direccion_ip' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
-             return back()->with('error', 'Solo admins.');
-        }
-
-        $proceso->update(['estado' => 'ACTIVO', 'nota_cierre' => null]);
-        
-        AuditoriaEvento::create([
-            'user_id' => Auth::id(),
-            'evento' => 'REABRIR_RADICADO',
-            'descripcion_breve' => "Reapertura radicado {$proceso->radicado}",
-            'criticidad' => 'media',
-            'direccion_ip' => request()->ip(),
-            'user_agent' => request()->userAgent(),
-        ]);
-
-        return back()->with('success', 'Caso reabierto.');
-    }
-
-    public function storeActuacion(Request $request, ProcesoRadicado $proceso)
-    {
-        $validated = $request->validate([
-            'nota' => ['required', 'string', 'max:5000'],
-            'fecha_actuacion' => ['required', 'date', 'before_or_equal:today'],
-        ]);
-
-        DB::transaction(function () use ($proceso, $validated) {
-            $proceso->actuaciones()->create([
-                'nota' => $validated['nota'],
-                'fecha_actuacion' => $validated['fecha_actuacion'],
-                'user_id' => Auth::id(),
-            ]);
-            $this->actualizarUltimaActuacion($proceso);
-
-            // ✅ Registro de revisión diaria por acción
-            $this->registrarRevisionAutomatica($proceso);
-
-            AuditoriaEvento::create([
-                'user_id' => Auth::id(),
-                'evento' => 'NUEVA_ACTUACION',
-                'descripcion_breve' => "Nueva actuación radicado {$proceso->radicado}",
-                'criticidad' => 'baja',
-                'direccion_ip' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
-        });
-
-        return back()->with('success', 'Registrado.');
-    }
-
-    public function updateActuacion(Request $request, Actuacion $actuacion)
-    {
-        $user = Auth::user();
-        if ($actuacion->actuable_type !== ProcesoRadicado::class || !$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
-             abort(403);
-        }
-        $validated = $request->validate([
-            'nota' => ['required', 'string', 'max:5000'],
-            'fecha_actuacion' => ['required', 'date', 'before_or_equal:today'],
-        ]);
-        $actuacion->update($validated);
-        if ($actuacion->actuable instanceof ProcesoRadicado) {
-            $this->actualizarUltimaActuacion($actuacion->actuable);
-        }
-        return back(303)->with('success', 'Actualizado.');
-    }
-
-    public function destroyActuacion(Actuacion $actuacion)
-    {
-        $user = Auth::user();
-        if ($actuacion->actuable_type !== ProcesoRadicado::class || !$user || !in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
-             abort(403);
-        }
-        $proceso = $actuacion->actuable;
-        $actuacion->delete();
-        if ($proceso instanceof ProcesoRadicado) {
-             $this->actualizarUltimaActuacion($proceso);
-        }
-        return back(303)->with('success', 'Eliminado.');
-    }
-
-    private function actualizarUltimaActuacion(ProcesoRadicado $proceso)
-    {
-        if (!$proceso) return;
-        $fechaMasReciente = $proceso->actuaciones()->max('fecha_actuacion');
-        $textoUltimaActuacion = $fechaMasReciente
-            ? Carbon::parse($fechaMasReciente)->isoFormat('DD [de] MMMM [de] YYYY')
-            : null;
-        $proceso->updateQuietly(['ultima_actuacion' => $textoUltimaActuacion]);
-    }
-
-    public function exportarExcel(Request $request)
-    {
-        $filtros = $request->all();
-        $filename = "Reporte_Expedientes_" . Carbon::now()->format('Ymd_His') . ".xlsx";
-
-        AuditoriaEvento::create([
-            'user_id' => Auth::id(),
-            'evento' => 'EXPORTAR_RADICADOS',
-            'descripcion_breve' => "Descarga Excel Expedientes",
-            'criticidad' => 'baja',
-            'direccion_ip' => request()->ip(),
-            'user_agent' => request()->userAgent(),
-        ]);
-
-        return Excel::download(new ProcesosExport($filtros), $filename);
-    }
-
-    /**
-     * Procesa los arrays de demandantes/demandados, crea nuevas personas si es necesario
-     * y detecta si falta información.
-     */
-    private function procesarPartes($partes, $tipo = 'DEMANDANTE')
+    private function procesarPartes(array $partes, string $tipo): array
     {
         $ids = [];
         $infoIncompleta = false;
 
         foreach ($partes as $parte) {
-            // Caso 1: Persona existente enviada como objeto con ID { id: ... } o solo ID
-            $id = is_array($parte) ? ($parte['id'] ?? null) : $parte;
-            $isNew = is_array($parte) && isset($parte['is_new']) && $parte['is_new'];
+            $id = $parte['id'] ?? null;
+            $nombre = $parte['nombre_completo'] ?? '';
+            $tipoDoc = $parte['tipo_documento'] ?? 'CC';
+            $numeroDoc = $parte['numero_documento'] ?? '';
+            $sinInfo = $parte['sin_info'] ?? false;
 
-            if ($id && !$isNew) {
-                $ids[] = $id;
-                
-                $persona = Persona::find($id);
-                if ($persona) {
-                    // Si es demandado, forzamos la marca en la DB para el Index de personas
-                    if ($tipo === 'DEMANDADO' && !$persona->es_demandado) {
-                        $persona->update(['es_demandado' => true]);
-                    }
-
-                    // IMPORTANTE: Si la persona existente sigue siendo "POR IDENTIFICAR", 
-                    // el proceso sigue teniendo información incompleta.
-                    if ($persona->nombre_completo === 'DEMANDADO POR IDENTIFICAR') {
-                        $infoIncompleta = true;
-                    }
-                }
-                continue;
+            if ($sinInfo || (empty($numeroDoc) && $tipo === 'DEMANDADO')) {
+                $infoIncompleta = true;
+                if (empty($nombre)) $nombre = "DEMANDADO POR IDENTIFICAR";
+                if (empty($numeroDoc)) $numeroDoc = "TEMP-" . uniqid();
             }
 
-            // Caso 2: Persona nueva o edición de una existente incompleta (is_new = true)
-            if ($isNew) {
-                $nombre = $parte['nombre_completo'] ?? null;
-                $sinInfo = isset($parte['sin_info']) && $parte['sin_info'];
-
-                if ($sinInfo) {
-                    $infoIncompleta = true;
-                    if (empty($nombre)) $nombre = "DEMANDADO POR IDENTIFICAR";
-                }
-
-                // Si el nombre resultante es el placeholder, marcar como incompleto
-                if ($nombre === 'DEMANDADO POR IDENTIFICAR') {
-                    $infoIncompleta = true;
-                }
-
-                // Generamos o recuperamos el identificador único temporal
-                $numeroDoc = $parte['numero_documento'] ?? null;
-                if (empty($numeroDoc)) {
-                    if ($id) {
-                        $pExistente = Persona::find($id);
-                        $numeroDoc = $pExistente?->numero_documento ?: 'TEMP-' . strtoupper(substr(uniqid(), -6));
-                    } else {
-                        $numeroDoc = 'TEMP-' . strtoupper(substr(uniqid(), -6));
-                    }
-                }
-                
-                $tipoDoc = $parte['tipo_documento'] ?? 'CC';
-
-                // Si tiene ID, intentamos actualizar esa persona específica
-                if ($id) {
-                    $persona = Persona::find($id);
-                    if ($persona) {
-                        $persona->update([
-                            'nombre_completo' => $nombre ?: 'SIN NOMBRE',
-                            'tipo_documento'  => $tipoDoc,
-                            'numero_documento'=> $numeroDoc,
-                            'es_demandado'    => ($tipo === 'DEMANDADO'),
-                        ]);
-                    }
-                } else {
-                    // Si no tiene ID, buscamos por documento para no duplicar si es posible
-                    $persona = Persona::where('numero_documento', $numeroDoc)
-                        ->where('tipo_documento', $tipoDoc)
-                        ->first();
-
-                    if (!$persona) {
-                        $persona = Persona::create([
-                            'nombre_completo' => $nombre ?: 'SIN NOMBRE',
-                            'tipo_documento'  => $tipoDoc,
-                            'numero_documento'=> $numeroDoc,
-                            'es_demandado'    => ($tipo === 'DEMANDADO'),
-                        ]);
-                    } else {
-                        // Actualizamos flag si es necesario
-                        if ($tipo === 'DEMANDADO' && !$persona->es_demandado) {
-                            $persona->update(['es_demandado' => true]);
-                        }
-                    }
-                }
-
+            if ($id) {
+                $persona = Persona::withTrashed()->find($id);
                 if ($persona) {
-                    if (!empty($parte['cooperativas_ids'])) $persona->cooperativas()->sync($parte['cooperativas_ids']);
-                    if (!empty($parte['abogados_ids'])) $persona->abogados()->sync($parte['abogados_ids']);
-                    $ids[] = $persona->id;
+                    if ($persona->trashed()) $persona->restore();
+                    $persona->update([
+                        'nombre_completo' => $nombre ?: $persona->nombre_completo,
+                        'tipo_documento'  => $tipoDoc ?: $persona->tipo_documento,
+                        'es_demandado'    => $persona->es_demandado || ($tipo === 'DEMANDADO'),
+                    ]);
                 }
+            } else {
+                $persona = Persona::withTrashed()->updateOrCreate(
+                    ['numero_documento' => $numeroDoc],
+                    [
+                        'nombre_completo' => $nombre ?: 'SIN NOMBRE',
+                        'tipo_documento'  => $tipoDoc,
+                        'es_demandado'    => ($tipo === 'DEMANDADO'),
+                        'deleted_at'      => null
+                    ]
+                );
+            }
+
+            if ($persona) {
+                if (!empty($parte['cooperativas_ids'])) $persona->cooperativas()->sync($parte['cooperativas_ids']);
+                if (!empty($parte['abogados_ids'])) $persona->abogados()->sync($parte['abogados_ids']);
+                $ids[] = $persona->id;
             }
         }
 
         return ['ids' => $ids, 'info_incompleta' => $infoIncompleta];
+    }
+
+    public function exportarExcel(Request $request)
+    {
+        $this->authorize('viewAny', ProcesoRadicado::class);
+        $filtros = $request->all();
+        return Excel::download(new ProcesosExport($filtros), 'procesos_' . now()->format('Ymd_His') . '.xlsx');
+    }
+
+    public function close(Request $request, ProcesoRadicado $proceso)
+    {
+        $this->authorize('update', $proceso);
+        $validated = $request->validate(['nota_cierre' => 'required|string|max:1000']);
+        $proceso->update(['estado' => 'CERRADO', 'nota_cierre' => $validated['nota_cierre']]);
+        return back()->with('success', 'Radicado cerrado exitosamente.');
+    }
+
+    public function reopen(ProcesoRadicado $proceso)
+    {
+        $this->authorize('update', $proceso);
+        $proceso->update(['estado' => 'ACTIVO', 'nota_cierre' => null]);
+        return back()->with('success', 'Radicado reabierto.');
+    }
+
+    public function storeActuacion(Request $request, ProcesoRadicado $proceso)
+    {
+        $this->authorize('update', $proceso);
+        $validated = $request->validate(['nota' => 'required|string', 'fecha_actuacion' => 'required|date']);
+        $proceso->actuaciones()->create(['nota' => $validated['nota'], 'fecha_actuacion' => $validated['fecha_actuacion'], 'user_id' => Auth::id()]);
+        return back()->with('success', 'Actuación registrada.');
+    }
+
+    public function updateActuacion(Request $request, Actuacion $actuacion)
+    {
+        $proceso = $actuacion->actuable;
+        if ($proceso instanceof ProcesoRadicado) {
+            $this->authorize('update', $proceso);
+        }
+        $validated = $request->validate(['nota' => 'required|string', 'fecha_actuacion' => 'required|date']);
+        $actuacion->update($validated);
+        return back()->with('success', 'Actuación actualizada.');
+    }
+
+    public function destroyActuacion(Actuacion $actuacion)
+    {
+        $proceso = $actuacion->actuable;
+        if ($proceso instanceof ProcesoRadicado) {
+            $this->authorize('update', $proceso);
+        }
+        $actuacion->delete();
+        return back()->with('success', 'Actuación eliminada.');
+    }
+    
+    public function showImportForm() {
+        $this->authorize('create', ProcesoRadicado::class);
+        return Inertia::render('Radicados/Import');
+    }
+
+    public function handleImport(Request $request) {
+        $this->authorize('create', ProcesoRadicado::class);
+        $request->validate(['archivo' => 'required|mimes:xlsx,xls,csv|max:10240']);
+        try {
+            Excel::import(new ProcesosImport, $request->file('archivo'));
+            return to_route('procesos.index')->with('success', 'Importación completada exitosamente.');
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->failures())->with('error', 'Error en los datos del archivo.');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Error crítico: ' . $e->getMessage());
+        }
     }
 }
