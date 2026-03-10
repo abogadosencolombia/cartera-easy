@@ -29,6 +29,11 @@ class Kernel extends ConsoleKernel
                  ->dailyAt('08:00')
                  ->timezone('America/Bogota') // <--- LA SOLUCIÓN: Hora de Colombia
                  ->name('generar_alertas_juridicas_financieras');
+
+        // NUEVA GESTIÓN DIARIA: Procesar alertas de 8 horas
+        $schedule->command('gestion:procesar-alertas')
+                 ->everyFifteenMinutes()
+                 ->name('procesar_alertas_gestion_diaria');
     }
 
     /**

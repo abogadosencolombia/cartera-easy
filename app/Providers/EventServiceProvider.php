@@ -51,7 +51,6 @@ class EventServiceProvider extends ServiceProvider
         ReporteExportado::class => [
             RegistrarExportacionDeReporte::class,
         ],
-        // ...otros listeners que puedas tener...
     ];
 
 

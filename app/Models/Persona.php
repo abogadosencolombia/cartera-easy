@@ -18,9 +18,16 @@ class Persona extends Model
         'nombre_completo', 'tipo_documento', 'numero_documento', 'telefono_fijo',
         'celular_1', 'celular_2', 'correo_1', 'correo_2', 'empresa', 'cargo', 'es_demandado',
         'observaciones', 'social_links', 'addresses', 'fecha_expedicion', 'fecha_nacimiento',
+        'direccion', 'ciudad', // ✅ Añadidos campos que faltaban
     ];
 
-    // ... (Mantener tus Accessors y Mutators existentes) ...
+    protected $casts = [
+        'addresses' => 'array',
+        'social_links' => 'array',
+        'fecha_expedicion' => 'date',
+        'fecha_nacimiento' => 'date',
+        'es_demandado' => 'boolean',
+    ];
 
     protected function fechaExpedicion(): Attribute
     {
@@ -35,22 +42,6 @@ class Persona extends Model
         return Attribute::make(
             get: fn ($value) => $value ? Carbon::parse($value)->format('Y-m-d') : null,
             set: fn ($value) => $value ?: null
-        );
-    }
-
-    protected function addresses(): Attribute
-    {
-        return Attribute::make(
-            get: fn ($value) => $value ? json_decode($value, true) : [],
-            set: fn ($value) => is_array($value) ? json_encode($value) : null
-        );
-    }
-
-    protected function socialLinks(): Attribute
-    {
-        return Attribute::make(
-            get: fn ($value) => $value ? json_decode($value, true) : [],
-            set: fn ($value) => is_array($value) ? json_encode($value) : null
         );
     }
 

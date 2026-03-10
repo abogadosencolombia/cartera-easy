@@ -46,8 +46,6 @@ class RevisionDiariaController extends Controller
         $applyFilters($radicadosQuery, 'radicados', $filters);
         $applyFilters($contratosQuery, 'contratos', $filters);
 
-        // ... resto del código (mantener igual hasta el final) ...
-        
         // --- CALCULO DE PENDIENTES ---
         $baseFilteredCasosQuery = (clone $casosQuery);
         $baseFilteredRadicadosQuery = (clone $radicadosQuery);
@@ -94,13 +92,9 @@ class RevisionDiariaController extends Controller
         ]);
     }
     
-    // ... Mantén el resto de métodos (toggle, export, getApplyFiltersClosure) exactamente igual ...
-    // Solo asegúrate de que en exportPendientesExcel también cambies 'demandante' por 'demandantes'
-    
     public function toggle(Request $request)
     {
-         // ... (código original de toggle) ...
-         $validated = $request->validate([ 'id' => 'required|integer', 'tipo' => 'required|string|in:Caso,ProcesoRadicado,Contrato']);
+        $validated = $request->validate([ 'id' => 'required|integer', 'tipo' => 'required|string|in:Caso,ProcesoRadicado,Contrato']);
         $user = Auth::user();
         $hoy = Carbon::today();
         $modelMap = [ 'Caso' => Caso::class, 'ProcesoRadicado' => ProcesoRadicado::class, 'Contrato' => Contrato::class];
@@ -121,7 +115,6 @@ class RevisionDiariaController extends Controller
 
     public function exportPendientesExcel(Request $request)
     {
-         // ... (Inicio del método igual) ...
         $user = Auth::user();
         $hoy = Carbon::today();
 
@@ -146,7 +139,6 @@ class RevisionDiariaController extends Controller
                 $modelClass = Caso::class; $idColumn = 'casos.id'; break;
             case 'radicados':
                 $relationsToLoad = [
-                    // CORRECCIÓN AQUÍ TAMBIÉN PARA EL EXCEL
                     'demandantes', 'demandados', 
                     'abogado', 
                     'revisionesDiarias' => fn($q) => $q->where('user_id', $user->id)->latest('fecha_revision')
@@ -155,7 +147,6 @@ class RevisionDiariaController extends Controller
                 $revisadosHoyIds = RevisionDiaria::where('user_id', $user->id)->where('fecha_revision', $hoy)->where('revisable_type', ProcesoRadicado::class)->pluck('revisable_id');
                 $modelClass = ProcesoRadicado::class; $idColumn = 'proceso_radicados.id'; break;
             case 'contratos':
-                // ... (Igual que antes) ...
                 $relationsToLoad = [
                     'cliente',
                     'proceso.abogado', 
@@ -167,7 +158,6 @@ class RevisionDiariaController extends Controller
             default: abort(400, 'Pestaña activa no válida.');
         }
 
-        // ... (Resto del método export y getApplyFiltersClosure igual) ...
         $applyFilters = $this->getApplyFiltersClosure();
         $applyFilters($baseQuery, $activeTab, $filters);
 
@@ -188,9 +178,6 @@ class RevisionDiariaController extends Controller
         $user = Auth::user();
         return function (Builder $query, string $type, array $filters) use ($user) {
             $query->where(function (Builder $mainQuery) use ($type, $filters, $user) {
-                // 0. Filtro base de seguridad: 
-                // Si no es admin, solo ve sus asignados. 
-                // Si es admin, ve los 60/60 casos.
                 if ($user->tipo_usuario !== 'admin') {
                     if ($type === 'casos') {
                         $mainQuery->where(function($q) use ($user) {
@@ -203,21 +190,16 @@ class RevisionDiariaController extends Controller
                     }
                 }
 
-                // 1. Filtro de Texto
                 $searchKey = "search_{$type}";
                 $searchTerm = $filters[$searchKey] ?? null;
                 if ($searchTerm) {
                     $lowerSearch = strtolower($searchTerm);
                     $mainQuery->where(function (Builder $q) use ($lowerSearch, $searchTerm, $type) {
                          if ($type === 'casos') {
-                             // ...
                              $q->whereRaw('LOWER(referencia_credito) LIKE ?', ["%{$lowerSearch}%"])
                                 ->orWhereHas('deudor', fn($sq) => $sq->whereRaw('LOWER(nombre_completo) LIKE ?', ["%{$lowerSearch}%"])->orWhere('numero_documento', 'like', "%{$lowerSearch}%"))
                                 ->orWhereHas('cooperativa', fn($sq) => $sq->whereRaw('LOWER(nombre) LIKE ?', ["%{$lowerSearch}%"]));
                         } elseif ($type === 'radicados') {
-                            // CORREGIR AQUÍ TAMBIÉN SI USAS WHEREHAS:
-                            // ProcesoRadicado tiene relación 'demandantes' y 'demandados' (plural).
-                            // Laravel es inteligente y a veces resuelve 'demandante' singular si es belongsTo, pero aquí es belongsToMany
                              $q->whereRaw('LOWER(radicado) LIKE ?', ["%{$lowerSearch}%"])
                                 ->orWhereHas('demandantes', fn($sq) => $sq->whereRaw('LOWER(nombre_completo) LIKE ?', ["%{$lowerSearch}%"])->orWhere('numero_documento', 'like', "%{$lowerSearch}%"))
                                 ->orWhereHas('demandados', fn($sq) => $sq->whereRaw('LOWER(nombre_completo) LIKE ?', ["%{$lowerSearch}%"])->orWhere('numero_documento', 'like', "%{$lowerSearch}%"));
@@ -227,8 +209,7 @@ class RevisionDiariaController extends Controller
                         }
                     });
                 }
-                // ... (Filtros fecha y abogado quedan igual) ...
-                 // 2. Filtro de Fecha
+                
                 $startDate = null; if (!empty($filters['start_date'])) try { $startDate = Carbon::parse($filters['start_date'])->startOfDay(); } catch (\Exception $e) {}
                 $endDate = null; if (!empty($filters['end_date'])) try { $endDate = Carbon::parse($filters['end_date'])->endOfDay(); } catch (\Exception $e) {}
                 $dateColumn = match ($type) { 'casos' => 'fecha_vencimiento', 'radicados' => 'fecha_proxima_revision', 'contratos' => 'created_at', default => null };

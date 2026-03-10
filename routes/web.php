@@ -133,6 +133,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/contacto-cliente', [ContactoClienteController::class, 'enviar'])->name('contacto.cliente.enviar');
 
     // --- Dashboard, Perfil y Notificaciones ---
+    // --- Gestión Diaria API ---
+    Route::prefix('api/gestion-diaria')->name('api.gestion.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\GestionDiariaController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\Api\GestionDiariaController::class, 'store'])->name('store');
+        Route::patch('/{id}/complete', [\App\Http\Controllers\Api\GestionDiariaController::class, 'complete'])->name('complete');
+        Route::delete('/{id}', [\App\Http\Controllers\Api\GestionDiariaController::class, 'destroy'])->name('destroy');
+        Route::get('/search-despacho', [\App\Http\Controllers\Api\GestionDiariaController::class, 'searchDespacho'])->name('search-despacho');
+        Route::get('/search-vinculacion', [\App\Http\Controllers\Api\GestionDiariaController::class, 'searchVinculacion'])->name('search-vinculacion');
+    });
+
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // --- NOTIFICACIONES ---

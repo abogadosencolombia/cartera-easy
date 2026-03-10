@@ -32,10 +32,10 @@ class HandleInertiaRequests extends Middleware
         // Inicializamos contadores en 0
         $countCasos = 0;
         $countTareas = 0;
+        $countGestionDiaria = 0;
 
         if ($user) {
-            // 1. Contador de notificaciones de CASOS (Tu sistema personalizado)
-            // Verificamos que la relación exista para evitar errores
+            // 1. Contador de notificaciones de CASOS
             if (method_exists($user, 'notificaciones')) {
                 $countCasos = $user->notificaciones()
                     ->where('leido', false)
@@ -43,19 +43,22 @@ class HandleInertiaRequests extends Middleware
                     ->count();
             }
 
-            // 2. Contador de notificaciones de TAREAS (Sistema nativo Laravel)
-            // Verificamos que el trait Notifiable esté activo y funcionando
+            // 2. Contador de notificaciones de TAREAS
             if (method_exists($user, 'unreadNotifications')) {
                 $countTareas = $user->unreadNotifications()->count();
             }
+
+            // 3. NUEVO: Contador de GESTIONES DIARIAS PENDIENTES
+            $countGestionDiaria = \App\Models\NotaGestion::where('user_id', $user->id)
+                ->where('is_completed', false)
+                ->count();
         }
 
         return array_merge(parent::share($request), [
             'auth' => [
                 'user' => $user ? $user->only('id', 'name', 'email', 'tipo_usuario') : null,
-                
-                // 3. Sumamos los dos contadores para la campanita del Layout
                 'unreadNotifications' => $countCasos + $countTareas,
+                'pendingGestionDiaria' => $countGestionDiaria,
             ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
