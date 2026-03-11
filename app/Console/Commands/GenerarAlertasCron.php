@@ -32,44 +32,77 @@ class GenerarAlertasCron extends Command
         // ------------------------------------------
         $this->info("1. Analizando Procesos Judiciales...");
         $procesos = ProcesoRadicado::where('estado', '!=', 'CERRADO') 
-            ->whereNotNull('fecha_proxima_revision')
-            ->with(['abogado', 'responsableRevision'])
+            ->where(function($q) {
+                $q->whereNotNull('fecha_proxima_revision')
+                  ->orWhereNotNull('etapa_procesal_id');
+            })
+            ->with(['abogado', 'responsableRevision', 'etapaActual'])
             ->get();
 
         $countProcesos = 0;
+        $countErrores = 0;
         $bar = $this->output->createProgressBar(count($procesos));
         $bar->start();
 
         foreach ($procesos as $proceso) {
-            $fecha = Carbon::parse($proceso->fecha_proxima_revision);
-            $hoy = Carbon::today();
-            $tipoAlerta = null;
+            try {
+                $hoy = Carbon::today();
+                $tipoAlerta = null;
 
-            if ($fecha->diffInDays($hoy) == 2 && $fecha->isFuture()) {
-                $tipoAlerta = 'proxima';
-            } elseif ($fecha->isSameDay($hoy)) {
-                $tipoAlerta = 'hoy';
-            } elseif ($fecha->isPast()) {
-                $tipoAlerta = 'vencida';
-            }
-
-            if ($tipoAlerta) {
-                // Notificar a abogado y responsable
-                $destinatarios = collect();
-                if ($proceso->abogado) $destinatarios->push($proceso->abogado);
-                if ($proceso->responsableRevision) $destinatarios->push($proceso->responsableRevision);
-                
-                $destinatarios = $destinatarios->unique('id');
-
-                if ($destinatarios->isNotEmpty()) {
-                    Notification::send($destinatarios, new ProcesoRevisionNotification($proceso, $tipoAlerta));
-                    $countProcesos++;
+                // A. Por Fecha Próxima Revisión
+                if ($proceso->fecha_proxima_revision) {
+                    $fecha = Carbon::parse($proceso->fecha_proxima_revision)->startOfDay();
+                    
+                    if ($fecha->isSameDay($hoy)) {
+                        $tipoAlerta = 'hoy';
+                    } elseif ($fecha->isPast()) {
+                        $tipoAlerta = 'vencida';
+                    } elseif (abs($fecha->diffInDays($hoy)) <= 2 && $fecha->isFuture()) {
+                        $tipoAlerta = 'proxima';
+                    }
                 }
+
+                // B. Por SLA de Etapa (Si no hay alerta por fecha o es más urgente)
+                if (!$tipoAlerta && $proceso->dias_para_vencer !== null) {
+                    if ($proceso->dias_para_vencer < 0) {
+                        $tipoAlerta = 'vencida';
+                    } elseif ($proceso->dias_para_vencer <= 1) {
+                        $tipoAlerta = 'hoy';
+                    }
+                }
+
+                if ($tipoAlerta) {
+                    $destinatarios = collect();
+                    if ($proceso->abogado) $destinatarios->push($proceso->abogado);
+                    if ($proceso->responsableRevision) $destinatarios->push($proceso->responsableRevision);
+                    
+                    $destinatarios = $destinatarios->unique('id');
+
+                    if ($destinatarios->isNotEmpty()) {
+                        // Evitar duplicados el mismo día para la misma alerta
+                        $yaNotificado = DB::table('notifications')
+                            ->where('notifiable_type', 'App\Models\User')
+                            ->whereIn('notifiable_id', $destinatarios->pluck('id'))
+                            ->where('data', 'like', '%"proceso_id":' . $proceso->id . '%')
+                            ->where('data', 'like', '%"estado":"' . $tipoAlerta . '"%')
+                            ->whereDate('created_at', Carbon::today())
+                            ->exists();
+
+                        if (!$yaNotificado) {
+                            Notification::send($destinatarios, new ProcesoRevisionNotification($proceso, $tipoAlerta));
+                            $countProcesos++;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                $countErrores++;
+                \Log::error("Error procesando alerta para Proceso #{$proceso->id}: " . $e->getMessage());
             }
             $bar->advance();
         }
         $bar->finish();
         $this->output->newLine();
+        $this->info("Procesos notificados: {$countProcesos}. Errores: {$countErrores}.");
 
         // ------------------------------------------
         // 2. PAGOS DE HONORARIOS (CORREGIDO)
