@@ -47,6 +47,7 @@ const loadPersonasArray = (personas) => {
             nombre_completo: p.nombre_completo, 
             tipo_documento: p.tipo_documento, 
             numero_documento: p.numero_documento,
+            dv: p.dv || '',
             sin_info: isIncomplete,
             cooperativas_ids: p.cooperativas ? p.cooperativas.map(c => ({ id: c.id, nombre: c.nombre })) : [],
             abogados_ids: p.abogados ? p.abogados.map(a => ({ id: a.id, name: a.name })) : []

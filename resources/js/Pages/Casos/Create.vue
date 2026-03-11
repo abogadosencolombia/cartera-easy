@@ -41,6 +41,7 @@ const form = useForm({
         nombre_completo: '',
         tipo_documento: 'CC',
         numero_documento: '',
+        dv: '',
         celular_1: '',
         correo_1: '',
         cooperativas_ids: [],
@@ -48,6 +49,7 @@ const form = useForm({
     },
     codeudores: props.casoAClonar?.codeudores?.map(c => ({
         ...c,
+        dv: c.dv || '',
         addresses: safeParseJson(c.addresses), 
         social_links: safeParseJson(c.social_links)
     })) || [],
@@ -193,8 +195,17 @@ const submit = () => {
                                                     <InputError :message="form.errors['deudor.tipo_documento']" />
                                                 </div>
                                                 <div>
-                                                    <TextInput v-model="form.deudor.numero_documento" placeholder="Número Documento *" class="w-full" />
+                                                    <InputLabel value="Número Documento *" />
+                                                    <div :class="form.deudor.tipo_documento === 'NIT' ? 'grid grid-cols-4 gap-2' : ''">
+                                                        <div :class="form.deudor.tipo_documento === 'NIT' ? 'col-span-3' : ''">
+                                                            <TextInput v-model="form.deudor.numero_documento" placeholder="Número *" class="w-full" />
+                                                        </div>
+                                                        <div v-if="form.deudor.tipo_documento === 'NIT'">
+                                                            <TextInput v-model="form.deudor.dv" maxlength="1" placeholder="DV" class="w-full text-center px-0" />
+                                                        </div>
+                                                    </div>
                                                     <InputError :message="form.errors['deudor.numero_documento']" />
+                                                    <InputError :message="form.errors['deudor.dv']" />
                                                 </div>
                                                 <div>
                                                     <TextInput v-model="form.deudor.celular_1" placeholder="Celular *" class="w-full" />
@@ -390,8 +401,16 @@ const submit = () => {
                                             </div>
                                             <div>
                                                 <InputLabel :for="'co_doc_' + index" value="Número Documento *" />
-                                                <TextInput :id="'co_doc_' + index" v-model="codeudor.numero_documento" class="mt-1 block w-full" placeholder="Documento" required />
+                                                <div :class="codeudor.tipo_documento === 'NIT' ? 'grid grid-cols-4 gap-2' : ''">
+                                                    <div :class="codeudor.tipo_documento === 'NIT' ? 'col-span-3' : ''">
+                                                        <TextInput :id="'co_doc_' + index" v-model="codeudor.numero_documento" class="mt-1 block w-full" placeholder="Documento" required />
+                                                    </div>
+                                                    <div v-if="codeudor.tipo_documento === 'NIT'">
+                                                        <TextInput v-model="codeudor.dv" maxlength="1" placeholder="DV" class="mt-1 block w-full text-center px-0" />
+                                                    </div>
+                                                </div>
                                                 <InputError :message="form.errors[`codeudores.${index}.numero_documento`]" />
+                                                <InputError :message="form.errors[`codeudores.${index}.dv`]" />
                                             </div>
                                             <div>
                                                 <InputLabel :for="'co_celular_' + index" value="Celular" />

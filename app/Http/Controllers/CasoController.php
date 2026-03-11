@@ -160,6 +160,7 @@ class CasoController extends Controller
                         [
                             'nombre_completo' => $datosDeudor['nombre_completo'],
                             'tipo_documento' => $datosDeudor['tipo_documento'],
+                            'dv' => $datosDeudor['dv'] ?? null,
                             'celular_1' => $datosDeudor['celular_1'] ?? null,
                             'correo_1' => $datosDeudor['correo_1'] ?? null,
                             'deleted_at' => null,
@@ -295,7 +296,8 @@ class CasoController extends Controller
                         ['numero_documento' => $datosDeudor['numero_documento']],
                         [
                             'nombre_completo' => $datosDeudor['nombre_completo'],
-                            'tipo_documento' => $datosDeudor['tipo_documento'] ?? 'CC',
+                            'tipo_documento' => $datosDeudor['tipo_documento'],
+                            'dv' => $datosDeudor['dv'] ?? null,
                             'celular_1' => $datosDeudor['celular_1'] ?? null,
                             'correo_1' => $datosDeudor['correo_1'] ?? null,
                             'deleted_at' => null,
@@ -414,6 +416,7 @@ class CasoController extends Controller
             $c = Codeudor::updateOrCreate(['numero_documento' => $d['numero_documento']], [
                 'nombre_completo' => $d['nombre_completo'],
                 'tipo_documento' => $d['tipo_documento'] ?? 'CC',
+                'dv' => $d['dv'] ?? null,
                 'celular' => $d['celular'] ?? null,
                 'correo' => $d['correo'] ?? null,
                 'addresses' => $d['addresses'] ?? null,

@@ -74,10 +74,11 @@ const form = useForm({
         id: props.caso.deudor_id,
         selected: props.caso.deudor ? { id: props.caso.deudor.id, nombre_completo: props.caso.deudor.nombre_completo, numero_documento: props.caso.deudor.numero_documento } : null,
         is_new: false,
-        nombre_completo: '', tipo_documento: 'CC', numero_documento: '', celular_1: '', correo_1: '', cooperativas_ids: [], abogados_ids: []
+        nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '', celular_1: '', correo_1: '', cooperativas_ids: [], abogados_ids: []
     },
     codeudores: props.caso.codeudores?.map(c => ({
         id: c.id, nombre_completo: c.nombre_completo || '', tipo_documento: c.tipo_documento || 'CC', numero_documento: c.numero_documento || '',
+        dv: c.dv || '',
         celular: c.celular || '', correo: c.correo || '', addresses: safeJsonParse(c.addresses), social_links: safeJsonParse(c.social_links), showDetails: true
     })) || [],
     juzgado_id: props.caso.juzgado ? { id: props.caso.juzgado.id, nombre: props.caso.juzgado.nombre } : null,
@@ -210,8 +211,16 @@ const submit = () => {
                                                 <InputError :message="form.errors['deudor.tipo_documento']" />
                                             </div>
                                             <div>
-                                                <TextInput v-model="form.deudor.numero_documento" placeholder="Documento" class="w-full" />
+                                                <div :class="form.deudor.tipo_documento === 'NIT' ? 'grid grid-cols-4 gap-2' : ''">
+                                                    <div :class="form.deudor.tipo_documento === 'NIT' ? 'col-span-3' : ''">
+                                                        <TextInput v-model="form.deudor.numero_documento" placeholder="Documento" class="w-full" />
+                                                    </div>
+                                                    <div v-if="form.deudor.tipo_documento === 'NIT'">
+                                                        <TextInput v-model="form.deudor.dv" maxlength="1" placeholder="DV" class="w-full text-center px-0" />
+                                                    </div>
+                                                </div>
                                                 <InputError :message="form.errors['deudor.numero_documento']" />
+                                                <InputError :message="form.errors['deudor.dv']" />
                                             </div>
                                             <div>
                                                 <TextInput v-model="form.deudor.celular_1" placeholder="Celular" class="w-full" />
@@ -266,7 +275,19 @@ const submit = () => {
                                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div class="md:col-span-1"><InputLabel value="Nombre Completo *" /><TextInput v-model="c.nombre_completo" class="mt-1 block w-full" required/><InputError :message="form.errors[`codeudores.${i}.nombre_completo`]" /></div>
                                         <div><InputLabel value="Tipo Documento" /><select v-model="c.tipo_documento" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option value="CC">Cédula de Ciudadanía</option><option value="NIT">NIT</option><option value="CE">Cédula de Extranjería</option></select></div>
-                                        <div><InputLabel value="Número Documento *" /><TextInput v-model="c.numero_documento" class="mt-1 block w-full" required/><InputError :message="form.errors[`codeudores.${i}.numero_documento`]" /></div>
+                                        <div>
+                                            <InputLabel value="Número Documento *" />
+                                            <div :class="c.tipo_documento === 'NIT' ? 'grid grid-cols-4 gap-2' : ''">
+                                                <div :class="c.tipo_documento === 'NIT' ? 'col-span-3' : ''">
+                                                    <TextInput v-model="c.numero_documento" class="mt-1 block w-full" required/>
+                                                </div>
+                                                <div v-if="c.tipo_documento === 'NIT'">
+                                                    <TextInput v-model="c.dv" maxlength="1" placeholder="DV" class="mt-1 block w-full text-center px-0" />
+                                                </div>
+                                            </div>
+                                            <InputError :message="form.errors[`codeudores.${i}.numero_documento`]" />
+                                            <InputError :message="form.errors[`codeudores.${i}.dv`]" />
+                                        </div>
                                         <div><InputLabel value="Celular" /><TextInput v-model="c.celular" class="mt-1 block w-full" placeholder="Ej: 3001234567" /></div>
                                         <div class="md:col-span-2"><InputLabel value="Correo Electrónico" /><TextInput v-model="c.correo" type="email" class="mt-1 block w-full" placeholder="correo@ejemplo.com" /></div>
                                     </div>

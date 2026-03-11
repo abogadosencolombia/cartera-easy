@@ -58,6 +58,7 @@ class UpdateCasoRequest extends FormRequest
             'deudor.nombre_completo' => ['required_if:deudor.is_new,true', 'nullable', 'string'],
             'deudor.tipo_documento' => ['required_if:deudor.is_new,true', 'nullable', 'string'],
             'deudor.numero_documento' => ['required_if:deudor.is_new,true', 'nullable', 'string'],
+            'deudor.dv' => ['nullable', 'string', 'max:1'],
             'deudor.celular_1' => ['nullable', 'string', 'max:20'],
             'deudor.correo_1' => ['nullable', 'email', 'max:255'],
             
@@ -65,6 +66,7 @@ class UpdateCasoRequest extends FormRequest
             'codeudores.*.id' => ['nullable', 'exists:codeudores,id'],
             'codeudores.*.nombre_completo' => ['required', 'string', 'max:255'],
             'codeudores.*.numero_documento' => ['required', 'string', 'max:50'],
+            'codeudores.*.dv' => ['nullable', 'string', 'max:1'],
             'codeudores.*.tipo_documento' => ['nullable', 'string', 'max:10'],
             'codeudores.*.celular' => ['nullable', 'string', 'max:20'],
             'codeudores.*.correo' => ['nullable', 'email', 'max:255'],

@@ -39,10 +39,10 @@ const form = useForm({
   etapa_procesal_id: '', 
 
   demandantes: [{ 
-    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', cooperativas_ids: [], abogados_ids: []
+    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '', cooperativas_ids: [], abogados_ids: []
   }],
   demandados: [{ 
-    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', sin_info: false, cooperativas_ids: [], abogados_ids: []
+    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '', sin_info: false, cooperativas_ids: [], abogados_ids: []
   }],
   
   radicado: '',
@@ -188,7 +188,27 @@ const submit = () => {
                         <div v-for="(item, index) in form.demandantes" :key="index" class="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50/50 dark:bg-gray-900/20 space-y-3 relative group">
                             <div class="flex justify-between items-center mb-1"><span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Demandante #{{ index + 1 }}</span><div class="flex items-center gap-3"><button type="button" @click="item.is_new = !item.is_new" class="text-[10px] font-bold uppercase" :class="item.is_new ? 'text-blue-600' : 'text-green-600'">{{ item.is_new ? '← Buscar' : '+ Nuevo' }}</button><button v-if="form.demandantes.length > 1" type="button" @click="removeDemandante(index)" class="text-red-400 hover:text-red-600 transition"><TrashIcon class="w-4 h-4"/></button></div></div>
                             <div v-if="!item.is_new"><AsyncSelect v-model="item.selected" :endpoint="route('personas.search')" placeholder="Buscar persona..." label-key="nombre_completo" /></div>
-                            <div v-else class="space-y-3 animate-in fade-in slide-in-from-top-1"><TextInput v-model="item.nombre_completo" placeholder="Nombre Completo *" class="text-sm w-full" /><div class="grid grid-cols-3 gap-2"><select v-model="item.tipo_documento" class="text-sm rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option>CC</option><option>NIT</option></select><TextInput v-model="item.numero_documento" placeholder="Número *" class="text-sm col-span-2" /></div><div class="grid grid-cols-1 gap-2"><AsyncSelect v-model="item.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Asignar empresas..." multiple label-key="nombre" /><AsyncSelect v-model="item.abogados_ids" :endpoint="route('users.search')" placeholder="Asignar abogados..." multiple label-key="name" /></div></div>
+                            <div v-else class="space-y-3 animate-in fade-in slide-in-from-top-1">
+                                <TextInput v-model="item.nombre_completo" placeholder="Nombre Completo *" class="text-sm w-full" />
+                                <div class="grid grid-cols-3 gap-2 items-end">
+                                    <select v-model="item.tipo_documento" class="text-sm rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm h-[42px]">
+                                        <option>CC</option>
+                                        <option>NIT</option>
+                                    </select>
+                                    <div :class="item.tipo_documento === 'NIT' ? 'col-span-2 grid grid-cols-4 gap-2' : 'col-span-2'">
+                                        <div :class="item.tipo_documento === 'NIT' ? 'col-span-3' : ''">
+                                            <TextInput v-model="item.numero_documento" placeholder="Número *" class="text-sm w-full" />
+                                        </div>
+                                        <div v-if="item.tipo_documento === 'NIT'">
+                                            <TextInput v-model="item.dv" maxlength="1" placeholder="DV" class="text-sm w-full text-center px-0 h-[42px]" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 gap-2">
+                                    <AsyncSelect v-model="item.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Asignar empresas..." multiple label-key="nombre" />
+                                    <AsyncSelect v-model="item.abogados_ids" :endpoint="route('users.search')" placeholder="Asignar abogados..." multiple label-key="name" />
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="space-y-4">
@@ -196,7 +216,31 @@ const submit = () => {
                         <div v-for="(item, index) in form.demandados" :key="index" class="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50/50 dark:bg-gray-900/20 space-y-3 relative group">
                             <div class="flex justify-between items-center mb-1"><span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Demandado #{{ index + 1 }}</span><div class="flex items-center gap-3"><button type="button" @click="item.is_new = !item.is_new" class="text-[10px] font-bold uppercase" :class="item.is_new ? 'text-blue-600' : 'text-green-600'">{{ item.is_new ? '← Buscar' : '+ Nuevo' }}</button><button v-if="form.demandados.length > 1" type="button" @click="removeDemandado(index)" class="text-red-400 hover:text-red-600 transition"><TrashIcon class="w-4 h-4"/></button></div></div>
                             <div v-if="!item.is_new"><AsyncSelect v-model="item.selected" :endpoint="route('personas.search')" placeholder="Buscar persona..." label-key="nombre_completo" /></div>
-                            <div v-else class="space-y-3 animate-in fade-in slide-in-from-top-1"><label class="flex items-center gap-2 cursor-pointer mb-2"><input type="checkbox" v-model="item.sin_info" class="rounded border-gray-300 text-indigo-600 shadow-sm" /><span class="text-[10px] font-bold text-amber-600 uppercase tracking-tight">Sin información completa</span></label><TextInput v-model="item.nombre_completo" placeholder="Nombre Completo *" class="text-sm w-full" /><div v-if="!item.sin_info" class="grid grid-cols-3 gap-2"><select v-model="item.tipo_documento" class="text-sm rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option>CC</option><option>NIT</option></select><TextInput v-model="item.numero_documento" placeholder="Número *" class="text-sm col-span-2" /></div><div class="grid grid-cols-1 gap-2"><AsyncSelect v-model="item.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Asignar empresas..." multiple label-key="nombre" /><AsyncSelect v-model="item.abogados_ids" :endpoint="route('users.search')" placeholder="Asignar abogados..." multiple label-key="name" /></div></div>
+                            <div v-else class="space-y-3 animate-in fade-in slide-in-from-top-1">
+                                <label class="flex items-center gap-2 cursor-pointer mb-2">
+                                    <input type="checkbox" v-model="item.sin_info" class="rounded border-gray-300 text-indigo-600 shadow-sm" />
+                                    <span class="text-[10px] font-bold text-amber-600 uppercase tracking-tight">Sin información completa</span>
+                                </label>
+                                <TextInput v-model="item.nombre_completo" placeholder="Nombre Completo *" class="text-sm w-full" />
+                                <div v-if="!item.sin_info" class="grid grid-cols-3 gap-2 items-end">
+                                    <select v-model="item.tipo_documento" class="text-sm rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm h-[42px]">
+                                        <option>CC</option>
+                                        <option>NIT</option>
+                                    </select>
+                                    <div :class="item.tipo_documento === 'NIT' ? 'col-span-2 grid grid-cols-4 gap-2' : 'col-span-2'">
+                                        <div :class="item.tipo_documento === 'NIT' ? 'col-span-3' : ''">
+                                            <TextInput v-model="item.numero_documento" placeholder="Número *" class="text-sm w-full" />
+                                        </div>
+                                        <div v-if="item.tipo_documento === 'NIT'">
+                                            <TextInput v-model="item.dv" maxlength="1" placeholder="DV" class="text-sm w-full text-center px-0 h-[42px]" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 gap-2">
+                                    <AsyncSelect v-model="item.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Asignar empresas..." multiple label-key="nombre" />
+                                    <AsyncSelect v-model="item.abogados_ids" :endpoint="route('users.search')" placeholder="Asignar abogados..." multiple label-key="name" />
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div><InputLabel value="Abogado / Gestor Principal" /><AsyncSelect v-model="form.abogado_id" :endpoint="route('users.search')" placeholder="Seleccionar abogado..." label-key="name" /><InputError :message="form.errors.abogado_id" /></div>
