@@ -26,19 +26,18 @@ const props = defineProps({
     etapas_procesales: { type: Array, default: () => [] },
 });
 
-const activeTab = useRemember('info-principal', 'casoEditTab:' + props.caso.id);
+const validTabs = ['info-principal', 'proceso-judicial', 'codeudores', 'control-notas'];
+const getInitialTab = () => {
+    if (typeof window === 'undefined') return 'info-principal';
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    return (tabParam && validTabs.includes(tabParam)) ? tabParam : 'info-principal';
+};
+
+const activeTab = ref(getInitialTab());
 const user = usePage().props.auth.user;
 
 // --- SINCRONIZACIÓN CON URL ---
-onMounted(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tabParam = params.get('tab');
-    const validTabs = ['info-principal', 'proceso-judicial', 'codeudores', 'control-notas'];
-    if (tabParam && validTabs.includes(tabParam)) {
-        activeTab.value = tabParam;
-    }
-});
-
 watch(activeTab, (newTab) => {
     router.replace(route('casos.edit', props.caso.id), {
         data: { tab: newTab },

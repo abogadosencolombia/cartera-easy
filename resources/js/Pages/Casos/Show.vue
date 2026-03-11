@@ -29,19 +29,18 @@ const props = defineProps({
 });
 
 const page = usePage();
-const activeTab = useRemember('resumen', 'casoShowTab:' + props.caso.id);
+const validTabs = ['resumen', 'documentos', 'financiero', 'actuaciones', 'actividad'];
+const getInitialTab = () => {
+    if (typeof window === 'undefined') return 'resumen';
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    return (tabParam && validTabs.includes(tabParam)) ? tabParam : 'resumen';
+};
+
+const activeTab = ref(getInitialTab());
 const user = usePage().props.auth.user;
 
 // --- SINCRONIZACIÓN CON URL ---
-onMounted(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tabParam = params.get('tab');
-    const validTabs = ['resumen', 'documentos', 'financiero', 'actuaciones', 'actividad'];
-    if (tabParam && validTabs.includes(tabParam)) {
-        activeTab.value = tabParam;
-    }
-});
-
 watch(activeTab, (newTab) => {
     router.replace(route('casos.show', props.caso.id), {
         data: { tab: newTab },
