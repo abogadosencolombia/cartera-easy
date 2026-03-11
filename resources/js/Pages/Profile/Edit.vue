@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, nextTick } from 'vue';
-import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { ref, computed, nextTick, onMounted, watch } from 'vue';
+import { Head, Link, useForm, usePage, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 
 // Importación de todos los componentes necesarios
@@ -14,7 +14,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import Checkbox from '@/Components/Checkbox.vue';
 
 // --- PROPS ---
-defineProps({
+const props = defineProps({
     mustVerifyEmail: { type: Boolean },
     status: { type: String },
 });
@@ -23,6 +23,25 @@ defineProps({
 const user = usePage().props.auth.user;
 const isAdmin = computed(() => user.tipo_usuario === 'admin');
 const activeTab = ref('profile'); // 'profile', 'password', 'notifications', 'admin'
+
+// --- SINCRONIZACIÓN CON URL ---
+onMounted(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    const validTabs = ['profile', 'password', 'notifications', 'admin'];
+    if (tabParam && validTabs.includes(tabParam)) {
+        activeTab.value = tabParam;
+    }
+});
+
+watch(activeTab, (newTab) => {
+    router.replace(route('profile.edit'), {
+        data: { tab: newTab },
+        preserveState: true,
+        preserveScroll: true,
+        replace: true
+    });
+});
 
 const setActiveTab = (tab) => {
     activeTab.value = tab;

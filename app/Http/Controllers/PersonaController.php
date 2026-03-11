@@ -6,6 +6,8 @@ use App\Models\Persona;
 use App\Models\PersonaDocumento;
 use App\Models\Cooperativa;
 use App\Models\User;
+use App\Models\Caso;
+use App\Models\ProcesoRadicado;
 use App\Models\AuditoriaEvento;
 use App\Http\Requests\StorePersonaRequest;
 use App\Http\Requests\UpdatePersonaRequest;
@@ -127,15 +129,49 @@ class PersonaController extends Controller
         
         $this->authorize('view', $persona);
 
+        // --- CARGAR CASOS DONDE ES DEUDOR O CODEUDOR ---
+        // Buscamos casos donde es deudor_id
+        // Y TAMBIÉN casos donde es codeudor (buscando por su número de documento en la tabla codeudores)
+        $documento = $persona->numero_documento;
+        
+        $casosQuery = \App\Models\Caso::with('user:id,name')
+            ->where(function($q) use ($persona, $documento) {
+                $q->where('deudor_id', $persona->id)
+                  ->orWhereHas('codeudores', function($sq) use ($documento) {
+                      $sq->where('numero_documento', $documento);
+                  });
+            })
+            ->latest();
+
+        $casos = $casosQuery->take(10)->get();
+        $casosCount = $casosQuery->count();
+
+        // --- CARGAR PROCESOS DONDE ES DEMANDANTE O DEMANDADO ---
+        $procesosQuery = \App\Models\ProcesoRadicado::whereHas('demandados', function($q) use ($persona) {
+                $q->where('personas.id', $persona->id);
+            })
+            ->orWhereHas('demandantes', function($q) use ($persona) {
+                $q->where('personas.id', $persona->id);
+            })
+            ->latest('updated_at'); // Usamos updated_at por si fecha_radicado es null
+
+        $procesos = $procesosQuery->take(10)->get();
+        $procesosCount = $procesosQuery->count();
+
         $persona->load([
             'cooperativas', 
             'abogados',
-            'casos' => fn($q) => $q->with('user:id,name')->latest()->take(10),
-            'procesos' => fn($q) => $q->latest('fecha_radicado')->take(10),
             'documentos.uploader'
         ]);
         
-        $persona->loadCount(['casos', 'procesos', 'documentos']);
+        // Seteamos las colecciones cargadas manualmente
+        $persona->setRelation('casos', $casos);
+        $persona->setRelation('procesos', $procesos);
+        
+        // Actualizamos los contadores
+        $persona->casos_count = $casosCount;
+        $persona->procesos_count = $procesosCount;
+        $persona->documentos_count = $persona->documentos()->count();
 
         return Inertia::render('Personas/Show', ['persona' => $persona]);
     }

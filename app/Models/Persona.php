@@ -58,15 +58,41 @@ class Persona extends Model
         return $this->hasMany(Caso::class, 'deudor_id');
     }
 
+    public function casosComoCodeudor(): BelongsToMany
+    {
+        // Nota: Asumimos que los codeudores están en la tabla 'codeudores' 
+        // pero el usuario puede querer que si una Persona existe con el mismo documento
+        // aparezcan sus casos. Sin embargo, la BD actual separa Persona de Codeudor.
+        // Por ahora, vinculamos a través de la tabla pivote si existe relación.
+        // Si no hay relación directa en la BD entre Persona y Caso como codeudor,
+        // lo ideal sería buscar por número de documento.
+        return $this->belongsToMany(Caso::class, 'caso_codeudor', 'codeudor_id', 'caso_id');
+    }
+
     public function casos(): HasMany
     {
         return $this->casosComoDeudor();
     }
 
+    public function procesosComoDemandado(): BelongsToMany
+    {
+        return $this->belongsToMany(ProcesoRadicado::class, 'proceso_radicado_personas', 'persona_id', 'proceso_radicado_id')
+            ->wherePivot('tipo', 'DEMANDADO')
+            ->withPivot('tipo')
+            ->withTimestamps();
+    }
+
+    public function procesosComoDemandante(): BelongsToMany
+    {
+        return $this->belongsToMany(ProcesoRadicado::class, 'proceso_radicado_personas', 'persona_id', 'proceso_radicado_id')
+            ->wherePivot('tipo', 'DEMANDANTE')
+            ->withPivot('tipo')
+            ->withTimestamps();
+    }
+
     public function procesos(): BelongsToMany
     {
-        return $this->belongsToMany(Proceso::class, 'proceso_radicado_personas', 'persona_id', 'proceso_radicado_id')
-            ->wherePivot('tipo', 'DEMANDADO')
+        return $this->belongsToMany(ProcesoRadicado::class, 'proceso_radicado_personas', 'persona_id', 'proceso_radicado_id')
             ->withPivot('tipo')
             ->withTimestamps();
     }

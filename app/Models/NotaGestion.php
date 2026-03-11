@@ -40,6 +40,11 @@ class NotaGestion extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function archivos()
+    {
+        return $this->hasMany(NotaGestionArchivo::class);
+    }
+
     public function relacionable()
     {
         return $this->morphTo();

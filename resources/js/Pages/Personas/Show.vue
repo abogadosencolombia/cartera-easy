@@ -5,7 +5,7 @@ import {
     PencilSquareIcon, ArrowLeftIcon, MapPinIcon, LinkIcon, 
     ArrowTopRightOnSquareIcon, PaperClipIcon, TrashIcon, 
     ArrowDownTrayIcon, DocumentPlusIcon, DocumentIcon,
-    EyeIcon,
+    EyeIcon, ExclamationTriangleIcon
 } from '@heroicons/vue/24/outline';
 import { ref, computed } from 'vue';
 
@@ -420,7 +420,10 @@ const deleteDocument = (docId) => {
                             <tr v-for="caso in persona.casos" :key="caso.id">
                                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 dark:text-white sm:pl-6">
                                     {{ caso.numero_caso || ('Caso #' + caso.id) }}
-                                    <div class="text-xs text-gray-500 font-normal">Rad: {{ caso.radicado || 'N/A' }}</div>
+                                    <div class="text-xs text-gray-500 font-normal">
+                                        <span v-if="caso.radicado">Rad: {{ caso.radicado }}</span>
+                                        <span v-else class="italic text-amber-600">Sin Radicado</span>
+                                    </div>
                                 </td>
                                 <td class="whitespace-nowrap px-3 py-4 text-sm">
                                     <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset"
@@ -435,7 +438,7 @@ const deleteDocument = (docId) => {
                                     {{ formatDate(caso.created_at) }}
                                 </td>
                                 <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                                    <a :href="route('casos.show', caso.id)" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">Ver</a>
+                                    <Link :href="route('casos.show', caso.id)" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">Ver</Link>
                                 </td>
                             </tr>
                         </tbody>
@@ -489,29 +492,31 @@ const deleteDocument = (docId) => {
                             <tr v-for="proceso in persona.procesos" :key="proceso.id">
                                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 dark:text-white sm:pl-6">
                                     <div class="flex flex-col">
-                                        <span class="font-mono text-indigo-600 dark:text-indigo-400 font-bold">{{ proceso.radicado }}</span>
-                                        <span class="text-xs text-gray-500 truncate max-w-xs" :title="proceso.asunto">{{ proceso.asunto }}</span>
+                                        <span v-if="proceso.radicado" class="font-mono text-indigo-600 dark:text-indigo-400 font-bold">{{ proceso.radicado }}</span>
+                                        <span v-else class="italic text-amber-600 font-bold text-xs uppercase">Sin Radicado</span>
+                                        <span class="text-xs text-gray-500 truncate max-w-xs" :title="proceso.asunto">{{ proceso.asunto || 'Sin asunto' }}</span>
                                     </div>
                                 </td>
                                 <td class="px-3 py-4 text-sm text-gray-500 dark:text-gray-300 max-w-xs truncate">
                                     <div class="flex items-start gap-1">
                                         <MapPinIcon class="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-400" />
-                                        <span class="truncate" :title="proceso.juzgado_entidad">{{ proceso.juzgado_entidad || 'N/A' }}</span>
+                                        <span class="truncate" :title="proceso.juzgado_entidad">{{ proceso.juzgado_entidad || (proceso.juzgado ? proceso.juzgado.nombre : 'N/A') }}</span>
                                     </div>
                                 </td>
                                 <td class="px-3 py-4 text-sm text-gray-500 dark:text-gray-300">
                                     <div class="flex flex-col gap-1">
-                                        <!-- Nota: Ajustamos esto para mostrar info genérica ya que es relación M:N -->
-                                        <span class="text-xs italic text-gray-400">Ver detalle</span>
+                                        <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 w-fit">
+                                            {{ (proceso.pivot?.tipo || 'Vinculado') }}
+                                        </span>
                                     </div>
                                 </td>
                                 <td class="whitespace-nowrap px-3 py-4 text-sm">
                                     <span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-900/30 dark:text-green-400">
-                                        {{ proceso.tipo_proceso || 'Activo' }}
+                                        {{ proceso.estado || 'Activo' }}
                                     </span>
                                 </td>
                                 <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                                    <a :href="route('procesos.show', proceso.id)" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">Ver</a>
+                                    <Link :href="route('procesos.show', proceso.id)" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">Ver</Link>
                                 </td>
                             </tr>
                         </tbody>

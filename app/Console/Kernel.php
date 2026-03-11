@@ -33,6 +33,7 @@ class Kernel extends ConsoleKernel
         // NUEVA GESTIÓN DIARIA: Procesar alertas de 8 horas
         $schedule->command('gestion:procesar-alertas')
                  ->everyFifteenMinutes()
+                 ->timezone('America/Bogota')
                  ->name('procesar_alertas_gestion_diaria');
     }
 

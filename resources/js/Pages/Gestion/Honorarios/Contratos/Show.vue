@@ -489,23 +489,33 @@ const contractStatusClasses = {
 const pestanaActiva = ref('cuotas') 
 const cambiarPestana = (nuevaPestana) => {
     pestanaActiva.value = nuevaPestana
-    const url = new URL(window.location)
-    url.searchParams.set('tab', nuevaPestana)
-    window.history.replaceState({}, '', url)
 }
+
 onMounted(() => {
-    const tabFromUrl = new URLSearchParams(window.location.search).get('tab')
-    if (tabFromUrl && ['cuotas', 'cargos', 'pagos', 'actuaciones'].includes(tabFromUrl)) {
-         pestanaActiva.value = tabFromUrl;
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    const validTabs = ['cuotas', 'cargos', 'pagos', 'actuaciones'];
+    
+    if (tabParam && validTabs.includes(tabParam)) {
+        pestanaActiva.value = tabParam;
     } else {
-         if (props.actuaciones.length > 0 && props.cuotas.data.length === 0 && props.cargos.data.length === 0) {
-             pestanaActiva.value = 'actuaciones';
-         } else {
-             pestanaActiva.value = 'cuotas';
-         }
-         cambiarPestana(pestanaActiva.value); 
+        // Lógica por defecto si no hay tab en URL
+        if (props.actuaciones.length > 0 && props.cuotas.data.length === 0 && props.cargos.data.length === 0) {
+            pestanaActiva.value = 'actuaciones';
+        } else {
+            pestanaActiva.value = 'cuotas';
+        }
     }
 })
+
+watch(pestanaActiva, (newTab) => {
+    router.replace(route('honorarios.contratos.show', props.contrato.id), {
+        data: { tab: newTab },
+        preserveState: true,
+        preserveScroll: true,
+        replace: true
+    });
+});
 
 // --- Lógica de Paginación ---
 const withTab = (url) => { if (!url) return null; try { const u = new URL(url, window.location.origin); u.searchParams.set('tab', pestanaActiva.value); return u.toString() } catch { return url } }

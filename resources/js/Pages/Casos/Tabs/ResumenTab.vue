@@ -16,7 +16,8 @@ import {
     MapPinIcon, 
     ChevronDownIcon,
     BellIcon,
-    ArrowTopRightOnSquareIcon 
+    ArrowTopRightOnSquareIcon,
+    GlobeAltIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -151,14 +152,25 @@ const submitNotification = () => {
                         </div>
                     </div>
 
-                    <!-- ✅ LINK DRIVE (NUEVO) -->
-                    <div class="md:col-span-2 border-t border-gray-200 dark:border-gray-700 pt-4 mt-2" v-if="caso.link_drive">
-                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase">Carpeta Digital</p>
-                        <a :href="caso.link_drive" target="_blank" class="inline-flex items-center px-4 py-2 bg-blue-50 border border-blue-200 rounded-md font-semibold text-xs text-blue-700 uppercase tracking-widest hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-900/50 transition ease-in-out duration-150 w-full justify-center sm:w-auto">
-                            <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg" alt="Drive" class="w-5 h-5 mr-2">
-                            Abrir Carpeta en Drive
-                            <ArrowTopRightOnSquareIcon class="w-4 h-4 ml-2" />
-                        </a>
+                    <!-- ✅ LINKS EXTERNOS (DRIVE Y EXPEDIENTE) -->
+                    <div class="md:col-span-2 border-t border-gray-200 dark:border-gray-700 pt-4 mt-2 flex flex-col sm:flex-row gap-4">
+                        <div v-if="caso.link_drive" class="flex-1">
+                            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase">Carpeta Digital</p>
+                            <a :href="caso.link_drive" target="_blank" class="inline-flex items-center px-4 py-2 bg-blue-50 border border-blue-200 rounded-md font-semibold text-xs text-blue-700 uppercase tracking-widest hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-900/50 transition ease-in-out duration-150 w-full justify-center">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg" alt="Drive" class="w-5 h-5 mr-2">
+                                Carpeta en Drive
+                                <ArrowTopRightOnSquareIcon class="w-4 h-4 ml-2" />
+                            </a>
+                        </div>
+                        
+                        <div v-if="caso.link_expediente" class="flex-1">
+                            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase">Expediente Judicial</p>
+                            <a :href="caso.link_expediente" target="_blank" class="inline-flex items-center px-4 py-2 bg-indigo-50 border border-indigo-200 rounded-md font-semibold text-xs text-indigo-700 uppercase tracking-widest hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-900/50 transition ease-in-out duration-150 w-full justify-center">
+                                <GlobeAltIcon class="w-5 h-5 mr-2 text-indigo-500" />
+                                Expediente Digital
+                                <ArrowTopRightOnSquareIcon class="w-4 h-4 ml-2" />
+                            </a>
+                        </div>
                     </div>
 
                 </dl>

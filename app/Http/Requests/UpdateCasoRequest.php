@@ -43,6 +43,7 @@ class UpdateCasoRequest extends FormRequest
             'origen_documental' => ['required'],
             'medio_contacto' => ['nullable', 'string'],
             'link_drive' => ['nullable', 'url'],
+            'link_expediente' => ['nullable', 'url'],
             'monto_total' => ['required', 'numeric'],
             'monto_deuda_actual' => ['nullable', 'numeric'],
             'monto_total_pagado' => ['nullable', 'numeric'],

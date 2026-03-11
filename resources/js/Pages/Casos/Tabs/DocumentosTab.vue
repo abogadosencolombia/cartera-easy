@@ -316,6 +316,7 @@ const submitAlerta = () => {
                             <!-- --- INICIO: CAMBIO DE DOCUMENTO --- -->
                             <!-- =============================================================== -->
                             <option>demanda</option>
+                            <option>autos</option>
                             <option>memorial</option>
                             <!-- =============================================================== -->
                             <!-- --- FIN: CAMBIO DE DOCUMENTO --- -->
@@ -373,15 +374,14 @@ const submitAlerta = () => {
                     <div>
                         <InputLabel for="archivo_upload" value="Archivo (Máx 128MB) *" />
                         <input
-                            id="archivo_upload"
-                            type="file"
-                            @input="docForm.archivo = $event.target.files[0]"
-                            class="mt-1 block w-full text-sm text-gray-500
-                                    file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0
-                                    file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                            accept=".pdf,.doc,.docx,image/*"
-                        />
-                        <InputError :message="docForm.errors.archivo" class="mt-2" />
+                        id="archivo_upload"
+                        type="file"
+                        @input="docForm.archivo = $event.target.files[0]"
+                        class="mt-1 block w-full text-sm text-gray-500
+                                file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0
+                                file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,image/*"
+                        />                        <InputError :message="docForm.errors.archivo" class="mt-2" />
                         <div v-if="docFormProgress !== null" class="mt-2 w-full bg-gray-200 rounded h-2">
                             <div class="h-2 rounded bg-indigo-600" :style="{ width: docFormProgress + '%' }"></div>
                         </div>

@@ -4,19 +4,21 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\NotaGestion;
+use App\Models\NotaGestionArchivo;
 use App\Models\Caso;
 use App\Models\ProcesoRadicado;
 use App\Models\Contrato;
 use App\Models\Juzgado;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class GestionDiariaController extends Controller
 {
     public function index()
     {
         return NotaGestion::where('user_id', Auth::id())
-            ->with('relacionable')
+            ->with(['relacionable', 'archivos'])
             ->orderBy('is_completed', 'asc')
             ->orderBy('expires_at', 'asc')
             ->get();
@@ -28,6 +30,7 @@ class GestionDiariaController extends Controller
             'descripcion' => 'required|min:5',
             'despacho' => 'required',
             'termino' => 'required',
+            'archivos.*' => 'nullable|file|max:10240', // 20MB por archivo
         ]);
 
         $nota = NotaGestion::create([
@@ -40,7 +43,20 @@ class GestionDiariaController extends Controller
             'expires_at' => now()->addHours(8),
         ]);
 
-        return response()->json($nota->load('relacionable'), 201);
+        if ($request->hasFile('archivos')) {
+            foreach ($request->file('archivos') as $file) {
+                $path = $file->store("gestion_diaria/{$nota->id}", 'public');
+                $nota->archivos()->create([
+                    'nombre_original' => $file->getClientOriginalName(),
+                    'ruta_archivo' => $path,
+                    'mime_type' => $file->getMimeType(),
+                    'size' => $file->getSize(),
+                    'uploaded_by' => Auth::id(),
+                ]);
+            }
+        }
+
+        return response()->json($nota->load(['relacionable', 'archivos']), 201);
     }
 
     public function complete($id)
@@ -53,16 +69,39 @@ class GestionDiariaController extends Controller
     public function destroy($id)
     {
         $nota = NotaGestion::where('user_id', Auth::id())->where('is_completed', true)->findOrFail($id);
+        
+        foreach ($nota->archivos as $archivo) {
+            Storage::disk('public')->delete($archivo->ruta_archivo);
+        }
+        
         $nota->delete();
         return response()->json(['message' => 'Eliminado']);
     }
 
+    public function downloadArchivo($id)
+    {
+        $archivo = NotaGestionArchivo::whereHas('notaGestion', function($q) {
+            $q->where('user_id', Auth::id());
+        })->findOrFail($id);
+
+        return Storage::disk('public')->download($archivo->ruta_archivo, $archivo->nombre_original);
+    }
+
+    public function viewArchivo($id)
+    {
+        $archivo = NotaGestionArchivo::whereHas('notaGestion', function($q) {
+            $q->where('user_id', Auth::id());
+        })->findOrFail($id);
+
+        return Storage::disk('public')->response($archivo->ruta_archivo);
+    }
+
     public function searchDespacho(Request $request)
     {
-        $term = strtolower($request->q);
+        $term = $request->q;
         if (strlen($term) < 2) return [];
         
-        return Juzgado::whereRaw('LOWER(nombre) like ?', ["%{$term}%"])
+        return Juzgado::where('nombre', 'ilike', "%{$term}%")
             ->limit(10)
             ->get(['id', 'nombre']);
     }
@@ -70,24 +109,43 @@ class GestionDiariaController extends Controller
     public function searchVinculacion(Request $request)
     {
         $type = $request->type;
-        $term = strtolower($request->q);
+        $term = $request->q;
         if (strlen($term) < 2 || !$type) return [];
 
         if ($type === 'App\Models\Caso') {
-            return Caso::whereRaw('LOWER(referencia_credito) like ?', ["%{$term}%"])
-                ->orWhereRaw('LOWER(radicado) like ?', ["%{$term}%"])
+            return Caso::with('deudor')
+                ->where(function($q) use ($term) {
+                    $q->where('referencia_credito', 'ilike', "%{$term}%")
+                      ->orWhere('radicado', 'ilike', "%{$term}%")
+                      ->orWhereHas('deudor', function($sq) use ($term) {
+                          $sq->where('nombre_completo', 'ilike', "%{$term}%")
+                            ->orWhere('numero_documento', 'like', "%{$term}%"); // Mantenemos like para números
+                      });
+                })
                 ->limit(10)->get();
         } 
         elseif ($type === 'App\Models\ProcesoRadicado') {
-            return ProcesoRadicado::whereRaw('LOWER(radicado) like ?', ["%{$term}%"])
-                ->orWhereRaw('LOWER(asunto) like ?', ["%{$term}%"])
+            return ProcesoRadicado::with(['demandantes', 'demandados'])
+                ->where(function($q) use ($term) {
+                    $q->where('radicado', 'ilike', "%{$term}%")
+                      ->orWhere('asunto', 'ilike', "%{$term}%")
+                      ->orWhereHas('demandantes', function($sq) use ($term) {
+                          $sq->where('nombre_completo', 'ilike', "%{$term}%")
+                            ->orWhere('numero_documento', 'like', "%{$term}%");
+                      })
+                      ->orWhereHas('demandados', function($sq) use ($term) {
+                          $sq->where('nombre_completo', 'ilike', "%{$term}%")
+                            ->orWhere('numero_documento', 'like', "%{$term}%");
+                      });
+                })
                 ->limit(10)->get();
         }
         elseif ($type === 'App\Models\Contrato') {
             return Contrato::with('cliente')
-                ->whereRaw('LOWER(referencia) like ?', ["%{$term}%"])
+                ->where('referencia', 'ilike', "%{$term}%")
                 ->orWhereHas('cliente', function($q) use ($term) {
-                    $q->whereRaw('LOWER(nombre_completo) like ?', ["%{$term}%"]);
+                    $q->where('nombre_completo', 'ilike', "%{$term}%")
+                      ->orWhere('numero_documento', 'like', "%{$term}%");
                 })->limit(10)->get();
         }
 

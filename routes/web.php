@@ -141,6 +141,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/{id}', [\App\Http\Controllers\Api\GestionDiariaController::class, 'destroy'])->name('destroy');
         Route::get('/search-despacho', [\App\Http\Controllers\Api\GestionDiariaController::class, 'searchDespacho'])->name('search-despacho');
         Route::get('/search-vinculacion', [\App\Http\Controllers\Api\GestionDiariaController::class, 'searchVinculacion'])->name('search-vinculacion');
+        Route::get('/archivo/{id}', [\App\Http\Controllers\Api\GestionDiariaController::class, 'downloadArchivo'])->name('download-archivo');
+        Route::get('/archivo/{id}/view', [\App\Http\Controllers\Api\GestionDiariaController::class, 'viewArchivo'])->name('view-archivo');
     });
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

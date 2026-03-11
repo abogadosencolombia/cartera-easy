@@ -12,7 +12,8 @@ import {
     TrashIcon,
     ClockIcon,
     ExclamationCircleIcon,
-    ChevronRightIcon
+    ChevronRightIcon,
+    PaperClipIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -42,8 +43,12 @@ const form = ref({
     despacho: '',
     termino: '',
     relacionable_type: '',
-    relacionable_id: null
+    relacionable_id: null,
+    archivos: []
 });
+
+const fileInput = ref(null);
+const selectedFiles = ref([]);
 
 // Búsquedas
 const searchDespacho = ref('');
@@ -63,6 +68,19 @@ const fetchNotas = async () => {
     }
 };
 
+const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files);
+    if (selectedFiles.value.length + files.length > 3) {
+        Toast.fire({ icon: 'warning', title: 'MÁXIMO 3 ARCHIVOS' });
+        return;
+    }
+    selectedFiles.value = [...selectedFiles.value, ...files];
+};
+
+const removeFile = (index) => {
+    selectedFiles.value.splice(index, 1);
+};
+
 // Guardar Nota
 const saveNota = async () => {
     if (!form.value.descripcion || !form.value.despacho || !form.value.termino) {
@@ -72,8 +90,23 @@ const saveNota = async () => {
     
     loading.value = true;
     try {
-        await axios.post(route('api.gestion.store'), form.value);
-        form.value = { descripcion: '', despacho: '', termino: '', relacionable_type: '', relacionable_id: null };
+        const formData = new FormData();
+        formData.append('descripcion', form.value.descripcion);
+        formData.append('despacho', form.value.despacho);
+        formData.append('termino', form.value.termino);
+        formData.append('relacionable_type', form.value.relacionable_type || '');
+        if (form.value.relacionable_id) formData.append('relacionable_id', form.value.relacionable_id);
+        
+        selectedFiles.value.forEach((file, index) => {
+            formData.append(`archivos[${index}]`, file);
+        });
+
+        await axios.post(route('api.gestion.store'), formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        form.value = { descripcion: '', despacho: '', termino: '', relacionable_type: '', relacionable_id: null, archivos: [] };
+        selectedFiles.value = [];
         searchDespacho.value = '';
         searchVinculacion.value = '';
         await fetchNotas();
@@ -154,8 +187,9 @@ const selectDespacho = (nombre) => {
 
 const selectVinculacion = (item) => {
     form.value.relacionable_id = item.id;
-    const label = item.radicado || item.referencia_credito || item.referencia;
-    searchVinculacion.value = label;
+    const typeLabel = form.value.relacionable_type.split('\\').pop().toUpperCase();
+    const ref = item.radicado || item.referencia_credito || item.referencia || `#${item.id}`;
+    searchVinculacion.value = `${typeLabel}: ${ref}`;
     showVinculacionResults.value = false;
 };
 
@@ -256,15 +290,46 @@ onMounted(fetchNotas);
                                     <option value="App\Models\Contrato">CONTRATO HONORARIOS</option>
                                 </select>
                                 <div v-if="form.relacionable_type" class="relative">
-                                    <input v-model="searchVinculacion" type="text" placeholder="FILTRAR..." 
+                                    <input v-model="searchVinculacion" type="text" placeholder="BUSCAR POR NOMBRE, DOC O RADICADO..." 
                                            class="w-full text-[10px] font-black uppercase rounded-lg border-blue-200 focus:border-blue-500 focus:ring-blue-500 shadow-sm text-blue-600">
-                                    <div v-if="showVinculacionResults && resultadosVinculacion.length" class="absolute z-10 w-full mt-1 bg-white border-2 border-blue-500 shadow-2xl rounded-lg max-h-48 overflow-y-auto">
+                                    <div v-if="showVinculacionResults && resultadosVinculacion.length" class="absolute z-10 w-full mt-1 bg-white border-2 border-blue-500 shadow-2xl rounded-lg max-h-60 overflow-y-auto">
                                         <button v-for="v in resultadosVinculacion" :key="v.id" @click="selectVinculacion(v)" 
                                                 class="w-full text-left px-4 py-3 hover:bg-blue-500 hover:text-white border-b last:border-0 transition">
                                             <div class="text-[10px] font-black uppercase">{{ v.radicado || v.referencia_credito || v.referencia }}</div>
-                                            <div class="text-[8px] font-bold opacity-75 uppercase truncate">{{ v.asunto || (v.cliente ? v.cliente.nombre_completo : '') }}</div>
+                                            <div class="text-[8px] font-bold opacity-75 uppercase truncate">
+                                                {{ v.asunto || '' }}
+                                                <span v-if="v.deudor">· {{ v.deudor.nombre_completo }} ({{ v.deudor.numero_documento }})</span>
+                                                <span v-else-if="v.cliente">· {{ v.cliente.nombre_completo }} ({{ v.cliente.numero_documento }})</span>
+                                                <span v-else-if="v.demandados?.length">· DDO: {{ v.demandados[0].nombre_completo }}</span>
+                                            </div>
                                         </button>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sección de Archivos -->
+                        <div class="pt-4 border-t border-gray-100">
+                            <label class="block text-[9px] font-black text-gray-400 uppercase mb-2 ml-1">Anexos (Máx 3 PDF/IMG/EXCEL/WORD)</label>
+                            <div class="flex items-center gap-2">
+                                <button @click="$refs.fileInput.click()" type="button" 
+                                        class="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-[10px] font-black uppercase transition-all">
+                                    <PaperClipIcon class="w-4 h-4" />
+                                    {{ selectedFiles.length > 0 ? 'Agregar más' : 'Adjuntar Documentos' }}
+                                </button>
+                                <input type="file" ref="fileInput" multiple @change="handleFileUpload" class="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,image/*">
+                                <span class="text-[9px] font-bold text-gray-400 uppercase italic">{{ selectedFiles.length }}/3 Archivos</span>
+                            </div>
+                            
+                            <div v-if="selectedFiles.length" class="mt-3 space-y-2">
+                                <div v-for="(file, idx) in selectedFiles" :key="idx" class="flex items-center justify-between p-2 bg-indigo-50 rounded-lg border border-indigo-100">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <PaperClipIcon class="w-3 h-3 text-indigo-500 shrink-0" />
+                                        <span class="text-[9px] font-bold text-indigo-900 truncate uppercase">{{ file.name }}</span>
+                                    </div>
+                                    <button @click="removeFile(idx)" class="text-red-500 hover:text-red-700 p-1">
+                                        <XMarkIcon class="w-4 h-4" />
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -308,8 +373,18 @@ onMounted(fetchNotas);
                                 <button v-if="nota.relacionable_type" @click="goToLink(nota)" 
                                         class="inline-flex items-center px-3 py-1.5 bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white rounded-lg text-[9px] font-black uppercase transition-all tracking-tighter">
                                     <LinkIcon class="w-3 h-3 mr-1.5" />
-                                    VÍNCULO: {{ nota.relacionable?.radicado || nota.relacionable?.referencia_credito || nota.relacionable?.referencia }}
+                                    VÍNCULO: {{ nota.relacionable?.radicado || nota.relacionable?.referencia_credito || nota.relacionable?.referencia || 'SIN REF' }}
                                 </button>
+
+                                <!-- Anexos en la lista -->
+                                <div v-if="nota.archivos?.length" class="mt-3 flex flex-wrap gap-2">
+                                    <a v-for="file in nota.archivos" :key="file.id" 
+                                       :href="route('api.gestion.download-archivo', file.id)" target="_blank"
+                                       class="flex items-center gap-1.5 px-2 py-1 bg-white border border-indigo-100 rounded text-[8px] font-bold text-indigo-600 hover:bg-indigo-50 transition-colors uppercase">
+                                        <PaperClipIcon class="w-2.5 h-2.5" />
+                                        {{ file.nombre_original }}
+                                    </a>
+                                </div>
                             </div>
 
                             <div class="flex flex-col space-y-2 shrink-0">

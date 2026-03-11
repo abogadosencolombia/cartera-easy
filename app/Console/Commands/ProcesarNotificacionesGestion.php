@@ -38,9 +38,14 @@ class ProcesarNotificacionesGestion extends Command
             ->get();
 
         foreach ($notasCasiVencen as $nota) {
-            $nota->user->notify(new NotaGestionAlerta($nota, 'before_expiry'));
+            try {
+                $nota->user->notify(new NotaGestionAlerta($nota, 'before_expiry'));
+                $this->info("Notificación preventiva enviada para nota ID: {$nota->id}");
+            } catch (\Exception $e) {
+                $this->error("Error notificando nota ID: {$nota->id} - " . $e->getMessage());
+            }
+            // Marcamos como notificado igualmente para no reintentar infinitamente si falla el mail
             $nota->update(['notified_before' => true]);
-            $this->info("Notificación preventiva enviada para nota ID: {$nota->id}");
         }
 
         // 2. Alerta de vencimiento inmediato (al llegar a las 8 horas)
@@ -50,9 +55,13 @@ class ProcesarNotificacionesGestion extends Command
             ->get();
 
         foreach ($notasVencidas as $nota) {
-            $nota->user->notify(new NotaGestionAlerta($nota, 'expired'));
+            try {
+                $nota->user->notify(new NotaGestionAlerta($nota, 'expired'));
+                $this->info("Notificación de vencimiento enviada para nota ID: {$nota->id}");
+            } catch (\Exception $e) {
+                $this->error("Error notificando vencimiento nota ID: {$nota->id} - " . $e->getMessage());
+            }
             $nota->update(['notified_after' => true]);
-            $this->info("Notificación de vencimiento enviada para nota ID: {$nota->id}");
         }
 
         // 3. Alertas periódicas: Cada hora después de vencer si sigue pendiente
@@ -65,9 +74,13 @@ class ProcesarNotificacionesGestion extends Command
             ->get();
 
         foreach ($notasPeriodic as $nota) {
-            $nota->user->notify(new NotaGestionAlerta($nota, 'periodic'));
+            try {
+                $nota->user->notify(new NotaGestionAlerta($nota, 'periodic'));
+                $this->info("Notificación periódica enviada para nota ID: {$nota->id}");
+            } catch (\Exception $e) {
+                $this->error("Error notificando periódica nota ID: {$nota->id} - " . $e->getMessage());
+            }
             $nota->update(['last_periodic_notification_at' => $ahora]);
-            $this->info("Notificación periódica enviada para nota ID: {$nota->id}");
         }
 
         $this->info('Proceso de alertas de gestión finalizado.');

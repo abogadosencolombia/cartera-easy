@@ -29,6 +29,25 @@ const props = defineProps({
 const activeTab = useRemember('info-principal', 'casoEditTab:' + props.caso.id);
 const user = usePage().props.auth.user;
 
+// --- SINCRONIZACIÓN CON URL ---
+onMounted(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    const validTabs = ['info-principal', 'proceso-judicial', 'codeudores', 'control-notas'];
+    if (tabParam && validTabs.includes(tabParam)) {
+        activeTab.value = tabParam;
+    }
+});
+
+watch(activeTab, (newTab) => {
+    router.replace(route('casos.edit', props.caso.id), {
+        data: { tab: newTab },
+        preserveState: true,
+        preserveScroll: true,
+        replace: true
+    });
+});
+
 // --- LÓGICA DE CIERRE/REAPERTURA ---
 const showCloseModal = ref(false);
 const closeForm = useForm({ nota_cierre: '' });
@@ -84,6 +103,7 @@ const form = useForm({
     motivo_bloqueo: props.caso.motivo_bloqueo ?? '',
     notas_legales: props.caso.notas_legales,
     link_drive: props.caso.link_drive || '',
+    link_expediente: props.caso.link_expediente || '',
 });
 
 const addCodeudor = () => { form.codeudores.push({ id: null, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', celular: '', correo: '', addresses: [], social_links: [], showDetails: true }); activeTab.value = 'codeudores'; };
@@ -234,7 +254,8 @@ const submit = () => {
                                     <div><InputLabel value="Tipo de Garantía *" /><select v-model="form.tipo_garantia_asociada" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option value="codeudor">Codeudor</option><option value="hipotecaria">Hipotecaria</option><option value="prendaria">Prendaria</option><option value="sin garantía">Sin garantía</option></select><InputError :message="form.errors.tipo_garantia_asociada" /></div>
                                     <div><InputLabel value="Origen Documental *" /><select v-model="form.origen_documental" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option value="pagaré">Pagaré</option><option value="libranza">Libranza</option><option value="contrato">Contrato</option><option value="otro">Otro</option></select><InputError :message="form.errors.origen_documental" /></div>
                                     <div><InputLabel value="Medio de Contacto" /><select v-model="form.medio_contacto" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option :value="null">-- Seleccione --</option><option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="telefono">Teléfono</option></select><InputError :message="form.errors.medio_contacto" /></div>
-                                    <div class="md:col-span-2"><InputLabel value="URL Carpeta Drive (Opcional)" /><TextInput v-model="form.link_drive" type="url" class="w-full" placeholder="https://drive.google.com/..." /><InputError :message="form.errors.link_drive" /></div>
+                                    <div class="md:col-span-1"><InputLabel value="URL Carpeta Drive (Opcional)" /><TextInput v-model="form.link_drive" type="url" class="w-full" placeholder="https://drive.google.com/..." /><InputError :message="form.errors.link_drive" /></div>
+                                    <div class="md:col-span-1"><InputLabel value="URL Expediente Digital (Opcional)" /><TextInput v-model="form.link_expediente" type="url" class="w-full" placeholder="https://expediente.justicia.gov.co/..." /><InputError :message="form.errors.link_expediente" /></div>
                                 </div>
                             </section>
 

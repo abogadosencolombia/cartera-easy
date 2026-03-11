@@ -76,6 +76,7 @@ const form = useForm({
     origen_documental: props.casoAClonar?.origen_documental || 'pagaré',
     medio_contacto: props.casoAClonar?.medio_contacto || null,
     link_drive: props.casoAClonar?.link_drive || '',
+    link_expediente: props.casoAClonar?.link_expediente || '',
     clonado_de_id: props.casoAClonar?.id || null,
 });
 
@@ -341,10 +342,15 @@ const submit = () => {
                                         </select>
                                         <InputError :message="form.errors.medio_contacto" />
                                     </div>
-                                    <div class="lg:col-span-3">
+                                    <div class="lg:col-span-2">
                                         <InputLabel value="URL Carpeta Drive (Opcional)" />
                                         <TextInput v-model="form.link_drive" type="url" class="mt-1 block w-full" placeholder="https://drive.google.com/..." />
                                         <InputError :message="form.errors.link_drive" />
+                                    </div>
+                                    <div class="lg:col-span-1">
+                                        <InputLabel value="URL Expediente Digital (Opcional)" />
+                                        <TextInput v-model="form.link_expediente" type="url" class="mt-1 block w-full" placeholder="https://expediente.justicia.gov.co/..." />
+                                        <InputError :message="form.errors.link_expediente" />
                                     </div>
                                 </div>
                             </section>

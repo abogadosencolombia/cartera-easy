@@ -33,7 +33,7 @@ class Caso extends Model
         'tasa_interes_corriente',
         'fecha_inicio_credito', 
         'origen_documental', 'bloqueado', 'motivo_bloqueo',
-        'etapa_actual', 'medio_contacto', 'link_drive', 'ultima_actividad', 'notas_legales',
+        'etapa_actual', 'medio_contacto', 'link_drive', 'link_expediente', 'ultima_actividad', 'notas_legales',
         'clonado_de_id',
         'subtipo_proceso',
         'subproceso',

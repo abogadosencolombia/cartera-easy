@@ -51,6 +51,7 @@ class StoreCasoRequest extends FormRequest
             'origen_documental' => ['required', Rule::in(['pagaré', 'libranza', 'contrato', 'otro'])],
             'medio_contacto' => ['nullable', 'string', 'max:100'],
             'link_drive' => ['nullable', 'url', 'max:2048'],
+            'link_expediente' => ['nullable', 'url', 'max:2048'],
 
             // --- DATOS FINANCIEROS ---
             'monto_total' => ['required', 'numeric', 'min:0'],

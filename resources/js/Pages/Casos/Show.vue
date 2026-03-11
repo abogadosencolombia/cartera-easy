@@ -1,7 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link, usePage, useRemember } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { Head, Link, usePage, useRemember, router } from '@inertiajs/vue3';
+import { ref, computed, onMounted, watch } from 'vue';
 
 // --- IMPORTAMOS LOS NUEVOS COMPONENTES DE PESTAÑA ---
 import ResumenTab from './Tabs/ResumenTab.vue';
@@ -31,6 +31,25 @@ const props = defineProps({
 const page = usePage();
 const activeTab = useRemember('resumen', 'casoShowTab:' + props.caso.id);
 const user = usePage().props.auth.user;
+
+// --- SINCRONIZACIÓN CON URL ---
+onMounted(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    const validTabs = ['resumen', 'documentos', 'financiero', 'actuaciones', 'actividad'];
+    if (tabParam && validTabs.includes(tabParam)) {
+        activeTab.value = tabParam;
+    }
+});
+
+watch(activeTab, (newTab) => {
+    router.replace(route('casos.show', props.caso.id), {
+        data: { tab: newTab },
+        preserveState: true,
+        preserveScroll: true,
+        replace: true
+    });
+});
 
 // --- Lógica de formato ---
 const parseMoney = (input) => {

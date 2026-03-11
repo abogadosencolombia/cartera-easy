@@ -216,6 +216,7 @@ const formatLabel = (text) => {
                                             <div class="flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
                                                 <span class="font-semibold text-gray-700 dark:text-gray-300">#{{ caso.id }}</span>
                                                 <span v-if="caso.radicado">· Rad: {{ caso.radicado }}</span>
+                                                <span v-else class="text-amber-600 font-bold italic">· Sin Radicado</span>
                                                 <span v-if="caso.clonado_de_id" class="italic text-amber-600 dark:text-amber-400">(Clonado del #{{ caso.clonado_de_id }})</span>
                                             </div>
                                         </div>

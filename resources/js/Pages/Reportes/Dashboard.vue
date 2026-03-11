@@ -33,6 +33,25 @@ const props = defineProps({
 
 const activeTab = ref('estrategico');
 
+// --- SINCRONIZACIÓN CON URL ---
+onMounted(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    const validTabs = ['estrategico', 'cumplimiento'];
+    if (tabParam && validTabs.includes(tabParam)) {
+        activeTab.value = tabParam;
+    }
+});
+
+watch(activeTab, (newTab) => {
+    router.replace(route('reportes.index'), {
+        data: { ...filtroForm.value, tab: newTab },
+        preserveState: true,
+        preserveScroll: true,
+        replace: true
+    });
+});
+
 const isExportMenuOpen = ref(false);
 const exportMenu = ref(null);
 const exportarDatos = (tipo) => {
