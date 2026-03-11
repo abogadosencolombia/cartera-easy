@@ -194,7 +194,9 @@ const checkIncompleta = (p) => {
                   </td>
                   <td class="px-6 py-4">
                     <div class="text-xs font-bold text-gray-500 uppercase">{{ p.tipo_documento }}</div>
-                    <div class="text-sm font-mono text-gray-700 dark:text-gray-300">{{ p.numero_documento }}</div>
+                    <div class="text-sm font-mono text-gray-700 dark:text-gray-300">
+                        {{ p.numero_documento }}<template v-if="p.tipo_documento === 'NIT' && p.dv">-{{ p.dv }}</template>
+                    </div>
                   </td>
                   <td class="px-6 py-4">
                     <div class="flex flex-wrap gap-1 max-w-[200px]">

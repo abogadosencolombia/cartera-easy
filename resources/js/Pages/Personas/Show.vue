@@ -162,7 +162,9 @@ const deleteDocument = (docId) => {
                             <span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-900/30 dark:text-blue-400">
                                 {{ persona.tipo_documento }}
                             </span>
-                            <span class="ml-2 font-mono text-base">{{ persona.numero_documento }}</span>
+                            <span class="ml-2 font-mono text-base">
+                                {{ persona.numero_documento }}<template v-if="persona.tipo_documento === 'NIT' && persona.dv">-{{ persona.dv }}</template>
+                            </span>
                         </dd>
                     </div>
                     <div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">

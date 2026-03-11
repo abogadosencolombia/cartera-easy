@@ -30,6 +30,7 @@ class UpdatePersonaRequest extends FormRequest
                     ->whereNull('deleted_at')
                     ->ignore($personaId)
             ],
+            'dv'                 => 'nullable|string|max:1',
 
             // --- FECHAS ---
             'fecha_expedicion'   => 'nullable|date',

@@ -19,6 +19,7 @@ const form = useForm({
   nombre_completo: '',
   tipo_documento: 'CC',
   numero_documento: '',
+  dv: '',
   fecha_expedicion: '',
   fecha_nacimiento: '',
   telefono_fijo: '',
@@ -151,8 +152,16 @@ const submit = () => {
                     <InputLabel for="numero_documento">
                         Número de Documento <span class="text-red-500">*</span>
                     </InputLabel>
-                    <TextInput v-model="form.numero_documento" id="numero_documento" type="text" class="mt-1 block w-full" required :class="{'border-red-500': form.errors.numero_documento}" />
+                    <div :class="form.tipo_documento === 'NIT' ? 'grid grid-cols-4 gap-2' : ''">
+                        <div :class="form.tipo_documento === 'NIT' ? 'col-span-3' : ''">
+                            <TextInput v-model="form.numero_documento" id="numero_documento" type="text" class="mt-1 block w-full" required :class="{'border-red-500': form.errors.numero_documento}" />
+                        </div>
+                        <div v-if="form.tipo_documento === 'NIT'">
+                            <TextInput v-model="form.dv" id="dv" type="text" class="mt-1 block w-full text-center" maxlength="1" placeholder="DV" :class="{'border-red-500': form.errors.dv}" />
+                        </div>
+                    </div>
                     <InputError :message="form.errors.numero_documento" class="mt-2" />
+                    <InputError :message="form.errors.dv" class="mt-2" />
                   </div>
                   
                   <div>

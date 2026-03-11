@@ -15,7 +15,7 @@ class Persona extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'nombre_completo', 'tipo_documento', 'numero_documento', 'telefono_fijo',
+        'nombre_completo', 'tipo_documento', 'numero_documento', 'dv', 'telefono_fijo',
         'celular_1', 'celular_2', 'correo_1', 'correo_2', 'empresa', 'cargo', 'es_demandado',
         'observaciones', 'social_links', 'addresses', 'fecha_expedicion', 'fecha_nacimiento',
         'direccion', 'ciudad', // ✅ Añadidos campos que faltaban

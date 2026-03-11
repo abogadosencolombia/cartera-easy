@@ -21,6 +21,7 @@ const form = useForm({
   nombre_completo: props.persona.nombre_completo,
   tipo_documento: props.persona.tipo_documento,
   numero_documento: props.persona.numero_documento,
+  dv: props.persona.dv || '',
   fecha_expedicion: props.persona.fecha_expedicion,
   fecha_nacimiento: props.persona.fecha_nacimiento,
   telefono_fijo: props.persona.telefono_fijo,
@@ -110,8 +111,16 @@ const submit = () => form.post(route('personas.update', props.persona.id));
                   </div>
                   <div>
                     <InputLabel for="numero_documento" value="Número de Documento" />
-                    <TextInput v-model="form.numero_documento" id="numero_documento" type="text" class="mt-1 block w-full" required />
+                    <div :class="form.tipo_documento === 'NIT' ? 'grid grid-cols-4 gap-2' : ''">
+                        <div :class="form.tipo_documento === 'NIT' ? 'col-span-3' : ''">
+                            <TextInput v-model="form.numero_documento" id="numero_documento" type="text" class="mt-1 block w-full" required />
+                        </div>
+                        <div v-if="form.tipo_documento === 'NIT'">
+                            <TextInput v-model="form.dv" id="dv" type="text" class="mt-1 block w-full text-center" maxlength="1" placeholder="DV" />
+                        </div>
+                    </div>
                     <InputError :message="form.errors.numero_documento" class="mt-2" />
+                    <InputError :message="form.errors.dv" class="mt-2" />
                   </div>
                   
                   <div>

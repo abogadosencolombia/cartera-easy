@@ -25,6 +25,7 @@ class StorePersonaRequest extends FormRequest
                 'max:255',
                 Rule::unique('personas', 'numero_documento')->whereNull('deleted_at')
             ],
+            'dv'                 => 'nullable|string|max:1',
 
             // --- FECHAS ---
             'fecha_expedicion'   => 'nullable|date',
