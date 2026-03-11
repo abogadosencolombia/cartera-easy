@@ -274,7 +274,6 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                   <div class="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-6">
                       <div><InputLabel value="Radicado" /><TextInput v-model="form.radicado" class="mt-1 block w-full" /></div>
                       <div><InputLabel value="Fecha de Radicado" /><DatePicker v-model="form.fecha_radicado" class="mt-1 block w-full" /></div>
-                      <div><InputLabel value="Fecha de Revisión" /><DatePicker v-model="form.fecha_revision" class="mt-1 block w-full" /></div>
                       <div><InputLabel value="Fecha Próxima Revisión" /><DatePicker v-model="form.fecha_proxima_revision" class="mt-1 block w-full" /></div>
                       <div><InputLabel value="Abogado / Gestor" /><AsyncSelect v-model="form.abogado_id" :endpoint="route('users.search')" placeholder="Asignar gestor..." label-key="name" /></div>
                       <div><InputLabel value="Responsable de Revisión" /><AsyncSelect v-model="form.responsable_revision_id" :endpoint="route('users.search')" placeholder="Asignar responsable..." label-key="name" /></div>

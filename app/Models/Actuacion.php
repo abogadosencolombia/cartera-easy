@@ -49,6 +49,26 @@ class Actuacion extends Model
     ];
 
     /**
+     * Boot del modelo para actualizar la fecha de revisión del proceso padre.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saved(function ($actuacion) {
+            if ($actuacion->actuable instanceof ProcesoRadicado) {
+                $actuacion->actuable->touchRevision();
+            }
+        });
+
+        static::deleted(function ($actuacion) {
+            if ($actuacion->actuable instanceof ProcesoRadicado) {
+                $actuacion->actuable->touchRevision();
+            }
+        });
+    }
+
+    /**
      * Get the parent actuable model (Caso, ProcesoRadicado, Contrato).
      */
     public function actuable(): MorphTo

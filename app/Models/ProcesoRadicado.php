@@ -41,6 +41,30 @@ class ProcesoRadicado extends Model
         'info_incompleta' => 'boolean',
     ];
 
+    /**
+     * Boot del modelo para automatizar tareas.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Al actualizar cualquier campo del radicado, marcamos como revisado HOY
+        static::updating(function ($proceso) {
+            // Solo actualizamos si no se está intentando cambiar la fecha de revisión explícitamente
+            if (!$proceso->isDirty('fecha_revision')) {
+                $proceso->fecha_revision = now();
+            }
+        });
+    }
+
+    /**
+     * Fuerza la actualización de la fecha de revisión al momento actual.
+     */
+    public function touchRevision()
+    {
+        $this->update(['fecha_revision' => now()]);
+    }
+
     // --- RELACIONES ---
 
     public function abogado(): BelongsTo { return $this->belongsTo(User::class, 'abogado_id'); }

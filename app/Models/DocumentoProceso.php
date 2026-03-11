@@ -20,6 +20,22 @@ class DocumentoProceso extends Model
         'file_name',     // nombre mostrado
     ];
 
+    /**
+     * Boot del modelo para actualizar la fecha de revisión del proceso padre.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::created(function ($documento) {
+            $documento->proceso?->touchRevision();
+        });
+
+        static::deleted(function ($documento) {
+            $documento->proceso?->touchRevision();
+        });
+    }
+
     public function proceso(): BelongsTo
     {
         return $this->belongsTo(ProcesoRadicado::class, 'proceso_radicado_id');
