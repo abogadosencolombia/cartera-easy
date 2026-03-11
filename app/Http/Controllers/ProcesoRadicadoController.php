@@ -23,9 +23,42 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
+use App\Notifications\ProcesoRevisionNotification;
+use Illuminate\Support\Facades\Notification;
+
 class ProcesoRadicadoController extends Controller
 {
     use RegistraRevisionTrait, AuthorizesRequests;
+
+    /**
+     * Helper para notificar revisión si es hoy o pasado.
+     */
+    private function notificarRevisionInmediata(ProcesoRadicado $proceso)
+    {
+        if (!$proceso->fecha_proxima_revision) return;
+
+        $fecha = Carbon::parse($proceso->fecha_proxima_revision);
+        $hoy = Carbon::today();
+        $tipoAlerta = null;
+
+        if ($fecha->isSameDay($hoy)) {
+            $tipoAlerta = 'hoy';
+        } elseif ($fecha->isPast()) {
+            $tipoAlerta = 'vencida';
+        }
+
+        if ($tipoAlerta) {
+            $destinatarios = collect();
+            if ($proceso->abogado_id) $destinatarios->push(User::find($proceso->abogado_id));
+            if ($proceso->responsable_revision_id) $destinatarios->push(User::find($proceso->responsable_revision_id));
+            
+            $destinatarios = $destinatarios->filter()->unique('id');
+
+            if ($destinatarios->isNotEmpty()) {
+                Notification::send($destinatarios, new ProcesoRevisionNotification($proceso, $tipoAlerta));
+            }
+        }
+    }
 
     /**
      * Lista de procesos con filtros y paginación.
@@ -166,6 +199,9 @@ class ProcesoRadicadoController extends Controller
                     'user_agent' => request()->userAgent(),
                 ]);
             });
+
+            // Notificación inmediata si aplica
+            $this->notificarRevisionInmediata($proceso);
         } catch (\Exception $e) {
             \Log::error("Error al crear radicado: " . $e->getMessage(), [
                 'exception' => $e,
@@ -266,6 +302,9 @@ class ProcesoRadicadoController extends Controller
                 $proceso->demandantes()->syncWithPivotValues($resDte['ids'], ['tipo' => 'DEMANDANTE']);
                 $proceso->demandados()->syncWithPivotValues($resDdo['ids'], ['tipo' => 'DEMANDADO']);
             });
+
+            // Notificación inmediata si aplica
+            $this->notificarRevisionInmediata($proceso);
         } catch (\Exception $e) {
             \Log::error("Error al actualizar radicado: " . $e->getMessage(), [
                 'exception' => $e,

@@ -13,6 +13,9 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\AlertaSistemaMailable;
 
+use App\Notifications\ProcesoRevisionNotification;
+use Illuminate\Support\Facades\Notification;
+
 class GenerarAlertasCron extends Command
 {
     protected $signature = 'alertas:procesar-vencimientos';
@@ -28,9 +31,9 @@ class GenerarAlertasCron extends Command
         // 1. REVISIÓN DE PROCESOS JUDICIALES
         // ------------------------------------------
         $this->info("1. Analizando Procesos Judiciales...");
-        $procesos = ProcesoRadicado::where('estado', '!=', 'Terminado') 
+        $procesos = ProcesoRadicado::where('estado', '!=', 'CERRADO') 
             ->whereNotNull('fecha_proxima_revision')
-            ->with(['abogado', 'responsable'])
+            ->with(['abogado', 'responsableRevision'])
             ->get();
 
         $countProcesos = 0;
@@ -40,23 +43,28 @@ class GenerarAlertasCron extends Command
         foreach ($procesos as $proceso) {
             $fecha = Carbon::parse($proceso->fecha_proxima_revision);
             $hoy = Carbon::today();
-            $mensaje = null;
-            $titulo = "";
+            $tipoAlerta = null;
 
             if ($fecha->diffInDays($hoy) == 2 && $fecha->isFuture()) {
-                $titulo = "Próxima Revisión";
-                $mensaje = "⏳ El proceso {$proceso->radicado} requiere revisión el " . $fecha->format('d/m/Y');
+                $tipoAlerta = 'proxima';
             } elseif ($fecha->isSameDay($hoy)) {
-                $titulo = "Revisión para HOY";
-                $mensaje = "⚖️ ATENCIÓN: Hoy debes revisar el proceso {$proceso->radicado} inmediatamente.";
+                $tipoAlerta = 'hoy';
             } elseif ($fecha->isPast()) {
-                $titulo = "Revisión VENCIDA";
-                $mensaje = "⚠️ URGENTE: La revisión del proceso {$proceso->radicado} está atrasada desde el " . $fecha->format('d/m/Y');
+                $tipoAlerta = 'vencida';
             }
 
-            if ($mensaje) {
-                $enviado = $this->createSystemNotification($proceso, $admins, $mensaje, $titulo);
-                if ($enviado) $countProcesos++;
+            if ($tipoAlerta) {
+                // Notificar a abogado y responsable
+                $destinatarios = collect();
+                if ($proceso->abogado) $destinatarios->push($proceso->abogado);
+                if ($proceso->responsableRevision) $destinatarios->push($proceso->responsableRevision);
+                
+                $destinatarios = $destinatarios->unique('id');
+
+                if ($destinatarios->isNotEmpty()) {
+                    Notification::send($destinatarios, new ProcesoRevisionNotification($proceso, $tipoAlerta));
+                    $countProcesos++;
+                }
             }
             $bar->advance();
         }
