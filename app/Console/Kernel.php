@@ -26,16 +26,15 @@ class Kernel extends ConsoleKernel
 
         // --- TAREA DE NOTIFICACIONES ---
         $schedule->command('alertas:procesar-vencimientos')
-                 ->dailyAt('08:00')
-                 ->timezone('America/Bogota') // <--- LA SOLUCIÓN: Hora de Colombia
-                 ->name('generar_alertas_juridicas_financieras');
+                  ->dailyAt('08:00')
+                  ->timezone('America/Bogota') // <--- LA SOLUCIÓN: Hora de Colombia
+                  ->name('generar_alertas_juridicas_financieras');
 
-        // NUEVA GESTIÓN DIARIA: Procesar alertas de 8 horas
+        // NUEVA GESTIÓN DIARIA: Procesar alertas cada 15 minutos
         $schedule->command('gestion:procesar-alertas')
-                 ->everyFifteenMinutes()
-                 ->timezone('America/Bogota')
-                 ->name('procesar_alertas_gestion_diaria');
-    }
+                  ->everyFifteenMinutes()
+                  ->timezone('America/Bogota')
+                  ->name('procesar_alertas_gestion_diaria');    }
 
     /**
      * Register the commands for the application.

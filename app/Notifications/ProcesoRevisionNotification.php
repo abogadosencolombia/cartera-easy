@@ -8,9 +8,9 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use App\Models\ProcesoRadicado;
 
-class ProcesoRevisionNotification extends Notification implements ShouldQueue
+class ProcesoRevisionNotification extends Notification
 {
-    use Queueable;
+    // use Queueable;
 
     protected $proceso;
     protected $tipo; // 'hoy', 'vencida', 'proxima'

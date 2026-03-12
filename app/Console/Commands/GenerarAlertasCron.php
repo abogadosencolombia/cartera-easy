@@ -91,6 +91,8 @@ class GenerarAlertasCron extends Command
                         if (!$yaNotificado) {
                             Notification::send($destinatarios, new ProcesoRevisionNotification($proceso, $tipoAlerta));
                             $countProcesos++;
+                            // Pausa para evitar rate-limit de Hostinger (0.5 segundos)
+                            usleep(500000);
                         }
                     }
                 }
@@ -149,13 +151,21 @@ class GenerarAlertasCron extends Command
 
                 if ($mensajePago) {
                     $enviado = $this->crearNotificacionPago($cuota, $admins, 'mora', $mensajePago, $tituloPago);
-                    if ($enviado) $countPagos++;
+                    if ($enviado) {
+                        $countPagos++;
+                        // Pausa de seguridad para correos de pagos (0.5s)
+                        usleep(500000);
+                    }
                 }
             }
             $this->info("Pagos gestionados y notificados: {$countPagos}");
         } else {
             $this->warn("No se encontró el modelo ContratoCuota.");
         }
+
+        // --- NUEVO: También procesamos la Hoja de Ruta Diaria ---
+        $this->info("3. Analizando Hoja de Ruta Diaria...");
+        $this->call('gestion:procesar-alertas', [], $this->getOutput());
 
         $this->info('--> Ejecución finalizada exitosamente.');
     }
