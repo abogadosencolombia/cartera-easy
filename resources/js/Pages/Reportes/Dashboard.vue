@@ -34,6 +34,17 @@ const props = defineProps({
 const activeTab = ref('estrategico');
 
 // --- SINCRONIZACIÓN CON URL ---
+const setActiveTab = (tab) => {
+    activeTab.value = tab;
+    const url = new URL(window.location);
+    url.searchParams.set('tab', tab);
+    window.history.replaceState({}, '', url);
+    
+    if (tab === 'estrategico') {
+        setTimeout(() => renderCharts(), 50);
+    }
+};
+
 onMounted(() => {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get('tab');
@@ -41,15 +52,7 @@ onMounted(() => {
     if (tabParam && validTabs.includes(tabParam)) {
         activeTab.value = tabParam;
     }
-});
-
-watch(activeTab, (newTab) => {
-    router.replace(route('reportes.index'), {
-        data: { ...filtroForm.value, tab: newTab },
-        preserveState: true,
-        preserveScroll: true,
-        replace: true
-    });
+    if (activeTab.value === 'estrategico') renderCharts();
 });
 
 const isExportMenuOpen = ref(false);
@@ -175,10 +178,6 @@ const renderCharts = () => {
 
 onMounted(() => { if (activeTab.value === 'estrategico') renderCharts(); });
 
-watch(activeTab, (newTab) => {
-    if (newTab === 'estrategico') setTimeout(() => renderCharts(), 0);
-});
-
 watch(() => props.graficas, () => {
     if (activeTab.value === 'estrategico') setTimeout(() => renderCharts(), 0);
 }, { deep: true });
@@ -256,11 +255,11 @@ const formatDateForCompliance = (dateString) => {
                 <!-- Pestañas -->
                 <div class="mb-2 border-b border-gray-200 dark:border-gray-700">
                     <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                        <button @click="activeTab = 'estrategico'"
+                        <button @click="setActiveTab('estrategico')"
                             :class="[activeTab === 'estrategico' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300', 'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm']">
                             Reporte Estratégico
                         </button>
-                        <button @click="activeTab = 'cumplimiento'"
+                        <button @click="setActiveTab('cumplimiento')"
                             :class="[activeTab === 'cumplimiento' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300', 'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm']">
                             Reporte de Cumplimiento
                         </button>

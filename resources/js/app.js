@@ -23,10 +23,10 @@ import { createInertiaApp, Link, Head } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy/dist/vue.m.js';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = import.meta.env.VITE_APP_NAME || window.document.getElementsByTagName('title')[0]?.innerText || 'Cobro Cartera';
 
 createInertiaApp({
-    title: (title) => `${title} - ${appName}`,
+    title: (title) => title ? `${title} - ${appName}` : appName,
     
     // --- ESTA ES LA LÍNEA ORIGINAL Y CORRECTA ---
     // Le dice a Inertia que busque SÓLO en la carpeta ./Pages/

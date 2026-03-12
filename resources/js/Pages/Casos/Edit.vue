@@ -38,14 +38,12 @@ const activeTab = ref(getInitialTab());
 const user = usePage().props.auth.user;
 
 // --- SINCRONIZACIÓN CON URL ---
-watch(activeTab, (newTab) => {
-    router.replace(route('casos.edit', props.caso.id), {
-        data: { tab: newTab },
-        preserveState: true,
-        preserveScroll: true,
-        replace: true
-    });
-});
+const setActiveTab = (tab) => {
+    activeTab.value = tab;
+    const url = new URL(window.location);
+    url.searchParams.set('tab', tab);
+    window.history.replaceState({}, '', url);
+};
 
 // --- LÓGICA DE CIERRE/REAPERTURA ---
 const showCloseModal = ref(false);
@@ -180,10 +178,10 @@ const submit = () => {
                 <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg overflow-visible">
                     <div class="border-b border-gray-200 dark:border-gray-700">
                         <nav class="-mb-px flex space-x-6 px-6 overflow-x-auto">
-                            <button @click="activeTab = 'info-principal'" :class="[activeTab === 'info-principal' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500']" class="py-4 px-1 border-b-2 font-medium text-sm flex items-center"><InformationCircleIcon class="h-5 w-5 mr-2"/> Info Principal</button>
-                            <button @click="activeTab = 'proceso-judicial'" :class="[activeTab === 'proceso-judicial' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500']" class="py-4 px-1 border-b-2 font-medium text-sm flex items-center"><ScaleIcon class="h-5 w-5 mr-2"/> Proceso Judicial</button>
-                            <button @click="activeTab = 'codeudores'" :class="[activeTab === 'codeudores' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500']" class="py-4 px-1 border-b-2 font-medium text-sm flex items-center"><UsersIcon class="h-5 w-5 mr-2"/> Codeudores</button>
-                            <button @click="activeTab = 'control-notas'" :class="[activeTab === 'control-notas' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500']" class="py-4 px-1 border-b-2 font-medium text-sm flex items-center"><LockClosedIcon class="h-5 w-5 mr-2"/> Control y Notas</button>
+                            <button @click="setActiveTab('info-principal')" :class="[activeTab === 'info-principal' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500']" class="py-4 px-1 border-b-2 font-medium text-sm flex items-center"><InformationCircleIcon class="h-5 w-5 mr-2"/> Info Principal</button>
+                            <button @click="setActiveTab('proceso-judicial')" :class="[activeTab === 'proceso-judicial' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500']" class="py-4 px-1 border-b-2 font-medium text-sm flex items-center"><ScaleIcon class="h-5 w-5 mr-2"/> Proceso Judicial</button>
+                            <button @click="setActiveTab('codeudores')" :class="[activeTab === 'codeudores' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500']" class="py-4 px-1 border-b-2 font-medium text-sm flex items-center"><UsersIcon class="h-5 w-5 mr-2"/> Codeudores</button>
+                            <button @click="setActiveTab('control-notas')" :class="[activeTab === 'control-notas' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500']" class="py-4 px-1 border-b-2 font-medium text-sm flex items-center"><LockClosedIcon class="h-5 w-5 mr-2"/> Control y Notas</button>
                         </nav>
                     </div>
 

@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, nextTick, onMounted, watch } from 'vue';
-import { Head, Link, useForm, usePage, router } from '@inertiajs/vue3';
+import { ref, computed, nextTick, onMounted } from 'vue';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 
 // Importación de todos los componentes necesarios

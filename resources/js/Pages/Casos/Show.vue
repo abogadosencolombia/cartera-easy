@@ -41,14 +41,12 @@ const activeTab = ref(getInitialTab());
 const user = usePage().props.auth.user;
 
 // --- SINCRONIZACIÓN CON URL ---
-watch(activeTab, (newTab) => {
-    router.replace(route('casos.show', props.caso.id), {
-        data: { tab: newTab },
-        preserveState: true,
-        preserveScroll: true,
-        replace: true
-    });
-});
+const setActiveTab = (tab) => {
+    activeTab.value = tab;
+    const url = new URL(window.location);
+    url.searchParams.set('tab', tab);
+    window.history.replaceState({}, '', url);
+};
 
 // --- Lógica de formato ---
 const parseMoney = (input) => {
@@ -275,7 +273,7 @@ const montoParaContrato = computed(() => {
                     <div class="border-b border-gray-200 dark:border-gray-700">
                         <nav class="-mb-px flex space-x-6 overflow-x-auto px-6" aria-label="Tabs">
                             <button
-                                @click="activeTab = 'resumen'"
+                                @click="setActiveTab('resumen')"
                                 :class="[
                                     activeTab === 'resumen'
                                         ? 'border-indigo-500 text-indigo-600'
@@ -286,7 +284,7 @@ const montoParaContrato = computed(() => {
                                 <InformationCircleIcon class="h-5 w-5 mr-2" /> Resumen
                             </button>
                             <button
-                                @click="activeTab = 'documentos'"
+                                @click="setActiveTab('documentos')"
                                 :class="[
                                     activeTab === 'documentos'
                                         ? 'border-indigo-500 text-indigo-600'
@@ -297,7 +295,7 @@ const montoParaContrato = computed(() => {
                                 <FolderOpenIcon class="h-5 w-5 mr-2" /> Documentos
                             </button>
                             <button
-                                @click="activeTab = 'financiero'"
+                                @click="setActiveTab('financiero')"
                                 :class="[
                                     activeTab === 'financiero'
                                         ? 'border-indigo-500 text-indigo-600'
@@ -308,7 +306,7 @@ const montoParaContrato = computed(() => {
                                 <CreditCardIcon class="h-5 w-5 mr-2" /> Financiero
                             </button>
                             <button
-                                @click="activeTab = 'actuaciones'"
+                                @click="setActiveTab('actuaciones')"
                                 :class="[
                                     activeTab === 'actuaciones'
                                         ? 'border-indigo-500 text-indigo-600'
@@ -319,7 +317,7 @@ const montoParaContrato = computed(() => {
                                 <ClipboardDocumentListIcon class="h-5 w-5 mr-2" /> Actuaciones
                             </button>
                             <button
-                                @click="activeTab = 'actividad'"
+                                @click="setActiveTab('actividad')"
                                 :class="[
                                     activeTab === 'actividad'
                                         ? 'border-indigo-500 text-indigo-600'

@@ -488,7 +488,10 @@ const contractStatusClasses = {
 // --- Lógica de Pestañas (Tabs) ---
 const pestanaActiva = ref('cuotas') 
 const cambiarPestana = (nuevaPestana) => {
-    pestanaActiva.value = nuevaPestana
+    pestanaActiva.value = nuevaPestana;
+    const url = new URL(window.location);
+    url.searchParams.set('tab', nuevaPestana);
+    window.history.replaceState({}, '', url);
 }
 
 onMounted(() => {
@@ -499,7 +502,6 @@ onMounted(() => {
     if (tabParam && validTabs.includes(tabParam)) {
         pestanaActiva.value = tabParam;
     } else {
-        // Lógica por defecto si no hay tab en URL
         if (props.actuaciones.length > 0 && props.cuotas.data.length === 0 && props.cargos.data.length === 0) {
             pestanaActiva.value = 'actuaciones';
         } else {
@@ -507,15 +509,6 @@ onMounted(() => {
         }
     }
 })
-
-watch(pestanaActiva, (newTab) => {
-    router.replace(route('honorarios.contratos.show', props.contrato.id), {
-        data: { tab: newTab },
-        preserveState: true,
-        preserveScroll: true,
-        replace: true
-    });
-});
 
 // --- Lógica de Paginación ---
 const withTab = (url) => { if (!url) return null; try { const u = new URL(url, window.location.origin); u.searchParams.set('tab', pestanaActiva.value); return u.toString() } catch { return url } }
