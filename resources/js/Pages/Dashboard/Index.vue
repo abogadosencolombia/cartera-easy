@@ -329,7 +329,7 @@ const lineData = computed(() => {
                         <!-- Ranking Gestores -->
                         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col" :class="isMounted ? 'animate-in' : 'opacity-0'" style="animation-delay: 500ms">
                             <h3 class="font-semibold text-blue-500 dark:text-white mb-4 flex items-center">
-                                <TrophyIcon class="w-5 h-5 text-amber-400 mr-2"/> Top Gestores
+                                <TrophyIcon class="w-5 h-5 text-amber-400 mr-2"/> Top Usuarios
                             </h3>
                             <div class="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
                                 <div v-for="(gestor, idx) in ranking" :key="gestor.id" class="flex items-center p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">

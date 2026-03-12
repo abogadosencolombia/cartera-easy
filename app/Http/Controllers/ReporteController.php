@@ -148,29 +148,43 @@ class ReporteController extends Controller
             ->get();
         
         // --- RANKING DE ABOGADOS ---
+        $fechaDesde = $request->input('fecha_desde', Carbon::now()->subYear()->format('Y-m-d'));
+        $fechaHasta = $request->input('fecha_hasta', Carbon::now()->format('Y-m-d'));
+
+        // 1. Obtener base de abogados y gestores
         $rankingAbogados = User::whereIn('tipo_usuario', ['abogado', 'gestor'])
             ->withCount(['casos as casos_count' => fn($q) => $q->whereIn('casos.id', $casosIds)])
             ->get();
 
-        $pagosSumaCasos = (clone $pagosCasoQuery)
+        // 2. Sumar pagos registrados en Casos (Atribuidos al usuario que registró el pago si existe, o al dueño del caso)
+        $pagosSumaCasos = DB::table('pagos_caso')
+            ->whereIn('caso_id', $casosIds)
+            ->whereBetween('fecha_pago', [$fechaDesde, $fechaHasta])
+            ->select('user_id', DB::raw('SUM(monto_pagado) as total'))
             ->groupBy('user_id')
-            ->select('user_id', DB::raw('SUM(monto_pagado) as total_pagado'))
-            ->pluck('total_pagado', 'user_id');
+            ->pluck('total', 'user_id');
 
-        $pagosSumaContratos = (clone $pagosContratoQuery)
+        // 3. Sumar pagos registrados en Contratos (Atribuidos al dueño del caso vinculado al contrato)
+        $pagosSumaContratos = DB::table('contrato_pagos')
             ->join('contratos', 'contrato_pagos.contrato_id', '=', 'contratos.id')
             ->join('casos', 'contratos.caso_id', '=', 'casos.id')
+            ->whereIn('casos.id', $casosIds)
+            ->whereBetween('contrato_pagos.fecha', [$fechaDesde, $fechaHasta])
+            ->select('casos.user_id', DB::raw('SUM(contrato_pagos.valor) as total'))
             ->groupBy('casos.user_id')
-            ->select('casos.user_id', DB::raw('SUM(contrato_pagos.valor) as total_pagado'))
-            ->pluck('total_pagado', 'casos.user_id');
+            ->pluck('total', 'casos.user_id');
 
+        // 4. Integrar resultados en la colección de abogados
         $rankingAbogados->each(function ($user) use ($pagosSumaCasos, $pagosSumaContratos) {
-            $totalCasos = $pagosSumaCasos->get($user->id, 0);
-            $totalContratos = $pagosSumaContratos->get($user->id, 0);
+            $totalCasos = (float) $pagosSumaCasos->get($user->id, 0);
+            $totalContratos = (float) $pagosSumaContratos->get($user->id, 0);
             $user->pagos_sum_monto_pagado = $totalCasos + $totalContratos;
         });
 
-        $rankingAbogados = $rankingAbogados->sortByDesc('pagos_sum_monto_pagado')->take(10)->values();
+        // 5. Ordenar y limitar
+        $rankingAbogados = $rankingAbogados->sortByDesc('pagos_sum_monto_pagado')
+            ->take(10)
+            ->values();
 
         // --- DATOS COMPLEMENTARIOS ---
         $cooperativas = ($user->tipo_usuario === 'admin') ? Cooperativa::all(['id', 'nombre']) : $user->cooperativas;
