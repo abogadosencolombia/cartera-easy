@@ -20,6 +20,13 @@ const props = defineProps({
   etapas: { type: Array, required: true },
 });
 
+const searchEtapa = ref('');
+const filteredEtapas = computed(() => {
+    return props.etapas.filter(e => 
+        e.nombre.toLowerCase().includes(searchEtapa.value.toLowerCase())
+    );
+});
+
 const showCloseModal = ref(false);
 const closeForm = useForm({ nota_cierre: '' });
 
@@ -277,7 +284,17 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                       <InputLabel value="Etapa Procesal" />
                       <Dropdown align="left" width="full">
                           <template #trigger><button type="button" class="mt-1 flex w-full justify-between items-center border border-gray-300 dark:border-gray-700 rounded-md p-2 text-sm dark:bg-gray-900"><span>{{ form.etapa_procesal_id ? etapas.find(e => e.id === form.etapa_procesal_id)?.nombre : 'Seleccione etapa...' }}</span><ChevronDownIcon class="h-4 w-4 text-gray-400" /></button></template>
-                          <template #content><div class="py-1 bg-white dark:bg-gray-800 max-h-60 overflow-y-auto"><button type="button" v-for="e in etapas" :key="e.id" @click="form.etapa_procesal_id = e.id" class="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">{{ e.nombre }}</button></div></template>
+                          <template #content>
+                              <div class="p-2 border-b border-gray-100 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
+                                  <TextInput v-model="searchEtapa" placeholder="Buscar etapa..." class="w-full text-xs" @click.stop />
+                              </div>
+                              <div class="py-1 bg-white dark:bg-gray-800 max-h-60 overflow-y-auto">
+                                  <button type="button" v-for="e in filteredEtapas" :key="e.id" @click="form.etapa_procesal_id = e.id" class="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
+                                      {{ e.nombre }}
+                                  </button>
+                                  <div v-if="filteredEtapas.length === 0" class="p-4 text-xs text-gray-500 text-center">No hay resultados</div>
+                              </div>
+                          </template>
                       </Dropdown>
                   </div>
 

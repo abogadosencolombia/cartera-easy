@@ -23,6 +23,13 @@ const props = defineProps({
 
 const { formatDate, getRevisionStatus } = useProcesos();
 
+const searchEtapa = ref('');
+const filteredEtapas = computed(() => {
+    return props.etapas.filter(e => 
+        e.nombre.toLowerCase().includes(searchEtapa.value.toLowerCase())
+    );
+});
+
 // --- Helpers Fecha ---
 const fmtDateTime = (d) => d ? new Date(String(d).replace(' ', 'T')).toLocaleString('es-CO', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : 'N/A';
 const fmtDateSimple = (d) => d ? new Date(String(d).replace(' ', 'T')).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
@@ -415,10 +422,14 @@ const eliminarActuacion = (actuacionId) => {
                         </button>
                     </template>
                     <template #content>
+                        <div class="p-2 border-b border-gray-100 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
+                            <TextInput v-model="searchEtapa" placeholder="Buscar etapa..." class="w-full text-xs" @click.stop />
+                        </div>
                         <div class="py-1 bg-white dark:bg-gray-800 max-h-60 overflow-y-auto">
-                            <button v-for="etapa in etapas" :key="etapa.id" @click="etapaForm.etapa_procesal_id = etapa.id" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': etapaForm.etapa_procesal_id === etapa.id }">
+                            <button v-for="etapa in filteredEtapas" :key="etapa.id" @click="etapaForm.etapa_procesal_id = etapa.id" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold': etapaForm.etapa_procesal_id === etapa.id }">
                                 {{ etapa.nombre }} <span class="text-[10px] opacity-60">({{ etapa.riesgo }})</span>
                             </button>
+                            <div v-if="filteredEtapas.length === 0" class="p-4 text-xs text-gray-500 text-center">No hay resultados</div>
                         </div>
                     </template>
                 </Dropdown>

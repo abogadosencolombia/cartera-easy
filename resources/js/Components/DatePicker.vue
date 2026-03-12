@@ -143,6 +143,73 @@ const isToday = (date) => {
     return date.toDateString() === new Date().toDateString();
 };
 
+// --- LÓGICA DE FESTIVOS COLOMBIANOS ---
+const getEaster = (year) => {
+    const a = year % 19, b = Math.floor(year / 100), c = year % 100,
+          d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25),
+          g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30,
+          i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7,
+          m = Math.floor((a + 11 * h + 22 * l) / 451),
+          month = Math.floor((h + l - 7 * m + 114) / 31),
+          day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(year, month - 1, day);
+};
+
+const movetoMonday = (date) => {
+    const day = date.getDay();
+    if (day === 1) return date; // Ya es lunes
+    const diff = day === 0 ? 1 : 8 - day;
+    const result = new Date(date);
+    result.setDate(date.getDate() + diff);
+    return result;
+};
+
+const holidays = computed(() => {
+    const year = currentYear.value;
+    const easter = getEaster(year);
+    const list = {};
+
+    const add = (date, name, emiliani = false) => {
+        const finalDate = emiliani ? movetoMonday(date) : date;
+        list[finalDate.toDateString()] = name;
+    };
+
+    // Fijos
+    add(new Date(year, 0, 1), 'Año Nuevo');
+    add(new Date(year, 4, 1), 'Día del Trabajo');
+    add(new Date(year, 6, 20), 'Grito de Independencia');
+    add(new Date(year, 7, 7), 'Batalla de Boyacá');
+    add(new Date(year, 11, 8), 'Inmaculada Concepción');
+    add(new Date(year, 11, 25), 'Navidad');
+
+    // Emiliani (Se mueven al lunes)
+    add(new Date(year, 0, 6), 'Reyes Magos', true);
+    add(new Date(year, 2, 19), 'San José', true);
+    add(new Date(year, 5, 29), 'San Pedro y San Pablo', true);
+    add(new Date(year, 7, 15), 'Asunción de la Virgen', true);
+    add(new Date(year, 9, 12), 'Día de la Raza', true);
+    add(new Date(year, 10, 1), 'Todos los Santos', true);
+    add(new Date(year, 10, 11), 'Independencia de Cartagena', true);
+
+    // Basados en Pascua
+    const juevesSanto = new Date(easter); juevesSanto.setDate(easter.getDate() - 3);
+    const viernesSanto = new Date(easter); viernesSanto.setDate(easter.getDate() - 2);
+    add(juevesSanto, 'Jueves Santo');
+    add(viernesSanto, 'Viernes Santo');
+
+    const ascension = new Date(easter); ascension.setDate(easter.getDate() + 43);
+    const corpus = new Date(easter); corpus.setDate(easter.getDate() + 64);
+    const sagrado = new Date(easter); sagrado.setDate(easter.getDate() + 71);
+    
+    add(ascension, 'Ascensión del Señor', true);
+    add(corpus, 'Corpus Christi', true);
+    add(sagrado, 'Sagrado Corazón', true);
+
+    return list;
+});
+
+const getHolidayName = (date) => holidays.value[date.toDateString()] || null;
+
 const displayValue = computed(() => {
     if (!selectedDate.value) return '';
     return selectedDate.value.toLocaleDateString('es-CO', {
@@ -273,14 +340,17 @@ const displayValue = computed(() => {
                                 :key="idx"
                                 @click="selectDate(item.date, close)"
                                 type="button"
+                                :title="getHolidayName(item.date)"
                                 class="h-8 w-8 flex items-center justify-center rounded-lg text-xs transition-all relative"
                                 :class="[
                                     item.currentMonth ? 'text-gray-700 dark:text-gray-200' : 'text-gray-300 dark:text-gray-600 opacity-50',
                                     isSelected(item.date) ? 'bg-indigo-600 text-white font-bold scale-105 shadow-md' : 'hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400',
-                                    isToday(item.date) && !isSelected(item.date) ? 'text-indigo-600 dark:text-indigo-400 font-bold ring-1 ring-inset ring-indigo-200 dark:ring-indigo-800' : ''
+                                    isToday(item.date) && !isSelected(item.date) ? 'text-indigo-600 dark:text-indigo-400 font-bold ring-1 ring-inset ring-indigo-200 dark:ring-indigo-800' : '',
+                                    getHolidayName(item.date) && !isSelected(item.date) ? 'text-red-600 dark:text-red-400 font-bold bg-red-50 dark:bg-red-900/20' : ''
                                 ]"
                             >
                                 {{ item.date.getDate() }}
+                                <div v-if="getHolidayName(item.date) && !isSelected(item.date)" class="absolute bottom-1 w-1 h-1 bg-red-400 rounded-full"></div>
                             </button>
                         </div>
                     </div>

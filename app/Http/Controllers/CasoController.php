@@ -44,9 +44,16 @@ class CasoController extends Controller
             // Admin ve todo
         } elseif (in_array($user->tipo_usuario, ['gestor', 'abogado'])) {
             $query->where(function($q) use ($user) {
-                // Estrictamente Casos de sus cooperativas asignadas
                 $cooperativaIds = $user->cooperativas->pluck('id');
-                $q->whereIn('cooperativa_id', $cooperativaIds);
+                
+                // Ve casos de sus cooperativas
+                $q->whereIn('cooperativa_id', $cooperativaIds)
+                  // O casos donde es el abogado principal
+                  ->orWhere('user_id', $user->id)
+                  // O casos donde está asignado en la relación múltiple
+                  ->orWhereHas('users', function($uq) use ($user) {
+                      $uq->where('users.id', $user->id);
+                  });
             });
         } elseif ($user->tipo_usuario === 'cliente') {
             $query->where('deudor_id', $user->persona_id);

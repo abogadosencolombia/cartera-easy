@@ -34,17 +34,12 @@ onMounted(() => {
     }
 });
 
-watch(activeTab, (newTab) => {
-    router.replace(route('profile.edit'), {
-        data: { tab: newTab },
-        preserveState: true,
-        preserveScroll: true,
-        replace: true
-    });
-});
-
 const setActiveTab = (tab) => {
     activeTab.value = tab;
+    // Actualizar URL sin recargar la página ni disparar visitas de Inertia innecesarias
+    const url = new URL(window.location);
+    url.searchParams.set('tab', tab);
+    window.history.replaceState({}, '', url);
 };
 
 // --- LÓGICA PARA INFORMACIÓN DEL PERFIL ---
