@@ -154,11 +154,14 @@ class CasoController extends Controller
         try {
             DB::transaction(function () use ($validated, $datosDeudor, $datosCodeudores, $userIds, $request, &$caso) {
                 // 1. Manejo del Deudor Híbrido
-                if ($datosDeudor['is_new']) {
+                if (!empty($datosDeudor['is_new'])) {
+                    if (empty($datosDeudor['numero_documento'])) {
+                        throw new \Exception("El número de documento es obligatorio para crear un nuevo deudor.");
+                    }
                     $deudor = Persona::withTrashed()->updateOrCreate(
-                        ['numero_documento' => $datosDeudor['numero_documento']],
+                        ['numero_documento' => trim($datosDeudor['numero_documento'])],
                         [
-                            'nombre_completo' => $datosDeudor['nombre_completo'],
+                            'nombre_completo' => trim($datosDeudor['nombre_completo']),
                             'tipo_documento' => $datosDeudor['tipo_documento'],
                             'dv' => $datosDeudor['dv'] ?? null,
                             'celular_1' => $datosDeudor['celular_1'] ?? null,
@@ -166,9 +169,10 @@ class CasoController extends Controller
                             'deleted_at' => null,
                         ]
                     );
-                    if (!empty($datosDeudor['cooperativas_ids'])) $deudor->cooperativas()->sync($datosDeudor['cooperativas_ids']);
-                    if (!empty($datosDeudor['abogados_ids'])) $deudor->abogados()->sync($datosDeudor['abogados_ids']);
                     $validated['deudor_id'] = $deudor->id;
+                } elseif (!empty($datosDeudor['id'])) {
+                    // Si no es nuevo, simplemente nos aseguramos de que el ID sea el correcto
+                    $validated['deudor_id'] = $datosDeudor['id'];
                 }
 
                 // 2. Crear Caso (usamos el primer abogado para la columna legacy user_id)
@@ -291,11 +295,14 @@ class CasoController extends Controller
 
         try {
             DB::transaction(function () use ($caso, $validated, $datosDeudor, $datosCodeudores, $userIds) {
-                if ($datosDeudor['is_new']) {
+                if (!empty($datosDeudor['is_new'])) {
+                    if (empty($datosDeudor['numero_documento'])) {
+                        throw new \Exception("El número de documento es obligatorio para crear/actualizar el deudor.");
+                    }
                     $deudor = Persona::withTrashed()->updateOrCreate(
-                        ['numero_documento' => $datosDeudor['numero_documento']],
+                        ['numero_documento' => trim($datosDeudor['numero_documento'])],
                         [
-                            'nombre_completo' => $datosDeudor['nombre_completo'],
+                            'nombre_completo' => trim($datosDeudor['nombre_completo']),
                             'tipo_documento' => $datosDeudor['tipo_documento'],
                             'dv' => $datosDeudor['dv'] ?? null,
                             'celular_1' => $datosDeudor['celular_1'] ?? null,
@@ -304,6 +311,8 @@ class CasoController extends Controller
                         ]
                     );
                     $validated['deudor_id'] = $deudor->id;
+                } elseif (!empty($datosDeudor['id'])) {
+                    $validated['deudor_id'] = $datosDeudor['id'];
                 }
                 
                 $original = $caso->getRawOriginal();
@@ -413,8 +422,11 @@ class CasoController extends Controller
     {
         $ids = [];
         foreach ($datosCodeudores as $d) {
-            $c = Codeudor::updateOrCreate(['numero_documento' => $d['numero_documento']], [
-                'nombre_completo' => $d['nombre_completo'],
+            $numDoc = trim($d['numero_documento'] ?? '');
+            if (empty($numDoc)) continue;
+
+            $c = Codeudor::updateOrCreate(['numero_documento' => $numDoc], [
+                'nombre_completo' => trim($d['nombre_completo'] ?? 'SIN NOMBRE'),
                 'tipo_documento' => $d['tipo_documento'] ?? 'CC',
                 'dv' => $d['dv'] ?? null,
                 'celular' => $d['celular'] ?? null,

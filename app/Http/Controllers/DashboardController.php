@@ -47,14 +47,14 @@ class DashboardController extends Controller
     {
         $cfg = config('cartera', []);
         
-        $T_PAGOS_CASO = $cfg['recoveries_table'] ?? 'pago_casos';
-        $Col_MONTO_CASO = $this->pickColumn($T_PAGOS_CASO, $cfg['recovery_amount_candidates'] ?? [], 'monto_pagado');
-        $Col_FECHA_CASO = $this->pickColumn($T_PAGOS_CASO, $cfg['recovery_date_candidates'] ?? [], 'fecha_pago');
-        $Fk_CASO = $this->pickColumn($T_PAGOS_CASO, $cfg['recovery_case_fk_candidates'] ?? [], 'caso_id');
+        $T_PAGOS_CASO = 'pagos_caso';
+        $Col_MONTO_CASO = 'monto_pagado';
+        $Col_FECHA_CASO = 'fecha_pago';
+        $Fk_CASO = 'caso_id';
 
         $T_PAGOS_CONTRATO = 'contrato_pagos';
-        $Col_MONTO_CONTRATO = $this->pickColumn($T_PAGOS_CONTRATO, ['monto', 'valor', 'total', 'cantidad', 'pago'], 'monto');
-        $Col_FECHA_CONTRATO = $this->pickColumn($T_PAGOS_CONTRATO, ['fecha_pago', 'fecha', 'created_at'], 'created_at');
+        $Col_MONTO_CONTRATO = 'valor';
+        $Col_FECHA_CONTRATO = 'fecha';
         
         $dbConfig = [
             'caso' => ['table' => $T_PAGOS_CASO, 'amount' => $Col_MONTO_CASO, 'date' => $Col_FECHA_CASO, 'fk' => $Fk_CASO],
@@ -193,23 +193,22 @@ class DashboardController extends Controller
 
         $cfgCaso = $config['caso'];
         if (Schema::hasTable($cfgCaso['table'])) {
-            $recuperacionCasos = Caso::query()
-                ->join($cfgCaso['table'], 'casos.id', '=', "{$cfgCaso['table']}.{$cfgCaso['fk']}")
-                ->select(DB::raw("TO_CHAR({$cfgCaso['table']}.{$cfgCaso['date']}, 'YYYY-MM') as mes"), DB::raw("SUM({$cfgCaso['table']}.{$cfgCaso['amount']}) as total"))
-                ->where("{$cfgCaso['table']}.{$cfgCaso['date']}", '>=', Carbon::now()->subYear())
-                ->when($cooperativaId, fn($q) => $q->where('casos.cooperativa_id', $cooperativaId))
-                ->reorder()->groupBy('mes')->orderBy('mes')->get()->pluck('total', 'mes');
+            $recuperacionCasos = DB::table($cfgCaso['table'])
+                ->select(DB::raw("TO_CHAR({$cfgCaso['date']}, 'YYYY-MM') as mes"), DB::raw("SUM({$cfgCaso['amount']}) as total"))
+                ->where("{$cfgCaso['date']}", '>=', Carbon::now()->subYear())
+                ->groupBy(DB::raw("TO_CHAR({$cfgCaso['date']}, 'YYYY-MM')"))
+                ->orderBy(DB::raw("TO_CHAR({$cfgCaso['date']}, 'YYYY-MM')"))
+                ->get()->pluck('total', 'mes');
         }
 
         $cfgContrato = $config['contrato'];
         if (Schema::hasTable($cfgContrato['table']) && Schema::hasTable('contratos')) {
              $recuperacionContratos = DB::table($cfgContrato['table'])
-                ->join('contratos', "{$cfgContrato['table']}.contrato_id", '=', 'contratos.id')
-                ->join('casos', 'contratos.caso_id', '=', 'casos.id')
-                ->select(DB::raw("TO_CHAR({$cfgContrato['table']}.{$cfgContrato['date']}, 'YYYY-MM') as mes"), DB::raw("SUM({$cfgContrato['table']}.{$cfgContrato['amount']}) as total"))
-                ->where("{$cfgContrato['table']}.{$cfgContrato['date']}", '>=', Carbon::now()->subYear())
-                ->when($cooperativaId, fn($q) => $q->where('casos.cooperativa_id', $cooperativaId))
-                ->groupBy('mes')->orderBy('mes')->get()->pluck('total', 'mes');
+                ->select(DB::raw("TO_CHAR({$cfgContrato['date']}, 'YYYY-MM') as mes"), DB::raw("SUM({$cfgContrato['amount']}) as total"))
+                ->where("{$cfgContrato['date']}", '>=', Carbon::now()->subYear())
+                ->groupBy(DB::raw("TO_CHAR({$cfgContrato['date']}, 'YYYY-MM')"))
+                ->orderBy(DB::raw("TO_CHAR({$cfgContrato['date']}, 'YYYY-MM')"))
+                ->get()->pluck('total', 'mes');
         }
 
         $todosLosMeses = $recuperacionCasos->keys()->merge($recuperacionContratos->keys())->unique()->sort();
@@ -229,38 +228,45 @@ class DashboardController extends Controller
 
         $cfgCaso = $config['caso'];
         if (Schema::hasTable($cfgCaso['table'])) {
-            $rankingCasos = User::query()
-                ->select('users.id', 'users.name', DB::raw("SUM({$cfgCaso['table']}.{$cfgCaso['amount']}) as total"))
+            $rankingCasos = DB::table('users')
                 ->join('casos', 'users.id', '=', 'casos.user_id')
                 ->join($cfgCaso['table'], 'casos.id', '=', "{$cfgCaso['table']}.{$cfgCaso['fk']}")
+                ->select('users.id', 'users.name', DB::raw("SUM({$cfgCaso['table']}.{$cfgCaso['amount']}) as total"))
                 ->whereBetween("{$cfgCaso['table']}.{$cfgCaso['date']}", [$period['start'], $period['end']])
                 ->when($cooperativaId, fn($q) => $q->where('casos.cooperativa_id', $cooperativaId))
-                ->reorder()->groupBy('users.id', 'users.name')->get();
+                ->groupBy('users.id', 'users.name')
+                ->get();
 
             foreach ($rankingCasos as $r) {
                 if (!isset($usersStats[$r->id])) $usersStats[$r->id] = ['id' => $r->id, 'name' => $r->name, 'total_recuperado' => 0];
-                $usersStats[$r->id]['total_recuperado'] += $r->total;
+                $usersStats[$r->id]['total_recuperado'] += (float)$r->total;
             }
         }
 
         $cfgContrato = $config['contrato'];
         if (Schema::hasTable($cfgContrato['table']) && Schema::hasTable('contratos')) {
-             $rankingContratos = User::query()
-                ->select('users.id', 'users.name', DB::raw("SUM({$cfgContrato['table']}.{$cfgContrato['amount']}) as total"))
+             $rankingContratos = DB::table('users')
                 ->join('casos', 'users.id', '=', 'casos.user_id')
                 ->join('contratos', 'casos.id', '=', 'contratos.caso_id')
                 ->join($cfgContrato['table'], 'contratos.id', '=', "{$cfgContrato['table']}.contrato_id")
+                ->select('users.id', 'users.name', DB::raw("SUM({$cfgContrato['table']}.{$cfgContrato['amount']}) as total"))
                 ->whereBetween("{$cfgContrato['table']}.{$cfgContrato['date']}", [$period['start'], $period['end']])
                 ->when($cooperativaId, fn($q) => $q->where('casos.cooperativa_id', $cooperativaId))
-                ->reorder()->groupBy('users.id', 'users.name')->get();
+                ->groupBy('users.id', 'users.name')
+                ->get();
 
             foreach ($rankingContratos as $r) {
                 if (!isset($usersStats[$r->id])) $usersStats[$r->id] = ['id' => $r->id, 'name' => $r->name, 'total_recuperado' => 0];
-                $usersStats[$r->id]['total_recuperado'] += $r->total;
+                $usersStats[$r->id]['total_recuperado'] += (float)$r->total;
             }
         }
 
-        return collect($usersStats)->sortByDesc('total_recuperado')->take(3)->values()->all();
+        return collect($usersStats)
+            ->where('total_recuperado', '>', 0)
+            ->sortByDesc('total_recuperado')
+            ->take(3)
+            ->values()
+            ->all();
     }
 
     private function getClientDashboardData(User $user): array
@@ -293,16 +299,16 @@ class DashboardController extends Controller
         }
         
         $casosActivosIds = (clone $casosActivosQuery)->pluck('id');
-        $montoTotalDeuda = (clone $casosActivosQuery)->sum('monto_total');
+        $montoTotalDeuda = (clone $casosActivosQuery)->sum('monto_total') ?? 0;
         
         $totalPagado = 0;
-        if (Schema::hasTable($T_PAGOS)) {
-            $totalPagado = DB::table($T_PAGOS)->whereIn($Fk_CASO, $casosActivosIds)->sum($Col_MONTO);
+        if (Schema::hasTable($T_PAGOS) && $casosActivosIds->isNotEmpty()) {
+            $totalPagado = DB::table($T_PAGOS)->whereIn($Fk_CASO, $casosActivosIds)->sum($Col_MONTO) ?? 0;
         }
         
         return [
             'kpis' => [
-                'saldo_total_pendiente' => $montoTotalDeuda - $totalPagado,
+                'saldo_total_pendiente' => max(0, $montoTotalDeuda - $totalPagado),
                 'casos_activos' => $casosActivosIds->count(),
             ],
             'userRole' => 'cliente',

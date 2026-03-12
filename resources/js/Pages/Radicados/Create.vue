@@ -88,6 +88,7 @@ const submit = () => {
             nombre_completo: d.nombre_completo,
             tipo_documento: d.tipo_documento,
             numero_documento: d.numero_documento,
+            dv: d.dv,
             cooperativas_ids: Array.isArray(d.cooperativas_ids) ? d.cooperativas_ids.map(c => c.id) : [],
             abogados_ids: Array.isArray(d.abogados_ids) ? d.abogados_ids.map(a => a.id) : [],
             is_new: true
@@ -100,6 +101,7 @@ const submit = () => {
             nombre_completo: d.nombre_completo,
             tipo_documento: d.tipo_documento,
             numero_documento: d.numero_documento,
+            dv: d.dv,
             sin_info: d.sin_info,
             cooperativas_ids: Array.isArray(d.cooperativas_ids) ? d.cooperativas_ids.map(c => c.id) : [],
             abogados_ids: Array.isArray(d.abogados_ids) ? d.abogados_ids.map(a => a.id) : [],

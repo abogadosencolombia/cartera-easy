@@ -385,16 +385,35 @@ class ProcesoRadicadoController extends Controller
 
         foreach ($partes as $parte) {
             $id = $parte['id'] ?? null;
-            $nombre = $parte['nombre_completo'] ?? '';
+            
+            // CRÍTICO: Si el frontend solo envía el ID (es decir, no es una persona "nueva" o en edición "incompleta"),
+            // no debemos sobrescribir sus datos, solo vincularla.
+            if (!empty($id) && empty($parte['is_new']) && empty($parte['nombre_completo']) && empty($parte['numero_documento'])) {
+                $persona = Persona::withTrashed()->find($id);
+                if ($persona) {
+                    if ($persona->trashed()) $persona->restore();
+                    if ($tipo === 'DEMANDADO' && !$persona->es_demandado) {
+                        $persona->update(['es_demandado' => true]);
+                    }
+                    $ids[] = $persona->id;
+                }
+                continue; // Saltar el resto de la lógica de creación/sobrescritura
+            }
+
+            $nombre = trim($parte['nombre_completo'] ?? '');
             $tipoDoc = $parte['tipo_documento'] ?? 'CC';
-            $numeroDoc = $parte['numero_documento'] ?? '';
+            $numeroDoc = trim($parte['numero_documento'] ?? '');
             $dv = $parte['dv'] ?? null;
             $sinInfo = $parte['sin_info'] ?? false;
 
             if ($sinInfo || (empty($numeroDoc) && $tipo === 'DEMANDADO')) {
                 $infoIncompleta = true;
-                if (empty($nombre)) $nombre = "DEMANDADO POR IDENTIFICAR";
-                if (empty($numeroDoc)) $numeroDoc = "TEMP-" . ($id ?: uniqid());
+                if ($nombre === '' || $nombre === 'PERSONA INDETERMINADA') {
+                    $nombre = "DEMANDADO POR IDENTIFICAR";
+                }
+                if ($numeroDoc === '') {
+                    $numeroDoc = "TEMP-" . ($id ?: uniqid());
+                }
             }
 
             // Buscar si ya existe una persona con ese número de documento (para evitar duplicados al "identificar")

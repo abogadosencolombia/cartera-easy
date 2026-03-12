@@ -39,7 +39,7 @@ const loadPersonasArray = (personas) => {
         id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', sin_info: false, cooperativas_ids: [], abogados_ids: []
     }];
     return personas.map(p => {
-        const isIncomplete = p.nombre_completo === 'DEMANDADO POR IDENTIFICAR';
+        const isIncomplete = p.nombre_completo === 'DEMANDADO POR IDENTIFICAR' || p.nombre_completo === 'PERSONA INDETERMINADA';
         return { 
             id: p.id, 
             selected: mapToSelectOption(p), 
@@ -102,6 +102,7 @@ const submit = () => {
             nombre_completo: d.nombre_completo,
             tipo_documento: d.tipo_documento,
             numero_documento: d.numero_documento,
+            dv: d.dv,
             cooperativas_ids: Array.isArray(d.cooperativas_ids) ? d.cooperativas_ids.map(c => c.id || c) : [],
             abogados_ids: Array.isArray(d.abogados_ids) ? d.abogados_ids.map(a => a.id || a) : [],
             is_new: true
@@ -115,6 +116,7 @@ const submit = () => {
             nombre_completo: d.nombre_completo,
             tipo_documento: d.tipo_documento,
             numero_documento: d.numero_documento,
+            dv: d.dv,
             sin_info: d.sin_info,
             cooperativas_ids: Array.isArray(d.cooperativas_ids) ? d.cooperativas_ids.map(c => c.id || c) : [],
             abogados_ids: Array.isArray(d.abogados_ids) ? d.abogados_ids.map(a => a.id || a) : [],
@@ -194,9 +196,19 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                             </div>
                             <div v-else class="space-y-3 animate-in fade-in slide-in-from-top-1">
                                 <TextInput v-model="item.nombre_completo" placeholder="Nombre Completo *" class="text-sm w-full" />
-                                <div class="grid grid-cols-3 gap-2">
-                                    <select v-model="item.tipo_documento" class="text-sm rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option>CC</option><option>NIT</option></select>
-                                    <TextInput v-model="item.numero_documento" placeholder="Número *" class="text-sm col-span-2" />
+                                <div class="grid grid-cols-3 gap-2 items-end">
+                                    <select v-model="item.tipo_documento" class="text-sm rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm h-[42px]">
+                                        <option>CC</option>
+                                        <option>NIT</option>
+                                    </select>
+                                    <div :class="item.tipo_documento === 'NIT' ? 'col-span-2 grid grid-cols-4 gap-2' : 'col-span-2'">
+                                        <div :class="item.tipo_documento === 'NIT' ? 'col-span-3' : ''">
+                                            <TextInput v-model="item.numero_documento" placeholder="Número *" class="text-sm w-full" />
+                                        </div>
+                                        <div v-if="item.tipo_documento === 'NIT'">
+                                            <TextInput v-model="item.dv" maxlength="1" placeholder="DV" class="text-sm w-full text-center px-0 h-[42px]" />
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="space-y-2">
                                     <AsyncSelect v-model="item.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Asignar empresas..." multiple label-key="nombre" />
@@ -234,9 +246,19 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                                     <span class="text-[10px] font-bold text-amber-600 uppercase">Sin info completa</span>
                                 </label>
                                 <TextInput v-model="item.nombre_completo" placeholder="Nombre Completo *" class="text-sm w-full" />
-                                <div v-if="!item.sin_info" class="grid grid-cols-3 gap-2">
-                                    <select v-model="item.tipo_documento" class="text-sm rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option>CC</option><option>NIT</option></select>
-                                    <TextInput v-model="item.numero_documento" placeholder="Número *" class="text-sm col-span-2" />
+                                <div v-if="!item.sin_info" class="grid grid-cols-3 gap-2 items-end">
+                                    <select v-model="item.tipo_documento" class="text-sm rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm h-[42px]">
+                                        <option>CC</option>
+                                        <option>NIT</option>
+                                    </select>
+                                    <div :class="item.tipo_documento === 'NIT' ? 'col-span-2 grid grid-cols-4 gap-2' : 'col-span-2'">
+                                        <div :class="item.tipo_documento === 'NIT' ? 'col-span-3' : ''">
+                                            <TextInput v-model="item.numero_documento" placeholder="Número *" class="text-sm w-full" />
+                                        </div>
+                                        <div v-if="item.tipo_documento === 'NIT'">
+                                            <TextInput v-model="item.dv" maxlength="1" placeholder="DV" class="text-sm w-full text-center px-0 h-[42px]" />
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="space-y-2">
                                     <AsyncSelect v-model="item.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Asignar empresas..." multiple label-key="nombre" />
