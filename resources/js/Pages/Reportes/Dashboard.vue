@@ -91,6 +91,7 @@ const filtroForm = ref({
     tipo_proceso: props.filtros.tipo_proceso || '',
     fecha_desde: props.filtros.fecha_desde || '',
     fecha_hasta: props.filtros.fecha_hasta || '',
+    tipo_fuente: props.filtros.tipo_fuente || 'todos',
 });
 
 // --- REFS PARA GRÁFICAS ---
@@ -270,7 +271,25 @@ const formatDateForCompliance = (dateString) => {
                 <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg">
                     <div class="p-6">
                         <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Filtros Globales del Reporte</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fuente de Gestión</label>
+                                <Dropdown align="left" width="full">
+                                    <template #trigger>
+                                        <button type="button" class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 dark:border-gray-700 dark:bg-gray-900 px-3 py-2 text-sm shadow-sm hover:border-indigo-500 transition-all">
+                                            <span class="truncate">{{ filtroForm.tipo_fuente === 'todos' ? 'Todo el Sistema' : (filtroForm.tipo_fuente === 'casos' ? 'Casos de Cobro' : 'Solo Radicados') }}</span>
+                                            <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+                                        </button>
+                                    </template>
+                                    <template #content>
+                                        <div class="py-1 bg-white dark:bg-gray-800">
+                                            <button @click="filtroForm.tipo_fuente = 'todos'; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 font-bold': filtroForm.tipo_fuente === 'todos' }">Todo el Sistema</button>
+                                            <button @click="filtroForm.tipo_fuente = 'casos'; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 font-bold': filtroForm.tipo_fuente === 'casos' }">Solo Casos de Cobro</button>
+                                            <button @click="filtroForm.tipo_fuente = 'radicados'; aplicarFiltros()" class="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 font-bold': filtroForm.tipo_fuente === 'radicados' }">Solo Radicados Judiciales</button>
+                                        </div>
+                                    </template>
+                                </Dropdown>
+                            </div>
                             <div>
                                 <label for="filtro_cooperativa" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cooperativa</label>
                                 <Dropdown align="left" width="full">
