@@ -268,6 +268,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/casos/{caso}/pagos', [PagoCasoController::class, 'store'])->name('casos.pagos.store');
         Route::get('/pagos/{pago}/comprobante', [PagoCasoController::class, 'verComprobante'])->name('pagos.verComprobante');
         Route::post('/casos/{caso}/notificaciones', [NotificacionController::class, 'storeManual'])->name('casos.notificaciones.store');
+        Route::post('/procesos/{proceso}/notificaciones', [NotificacionController::class, 'storeManualProceso'])->name('procesos.notificaciones.store');
         Route::get('/documentos-generados', [DocumentoGeneradoController::class, 'index'])->name('documentos-generados.index');
         Route::post('/documentos/generar', [GeneradorDocumentoController::class, 'generar'])->name('documentos.generar');
         Route::get('/documentos/{documento}/descargar-docx', [GeneradorDocumentoController::class, 'descargarDocx'])->name('documentos.descargar.docx');

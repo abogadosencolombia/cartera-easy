@@ -44,7 +44,7 @@ class ProcesarAlertasProgramadas implements ShouldQueue
                     // Inmediata (sin fecha)
                     if (is_null($a->programado_en)) {
                         $user->notify(new AlertaProgramadaNotification(
-                            $a->caso_id, $a->mensaje, true, $a->prioridad ?? 'media'
+                            $a->caso_id, $a->mensaje, true, $a->prioridad ?? 'media', $a->proceso_id
                         ));
                         $a->forceFill([
                             'fecha_envio'  => $now,
@@ -60,7 +60,7 @@ class ProcesarAlertasProgramadas implements ShouldQueue
                     if ($diff <= 0) {
                         // Llegó o se pasó
                         $user->notify(new AlertaProgramadaNotification(
-                            $a->caso_id, $a->mensaje, true, $a->prioridad ?? 'media'
+                            $a->caso_id, $a->mensaje, true, $a->prioridad ?? 'media', $a->proceso_id
                         ));
                         $a->forceFill([
                             'fecha_envio'  => $now,
@@ -75,7 +75,7 @@ class ProcesarAlertasProgramadas implements ShouldQueue
                         $ultimo = $a->last_sent_at?->timezone($tz);
                         if (is_null($ultimo) || $ultimo->lt($now->copy()->startOfDay())) {
                             $user->notify(new AlertaProgramadaNotification(
-                                $a->caso_id, $a->mensaje, false, $a->prioridad ?? 'media'
+                                $a->caso_id, $a->mensaje, false, $a->prioridad ?? 'media', $a->proceso_id
                             ));
                             $a->forceFill(['last_sent_at' => $now])->save();
                         }

@@ -12,6 +12,7 @@ import Checkbox from '@/Components/Checkbox.vue';
 import Modal from '@/Components/Modal.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import AsyncSelect from '@/Components/AsyncSelect.vue';
+import SearchableSelect from '@/Components/SearchableSelect.vue';
 import { Head, Link, useForm, usePage, useRemember, router } from '@inertiajs/vue3';
 import { ref, computed, watch, onMounted } from 'vue';
 import axios from 'axios';
@@ -252,11 +253,70 @@ const submit = () => {
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div><InputLabel value="Radicado" /><TextInput v-model="form.radicado" class="w-full" /><InputError :message="form.errors.radicado" /></div>
                                     <div><InputLabel value="Juzgado" /><AsyncSelect v-model="form.juzgado_id" :endpoint="route('juzgados.search')" label-key="nombre" /><InputError :message="form.errors.juzgado_id" /></div>
-                                    <div><InputLabel value="Especialidad *" /><select v-model="form.especialidad_id" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option :value="null">Seleccione...</option><option v-for="e in especialidades" :key="e.id" :value="e.id">{{ formatLabel(e.nombre) }}</option></select><InputError :message="form.errors.especialidad_id" /></div>
-                                    <div><InputLabel value="Tipo de Proceso *" /><select v-model="form.tipo_proceso" :disabled="!form.especialidad_id" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option :value="null">Seleccione...</option><option v-for="t in tiposDisponibles" :key="t.id" :value="t.nombre">{{ formatLabel(t.nombre) }}</option></select><InputError :message="form.errors.tipo_proceso" /></div>
-                                    <div><InputLabel value="Proceso *" /><select v-model="form.subtipo_proceso" :disabled="!form.tipo_proceso" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option :value="null">Seleccione...</option><option v-for="s in subtiposDisponibles" :key="s.id" :value="s.nombre">{{ formatLabel(s.nombre) }}</option></select><InputError :message="form.errors.subtipo_proceso" /></div>
-                                    <div><InputLabel value="Subproceso (Detalle)" /><select v-model="form.subproceso" :disabled="!form.subtipo_proceso" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option :value="null">Seleccione...</option><option v-for="sp in subprocesosDisponibles" :key="sp.id" :value="sp.nombre">{{ sp.nombre }}</option></select><InputError :message="form.errors.subproceso" /></div>
-                                    <div><InputLabel value="Etapa Procesal" /><Dropdown align="left" width="full"><template #trigger><button type="button" class="w-full flex justify-between border border-gray-300 dark:border-gray-700 rounded-md p-2 dark:bg-gray-900"><span>{{ formatLabel(form.etapa_procesal) || '--' }}</span><ChevronDownIcon class="h-4 w-4"/></button></template><template #content><div class="py-1 bg-white dark:bg-gray-800 max-h-60 overflow-y-auto"><button type="button" v-for="e in etapas_procesales" :key="e" @click="form.etapa_procesal = e" class="block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">{{ formatLabel(e) }}</button></div></template></Dropdown><InputError :message="form.errors.etapa_procesal" /></div>
+                                    <div>
+                                        <InputLabel value="Especialidad *" />
+                                        <SearchableSelect
+                                            v-model="form.especialidad_id"
+                                            :options="especialidades"
+                                            :featured-options="[1, 2]"
+                                            value-key="id"
+                                            label-key="nombre"
+                                            :format-label="formatLabel"
+                                            placeholder="Seleccione especialidad..."
+                                        />
+                                        <InputError :message="form.errors.especialidad_id" />
+                                    </div>
+                                    <div>
+                                        <InputLabel value="Tipo de Proceso *" />
+                                        <SearchableSelect
+                                            v-model="form.tipo_proceso"
+                                            :options="tiposDisponibles"
+                                            value-key="nombre"
+                                            label-key="nombre"
+                                            :format-label="formatLabel"
+                                            :disabled="!form.especialidad_id"
+                                            placeholder="Seleccione tipo..."
+                                        />
+                                        <InputError :message="form.errors.tipo_proceso" />
+                                    </div>
+                                    <div>
+                                        <InputLabel value="Proceso *" />
+                                        <SearchableSelect
+                                            v-model="form.subtipo_proceso"
+                                            :options="subtiposDisponibles"
+                                            value-key="nombre"
+                                            label-key="nombre"
+                                            :format-label="formatLabel"
+                                            :disabled="!form.tipo_proceso"
+                                            placeholder="Seleccione proceso..."
+                                        />
+                                        <InputError :message="form.errors.subtipo_proceso" />
+                                    </div>
+                                    <div>
+                                        <InputLabel value="Subproceso (Detalle)" />
+                                        <SearchableSelect
+                                            v-model="form.subproceso"
+                                            :options="subprocesosDisponibles"
+                                            value-key="nombre"
+                                            label-key="nombre"
+                                            :disabled="!form.subtipo_proceso"
+                                            placeholder="Seleccione subproceso..."
+                                        />
+                                        <InputError :message="form.errors.subproceso" />
+                                    </div>
+                                    <div>
+                                        <InputLabel value="Etapa Procesal" />
+                                        <SearchableSelect
+                                            v-model="form.etapa_procesal"
+                                            :options="etapas_procesales.map(e => ({ id: e, nombre: e }))"
+                                            :featured-options="['DEMANDADO', 'EN EJECUCIÓN']"
+                                            value-key="id"
+                                            label-key="nombre"
+                                            :format-label="formatLabel"
+                                            placeholder="Seleccione etapa..."
+                                        />
+                                        <InputError :message="form.errors.etapa_procesal" />
+                                    </div>
                                     <div><InputLabel value="Tipo de Garantía *" /><select v-model="form.tipo_garantia_asociada" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option value="codeudor">Codeudor</option><option value="hipotecaria">Hipotecaria</option><option value="prendaria">Prendaria</option><option value="sin garantía">Sin garantía</option></select><InputError :message="form.errors.tipo_garantia_asociada" /></div>
                                     <div><InputLabel value="Origen Documental *" /><select v-model="form.origen_documental" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option value="pagaré">Pagaré</option><option value="libranza">Libranza</option><option value="contrato">Contrato</option><option value="otro">Otro</option></select><InputError :message="form.errors.origen_documental" /></div>
                                     <div><InputLabel value="Medio de Contacto" /><select v-model="form.medio_contacto" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option :value="null">-- Seleccione --</option><option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="telefono">Teléfono</option></select><InputError :message="form.errors.medio_contacto" /></div>
@@ -318,3 +378,7 @@ const submit = () => {
         </Modal>
     </AuthenticatedLayout>
 </template>
+
+<style>
+/* Estilos adicionales si fueran necesarios */
+</style>

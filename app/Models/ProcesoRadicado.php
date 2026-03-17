@@ -104,6 +104,11 @@ class ProcesoRadicado extends Model
         return $this->hasMany(DocumentoProceso::class, 'proceso_radicado_id');
     }
 
+    public function notificaciones(): HasMany
+    {
+        return $this->hasMany(NotificacionCaso::class, 'proceso_id');
+    }
+
     public function actuaciones(): MorphMany
     {
         return $this->morphMany(Actuacion::class, 'actuable')->orderBy('created_at', 'desc');

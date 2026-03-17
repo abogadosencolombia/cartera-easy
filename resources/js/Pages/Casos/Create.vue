@@ -9,6 +9,7 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import Textarea from '@/Components/Textarea.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import AsyncSelect from '@/Components/AsyncSelect.vue';
+import SearchableSelect from '@/Components/SearchableSelect.vue';
 import { TrashIcon, ChevronDownIcon } from '@heroicons/vue/24/outline';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
@@ -277,43 +278,67 @@ const submit = () => {
                                     
                                     <div>
                                         <InputLabel value="Especialidad *" />
-                                        <select v-model="form.especialidad_id" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
-                                            <option :value="null">Seleccione...</option>
-                                            <option v-for="esp in especialidades" :key="esp.id" :value="esp.id">{{ formatLabel(esp.nombre) }}</option>
-                                        </select>
+                                        <SearchableSelect
+                                            v-model="form.especialidad_id"
+                                            :options="especialidades"
+                                            :featured-options="[1, 2]"
+                                            value-key="id"
+                                            label-key="nombre"
+                                            :format-label="formatLabel"
+                                            placeholder="Seleccione especialidad..."
+                                        />
                                         <InputError :message="form.errors.especialidad_id" />
                                     </div>
                                     <div>
                                         <InputLabel value="Tipo de Proceso *" />
-                                        <select v-model="form.tipo_proceso" :disabled="!form.especialidad_id" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
-                                            <option :value="null">Seleccione...</option>
-                                            <option v-for="t in tiposDisponibles" :key="t.id" :value="t.nombre">{{ formatLabel(t.nombre) }}</option>
-                                        </select>
+                                        <SearchableSelect
+                                            v-model="form.tipo_proceso"
+                                            :options="tiposDisponibles"
+                                            value-key="nombre"
+                                            label-key="nombre"
+                                            :format-label="formatLabel"
+                                            :disabled="!form.especialidad_id"
+                                            placeholder="Seleccione tipo..."
+                                        />
                                         <InputError :message="form.errors.tipo_proceso" />
                                     </div>
                                     <div>
                                         <InputLabel value="Proceso *" />
-                                        <select v-model="form.subtipo_proceso" :disabled="!form.tipo_proceso" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
-                                            <option :value="null">Seleccione...</option>
-                                            <option v-for="s in subtiposDisponibles" :key="s.id" :value="s.nombre">{{ formatLabel(s.nombre) }}</option>
-                                        </select>
+                                        <SearchableSelect
+                                            v-model="form.subtipo_proceso"
+                                            :options="subtiposDisponibles"
+                                            value-key="nombre"
+                                            label-key="nombre"
+                                            :format-label="formatLabel"
+                                            :disabled="!form.tipo_proceso"
+                                            placeholder="Seleccione proceso..."
+                                        />
                                         <InputError :message="form.errors.subtipo_proceso" />
                                     </div>
                                     <div class="md:col-span-2">
                                         <InputLabel value="Subproceso (Detalle)" />
-                                        <select v-model="form.subproceso" :disabled="!form.subtipo_proceso" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
-                                            <option :value="null">Seleccione...</option>
-                                            <option v-for="sp in subprocesosDisponibles" :key="sp.id" :value="sp.nombre">{{ sp.nombre }}</option>
-                                        </select>
+                                        <SearchableSelect
+                                            v-model="form.subproceso"
+                                            :options="subprocesosDisponibles"
+                                            value-key="nombre"
+                                            label-key="nombre"
+                                            :disabled="!form.subtipo_proceso"
+                                            placeholder="Seleccione subproceso..."
+                                        />
                                         <InputError :message="form.errors.subproceso" />
                                     </div>
                                     
                                     <div>
                                         <InputLabel value="Etapa Procesal" />
-                                        <Dropdown align="left" width="full">
-                                            <template #trigger><button type="button" class="mt-1 flex w-full justify-between rounded-md border border-gray-300 dark:border-gray-700 p-2 text-sm dark:bg-gray-900"><span>{{ form.etapa_procesal ? formatLabel(form.etapa_procesal) : '-- Sin especificar --' }}</span><ChevronDownIcon class="h-4 w-4" /></button></template>
-                                            <template #content><div class="py-1 bg-white dark:bg-gray-800 max-h-60 overflow-y-auto"><button type="button" v-for="e in etapas_procesales" :key="e" @click="form.etapa_procesal = e" class="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">{{ formatLabel(e) }}</button></div></template>
-                                        </Dropdown>
+                                        <SearchableSelect
+                                            v-model="form.etapa_procesal"
+                                            :options="etapas_procesales.map(e => ({ id: e, nombre: e }))"
+                                            :featured-options="['DEMANDADO', 'EN EJECUCIÓN']"
+                                            value-key="id"
+                                            label-key="nombre"
+                                            :format-label="formatLabel"
+                                            placeholder="Seleccione etapa..."
+                                        />
                                         <InputError :message="form.errors.etapa_procesal" />
                                     </div>
 
@@ -483,3 +508,7 @@ const submit = () => {
         </div>
     </AuthenticatedLayout>
 </template>
+
+<style>
+/* Estilos adicionales si fueran necesarios para esta página */
+</style>

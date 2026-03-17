@@ -153,30 +153,61 @@ const deleteNota = async (id) => {
     }
 };
 
+const searchingDespacho = ref(false);
+const searchingVinculacion = ref(false);
+
 // Búsqueda de Despacho
-watch(searchDespacho, async (val) => {
-    if (val.length < 3) {
+let searchTimeout = null;
+watch(searchDespacho, (val) => {
+    if (val.length < 2) {
         resultadosDespacho.value = [];
+        showDespachoResults.value = false;
         return;
     }
-    try {
-        const response = await axios.get(route('api.gestion.search-despacho'), { params: { q: val } });
-        resultadosDespacho.value = response.data;
-        showDespachoResults.value = true;
-    } catch (e) {}
+    
+    // Evitar buscar si el valor es el que acabamos de seleccionar
+    if (val === form.value.despacho) return;
+
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(async () => {
+        searchingDespacho.value = true;
+        try {
+            const response = await axios.get(route('api.gestion.search-despacho'), { params: { q: val } });
+            resultadosDespacho.value = response.data;
+            showDespachoResults.value = true;
+        } catch (e) {
+            console.error('Error en búsqueda de despacho', e);
+        } finally {
+            searchingDespacho.value = false;
+        }
+    }, 300);
 });
 
 // Búsqueda de Vinculación
-watch([searchVinculacion, () => form.value.relacionable_type], async ([q, type]) => {
+let vinculacionTimeout = null;
+watch([searchVinculacion, () => form.value.relacionable_type], ([q, type]) => {
     if (q.length < 2 || !type) {
         resultadosVinculacion.value = [];
+        showVinculacionResults.value = false;
         return;
     }
-    try {
-        const response = await axios.get(route('api.gestion.search-vinculacion'), { params: { q, type } });
-        resultadosVinculacion.value = response.data;
-        showVinculacionResults.value = true;
-    } catch (e) {}
+
+    // Evitar buscar si ya está seleccionado
+    if (searchVinculacion.value.includes(': ') && form.value.relacionable_id) return;
+
+    clearTimeout(vinculacionTimeout);
+    vinculacionTimeout = setTimeout(async () => {
+        searchingVinculacion.value = true;
+        try {
+            const response = await axios.get(route('api.gestion.search-vinculacion'), { params: { q, type } });
+            resultadosVinculacion.value = response.data;
+            showVinculacionResults.value = true;
+        } catch (e) {
+            console.error('Error en búsqueda de vinculación', e);
+        } finally {
+            searchingVinculacion.value = false;
+        }
+    }, 300);
 });
 
 const selectDespacho = (nombre) => {
@@ -264,13 +295,23 @@ onMounted(fetchNotas);
                         <div class="grid grid-cols-2 gap-4">
                             <div class="relative">
                                 <label class="block text-[9px] font-black text-gray-400 uppercase mb-1 ml-1">Despacho / Entidad</label>
-                                <input v-model="searchDespacho" type="text" placeholder="BUSCAR..." 
-                                       class="w-full text-xs font-black uppercase rounded-lg border-gray-200 focus:border-blue-500 focus:ring-blue-500 transition-all shadow-inner text-blue-600">
-                                <div v-if="showDespachoResults && resultadosDespacho.length" class="absolute z-10 w-full mt-1 bg-white border-2 border-indigo-600 shadow-2xl rounded-lg max-h-48 overflow-y-auto">
-                                    <button v-for="j in resultadosDespacho" :key="j.id" @click="selectDespacho(j.nombre)" 
-                                            class="w-full text-left px-4 py-3 text-[10px] font-black uppercase hover:bg-indigo-600 hover:text-white border-b last:border-0 transition">
-                                        {{ j.nombre }}
-                                    </button>
+                                <div class="relative">
+                                    <input v-model="searchDespacho" type="text" placeholder="BUSCAR..." 
+                                           class="w-full text-xs font-black uppercase rounded-lg border-gray-200 focus:border-blue-500 focus:ring-blue-500 transition-all shadow-inner text-blue-600">
+                                    <div v-if="searchingDespacho" class="absolute right-3 top-1/2 -translate-y-1/2">
+                                        <div class="animate-spin h-3 w-3 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                    </div>
+                                </div>
+                                <div v-if="showDespachoResults" class="absolute z-10 w-full mt-1 bg-white border-2 border-indigo-600 shadow-2xl rounded-lg max-h-48 overflow-y-auto">
+                                    <template v-if="resultadosDespacho.length">
+                                        <button v-for="j in resultadosDespacho" :key="j.id" @click="selectDespacho(j.nombre)" 
+                                                class="w-full text-left px-4 py-3 text-[10px] font-black uppercase hover:bg-indigo-600 hover:text-white border-b last:border-0 transition">
+                                            {{ j.nombre }}
+                                        </button>
+                                    </template>
+                                    <div v-else-if="!searchingDespacho" class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase italic">
+                                        No se encontraron resultados
+                                    </div>
                                 </div>
                             </div>
                             <div>
@@ -290,19 +331,29 @@ onMounted(fetchNotas);
                                     <option value="App\Models\Contrato">CONTRATO HONORARIOS</option>
                                 </select>
                                 <div v-if="form.relacionable_type" class="relative">
-                                    <input v-model="searchVinculacion" type="text" placeholder="BUSCAR POR NOMBRE, DOC O RADICADO..." 
-                                           class="w-full text-[10px] font-black uppercase rounded-lg border-blue-200 focus:border-blue-500 focus:ring-blue-500 shadow-sm text-blue-600">
-                                    <div v-if="showVinculacionResults && resultadosVinculacion.length" class="absolute z-10 w-full mt-1 bg-white border-2 border-blue-500 shadow-2xl rounded-lg max-h-60 overflow-y-auto">
-                                        <button v-for="v in resultadosVinculacion" :key="v.id" @click="selectVinculacion(v)" 
-                                                class="w-full text-left px-4 py-3 hover:bg-blue-500 hover:text-white border-b last:border-0 transition">
-                                            <div class="text-[10px] font-black uppercase">{{ v.radicado || v.referencia_credito || v.referencia }}</div>
-                                            <div class="text-[8px] font-bold opacity-75 uppercase truncate">
-                                                {{ v.asunto || '' }}
-                                                <span v-if="v.deudor">· {{ v.deudor.nombre_completo }} ({{ v.deudor.numero_documento }})</span>
-                                                <span v-else-if="v.cliente">· {{ v.cliente.nombre_completo }} ({{ v.cliente.numero_documento }})</span>
-                                                <span v-else-if="v.demandados?.length">· DDO: {{ v.demandados[0].nombre_completo }}</span>
-                                            </div>
-                                        </button>
+                                    <div class="relative">
+                                        <input v-model="searchVinculacion" type="text" placeholder="BUSCAR POR NOMBRE, DOC O RADICADO..." 
+                                               class="w-full text-[10px] font-black uppercase rounded-lg border-blue-200 focus:border-blue-500 focus:ring-blue-500 shadow-sm text-blue-600">
+                                        <div v-if="searchingVinculacion" class="absolute right-3 top-1/2 -translate-y-1/2">
+                                            <div class="animate-spin h-3 w-3 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                        </div>
+                                    </div>
+                                    <div v-if="showVinculacionResults" class="absolute z-10 w-full mt-1 bg-white border-2 border-blue-500 shadow-2xl rounded-lg max-h-60 overflow-y-auto">
+                                        <template v-if="resultadosVinculacion.length">
+                                            <button v-for="v in resultadosVinculacion" :key="v.id" @click="selectVinculacion(v)" 
+                                                    class="w-full text-left px-4 py-3 hover:bg-blue-500 hover:text-white border-b last:border-0 transition text-blue-900">
+                                                <div class="text-[10px] font-black uppercase">{{ v.radicado || v.referencia_credito || v.referencia }}</div>
+                                                <div class="text-[8px] font-bold opacity-75 uppercase truncate">
+                                                    {{ v.asunto || '' }}
+                                                    <span v-if="v.deudor">· {{ v.deudor.nombre_completo }} ({{ v.deudor.numero_documento }})</span>
+                                                    <span v-else-if="v.cliente">· {{ v.cliente.nombre_completo }} ({{ v.cliente.numero_documento }})</span>
+                                                    <span v-else-if="v.demandados?.length">· DDO: {{ v.demandados[0].nombre_completo }}</span>
+                                                </div>
+                                            </button>
+                                        </template>
+                                        <div v-else-if="!searchingVinculacion" class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase italic">
+                                            No se encontraron resultados
+                                        </div>
                                     </div>
                                 </div>
                             </div>

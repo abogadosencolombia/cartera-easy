@@ -100,10 +100,17 @@ class GestionDiariaController extends Controller
     {
         $term = $request->q;
         if (strlen($term) < 2) return [];
+
+        $keywords = explode(' ', $term);
+        $query = Juzgado::query();
+
+        foreach ($keywords as $keyword) {
+            if (empty($keyword)) continue;
+            $normalized = $this->normalizeTerm($keyword);
+            $query->whereRaw("TRANSLATE(nombre, 'áéíóúüÁÉÍÓÚÜ', 'aeiouuAEIOUU') ILIKE ?", ["%{$normalized}%"]);
+        }
         
-        return Juzgado::where('nombre', 'ilike', "%{$term}%")
-            ->limit(10)
-            ->get(['id', 'nombre']);
+        return $query->limit(15)->get(['id', 'nombre']);
     }
 
     public function searchVinculacion(Request $request)
@@ -112,43 +119,70 @@ class GestionDiariaController extends Controller
         $term = $request->q;
         if (strlen($term) < 2 || !$type) return [];
 
+        $keywords = explode(' ', $term);
+
         if ($type === 'App\Models\Caso') {
-            return Caso::with('deudor')
-                ->where(function($q) use ($term) {
-                    $q->where('referencia_credito', 'ilike', "%{$term}%")
-                      ->orWhere('radicado', 'ilike', "%{$term}%")
-                      ->orWhereHas('deudor', function($sq) use ($term) {
-                          $sq->where('nombre_completo', 'ilike', "%{$term}%")
-                            ->orWhere('numero_documento', 'like', "%{$term}%"); // Mantenemos like para números
+            $query = Caso::with('deudor');
+            foreach ($keywords as $keyword) {
+                if (empty($keyword)) continue;
+                $norm = $this->normalizeTerm($keyword);
+                $query->where(function($q) use ($keyword, $norm) {
+                    $q->where('referencia_credito', 'ilike', "%{$keyword}%")
+                      ->orWhere('radicado', 'ilike', "%{$keyword}%")
+                      ->orWhereRaw("TRANSLATE(referencia_credito, 'áéíóúüÁÉÍÓÚÜ', 'aeiouuAEIOUU') ILIKE ?", ["%{$norm}%"])
+                      ->orWhereHas('deudor', function($sq) use ($keyword, $norm) {
+                          $sq->where('numero_documento', 'like', "%{$keyword}%")
+                            ->orWhereRaw("TRANSLATE(nombre_completo, 'áéíóúüÁÉÍÓÚÜ', 'aeiouuAEIOUU') ILIKE ?", ["%{$norm}%"]);
                       });
-                })
-                ->limit(10)->get();
+                });
+            }
+            return $query->limit(15)->get();
         } 
         elseif ($type === 'App\Models\ProcesoRadicado') {
-            return ProcesoRadicado::with(['demandantes', 'demandados'])
-                ->where(function($q) use ($term) {
-                    $q->where('radicado', 'ilike', "%{$term}%")
-                      ->orWhere('asunto', 'ilike', "%{$term}%")
-                      ->orWhereHas('demandantes', function($sq) use ($term) {
-                          $sq->where('nombre_completo', 'ilike', "%{$term}%")
-                            ->orWhere('numero_documento', 'like', "%{$term}%");
+            $query = ProcesoRadicado::with(['demandantes', 'demandados']);
+            foreach ($keywords as $keyword) {
+                if (empty($keyword)) continue;
+                $norm = $this->normalizeTerm($keyword);
+                $query->where(function($q) use ($keyword, $norm) {
+                    $q->where('radicado', 'ilike', "%{$keyword}%")
+                      ->orWhereRaw("TRANSLATE(asunto, 'áéíóúüÁÉÍÓÚÜ', 'aeiouuAEIOUU') ILIKE ?", ["%{$norm}%"])
+                      ->orWhereHas('demandantes', function($sq) use ($keyword, $norm) {
+                          $sq->where('numero_documento', 'like', "%{$keyword}%")
+                            ->orWhereRaw("TRANSLATE(nombre_completo, 'áéíóúüÁÉÍÓÚÜ', 'aeiouuAEIOUU') ILIKE ?", ["%{$norm}%"]);
                       })
-                      ->orWhereHas('demandados', function($sq) use ($term) {
-                          $sq->where('nombre_completo', 'ilike', "%{$term}%")
-                            ->orWhere('numero_documento', 'like', "%{$term}%");
+                      ->orWhereHas('demandados', function($sq) use ($keyword, $norm) {
+                          $sq->where('numero_documento', 'like', "%{$keyword}%")
+                            ->orWhereRaw("TRANSLATE(nombre_completo, 'áéíóúüÁÉÍÓÚÜ', 'aeiouuAEIOUU') ILIKE ?", ["%{$norm}%"]);
                       });
-                })
-                ->limit(10)->get();
+                });
+            }
+            return $query->limit(15)->get();
         }
         elseif ($type === 'App\Models\Contrato') {
-            return Contrato::with('cliente')
-                ->where('referencia', 'ilike', "%{$term}%")
-                ->orWhereHas('cliente', function($q) use ($term) {
-                    $q->where('nombre_completo', 'ilike', "%{$term}%")
-                      ->orWhere('numero_documento', 'like', "%{$term}%");
-                })->limit(10)->get();
+            $query = Contrato::with('cliente');
+            foreach ($keywords as $keyword) {
+                if (empty($keyword)) continue;
+                $norm = $this->normalizeTerm($keyword);
+                $query->where(function($q) use ($keyword, $norm) {
+                    $q->where('referencia', 'ilike', "%{$keyword}%")
+                      ->orWhereHas('cliente', function($sq) use ($keyword, $norm) {
+                          $sq->where('numero_documento', 'like', "%{$keyword}%")
+                            ->orWhereRaw("TRANSLATE(nombre_completo, 'áéíóúüÁÉÍÓÚÜ', 'aeiouuAEIOUU') ILIKE ?", ["%{$norm}%"]);
+                      });
+                });
+            }
+            return $query->limit(15)->get();
         }
 
         return [];
+    }
+
+    private function normalizeTerm($term)
+    {
+        return str_replace(
+            ['á', 'é', 'í', 'ó', 'ú', 'ü', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ü'],
+            ['a', 'e', 'i', 'o', 'u', 'u', 'A', 'E', 'I', 'O', 'U', 'U'],
+            $term
+        );
     }
 }

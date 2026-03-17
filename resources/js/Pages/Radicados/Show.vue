@@ -10,16 +10,34 @@ import DangerButton from '@/Components/DangerButton.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import InputError from '@/Components/InputError.vue';
 import TextInput from '@/Components/TextInput.vue';
+import DateTimePicker from '@/Components/DateTimePicker.vue';
 import DatePicker from '@/Components/DatePicker.vue';
 import Textarea from '@/Components/Textarea.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import { useProcesos } from '@/composables/useProcesos';
-import { ArrowPathIcon, ChevronDownIcon } from '@heroicons/vue/24/outline';
+import { ArrowPathIcon, ChevronDownIcon, BellIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     proceso: { type: Object, required: true },
     etapas: { type: Array, required: true }, // Recibir etapas para el modal
 });
+
+// --- FORMULARIO PARA NOTIFICACIONES ---
+const notifForm = useForm({
+    fecha_programada: '',
+    mensaje: '',
+    prioridad: 'media',
+});
+
+const submitNotification = () => {
+    notifForm.post(route('procesos.notificaciones.store', props.proceso.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            notifForm.reset();
+            router.reload({ only: ['auth'] });
+        },
+    });
+};
 
 const { formatDate, getRevisionStatus } = useProcesos();
 
@@ -361,6 +379,45 @@ const eliminarActuacion = (actuacionId) => {
                      <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Expediente Digital</dt><dd><a v-if="proceso.link_expediente" :href="proceso.link_expediente" target="_blank" class="text-indigo-600 hover:underline break-all">{{ proceso.link_expediente }}</a><span v-else>—</span></dd></div>
                      <div><dt class="text-xs uppercase font-bold text-gray-700 dark:text-gray-300">Drive</dt><dd><a v-if="proceso.ubicacion_drive" :href="proceso.ubicacion_drive" target="_blank" class="text-indigo-600 hover:underline break-all">{{ proceso.ubicacion_drive }}</a><span v-else>—</span></dd></div>
                  </dl>
+              </div>
+
+              <!-- ✅ PROGRAMAR NOTIFICACIÓN (NUEVO) -->
+              <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg p-6">
+                  <h3 class="text-lg font-bold mb-4 flex items-center text-gray-800 dark:text-gray-100">
+                      <BellIcon class="h-5 w-5 mr-2 text-amber-500" />
+                      Programar Recordatorio
+                  </h3>
+                  
+                  <form @submit.prevent="submitNotification" class="space-y-4">
+                      <div>
+                          <InputLabel for="fecha_programada" value="Fecha y Hora" class="!text-xs" />
+                          <DateTimePicker 
+                              id="fecha_programada" 
+                              v-model="notifForm.fecha_programada" 
+                              placeholder="Clic para agendar..."
+                          />
+                          <InputError :message="notifForm.errors.fecha_programada" class="mt-1" />
+                      </div>
+                      
+                      <div>
+                          <InputLabel for="mensaje" value="Mensaje / Tarea" class="!text-xs" />
+                          <Textarea 
+                              id="mensaje" 
+                              v-model="notifForm.mensaje" 
+                              class="mt-1 block w-full text-sm" 
+                              rows="3" 
+                              placeholder="Ej: Revisar estado del proceso..." 
+                              required 
+                          />
+                          <InputError :message="notifForm.errors.mensaje" class="mt-1" />
+                      </div>
+
+                      <div class="flex justify-end">
+                          <PrimaryButton :class="{ 'opacity-25': notifForm.processing }" :disabled="notifForm.processing" class="w-full justify-center">
+                              Agendar
+                          </PrimaryButton>
+                      </div>
+                  </form>
               </div>
             </div>
           </div>

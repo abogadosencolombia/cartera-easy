@@ -16,45 +16,39 @@ class JuzgadoSearchController extends Controller
     {
         $searchTerm = $request->query('q', '');
 
-        // Mantenemos tu validación, ¡es una buena práctica!
-        if (strlen($searchTerm) < 3) {
+        if (strlen($searchTerm) < 2) {
             return response()->json([]);
         }
 
-        // =======================================================
-        // ===== INICIO DEL CAMBIO: BÚSQUEDA POR PALABRAS CLAVE ====
-        // =======================================================
-
-        // 1. Dividir el término de búsqueda en palabras individuales.
         $keywords = explode(' ', $searchTerm);
-
-        // 2. Construir la consulta dinámicamente.
         $query = Juzgado::query();
 
         foreach ($keywords as $keyword) {
-            // Se asegura de que la palabra no esté vacía antes de añadir la condición.
-            if (!empty($keyword)) {
-                $query->where('nombre', 'ILIKE', '%' . $keyword . '%');
-            }
+            if (empty($keyword)) continue;
+            
+            $normalized = $this->normalizeTerm($keyword);
+            $query->whereRaw("TRANSLATE(nombre, 'áéíóúüÁÉÍÓÚÜ', 'aeiouuAEIOUU') ILIKE ?", ["%{$normalized}%"]);
         }
 
-        // 3. Ejecutar la consulta con el límite y la selección de columnas que ya tenías.
         $juzgados = $query
             ->limit(50)
             ->get(['id', 'nombre']);
 
-        // =======================================================
-        // ===== FIN DEL CAMBIO ==================================
-        // =======================================================
-
-        // 👇 Mantenemos tu excelente normalización para el frontend.
-        // Esto no necesita cambiar en absoluto.
         return response()->json(
             $juzgados->map(fn ($j) => [
                 'id'    => $j->id,
                 'label' => $j->nombre,
                 'value' => $j->nombre,
             ])
+        );
+    }
+
+    private function normalizeTerm($term)
+    {
+        return str_replace(
+            ['á', 'é', 'í', 'ó', 'ú', 'ü', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ü'],
+            ['a', 'e', 'i', 'o', 'u', 'u', 'A', 'E', 'I', 'O', 'U', 'U'],
+            $term
         );
     }
 }

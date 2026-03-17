@@ -324,7 +324,11 @@ const esNotificacionDeSistema = (notificacion) => {
                                                     
                                                     <Link v-if="notif.caso_id" :href="route('casos.show', notif.caso_id)" 
                                                           class="text-xs font-bold text-gray-400 hover:text-indigo-600 transition-colors flex items-center gap-1">
-                                                        VER EXPEDIENTE <ChevronRightIcon class="h-3 w-3" />
+                                                        VER CASO <ChevronRightIcon class="h-3 w-3" />
+                                                    </Link>
+                                                    <Link v-else-if="notif.proceso_id" :href="route('procesos.show', notif.proceso_id)" 
+                                                          class="text-xs font-bold text-gray-400 hover:text-indigo-600 transition-colors flex items-center gap-1">
+                                                        VER RADICADO <ChevronRightIcon class="h-3 w-3" />
                                                     </Link>
                                                     <span v-else class="text-xs text-gray-300 italic">Notificación general</span>
 

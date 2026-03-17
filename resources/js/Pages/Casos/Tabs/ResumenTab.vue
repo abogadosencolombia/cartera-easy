@@ -3,6 +3,7 @@ import { useForm, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
+import DateTimePicker from '@/Components/DateTimePicker.vue';
 import Textarea from '@/Components/Textarea.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import InputError from '@/Components/InputError.vue';
@@ -270,12 +271,10 @@ const submitNotification = () => {
                 <form @submit.prevent="submitNotification" class="space-y-4">
                     <div>
                         <InputLabel for="fecha_programada" value="Fecha y Hora" class="!text-xs" />
-                        <TextInput 
+                        <DateTimePicker 
                             id="fecha_programada" 
-                            type="datetime-local" 
                             v-model="notifForm.fecha_programada" 
-                            class="mt-1 block w-full text-sm" 
-                            required 
+                            placeholder="Clic para agendar..."
                         />
                         <InputError :message="notifForm.errors.fecha_programada" class="mt-1" />
                     </div>

@@ -18,6 +18,8 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\AlertaSistemaMailable;
 
+use App\Models\ProcesoRadicado;
+
 class NotificacionController extends Controller
 {
     public function index(Request $request): Response
@@ -25,7 +27,7 @@ class NotificacionController extends Controller
         $user = Auth::user();
 
         // 1. OBTENER NOTIFICACIONES DE CASOS (Tabla Personalizada)
-        $queryCasos = NotificacionCaso::with('caso');
+        $queryCasos = NotificacionCaso::with(['caso', 'proceso']);
 
         if ($user->tipo_usuario !== 'admin') {
             $queryCasos->where('user_id', $user->id);
@@ -55,7 +57,7 @@ class NotificacionController extends Controller
             $mapaTipos = [
                 'vencimiento'   => 'App\Notifications\AlertaProceso', // Legal
                 'mora'          => 'App\Notifications\AlertaPago',    // Pagos
-                'alerta_manual' => 'App\Notifications\AlertaManual'
+                'alerta_manual' => 'App\Notifications\AlertaProgramadaNotification'
             ];
 
             if (isset($mapaTipos[$tipo])) {
@@ -214,9 +216,12 @@ class NotificacionController extends Controller
             'mensaje' => 'required|string|max:1000',
             'prioridad' => 'nullable|in:baja,media,alta',
             'fecha_programada' => 'nullable|date',
+            'programado_para' => 'nullable|date', // Soporte para ambos nombres desde el frontend
          ]);
          
-         $fechaEnvio = $request->filled('fecha_programada') ? Carbon::parse($validated['fecha_programada']) : now();
+         // Unificar el campo de fecha
+         $fechaStr = $validated['fecha_programada'] ?? $validated['programado_para'] ?? null;
+         $fechaEnvio = $fechaStr ? Carbon::parse($fechaStr) : now();
 
          // 1. Recopilar todos los IDs de usuarios que deben recibir la notificación
          $userIds = collect();
@@ -244,28 +249,51 @@ class NotificacionController extends Controller
                 'user_id' => $uid,
                 'tipo' => 'alerta_manual',
                 'mensaje' => $validated['mensaje'],
-                'fecha_envio' => $fechaEnvio,
+                'fecha_envio' => $fechaEnvio, // Para mostrar en el listado histórico
+                'programado_en' => $fechaEnvio, // IMPORTANTE: Para que el Job ProcesarAlertasProgramadas lo tome
                 'prioridad' => $validated['prioridad'] ?? 'media',
                 'leido' => false 
              ]);
          }
 
-         // Enviar correo solo al responsable principal si es para hoy
-         if ($fechaEnvio->isToday() && $caso->user_id) {
-             try {
-                 $user = User::find($caso->user_id);
-                 if ($user && $user->email) {
-                     Mail::to($user->email)->send(new AlertaSistemaMailable(
-                         $user->name,
-                         'Nueva Alerta Manual',
-                         $validated['mensaje'],
-                         route('casos.show', $caso->id),
-                         'Alerta creada manualmente sobre el caso #' . $caso->id
-                     ));
-                 }
-             } catch (\Exception $e) {}
+         return back()->with('success', 'Alerta programada para todos los responsables y administradores.');
+    }
+
+    public function storeManualProceso(Request $request, ProcesoRadicado $proceso): RedirectResponse
+    {
+         $validated = $request->validate([
+            'mensaje' => 'required|string|max:1000',
+            'prioridad' => 'nullable|in:baja,media,alta',
+            'fecha_programada' => 'nullable|date',
+            'programado_para' => 'nullable|date',
+         ]);
+         
+         $fechaStr = $validated['fecha_programada'] ?? $validated['programado_para'] ?? null;
+         $fechaEnvio = $fechaStr ? Carbon::parse($fechaStr) : now();
+
+         $userIds = collect();
+         $userIds->push(Auth::id());
+         
+         if ($proceso->abogado_id) $userIds->push($proceso->abogado_id);
+         if ($proceso->responsable_revision_id) $userIds->push($proceso->responsable_revision_id);
+         
+         $admins = User::where('tipo_usuario', 'admin')->pluck('id');
+         $userIds = $userIds->merge($admins);
+
+         $targetUsers = $userIds->unique()->filter();
+
+         foreach ($targetUsers as $uid) {
+             $proceso->notificaciones()->create([
+                'user_id' => $uid,
+                'tipo' => 'alerta_manual',
+                'mensaje' => $validated['mensaje'],
+                'fecha_envio' => $fechaEnvio,
+                'programado_en' => $fechaEnvio,
+                'prioridad' => $validated['prioridad'] ?? 'media',
+                'leido' => false 
+             ]);
          }
 
-         return back()->with('success', 'Alerta creada para todos los responsables y administradores.');
+         return back()->with('success', 'Alerta programada para los responsables del expediente.');
     }
 }

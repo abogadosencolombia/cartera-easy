@@ -10,9 +10,9 @@ class NotificacionCaso extends Model
     protected $table = 'notificaciones_caso';
 
     protected $fillable = [
-        'caso_id','user_id','tipo','mensaje','prioridad',
-        'programado_en','fecha_envio','last_sent_at',
-        'completed','leido','atendida_en','programado_para',
+        'caso_id', 'proceso_id', 'user_id', 'tipo', 'mensaje', 'prioridad',
+        'programado_en', 'fecha_envio', 'last_sent_at',
+        'completed', 'leido', 'atendida_en', 'programado_para',
     ];
 
     protected $casts = [
@@ -26,4 +26,5 @@ class NotificacionCaso extends Model
 
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
     public function caso(): BelongsTo { return $this->belongsTo(Caso::class); }
+    public function proceso(): BelongsTo { return $this->belongsTo(ProcesoRadicado::class, 'proceso_id'); }
 }

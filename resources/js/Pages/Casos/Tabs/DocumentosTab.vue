@@ -141,7 +141,7 @@ const submitGenerarDocumento = () => {
 const mostrandoModalAlerta = ref(false);
 const alertaForm = useForm({
     mensaje: '',
-    programado_para: null,
+    fecha_programada: null,
     prioridad: 'media',
 });
 const abrirModalAlerta = () => {
@@ -154,7 +154,11 @@ const cerrarModalAlerta = () => {
 const submitAlerta = () => {
     alertaForm.post(route('casos.notificaciones.store', props.caso.id), {
         preserveScroll: true,
-        onSuccess: () => cerrarModalAlerta(),
+        onSuccess: () => {
+            cerrarModalAlerta();
+            alertaForm.reset();
+            router.reload({ only: ['auth'] });
+        },
     });
 };
 
@@ -485,10 +489,10 @@ const submitAlerta = () => {
                         </SelectInput>
                     <InputError :message="alertaForm.errors.prioridad" class="mt-2" />
                     <div>
-                        <InputLabel for="programado_para" value="Fecha de la Alerta (Opcional)" />
+                        <InputLabel for="fecha_programada" value="Fecha de la Alerta (Opcional)" />
                         <TextInput
-                            v-model="alertaForm.programado_para"
-                            id="programado_para"
+                            v-model="alertaForm.fecha_programada"
+                            id="fecha_programada"
                             type="datetime-local"
                             class="mt-1 block w-full"
                         />
@@ -498,7 +502,7 @@ const submitAlerta = () => {
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                 S te enviaremos un recordatorio diario hasta esta fecha y hora (zona horaria del sistema).
                         </p>
-                        <InputError :message="alertaForm.errors.programado_para" class="mt-2" />
+                        <InputError :message="alertaForm.errors.fecha_programada" class="mt-2" />
                     </div>
                     <div class="mt-6 flex justify-end">
                         <SecondaryButton @click="cerrarModalAlerta">Cancelar</SecondaryButton>
