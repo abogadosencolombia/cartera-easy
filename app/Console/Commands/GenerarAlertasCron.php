@@ -73,8 +73,8 @@ class GenerarAlertasCron extends Command
 
                 if ($tipoAlerta) {
                     $destinatarios = collect();
-                    if ($proceso->abogado) $destinatarios->push($proceso->abogado);
-                    if ($proceso->responsableRevision) $destinatarios->push($proceso->responsableRevision);
+                    if ($proceso->abogado && !empty($proceso->abogado->email)) $destinatarios->push($proceso->abogado);
+                    if ($proceso->responsableRevision && !empty($proceso->responsableRevision->email)) $destinatarios->push($proceso->responsableRevision);
                     
                     $destinatarios = $destinatarios->unique('id');
 
@@ -91,8 +91,8 @@ class GenerarAlertasCron extends Command
                         if (!$yaNotificado) {
                             Notification::send($destinatarios, new ProcesoRevisionNotification($proceso, $tipoAlerta));
                             $countProcesos++;
-                            // Pausa para evitar rate-limit de Hostinger (0.5 segundos)
-                            usleep(500000);
+                            // Pausa para evitar rate-limit de Hostinger (1.0 segundo)
+                            usleep(1000000);
                         }
                     }
                 }
@@ -153,8 +153,8 @@ class GenerarAlertasCron extends Command
                     $enviado = $this->crearNotificacionPago($cuota, $admins, 'mora', $mensajePago, $tituloPago);
                     if ($enviado) {
                         $countPagos++;
-                        // Pausa de seguridad para correos de pagos (0.5s)
-                        usleep(500000);
+                        // Pausa de seguridad para correos de pagos (1.0s)
+                        usleep(1000000);
                     }
                 }
             }
@@ -176,12 +176,12 @@ class GenerarAlertasCron extends Command
     {
         try {
             $user = User::find($userId);
-            if ($user && $user->email && !str_contains($user->email, 'example.com')) {
+            if ($user && !empty($user->email) && !str_contains($user->email, 'example.com')) {
                 Mail::to($user->email)->send(new AlertaSistemaMailable(
                     $user->name, $titulo, $mensaje, $link, $detalles
                 ));
                 // Pequeña pausa para no saturar el servidor de correo
-                usleep(500000); // 0.5 segundos
+                usleep(1000000); // 1.0 segundo
             } 
         } catch (\Exception $e) {
             // Silenciamos error de correo para no detener el proceso principal

@@ -22,7 +22,13 @@ class GestionDiariaNotification extends Notification
 
     public function via($notifiable): array
     {
-        return ["database", "mail"];
+        $channels = ["database"];
+        
+        if (!empty($notifiable->email)) {
+            $channels[] = "mail";
+        }
+        
+        return $channels;
     }
 
     public function toMail($notifiable): MailMessage

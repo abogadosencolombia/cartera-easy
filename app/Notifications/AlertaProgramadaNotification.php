@@ -21,7 +21,13 @@ class AlertaProgramadaNotification extends Notification
     }
 
     public function via($notifiable): array {
-        return [WebPushChannel::class, 'mail'];
+        $channels = [WebPushChannel::class];
+        
+        if (!empty($notifiable->email)) {
+            $channels[] = 'mail';
+        }
+        
+        return $channels;
     }
 
     public function toMail($notifiable): \App\Mail\AlertaSistemaMailable

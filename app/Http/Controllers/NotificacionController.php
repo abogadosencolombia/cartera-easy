@@ -219,9 +219,10 @@ class NotificacionController extends Controller
             'programado_para' => 'nullable|date', // Soporte para ambos nombres desde el frontend
          ]);
          
-         // Unificar el campo de fecha
+         // Unificar el campo de fecha y forzar zona horaria de Bogotá
          $fechaStr = $validated['fecha_programada'] ?? $validated['programado_para'] ?? null;
-         $fechaEnvio = $fechaStr ? Carbon::parse($fechaStr) : now();
+         $tz = config('app.timezone', 'America/Bogota');
+         $fechaEnvio = $fechaStr ? Carbon::parse($fechaStr, $tz) : now($tz);
 
          // 1. Recopilar todos los IDs de usuarios que deben recibir la notificación
          $userIds = collect();
@@ -269,7 +270,8 @@ class NotificacionController extends Controller
          ]);
          
          $fechaStr = $validated['fecha_programada'] ?? $validated['programado_para'] ?? null;
-         $fechaEnvio = $fechaStr ? Carbon::parse($fechaStr) : now();
+         $tz = config('app.timezone', 'America/Bogota');
+         $fechaEnvio = $fechaStr ? Carbon::parse($fechaStr, $tz) : now($tz);
 
          $userIds = collect();
          $userIds->push(Auth::id());

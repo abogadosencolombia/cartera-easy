@@ -15,7 +15,7 @@ class ProcesarAlertasProgramadas implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 1;
-    public int $timeout = 60;
+    public int $timeout = 300;
 
     public function __construct()
     {
@@ -33,10 +33,10 @@ class ProcesarAlertasProgramadas implements ShouldQueue
             ->where('completed', false)
             ->with('user')
             ->orderBy('id')
-            ->chunkById(200, function ($lote) use ($now, $tz) {
+            ->chunkById(50, function ($lote) use ($now, $tz) {
                 foreach ($lote as $a) {
                     $user = $a->user;
-                    if (!$user) {
+                    if (!$user || empty($user->email)) {
                         $a->forceFill(['completed' => true, 'last_sent_at' => $now])->save();
                         continue;
                     }
@@ -51,10 +51,12 @@ class ProcesarAlertasProgramadas implements ShouldQueue
                             'last_sent_at' => $now,
                             'completed'    => true,
                         ])->save();
+                        usleep(1000000); // 1.0s pause seguridad mail
                         continue;
                     }
 
-                    $target = $a->programado_en->timezone($tz)->seconds(0);
+                    // Asegurar que programado_en se trate como UTC antes de convertir a Bogotá
+                    $target = $a->programado_en->shiftTimezone('UTC')->timezone($tz)->seconds(0);
                     $diff   = $now->diffInMinutes($target, false);
 
                     if ($diff <= 0) {
@@ -67,6 +69,7 @@ class ProcesarAlertasProgramadas implements ShouldQueue
                             'last_sent_at' => $now,
                             'completed'    => true,
                         ])->save();
+                        usleep(1000000); // 1.0s pause seguridad mail
                         continue;
                     }
 
@@ -78,6 +81,7 @@ class ProcesarAlertasProgramadas implements ShouldQueue
                                 $a->caso_id, $a->mensaje, false, $a->prioridad ?? 'media', $a->proceso_id
                             ));
                             $a->forceFill(['last_sent_at' => $now])->save();
+                            usleep(1000000); // 1.0s pause seguridad mail
                         }
                     }
                 }

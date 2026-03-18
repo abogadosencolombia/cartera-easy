@@ -1,24 +1,41 @@
-import axios from 'axios';
+import axios, { isCancel } from 'axios';
 import Swal from 'sweetalert2';
 window.axios = axios;
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 
+window.Pusher = Pusher;
+
+// Solo inicializar Echo si tenemos las llaves configuradas, 
+// o usar valores por defecto seguros para evitar errores de referencia en Vue.
+window.Echo = new Echo({
+    broadcaster: 'pusher',
+    key: import.meta.env.VITE_PUSHER_APP_KEY || 'loading',
+    cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER || 'mt1',
+    forceTLS: true,
+    enabledTransports: ['ws', 'wss']
+});
+
 window.axios.defaults.withCredentials = true;
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 
-// --- Tu código de CSRF (Está perfecto) ---
+// --- Manejo de CSRF ---
 const token = document.querySelector('meta[name="csrf-token"]');
 if (token) {
     window.axios.defaults.headers.common['X-CSRF-TOKEN'] = token.content;
 }
 
-// --------------------------------------------------------------------------
-// --- INTERCEPTOR GLOBAL DE ERRORES (419, 403, 500, ETC.) ---
-// --------------------------------------------------------------------------
+/**
+ * Interceptor Global de Axios para manejar errores de sesión y red.
+ */
 window.axios.interceptors.response.use(
-    (response) => response, // Pasa las respuestas correctas
+    (response) => response,
     async (error) => {
+        // --- 1. Ignorar errores de cancelación (Navegación Inertia, búsquedas abortadas) ---
+        if (isCancel(error)) {
+            return Promise.reject(error);
+        }
+
         const originalRequest = error.config;
 
         if (error.response) {
@@ -58,7 +75,6 @@ window.axios.interceptors.response.use(
             }
 
             // 2. Manejo de Errores Comunes (500, 403, 404)
-            // Evitamos mostrar la alerta en peticiones que el desarrollador decida silenciar
             if (!originalRequest.silent) {
                 if (status >= 500) {
                     Swal.fire({
@@ -84,7 +100,8 @@ window.axios.interceptors.response.use(
                 }
             }
         } else if (error.request) {
-            // El servidor no respondió (Caída de red)
+            // El servidor no respondió (Caída de red o petición abortada por el navegador)
+            // Solo mostrar alerta si NO es un error de cancelación (ya manejado arriba)
             Swal.fire({
                 toast: true, position: 'top-end', showConfirmButton: false, timer: 5000, timerProgressBar: true,
                 icon: 'error',

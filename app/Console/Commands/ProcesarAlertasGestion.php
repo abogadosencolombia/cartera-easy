@@ -22,7 +22,7 @@ class ProcesarAlertasGestion extends Command
             ->get();
 
         foreach ($notas as $nota) {
-            if (!$nota->user) continue;
+            if (!$nota->user || empty($nota->user->email)) continue;
 
             $ahora = now();
             $expira = Carbon::parse($nota->expires_at);
@@ -35,7 +35,7 @@ class ProcesarAlertasGestion extends Command
                 if (!$yaNotificadoHoy) {
                     $nota->user->notify(new GestionDiariaNotification($nota, "proxima"));
                     $this->info("Notificación PROXIMA enviada a {$nota->user->name} para tarea #{$nota->id}");
-                    usleep(500000); // 0.5s pausa seguridad mail
+                    usleep(1000000); // 1.0s pausa seguridad mail
                 }
             }
 
@@ -47,7 +47,7 @@ class ProcesarAlertasGestion extends Command
                 if (!$yaNotificadoRecientemente) {
                     $nota->user->notify(new GestionDiariaNotification($nota, "vencida"));
                     $this->info("Notificación VENCIDA enviada a {$nota->user->name} para tarea #{$nota->id}");
-                    usleep(500000); // 0.5s pausa seguridad mail
+                    usleep(1000000); // 1.0s pausa seguridad mail
                 }
             }
         }
