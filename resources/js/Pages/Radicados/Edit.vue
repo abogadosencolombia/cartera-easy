@@ -62,7 +62,7 @@ const loadPersonasArray = (personas) => {
     });
 };
 
-const form = useForm({
+const form = useForm(`EditRadicado:${props.radicado.id}`, {
   _method: 'PATCH',
   abogado_id: mapToSelectOption(props.proceso.abogado, 'name'),
   responsable_revision_id: mapToSelectOption(props.proceso.responsable_revision, 'name'),

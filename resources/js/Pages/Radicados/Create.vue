@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed } from 'vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { ref, computed, watch } from 'vue';
+import { Head, Link, useForm, useRemember } from '@inertiajs/vue3';
+import { debounce } from 'lodash';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
@@ -25,9 +26,9 @@ const filteredEtapas = computed(() => {
 });
 
 // --- State for the Wizard ---
-const step = ref(1);
+const step = useRemember(1, 'CreateRadicadoStep');
 const totalSteps = 3;
-const transitionName = ref('slide-next');
+const transitionName = useRemember('slide-next', 'CreateRadicadoTransition');
 
 const steps = [
   { id: 1, name: 'Información Principal', fields: ['tipo_proceso_id', 'etapa_procesal_id', 'juzgado_id'] },
@@ -38,7 +39,7 @@ const steps = [
 const currentStep = computed(() => steps.find(s => s.id === step.value));
 
 // --- Form Data ---
-const form = useForm({
+const initialData = {
   abogado_id: null,
   responsable_revision_id: null,
   juzgado_id: null,
@@ -63,7 +64,23 @@ const form = useForm({
   ubicacion_drive: '',
   correos_juzgado: '',
   observaciones: '',
-});
+};
+
+const rememberedData = useRemember(initialData, 'CreateRadicadoData');
+const form = useForm(rememberedData.value);
+
+watch(form, (val) => {
+    rememberedData.value = { ...val };
+}, { deep: true });
+
+// Sincronizar campos principales con la URL
+watch(form, debounce(() => {
+    const url = new URL(window.location);
+    if (form.radicado) url.searchParams.set('radicado', form.radicado);
+    if (form.asunto) url.searchParams.set('asunto', form.asunto);
+    if (form.naturaleza) url.searchParams.set('naturaleza', form.naturaleza);
+    window.history.replaceState({}, '', url);
+}, 500), { deep: true });
 
 // --- Helpers para Listas Dinámicas ---
 const addDemandante = () => form.demandantes.push({ 
@@ -118,6 +135,10 @@ const submit = () => {
     }).filter(d => d.id || d.is_new),
   })).post(route('procesos.store'), {
     preserveScroll: true,
+    onSuccess: () => {
+      step.value = 1;
+      transitionName.value = 'slide-next';
+    },
     onError: (errors) => {
       const errorKeys = Object.keys(errors);
       if (errorKeys.length > 0) {

@@ -23,7 +23,7 @@ const props = defineProps({
 });
 
 // --- FORMULARIO PARA NOTIFICACIONES ---
-const notifForm = useForm({
+const notifForm = useForm(`ProcesoNotifForm:${props.proceso.id}`, {
     fecha_programada: '',
     mensaje: '',
     prioridad: 'media',
@@ -60,7 +60,7 @@ const asText = (v) => v ?? '—';
 
 // --- LOGICA CAMBIO DE ETAPA ---
 const showEtapaModal = ref(false);
-const etapaForm = useForm({
+const etapaForm = useForm(`ProcesoEtapaForm:${props.proceso.id}`, {
     etapa_procesal_id: props.proceso.etapa_procesal_id || '',
     observacion: '',
 });
@@ -80,7 +80,7 @@ const submitEtapa = () => {
 
 // --- Lógica Cierre/Reapertura ---
 const showCloseModal = ref(false);
-const closeForm = useForm({ nota_cierre: '' });
+const closeForm = useForm(`ProcesoCloseForm:${props.proceso.id}`, { nota_cierre: '' });
 const openCloseModal = () => { closeForm.reset(); showCloseModal.value = true; };
 const submitCloseCase = () => closeForm.patch(route('procesos.close', props.proceso.id), { preserveScroll: true, onSuccess: () => showCloseModal.value = false });
 
@@ -97,7 +97,7 @@ const closeDelete = () => (confirmingDeletion.value = false);
 const doDelete = () => deleteForm.delete(route('procesos.destroy', props.proceso.id), { onSuccess: () => closeDelete() });
 
 // --- Subida Documentos ---
-const uploadForm = useForm({ archivo: null, nombre: '', nota: '' });
+const uploadForm = useForm(`ProcesoUploadForm:${props.proceso.id}`, { archivo: null, nombre: '', nota: '' });
 const fileInput = ref(null);
 const onPickFile = (e) => {
   const file = e.target.files?.[0];
@@ -133,12 +133,12 @@ const doDeleteDoc = () => {
 };
 
 // --- Actuaciones ---
-const actuacionForm = useForm({ nota: '', fecha_actuacion: new Date().toISOString().slice(0, 10) });
+const actuacionForm = useForm(`ProcesoActuacionForm:${props.proceso.id}`, { nota: '', fecha_actuacion: new Date().toISOString().slice(0, 10) });
 const guardarActuacion = () => actuacionForm.post(route('procesos.actuaciones.store', props.proceso.id), { preserveScroll: true, onSuccess: () => { actuacionForm.reset(); router.reload({ only: ['proceso'], preserveState: true }); } });
 
 const editActuacionModalAbierto = ref(false);
 const actuacionEnEdicion = ref(null);
-const editActuacionForm = useForm({ nota: '', fecha_actuacion: '' });
+const editActuacionForm = useForm(`ProcesoEditActuacionForm:${props.proceso.id}`, { nota: '', fecha_actuacion: '' });
 
 const abrirModalEditar = (actuacion) => {
     actuacionEnEdicion.value = actuacion;

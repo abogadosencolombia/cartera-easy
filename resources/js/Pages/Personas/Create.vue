@@ -15,7 +15,7 @@ const props = defineProps({
   allAbogados: { type: Array, default: () => [] },
 });
 
-const form = useForm({
+const form = useForm('CreatePersona', {
   nombre_completo: '',
   tipo_documento: 'CC',
   numero_documento: '',

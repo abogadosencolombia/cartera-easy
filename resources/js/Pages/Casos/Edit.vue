@@ -35,7 +35,7 @@ const getInitialTab = () => {
     return (tabParam && validTabs.includes(tabParam)) ? tabParam : 'info-principal';
 };
 
-const activeTab = ref(getInitialTab());
+const activeTab = useRemember(getInitialTab(), `EditCasoTab:${props.caso.id}`);
 const user = usePage().props.auth.user;
 
 // --- SINCRONIZACIÓN CON URL ---
@@ -62,7 +62,7 @@ const isFormDisabled = computed(() => (user.tipo_usuario !== 'admin' && props.ca
 const formatDateForInput = (d) => d ? new Date(d).toISOString().split('T')[0] : null;
 const safeJsonParse = (s) => { if (!s) return []; try { const p = JSON.parse(s); return Array.isArray(p) ? p : []; } catch (e) { return []; } };
 
-const form = useForm({
+const form = useForm(`EditCaso:${props.caso.id}`, {
     _method: 'PATCH',
     cooperativa_id: props.caso.cooperativa ? { id: props.caso.cooperativa.id, nombre: props.caso.cooperativa.nombre } : null,
     user_id: props.caso.users?.length > 0 

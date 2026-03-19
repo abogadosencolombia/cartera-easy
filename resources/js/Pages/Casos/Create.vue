@@ -11,9 +11,10 @@ import Dropdown from '@/Components/Dropdown.vue';
 import AsyncSelect from '@/Components/AsyncSelect.vue';
 import SearchableSelect from '@/Components/SearchableSelect.vue';
 import { TrashIcon, ChevronDownIcon } from '@heroicons/vue/24/outline';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, useRemember } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
 import axios from 'axios';
+import { debounce } from 'lodash';
 
 const props = defineProps({
     casoAClonar: { type: Object, default: null },
@@ -31,7 +32,7 @@ const safeParseJson = (jsonString) => {
   }
 };
 
-const form = useForm({
+const initialData = {
     cooperativa_id: props.casoAClonar?.cooperativa || null,
     user_id: props.casoAClonar?.user ? [{ id: props.casoAClonar.user.id, name: props.casoAClonar.user.name }] : [],
     deudor_id: props.casoAClonar?.deudor_id || null,
@@ -81,7 +82,15 @@ const form = useForm({
     link_drive: props.casoAClonar?.link_drive || '',
     link_expediente: props.casoAClonar?.link_expediente || '',
     clonado_de_id: props.casoAClonar?.id || null,
-});
+};
+
+const rememberedData = useRemember(initialData, 'CreateCasoData');
+const form = useForm(rememberedData.value);
+
+// Sincronizar el form con el remember para que persista al escribir
+watch(form, (val) => {
+    rememberedData.value = { ...val };
+}, { deep: true });
 
 // --- HELPERS DINÁMICOS ---
 const addCodeudor = () => form.codeudores.push({ nombre_completo: '', tipo_documento: 'CC', numero_documento: '', celular: '', correo: '', addresses: [], social_links: [] });
@@ -122,6 +131,15 @@ watch(() => form.subtipo_proceso, (newVal, oldVal) => {
         form.subproceso = null;
     }
 }, { immediate: true });
+
+watch(form, debounce(() => {
+    const url = new URL(window.location);
+    // Solo guardamos campos de texto simples para evitar URLs gigantes
+    if (form.radicado) url.searchParams.set('radicado', form.radicado);
+    if (form.referencia_credito) url.searchParams.set('ref', form.referencia_credito);
+    if (form.asunto) url.searchParams.set('asunto', form.asunto);
+    window.history.replaceState({}, '', url);
+}, 500), { deep: true });
 
 const submit = () => {
     form.transform(data => ({

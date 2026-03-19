@@ -16,7 +16,7 @@ const props = defineProps({
   allAbogados: { type: Array, default: () => [] },
 });
 
-const form = useForm({
+const form = useForm(`EditPersona:${props.persona.id}`, {
   _method: 'PATCH',
   nombre_completo: props.persona.nombre_completo,
   tipo_documento: props.persona.tipo_documento,
