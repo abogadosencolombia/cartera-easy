@@ -90,29 +90,6 @@ Route::get('/', function () {
     ]);
 })->name('welcome');
 
-Route::get('/_push-test', function () {
-    $u = auth()->user() ?: \App\Models\User::first();
-    if ($u) $u->notify(new \App\Notifications\DebugPushNotification());
-    return 'ok';
-})->middleware('auth')->name('_push.test');
-
-Route::get('/api/simulador/supersolidaria/validar/{nit}', function ($nit) {
-    $cooperativasSimuladas = [
-        '900123456-7' => ['nombre' => 'Cooperativa El Futuro', 'estado' => 'Activa', 'fecha_registro' => '2010-05-20'],
-        '800987654-3' => ['nombre' => 'CoopProgreso', 'estado' => 'En Liquidación', 'fecha_registro' => '2005-11-15'],
-        '123456789-0' => ['nombre' => 'Cooperativa Fantasma', 'estado' => 'Cancelada', 'fecha_registro' => '2001-01-10'],
-    ];
-    return response()->json($cooperativasSimuladas[$nit] ?? ['error' => 'Cooperativa no encontrada'], 404);
-});
-
-Route::get('/probar-integracion-supersolidaria', function (IntegrationService $integrationService) {
-    $nitDePrueba = '800987654-3';
-    $urlDelSimulador = url('/api/simulador/supersolidaria/validar/' . $nitDePrueba);
-    $respuesta = $integrationService->ejecutar('Supersolidaria (Simulador)', 'get', $urlDelSimulador);
-    dump($respuesta);
-    echo "<h1>Revisa la tabla 'integracion_externa_logs' en tu base de datos.</h1>";
-});
-
 // =================================================================
 // ===== GRUPO PRINCIPAL DE RUTAS PROTEGIDAS POR AUTENTICACIÓN =====
 // =================================================================

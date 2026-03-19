@@ -39,7 +39,7 @@ const steps = [
 const currentStep = computed(() => steps.find(s => s.id === step.value));
 
 // --- Form Data ---
-const initialData = {
+const form = useForm('CreateRadicado', {
   abogado_id: null,
   responsable_revision_id: null,
   juzgado_id: null,
@@ -64,14 +64,7 @@ const initialData = {
   ubicacion_drive: '',
   correos_juzgado: '',
   observaciones: '',
-};
-
-const rememberedData = useRemember(initialData, 'CreateRadicadoData');
-const form = useForm(rememberedData.value);
-
-watch(form, (val) => {
-    rememberedData.value = { ...val };
-}, { deep: true });
+});
 
 // Sincronizar campos principales con la URL
 watch(form, debounce(() => {

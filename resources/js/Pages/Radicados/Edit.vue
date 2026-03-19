@@ -62,7 +62,7 @@ const loadPersonasArray = (personas) => {
     });
 };
 
-const form = useForm(`EditRadicado:${props.radicado.id}`, {
+const form = useForm(`EditRadicado:${props.proceso.id}`, {
   _method: 'PATCH',
   abogado_id: mapToSelectOption(props.proceso.abogado, 'name'),
   responsable_revision_id: mapToSelectOption(props.proceso.responsable_revision, 'name'),
@@ -96,14 +96,14 @@ const addDemandado = () => form.demandados.push({
 const removeDemandado = (index) => { if (form.demandados.length > 1) form.demandados.splice(index, 1); };
 
 const submit = () => {
-  const payload = {
-    ...form.data(),
-    abogado_id: form.abogado_id?.id ?? null,
-    responsable_revision_id: form.responsable_revision_id?.id ?? null,
-    juzgado_id: form.juzgado_id?.id ?? null,
-    tipo_proceso_id: form.tipo_proceso_id?.id ?? null,
+  form.transform(data => ({
+    ...data,
+    abogado_id: data.abogado_id?.id ?? null,
+    responsable_revision_id: data.responsable_revision_id?.id ?? null,
+    juzgado_id: data.juzgado_id?.id ?? null,
+    tipo_proceso_id: data.tipo_proceso_id?.id ?? null,
     
-    demandantes: form.demandantes.map(d => {
+    demandantes: data.demandantes.map(d => {
         if (d.is_new) return {
             id: d.id,
             nombre_completo: d.nombre_completo,
@@ -117,7 +117,7 @@ const submit = () => {
         return { id: d.selected?.id };
     }).filter(d => d.id || d.is_new),
     
-    demandados: form.demandados.map(d => {
+    demandados: data.demandados.map(d => {
         if (d.is_new) return {
             id: d.id,
             nombre_completo: d.nombre_completo,
@@ -131,9 +131,7 @@ const submit = () => {
         };
         return { id: d.selected?.id };
     }).filter(d => d.id || d.is_new),
-  };
-  
-  router.post(route('procesos.update', props.proceso.id), payload, { preserveScroll: true });
+  })).post(route('procesos.update', props.proceso.id), { preserveScroll: true });
 };
 
 const isClosed = computed(() => props.proceso.estado === 'CERRADO');
