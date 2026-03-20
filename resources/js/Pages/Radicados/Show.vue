@@ -15,12 +15,34 @@ import DatePicker from '@/Components/DatePicker.vue';
 import Textarea from '@/Components/Textarea.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import { useProcesos } from '@/composables/useProcesos';
-import { ArrowPathIcon, ChevronDownIcon, BellIcon } from '@heroicons/vue/24/outline';
+import { ArrowPathIcon, ChevronDownIcon, BellIcon, CalendarDaysIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     proceso: { type: Object, required: true },
     etapas: { type: Array, required: true }, // Recibir etapas para el modal
 });
+
+// --- LÓGICA DE COMPROMISO DE REVISIÓN (OBLIGATORIO) ---
+const showCommitmentModal = ref(false);
+const globalRevisionDate = ref(props.proceso.fecha_proxima_revision || '');
+let pendingAction = null;
+
+const openCommitmentModal = (action) => {
+    pendingAction = action;
+    // Si la fecha actual ya pasó, sugerimos mañana por defecto para que no quede vacía
+    const today = new Date().toISOString().split('T')[0];
+    if (!globalRevisionDate.value || globalRevisionDate.value < today) {
+        globalRevisionDate.value = today;
+    }
+    showCommitmentModal.value = true;
+};
+
+const executeCommittedAction = () => {
+    if (!globalRevisionDate.value) return;
+    showCommitmentModal.value = false;
+    pendingAction(globalRevisionDate.value);
+};
+// -----------------------------------------------------
 
 // --- FORMULARIO PARA NOTIFICACIONES ---
 const notifForm = useForm(`ProcesoNotifForm:${props.proceso.id}`, {
@@ -63,18 +85,23 @@ const showEtapaModal = ref(false);
 const etapaForm = useForm(`ProcesoEtapaForm:${props.proceso.id}`, {
     etapa_procesal_id: props.proceso.etapa_procesal_id || '',
     observacion: '',
+    fecha_proxima_revision: props.proceso.fecha_proxima_revision || '',
 });
 
 const openEtapaModal = () => {
     etapaForm.etapa_procesal_id = props.proceso.etapa_procesal_id;
     etapaForm.observacion = '';
+    etapaForm.fecha_proxima_revision = props.proceso.fecha_proxima_revision;
     showEtapaModal.value = true;
 };
 
 const submitEtapa = () => {
-    etapaForm.patch(route('procesos.update_etapa', props.proceso.id), {
-        onSuccess: () => showEtapaModal.value = false,
-        preserveScroll: true
+    openCommitmentModal((date) => {
+        etapaForm.fecha_proxima_revision = date;
+        etapaForm.patch(route('procesos.update_etapa', props.proceso.id), {
+            onSuccess: () => showEtapaModal.value = false,
+            preserveScroll: true
+        });
     });
 };
 
@@ -97,7 +124,12 @@ const closeDelete = () => (confirmingDeletion.value = false);
 const doDelete = () => deleteForm.delete(route('procesos.destroy', props.proceso.id), { onSuccess: () => closeDelete() });
 
 // --- Subida Documentos ---
-const uploadForm = useForm(`ProcesoUploadForm:${props.proceso.id}`, { archivo: null, nombre: '', nota: '' });
+const uploadForm = useForm(`ProcesoUploadForm:${props.proceso.id}`, { 
+    archivo: null, 
+    nombre: '', 
+    nota: '',
+    fecha_proxima_revision: props.proceso.fecha_proxima_revision || '',
+});
 const fileInput = ref(null);
 const onPickFile = (e) => {
   const file = e.target.files?.[0];
@@ -111,12 +143,15 @@ const onPickFile = (e) => {
 };
 const submitUpload = () => {
   if (!uploadForm.archivo) return;
-  uploadForm.post(route('procesos.documentos.store', props.proceso.id), {
-    forceFormData: true, preserveScroll: true, onSuccess: () => {
-      uploadForm.reset();
-      if (fileInput.value) fileInput.value.value = '';
-      router.reload({ only: ['proceso'], preserveState: true });
-    },
+  openCommitmentModal((date) => {
+    uploadForm.fecha_proxima_revision = date;
+    uploadForm.post(route('procesos.documentos.store', props.proceso.id), {
+        forceFormData: true, preserveScroll: true, onSuccess: () => {
+        uploadForm.reset();
+        if (fileInput.value) fileInput.value.value = '';
+        router.reload({ only: ['proceso'], preserveState: true });
+        },
+    });
   });
 };
 
@@ -133,8 +168,23 @@ const doDeleteDoc = () => {
 };
 
 // --- Actuaciones ---
-const actuacionForm = useForm(`ProcesoActuacionForm:${props.proceso.id}`, { nota: '', fecha_actuacion: new Date().toISOString().slice(0, 10) });
-const guardarActuacion = () => actuacionForm.post(route('procesos.actuaciones.store', props.proceso.id), { preserveScroll: true, onSuccess: () => { actuacionForm.reset(); router.reload({ only: ['proceso'], preserveState: true }); } });
+const actuacionForm = useForm(`ProcesoActuacionForm:${props.proceso.id}`, { 
+    nota: '', 
+    fecha_actuacion: new Date().toISOString().slice(0, 10),
+    fecha_proxima_revision: props.proceso.fecha_proxima_revision || '',
+});
+const guardarActuacion = () => {
+    openCommitmentModal((date) => {
+        actuacionForm.fecha_proxima_revision = date;
+        actuacionForm.post(route('procesos.actuaciones.store', props.proceso.id), { 
+            preserveScroll: true, 
+            onSuccess: () => { 
+                actuacionForm.reset(); 
+                router.reload({ only: ['proceso'], preserveState: true }); 
+            } 
+        });
+    });
+};
 
 const editActuacionModalAbierto = ref(false);
 const actuacionEnEdicion = ref(null);
@@ -311,7 +361,7 @@ const eliminarActuacion = (actuacionId) => {
                                     <InputError :message="actuacionForm.errors.fecha_actuacion" class="mt-2" />
                                 </div>
                             </div>
-                            <div class="flex justify-end"><PrimaryButton :disabled="actuacionForm.processing">Registrar</PrimaryButton></div>
+                            <div class="flex justify-end"><PrimaryButton :disabled="actuacionForm.processing">Registrar Actuación</PrimaryButton></div>
                         </form>
                    </fieldset>
                    <h3 class="text-lg font-bold mb-4">Historial</h3>
@@ -465,7 +515,44 @@ const eliminarActuacion = (actuacionId) => {
         </form>
     </Modal>
 
-    <!-- MODAL CAMBIO DE ETAPA (NUEVO) -->
+    <!-- MODAL DE COMPROMISO DE REVISIÓN (OBLIGATORIO) -->
+    <Modal :show="showCommitmentModal" @close="showCommitmentModal = false" maxWidth="sm">
+        <div class="p-6">
+            <div class="flex items-center gap-3 mb-4 text-indigo-600 dark:text-indigo-400">
+                <CalendarDaysIcon class="h-8 w-8" />
+                <h2 class="text-xl font-black uppercase tracking-tight">Próxima Revisión</h2>
+            </div>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-6 font-medium">
+                Antes de continuar, es <strong>obligatorio</strong> que definas la fecha de la próxima revisión para este radicado. ¡No dejes que se venza!
+            </p>
+            
+            <div class="space-y-4">
+                <div class="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border-2 border-indigo-100 dark:border-indigo-800">
+                    <InputLabel value="¿Cuándo volverás a revisar?" class="text-xs font-bold text-indigo-700 dark:text-indigo-300 uppercase mb-2" />
+                    <DatePicker 
+                        v-model="globalRevisionDate" 
+                        class="mt-1 block w-full shadow-sm border-indigo-200 focus:border-indigo-500 focus:ring-indigo-500 rounded-lg" 
+                        required 
+                    />
+                </div>
+                
+                <div class="flex flex-col gap-2 pt-4">
+                    <PrimaryButton 
+                        @click="executeCommittedAction" 
+                        class="w-full justify-center !py-4 !text-sm !bg-indigo-600 hover:!bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none transition-all transform hover:scale-[1.02]"
+                        :disabled="!globalRevisionDate"
+                    >
+                        Confirmar y Guardar
+                    </PrimaryButton>
+                    <SecondaryButton @click="showCommitmentModal = false" class="w-full justify-center">
+                        Cancelar acción
+                    </SecondaryButton>
+                </div>
+            </div>
+        </div>
+    </Modal>
+
+    <!-- MODAL CAMBIO DE ETAPA -->
     <Modal :show="showEtapaModal" @close="showEtapaModal = false">
         <div class="p-6">
             <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Actualizar Etapa Procesal</h2>

@@ -332,7 +332,8 @@ class ProcesoRadicadoController extends Controller
         $this->authorize('update', $proceso);
         $validated = $request->validate([
             'etapa_procesal_id' => 'required|exists:etapas_procesales,id',
-            'observacion' => 'nullable|string|max:500'
+            'observacion' => 'nullable|string|max:500',
+            'fecha_proxima_revision' => 'required|date|after_or_equal:today',
         ]);
 
         $nuevaEtapa = EtapaProcesal::find($validated['etapa_procesal_id']);
@@ -341,6 +342,7 @@ class ProcesoRadicadoController extends Controller
             $proceso->update([
                 'etapa_procesal_id' => $nuevaEtapa->id,
                 'fecha_cambio_etapa' => now(),
+                'fecha_proxima_revision' => $validated['fecha_proxima_revision'],
             ]);
 
             $nota = "El proceso avanzó a la etapa: {$nuevaEtapa->nombre}";
@@ -357,7 +359,7 @@ class ProcesoRadicadoController extends Controller
             AuditoriaEvento::create([
                 'user_id' => Auth::id(),
                 'evento' => 'CAMBIO_ETAPA_RADICADO',
-                'descripcion_breve' => "Radicado {$proceso->radicado} movido a etapa {$nuevaEtapa->nombre}",
+                'descripcion_breve' => "Radicado {$proceso->radicado} movido a etapa {$nuevaEtapa->nombre} (Próxima revisión: {$validated['fecha_proxima_revision']})",
                 'auditable_id' => $proceso->id,
                 'auditable_type' => ProcesoRadicado::class,
                 'criticidad' => 'media',
@@ -366,7 +368,7 @@ class ProcesoRadicadoController extends Controller
             ]);
         });
 
-        return back()->with('success', "Etapa actualizada a {$nuevaEtapa->nombre}");
+        return back()->with('success', "Etapa actualizada a {$nuevaEtapa->nombre} y próxima revisión agendada.");
     }
 
     public function destroy(ProcesoRadicado $proceso)
@@ -500,9 +502,23 @@ class ProcesoRadicadoController extends Controller
     public function storeActuacion(Request $request, ProcesoRadicado $proceso)
     {
         $this->authorize('update', $proceso);
-        $validated = $request->validate(['nota' => 'required|string', 'fecha_actuacion' => 'required|date']);
-        $proceso->actuaciones()->create(['nota' => $validated['nota'], 'fecha_actuacion' => $validated['fecha_actuacion'], 'user_id' => Auth::id()]);
-        return back()->with('success', 'Actuación registrada.');
+        $validated = $request->validate([
+            'nota' => 'required|string', 
+            'fecha_actuacion' => 'required|date',
+            'fecha_proxima_revision' => 'required|date|after_or_equal:today',
+        ]);
+
+        DB::transaction(function () use ($proceso, $validated) {
+            $proceso->actuaciones()->create([
+                'nota' => $validated['nota'], 
+                'fecha_actuacion' => $validated['fecha_actuacion'], 
+                'user_id' => Auth::id()
+            ]);
+
+            $proceso->update(['fecha_proxima_revision' => $validated['fecha_proxima_revision']]);
+        });
+
+        return back()->with('success', 'Actuación registrada y próxima revisión actualizada.');
     }
 
     public function updateActuacion(Request $request, Actuacion $actuacion)

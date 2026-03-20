@@ -10,7 +10,18 @@ import Textarea from '@/Components/Textarea.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import AsyncSelect from '@/Components/AsyncSelect.vue';
 import SearchableSelect from '@/Components/SearchableSelect.vue';
-import { TrashIcon, ChevronDownIcon } from '@heroicons/vue/24/outline';
+import { 
+    TrashIcon, 
+    ChevronDownIcon, 
+    ScaleIcon, 
+    UsersIcon, 
+    BriefcaseIcon, 
+    BuildingOfficeIcon,
+    CheckCircleIcon,
+    ClockIcon,
+    DocumentTextIcon,
+    ArrowPathIcon
+} from '@heroicons/vue/24/outline';
 import { Head, Link, useForm, useRemember } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
 import axios from 'axios';
@@ -299,7 +310,7 @@ const submit = () => {
                                         <SearchableSelect
                                             v-model="form.especialidad_id"
                                             :options="especialidades"
-                                            :featured-options="[1, 2]"
+                                            :featured-options="[8, 12, 10, 11]" 
                                             value-key="id"
                                             label-key="nombre"
                                             :format-label="formatLabel"
@@ -351,7 +362,7 @@ const submit = () => {
                                         <SearchableSelect
                                             v-model="form.etapa_procesal"
                                             :options="etapas_procesales.map(e => ({ id: e, nombre: e }))"
-                                            :featured-options="['DEMANDADO', 'EN EJECUCIÓN']"
+                                            :featured-options="[1220, 1233, 1281]"
                                             value-key="id"
                                             label-key="nombre"
                                             :format-label="formatLabel"

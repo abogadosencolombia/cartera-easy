@@ -9,12 +9,15 @@ import TextInput from '@/Components/TextInput.vue';
 import Textarea from '@/Components/Textarea.vue';
 import { useForm, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
+import { useNotifications } from '@/composables/useNotifications';
 
 const props = defineProps({
     caso: Object,
     actuaciones: Array,
     isFormDisabled: Boolean,
 });
+
+const { notify, confirm: confirmDestructive } = useNotifications();
 
 // --- Lógica de formato (copiada) ---
 const parseDate = (s) => {
@@ -109,16 +112,23 @@ const actualizarActuacion = () => {
     });
 };
 
-const eliminarActuacion = (actuacionId) => {
-    if (confirm('¿Estás seguro de que quieres eliminar esta actuación? Esta acción no se puede deshacer.')) {
+const eliminarActuacion = async (actuacionId) => {
+    const result = await confirmDestructive({
+        title: '¿Eliminar actuación?',
+        text: 'Esta acción no se puede deshacer y se borrará del historial.',
+        confirmText: 'Sí, eliminar'
+    });
+
+    if (result.isConfirmed) {
         router.delete(route('casos.actuaciones.destroy', actuacionId), {
             preserveScroll: true,
             onSuccess: () => {
                  router.reload({ only: ['actuaciones', 'caso'], preserveState: true });
+                 notify('success', 'La actuación ha sido eliminada.');
             },
             onError: (errors) => {
                  console.error("Error al eliminar actuación:", errors);
-                 alert("Error: No se pudo eliminar la actuación. Es posible que no tengas permiso.");
+                 notify('error', 'No se pudo eliminar. Verifica tus permisos.');
             }
         });
     }

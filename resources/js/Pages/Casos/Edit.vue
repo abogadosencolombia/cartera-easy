@@ -18,7 +18,8 @@ import { ref, computed, watch, onMounted } from 'vue';
 import axios from 'axios';
 import { 
     TrashIcon, InformationCircleIcon, ScaleIcon, UsersIcon, LockClosedIcon, 
-    PlusIcon, ChevronUpIcon, ChevronDownIcon, ArchiveBoxXMarkIcon, ArrowPathIcon 
+    PlusIcon, ChevronUpIcon, ChevronDownIcon, ArchiveBoxXMarkIcon, ArrowPathIcon,
+    BriefcaseIcon, BuildingOfficeIcon, CheckCircleIcon, ClockIcon, DocumentTextIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -116,6 +117,27 @@ const especialidades = computed(() => props.estructuraProcesal);
 const tiposDisponibles = ref([]);
 const subtiposDisponibles = ref([]);
 const subprocesosDisponibles = ref([]);
+
+// Opciones rápidas con iconos (Diseño Premium)
+const opcionesRapidasEsp = computed(() => {
+    const iconos = {
+        'CIVIL': ScaleIcon,
+        'LABORAL': BriefcaseIcon,
+        'FAMILIA': UsersIcon,
+        'COMERCIAL': BuildingOfficeIcon
+    };
+    return especialidades.value
+        .filter(e => iconos[e.nombre])
+        .map(e => ({ ...e, icono: iconos[e.nombre] }))
+        .sort((a, b) => a.nombre.localeCompare(b.nombre));
+});
+
+const etapasRapidas = [
+    { id: 'DEMANDA PRESENTADA', icono: DocumentTextIcon },
+    { id: 'MANDAMIENTO DE PAGO', icono: CheckCircleIcon },
+    { id: 'AUDIENCIA INICIAL (ART. 372 CGP)', icono: ClockIcon },
+    { id: 'TERMINADO POR PAGO TOTAL', icono: ArrowPathIcon }
+];
 
 watch(() => form.especialidad_id, (id, oldId) => {
     const esp = especialidades.value.find(e => e.id === id);
@@ -258,7 +280,7 @@ const submit = () => {
                                         <SearchableSelect
                                             v-model="form.especialidad_id"
                                             :options="especialidades"
-                                            :featured-options="[1, 2]"
+                                            :featured-options="[8, 12, 10, 11]"
                                             value-key="id"
                                             label-key="nombre"
                                             :format-label="formatLabel"
@@ -309,7 +331,7 @@ const submit = () => {
                                         <SearchableSelect
                                             v-model="form.etapa_procesal"
                                             :options="etapas_procesales.map(e => ({ id: e, nombre: e }))"
-                                            :featured-options="['DEMANDADO', 'EN EJECUCIÓN']"
+                                            :featured-options="[1220, 1233, 1281]"
                                             value-key="id"
                                             label-key="nombre"
                                             :format-label="formatLabel"

@@ -286,7 +286,12 @@ const submit = () => {
                 <!-- Step 3 -->
                 <div v-else-if="step === 3" key="step3" class="space-y-6">
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div><InputLabel value="Fecha Próxima Revisión" /><DatePicker v-model="form.fecha_proxima_revision" class="mt-1 block w-full" /><InputError :message="form.errors.fecha_proxima_revision" /></div>
+                    <div class="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800">
+                        <InputLabel value="Fecha Próxima Revisión *" class="!text-indigo-700 dark:!text-indigo-300 font-black" />
+                        <DatePicker v-model="form.fecha_proxima_revision" class="mt-1 block w-full" required />
+                        <InputError :message="form.errors.fecha_proxima_revision" class="mt-1" />
+                        <p class="text-[10px] text-indigo-600 dark:text-indigo-400 mt-1 uppercase font-bold">Obligatorio: Define cuándo volverás a revisar este radicado.</p>
+                    </div>
                     <div class="md:col-span-2"><InputLabel value="Observaciones (opcional)" /><Textarea v-model="form.observaciones" rows="3" class="mt-1 block w-full" /><InputError :message="form.errors.observaciones" /></div>
                     <div><InputLabel value="Link de expediente digital" /><TextInput v-model="form.link_expediente" type="url" class="mt-1 block w-full" placeholder="https://…" /><InputError :message="form.errors.link_expediente" /></div>
                     <div><InputLabel value="Ubicación en Drive" /><TextInput v-model="form.ubicacion_drive" type="url" class="mt-1 block w-full" placeholder="https://drive.google.com/…" /><InputError :message="form.errors.ubicacion_drive" /></div>

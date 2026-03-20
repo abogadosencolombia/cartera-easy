@@ -13,7 +13,7 @@ import Textarea from '@/Components/Textarea.vue';
 import AsyncSelect from '@/Components/AsyncSelect.vue';
 import Modal from '@/Components/Modal.vue';
 import Dropdown from '@/Components/Dropdown.vue';
-import { PlusIcon, TrashIcon, ChevronDownIcon } from '@heroicons/vue/24/outline';
+import { PlusIcon, TrashIcon, ChevronDownIcon, CalendarDaysIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
   proceso: { type: Object, required: true },
@@ -26,6 +26,28 @@ const filteredEtapas = computed(() => {
         e.nombre.toLowerCase().includes(searchEtapa.value.toLowerCase())
     );
 });
+
+// --- LÓGICA DE COMPROMISO DE REVISIÓN (OBLIGATORIO) ---
+const showCommitmentModal = ref(false);
+const globalRevisionDate = ref(props.proceso.fecha_proxima_revision || '');
+let isCommitted = false;
+
+const openCommitmentModal = () => {
+    const today = new Date().toISOString().split('T')[0];
+    if (!globalRevisionDate.value || globalRevisionDate.value < today) {
+        globalRevisionDate.value = today;
+    }
+    showCommitmentModal.value = true;
+};
+
+const executeCommittedAction = () => {
+    if (!globalRevisionDate.value) return;
+    showCommitmentModal.value = false;
+    isCommitted = true;
+    form.fecha_proxima_revision = globalRevisionDate.value;
+    submit(); 
+};
+// -----------------------------------------------------
 
 const showCloseModal = ref(false);
 const closeForm = useForm({ nota_cierre: '' });
@@ -96,6 +118,12 @@ const addDemandado = () => form.demandados.push({
 const removeDemandado = (index) => { if (form.demandados.length > 1) form.demandados.splice(index, 1); };
 
 const submit = () => {
+  // OBLIGATORIEDAD: Si no han pasado por el modal de compromiso, se abre antes de enviar.
+  if (!isCommitted) {
+      openCommitmentModal();
+      return;
+  }
+
   form.transform(data => ({
     ...data,
     abogado_id: data.abogado_id?.id ?? null,
@@ -311,7 +339,6 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                   <div class="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-6">
                       <div><InputLabel value="Radicado" /><TextInput v-model="form.radicado" class="mt-1 block w-full" /></div>
                       <div><InputLabel value="Fecha de Radicado" /><DatePicker v-model="form.fecha_radicado" class="mt-1 block w-full" /></div>
-                      <div><InputLabel value="Fecha Próxima Revisión" /><DatePicker v-model="form.fecha_proxima_revision" class="mt-1 block w-full" /></div>
                       <div><InputLabel value="Abogado / Gestor" /><AsyncSelect v-model="form.abogado_id" :endpoint="route('users.search')" placeholder="Asignar gestor..." label-key="name" /></div>
                       <div><InputLabel value="Responsable de Revisión" /><AsyncSelect v-model="form.responsable_revision_id" :endpoint="route('users.search')" placeholder="Asignar responsable..." label-key="name" /></div>
                       <div><InputLabel value="Correo Radicación" /><TextInput v-model="form.correo_radicacion" type="email" class="mt-1 block w-full" /></div>
@@ -333,6 +360,43 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
          <div class="mt-6"><InputLabel value="Nota de Cierre" /><Textarea v-model="closeForm.nota_cierre" class="w-full mt-1" rows="4" placeholder="Indica el motivo del cierre..." /></div>
          <div class="mt-6 flex justify-end gap-3"><SecondaryButton @click="showCloseModal = false">Cancelar</SecondaryButton><DangerButton @click="closeTheCase">Confirmar</DangerButton></div>
        </div>
+    </Modal>
+
+    <!-- MODAL DE COMPROMISO DE REVISIÓN (OBLIGATORIO) -->
+    <Modal :show="showCommitmentModal" @close="showCommitmentModal = false" maxWidth="sm">
+        <div class="p-6">
+            <div class="flex items-center gap-3 mb-4 text-indigo-600 dark:text-indigo-400">
+                <CalendarDaysIcon class="h-8 w-8" />
+                <h2 class="text-xl font-black uppercase tracking-tight">Próxima Revisión</h2>
+            </div>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-6 font-medium">
+                Para guardar los cambios, es <strong>obligatorio</strong> que definas la fecha de la próxima revisión.
+            </p>
+            
+            <div class="space-y-4">
+                <div class="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border-2 border-indigo-100 dark:border-indigo-800">
+                    <InputLabel value="¿Cuándo revisarás esto de nuevo?" class="text-xs font-bold text-indigo-700 dark:text-indigo-300 uppercase mb-2" />
+                    <DatePicker 
+                        v-model="globalRevisionDate" 
+                        class="mt-1 block w-full" 
+                        required 
+                    />
+                </div>
+                
+                <div class="flex flex-col gap-2 pt-4">
+                    <PrimaryButton 
+                        @click="executeCommittedAction" 
+                        class="w-full justify-center !py-4 !text-sm !bg-indigo-600 hover:!bg-indigo-700 shadow-lg transition-all"
+                        :disabled="!globalRevisionDate"
+                    >
+                        Confirmar y Guardar Cambios
+                    </PrimaryButton>
+                    <SecondaryButton @click="showCommitmentModal = false" class="w-full justify-center">
+                        Seguir editando
+                    </SecondaryButton>
+                </div>
+            </div>
+        </div>
     </Modal>
   </AuthenticatedLayout>
 </template>

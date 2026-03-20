@@ -21,31 +21,36 @@ class DocumentoProcesoController extends Controller
             'archivo' => ['required', 'file', 'max:102400'], // 100MB
             'nombre'  => ['required', 'string', 'max:255'],
             'nota'    => ['nullable', 'string', 'max:2000'],
+            'fecha_proxima_revision' => ['required', 'date', 'after_or_equal:today'],
         ]);
 
         $file = $request->file('archivo');
         $dir  = "procesos/{$proceso->id}";
         $path = $file->store($dir, 'public');
 
-        DocumentoProceso::create([
-            'proceso_radicado_id' => $proceso->id,
-            'user_id'             => $request->user()->id ?? null,
-            'descripcion'         => $data['nota'] ?? null,
-            'file_name'           => $data['nombre'],
-            'file_path'           => $path,
-        ]);
+        \DB::transaction(function () use ($proceso, $data, $path, $request) {
+            DocumentoProceso::create([
+                'proceso_radicado_id' => $proceso->id,
+                'user_id'             => $request->user()->id ?? null,
+                'descripcion'         => $data['nota'] ?? null,
+                'file_name'           => $data['nombre'],
+                'file_path'           => $path,
+            ]);
 
-        // ✅ AUDITORÍA GLOBAL
-        AuditoriaEvento::create([
-            'user_id' => Auth::id(),
-            'evento' => 'SUBIR_DOCUMENTO_PROCESO',
-            'descripcion_breve' => "Subido documento '{$data['nombre']}' al radicado {$proceso->radicado}",
-            'criticidad' => 'media',
-            'direccion_ip' => request()->ip(),
-            'user_agent' => request()->userAgent(),
-        ]);
+            $proceso->update(['fecha_proxima_revision' => $data['fecha_proxima_revision']]);
 
-        return back()->with('success', 'Documento cargado correctamente.');
+            // ✅ AUDITORÍA GLOBAL
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'SUBIR_DOCUMENTO_PROCESO',
+                'descripcion_breve' => "Subido documento '{$data['nombre']}' al radicado {$proceso->radicado}. Próxima revisión: {$data['fecha_proxima_revision']}",
+                'criticidad' => 'media',
+                'direccion_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+        });
+
+        return back()->with('success', 'Documento cargado y próxima revisión actualizada.');
     }
 
     public function view(DocumentoProceso $documento)

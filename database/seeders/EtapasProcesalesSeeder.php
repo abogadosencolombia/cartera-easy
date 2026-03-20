@@ -7,261 +7,70 @@ use App\Models\EtapaProcesal;
 
 class EtapasProcesalesSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     *
-     * @return void
-     */
     public function run(): void
     {
-        // Lista completa y actualizada de etapas procesales para Colombia
-        // Basada en la documentación oficial del sistema (167 etapas)
+        $this->command->info('Actualizando etapas procesales incrementalmente (SIN BORRADO)...');
+
         $etapas = [
-            // ETAPAS INICIALES Y PRESENTACIÓN
-            'POR PRESENTAR',
-            'DEMANDA PRESENTADA',
-            'DEMANDA PRESENTADA 1',
-            'DEMANDA PRESENTADA 2',
-            
-            // ADMISIÓN Y RECHAZO DE DEMANDAS
-            'INADMITE',
-            'INADMITE 2',
-            'CUMPLE REQUISITOS',
-            'CUMPLE REQUISITOS 2',
-            'RECHAZADA INCUMPLIMIENTO REQUISITOS',
-            'RECHAZADA POR COMPETENCIA',
-            'RECHAZADA LUEGO DE CUMPLIR REQUISITOS',
-            'ADMITE DEMANDA',
-            'CALIFICACION DE DEMANDA',
-            
-            // AUTOS Y MANDAMIENTOS
-            'AUTO ADMITE DEMANDA (PROCESO DE RESTITUCION)',
-            'MANDAMIENTO DE PAGO',
-            'MANDAMIENTO DE PAGO (PROCESO EJECUTIVO)',
-            'NIEGA MANDAMIENTO DE PAGO',
-            'CORRIGE MANDAMIENTO DE PAGO',
-            'SOLICITUD DE CORRECCION DE AUTO QUE LIBRA MANDAMIENTO DE PAGO',
-            
-            // NOTIFICACIONES
-            'PROCESO DE NOTIFICACION',
-            'PENDIENTE DE NOTIFICACION',
-            'REQUIERE PREVIO DESISTIMIENTO',
-            'CLIENTE NOTIFICADO',
-            'NOTIFICACION AL DEUDOR PARA ENTREGA DIRECTA',
-            'NOTIFICACION A ACREEDORES',
-            
-            // AUDIENCIAS
-            'AUDIENCIA DE TRAMITE',
-            'AUDIENCIA RESOLUCION DE OBJECIONES',
-            'AUDIENCIA DE GRADUACION Y CALIFICACION DE CREDITOS',
-            'AUDIENCIA DE CONFIRMACION DE ACUERDO',
-            'AUDIENCIA DE CONFIRMACION ACUERDO DE REORGANIZACION',
-            'AUDIENCIA CONVALIDACION DE ACUERDO PRIVADO',
-            'AUDIENCIA DE APROBACION DE ACUERDO DE NEGOCIACION DE DEUDAS',
-            'AUDIENCIA RESOLUCION DE OBJECIONES NEGOCIACION',
-            'AUDIENCIA RESOLUCION DE OBJECIONES LIQUIDACION PATRIMONIAL',
-            'AUDIENCIA RESOLUCION DE OBJECIONES REORGANIZACION',
-            'AUDIENCIA RESOLUCION DE OBJECIONES LIQUIDACION',
-            'AUDIENCIA DE INCUMPLIMIENTO DEL ACUERDO DE REORGANIZACION',
-            'AUDIENCIA DE NEGOCIACION DE DEUDAS',
-            
-            // DECISIONES JUDICIALES
-            'AUTO INTERLOCUTORIO',
-            'SENTENCIA',
-            'AVOCA CONOCIMIENTO',
-            'CONFIRMA PROVIDENCIA',
-            'ORDENA CESAR LA EJECUCION',
-            
-            // LIQUIDACIONES
-            'LIQUIDACION DE COSTAS',
-            'LIQUIDACION DEL CREDITO',
-            'TRASLADO DE LIQUIDACION',
-            'APRUEBA LIQUIDACION',
-            'ORDENAN LIQUIDACION PATRIMONIAL',
-            'ADMITE LIQUIDACION PATRIMONIAL',
-            'RECHAZA LIQUIDACION PATRIMONIAL',
-            
-            // SOLICITUDES DE TERMINACIÓN
-            'SOLICITUD TERMINACION Y/O SUSPENSION',
-            'SOLICITUD DE SUSPENSION DEL PROCESO',
-            'SOLICITUD DE TERMINACION POR NOVACION',
-            'SOLICITUD DE TERMINACION POR REESTRUCTURACION',
-            'SOLICITUD TERMINACION PAGO DE LA MORA',
-            'SOLICITUD RETIRO DE LA DEMANDA',
-            'SOLICITUD DE TERMINACION PAGO DIRECTO',
-            'SOLICITUD DE TERMINACION POR TRANSACCION',
-            'SOLICITUD DE TERMINACION POR PAGO TOTAL',
-            'SOLICITUD DE RETIRO PARA VOLVER A PRESENTAR',
-            
-            // ESTADOS DE SUSPENSIÓN
-            'SUSPENDIDO',
-            'SUSPENDIDO POR TRAMITE DE INSOLVENCIA',
-            
-            // TERMINACIONES DEL PROCESO
-            'TERMINADO POR PAGO TOTAL',
-            'TERMINADO POR RENUNCIA PODER',
-            'TERMINADO POR PERENCION',
-            'TERMINADO POR PAGO MORA',
-            'TERMINADO POR PRESCRIPCION',
-            'TERMINADO POR DESISTIMIENTO TACITO',
-            'TERMINADO POR NOVACION',
-            'TERMINADO POR TRANSACCION',
-            'TERMINADO POR REESTRUCTURACION',
-            'TERMINADO POR ADJUDICACION DE BIENES',
-            'TERMINADO POR VENTA DE CARTERA',
-            
-            // RECURSOS
-            'INTERPONE RECURSO',
-            'TRASLADO RECURSO',
-            'RESUELVE RECURSO',
-            'ADMITE APELACION',
-            'RECURSO CONTRA AUTO QUE LIBRA MANDAMIENTO DE PAGO',
-            'RECURSO CONTRA AUTO QUE ADMITE DEMANDA (RESTITUCION)',
-            'RECURSO CONTRA AUTO QUE TERMINA PROCESO POR DESISTIMIENTO TACITO (SIN SENTENCIA)',
-            'RECURSO CONTRA AUTO QUE TERMINA PROCESO POR DESISTIMIENTO TACITO (CON SENTENCIA)',
-            'RECURSO CONTRA AUTO QUE DICTA SENTENCIA',
-            'RECURSO CONTRA AUTO QUE RECHAZA DEMANDA',
-            'RECURSO CONTRA AUTO QUE NIEGA MANDAMIENTO DE PAGO',
-            'RECURSO CONTRA AUTO QUE TERMINA PROCESO POR PAGO TOTAL',
-            
-            // RETIROS Y DEVOLUCIONES
-            'RETIRADA POR PAGO TOTAL',
-            'RETIRADA POR PAGO DE LA MORA',
-            'RETIRADA PARA VOLVER A PRESENTAR',
-            'RETIRADA PARA DEVOLVER DOCUMENTOS',
-            'DEVOLUCION DE DOCUMENTOS A CLIENTE',
-            'DEVOLUCION DE DOCUMENTOS AL CLIENTE - INCIAL',
-            'DEVOLUCION DE DOCUMENTOS AL CLIENTE - INTERMEDIA',
-            'DEVOLUCION DE DOCUMENTOS AL CLIENTE - FINAL',
-            
-            // RENUNCIA DE PODER
-            'ABOGADO RENUNCIA PODER',
-            
-            // DOCUMENTOS
-            'RECEPCION DE DOCUMENTOS',
-            'RECEPCION DE DOCUMENTOS PARCIAL',
-            'ELABORACION DE DEMANDA',
-            'ASIGNACION SIN DOCUMENTOS',
-            
-            // PRUEBAS Y EXCEPCIONES
-            'DECRETA PRUEBAS',
-            'PROPONE EXCEPCIONES',
-            'NO PROPONE EXCEPCIONES',
-            'PRONUNCIAMIENTO DE EXCEPCIONES',
-            'TRASLADO EXCEPCIONES',
-            
-            // PROYECTOS Y PRESENTACIONES
-            'PRESENTA PROYECTO',
-            'PRESENTA ACUERDO DE REORGANIZACION',
-            'PRESENTA PROYECTO DE ADJUDICACION',
-            'TRASLADO DE PROYECTO DE ADJUDICACION E INVENTARIO DE BIENES',
-            'PRESENTACION DE ACREENCIAS',
-            'PRESENTACION DE ACREENCIAS REORGANIZACION',
-            'PRESENTACION DE ACREENCIAS LIQUIDACION',
-            'PRESENTA ACUERDO',
-            
-            // OBJECIONES
-            'OBJECIONES AL PROYECTO DE GRADUACION Y CALIFICACION',
-            'OBJECIONES AL PROYECTO DE ADJUDICACION E INVENTARIO DE BIENES',
-            'FORMULACION DE OBJECIONES A LA GRADUACION Y CALIFICACION DE CREDITOS',
-            'FORMULACION DE OBJECIONES AL ACUERDO PRIVADO',
-            'RESOLUCION DE OBJECIONES',
-            'TRASLADO DE OBJECIONES',
-            
-            // ACUERDOS Y APROBACIONES
-            'APRUEBA ACUERDO DE REORGANIZACION',
-            'ACUERDO DE REORGANIZACION EN FIRME',
-            'APRUEBA ACUERDO DE ADJUDICACION',
-            'ACUERDO DE ADJUDICACION EN FIRME',
-            'ACUERDO DE ADJUDICACION EN FIRME LIQUIDACION',
-            'ACUERDO DE ADJUDICACION DE BIENES',
-            'ACUERDO DE NEGOCIACION DE DEUDAS',
-            'APRUEBA ACUERDO DE NEGOCIACION DE DEUDAS',
-            'CONVALIDACION DE ACUERDO PRIVADO',
-            'CONSTANCIA DE NO ACUERDO',
-            'ACUERDO DE PAGO',
-            'SIN DEMANDA POR ACUERDO DE PAGO',
-            
-            // TRASLADOS ESPECÍFICOS
-            'TRASLADO PROYECTO DE CALIFICACION Y GRADUACION DE CREDITOS',
-            'TRASLADO PROYECTO DE CALIFICACION Y GRADUACION DE CREDITOS REORGANIZACION',
-            'TRASLADO PROYECTO DE CALIFICACION Y GRADUACION DE CREDITOS LIQUIDACION',
-            
-            // PROCESOS DE INSOLVENCIA
-            'TRAMITE DE INSOLVENCIA',
-            'ADMITE PROCESO DE INSOLVENCIA PERSONA NATURAL NO COMERCIANTE',
-            'ADMITE PROCESO DE INSOLVENCIA PERSONA NATURAL COMERCIANTE',
-            'ADMITE TRAMITE DE NEGOCIACION DE DEUDAS',
-            'DECLARA INCUMPLIMIENTO AL ACUERDO DE NEGOCIACION DE DEUDAS',
-            'TERMINA PROCESO DE REORGANIZACION EMPRESARIAL',
-            'ADMITE PROCESO DE REORGANIZACION EMPRESARIAL',
-            'DECRETA INCUMPLIMIENTO ACUERDO Y APERTURA A LIQUIDACION JUDICIAL',
-            'DENUNCIA INCUMPLIMIENTO DE ACUERDO DE REORGANIZACION',
-            'DEVUELVEN TRAMITE A CENTRO DE CONCILIACION',
-            
-            // GARANTÍAS MOBILIARIAS Y APREHENSIÓN
-            'SOLICITUD DE APREHENSION',
-            'SOLICITUD DE APREHENSION 2',
-            'SOLICITUD DE APREHENSION AL JUEZ',
-            'ORDEN DE APREHENSION',
-            'ORDENAN APREHENSION DEL VEHICULO',
-            'CAPTURA DE VEHICULO',
-            'VEHICULO APREHENDIDO',
-            'ENTREGA DEL BIEN',
-            'ENTREGA VOLUNTARIA DEL VEHICULO',
-            'AVALUO DEL BIEN',
-            'AVALUO PERITO',
-            'TRANSFERENCIA DE DOMINIO',
-            'APROPIACION DEL VEHICULO',
-            'APROPIACION DEL VEHICULO A NOMBRE DEL BANCO',
-            'TERMINACION DE APREHENSION',
-            'RETIRO DE SOLICITUD DE APRENHENSION',
-            'RESTITUCION DEL BIEN',
-            
-            // CONTRATOS DE LEASING
-            'DECLARA TERMINADO CONTRATO DE LEASING',
-            'DECLARA TERMINADO CONTRATO DE LEASING Y ORDENA RESTITUCION',
-            
-            // DESISTIMIENTOS
-            'DESISTIMIENTO DE LAS PRETENSIONES (PAGO DIRECTO)',
-            'DESISTIMIENTO DE LAS PRETENSIONES',
-            
-            // REGISTROS Y NOTIFICACIONES ESPECIALES
-            'INSCRIPCION COMFECAMARAS',
-            'SOLICITUD INSCRIPCION DE EJECUCION CONFECAMARAS',
-            'CARTA PREAVISO PAGO DIRECTO',
-            'AVISO CARTA PRE INICIO EJECUCION AL CLIENTE',
-            
-            // CONDICIONES ESPECIALES
-            'NO CUMPLE REQUISITOS',
-            
-            // INVESTIGACIÓN DE BIENES
-            'INVESTIGACION DE BIENES',
-            'INVESTIGACION DE BIENES POSITIVA',
-            'INVESTIGACION DE BIENES NEGATIVA',
-            
-            // SUBSANACIÓN
-            'SUBSANACION',
-            
-            // CESIÓN DE CRÉDITO
-            'SOLICITUD CESION DE CREDITO',
-            'ACEPTADA CESION DE CREDITO'
+            // FASE 1: POSTULACIÓN (Módulo 2)
+            ['nombre' => 'ELABORACIÓN DE DEMANDA', 'modulo_id' => 2, 'sla_dias' => 5, 'riesgo' => 'BAJO', 'responsable' => 'ABOGADO'],
+            ['nombre' => 'DEMANDA PRESENTADA', 'modulo_id' => 2, 'sla_dias' => 1, 'riesgo' => 'BAJO', 'responsable' => 'SISTEMA'],
+            ['nombre' => 'REPARTO / ASIGNACIÓN JUZGADO', 'modulo_id' => 2, 'sla_dias' => 3, 'riesgo' => 'BAJO', 'responsable' => 'JUZGADO'],
+            ['nombre' => 'CALIFICACIÓN: ADMITIDA', 'modulo_id' => 2, 'sla_dias' => 10, 'riesgo' => 'BAJO', 'responsable' => 'JUZGADO'],
+            ['nombre' => 'CALIFICACIÓN: INADMITIDA', 'modulo_id' => 2, 'sla_dias' => 5, 'riesgo' => 'MEDIO', 'responsable' => 'ABOGADO'],
+            ['nombre' => 'CALIFICACIÓN: RECHAZADA', 'modulo_id' => 2, 'sla_dias' => 3, 'riesgo' => 'ALTO', 'responsable' => 'ABOGADO'],
+            ['nombre' => 'SUBSANACIÓN DE DEMANDA', 'modulo_id' => 2, 'sla_dias' => 5, 'riesgo' => 'MEDIO', 'responsable' => 'ABOGADO'],
+
+            // FASE 2: NOTIFICACIÓN (Módulo 3)
+            ['nombre' => 'NOTIFICACIÓN LEY 2213 (MENSAJE DE DATOS)', 'modulo_id' => 3, 'sla_dias' => 2, 'riesgo' => 'BAJO', 'responsable' => 'ABOGADO'],
+            ['nombre' => 'NOTIFICACIÓN PERSONAL (ART. 291 CGP)', 'modulo_id' => 3, 'sla_dias' => 5, 'riesgo' => 'BAJO', 'responsable' => 'ABOGADO'],
+            ['nombre' => 'NOTIFICACIÓN POR AVISO (ART. 292 CGP)', 'modulo_id' => 3, 'sla_dias' => 5, 'riesgo' => 'BAJO', 'responsable' => 'ABOGADO'],
+            ['nombre' => 'EMPLAZAMIENTO', 'modulo_id' => 3, 'sla_dias' => 15, 'riesgo' => 'MEDIO', 'responsable' => 'ABOGADO'],
+            ['nombre' => 'NOMBRAMIENTO CURADOR AD LITEM', 'modulo_id' => 3, 'sla_dias' => 10, 'riesgo' => 'MEDIO', 'responsable' => 'JUZGADO'],
+
+            // FASE 3: CONTRADICCIÓN Y DEFENSA (Módulo 3)
+            ['nombre' => 'TÉRMINO DE TRASLADO CORRIENDO', 'modulo_id' => 3, 'sla_dias' => 20, 'riesgo' => 'BAJO', 'responsable' => 'CONTRAPARTE'],
+            ['nombre' => 'CONTESTACIÓN DE DEMANDA', 'modulo_id' => 3, 'sla_dias' => 1, 'riesgo' => 'MEDIO', 'responsable' => 'CONTRAPARTE'],
+            ['nombre' => 'EXCEPCIONES DE MÉRITO / PREVIAS', 'modulo_id' => 3, 'sla_dias' => 10, 'riesgo' => 'ALTO', 'responsable' => 'CONTRAPARTE'],
+            ['nombre' => 'DEMANDA DE RECONVENCIÓN', 'modulo_id' => 3, 'sla_dias' => 20, 'riesgo' => 'ALTO', 'responsable' => 'CONTRAPARTE'],
+
+            // FASE 4: AUDIENCIAS (Módulo 4)
+            ['nombre' => 'AUDIENCIA INICIAL (ART. 372 CGP)', 'modulo_id' => 4, 'sla_dias' => 30, 'riesgo' => 'ALTO', 'responsable' => 'JUZGADO'],
+            ['nombre' => 'AUDIENCIA INSTRUCCIÓN Y JUZGAMIENTO (ART. 373 CGP)', 'modulo_id' => 4, 'sla_dias' => 60, 'riesgo' => 'MUY_ALTO', 'responsable' => 'JUZGADO'],
+            ['nombre' => 'AUDIENCIA ÚNICA (VERBAL SUMARIO)', 'modulo_id' => 4, 'sla_dias' => 30, 'riesgo' => 'MUY_ALTO', 'responsable' => 'JUZGADO'],
+
+            // FASE 5: SENTENCIA Y RECURSOS (Módulo 5)
+            ['nombre' => 'SENTENCIA DE PRIMERA INSTANCIA', 'modulo_id' => 5, 'sla_dias' => 1, 'riesgo' => 'MUY_ALTO', 'responsable' => 'JUZGADO'],
+            ['nombre' => 'RECURSO DE APELACIÓN / REPOSICIÓN', 'modulo_id' => 5, 'sla_dias' => 5, 'riesgo' => 'ALTO', 'responsable' => 'ABOGADO'],
+            ['nombre' => 'SENTENCIA EN FIRME / EJECUTORIADA', 'modulo_id' => 5, 'sla_dias' => 3, 'riesgo' => 'BAJO', 'responsable' => 'SISTEMA'],
+
+            // FASE 6: EJECUCIÓN (Módulo 6)
+            ['nombre' => 'MANDAMIENTO DE PAGO', 'modulo_id' => 6, 'sla_dias' => 10, 'riesgo' => 'BAJO', 'responsable' => 'JUZGADO'],
+            ['nombre' => 'MEDIDAS CAUTELARES (EMBARGO/SECUESTRO)', 'modulo_id' => 6, 'sla_dias' => 15, 'riesgo' => 'MEDIO', 'responsable' => 'ABOGADO'],
+            ['nombre' => 'LIQUIDACIÓN DE CRÉDITO Y COSTAS', 'modulo_id' => 6, 'sla_dias' => 10, 'riesgo' => 'MEDIO', 'responsable' => 'ABOGADO'],
+            ['nombre' => 'AVALÚO DE BIENES', 'modulo_id' => 6, 'sla_dias' => 20, 'riesgo' => 'MEDIO', 'responsable' => 'ABOGADO'],
+            ['nombre' => 'REMATE DE BIENES', 'modulo_id' => 6, 'sla_dias' => 60, 'riesgo' => 'ALTO', 'responsable' => 'JUZGADO'],
+
+            // FASE 7: TERMINACIÓN Y ARCHIVO (Módulo 8)
+            ['nombre' => 'TERMINADO POR PAGO TOTAL', 'modulo_id' => 8, 'sla_dias' => 0, 'riesgo' => 'BAJO', 'responsable' => 'SISTEMA'],
+            ['nombre' => 'TERMINADO POR TRANSACCIÓN / CONCILIACIÓN', 'modulo_id' => 8, 'sla_dias' => 0, 'riesgo' => 'BAJO', 'responsable' => 'ABOGADO'],
+            ['nombre' => 'TERMINADO POR DESISTIMIENTO TÁCITO (ART. 317 CGP)', 'modulo_id' => 8, 'sla_dias' => 0, 'riesgo' => 'MUY_ALTO', 'responsable' => 'ABOGADO'],
+            ['nombre' => 'ARCHIVO DEFINITIVO', 'modulo_id' => 8, 'sla_dias' => 0, 'riesgo' => 'BAJO', 'responsable' => 'JUZGADO'],
         ];
 
-        // Limpiar tabla existente para evitar duplicados
-        EtapaProcesal::query()->delete();
-        
-        // Eliminar duplicados del array manteniendo el orden
-        $etapas = array_unique($etapas);
-        
-        $orden = 1;
-        foreach ($etapas as $nombre) {
-            EtapaProcesal::create([
-                'nombre' => trim($nombre), // Limpiar espacios
-                'orden'  => $orden++
-            ]);
+        foreach ($etapas as $index => $data) {
+            EtapaProcesal::updateOrCreate(
+                ['nombre' => $data['nombre']],
+                [
+                    'modulo_id' => $data['modulo_id'],
+                    'sla_dias'  => $data['sla_dias'],
+                    'riesgo'    => $data['riesgo'],
+                    'responsable' => $data['responsable'],
+                    'orden'     => ($index + 1) * 10 // Multiplicamos por 10 para permitir inserciones intermedias en el futuro
+                ]
+            );
         }
-        
-        $this->command->info('Se han insertado ' . count($etapas) . ' etapas procesales correctamente.');
+
+        $this->command->info('Se han actualizado ' . count($etapas) . ' etapas procesales correctamente.');
     }
 }
