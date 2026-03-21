@@ -87,3 +87,12 @@ Route::post('/chatbot/notify', function (Request $request) {
         'message_id' => $botMessage->id
     ]);
 });
+
+// --- RUTA DEL WEBHOOK DE CHATWOOT ---
+Route::post('/webhook/chatwoot', [App\Http\Controllers\Api\ChatwootWebhookController::class, 'handle']);
+
+// --- RUTAS API CHAT INTERNO (Desde 0) ---
+Route::middleware('auth:sanctum')->group(function() {
+    Route::post('/chat/send', [App\Http\Controllers\Api\ChatwootApiController::class, 'sendMessage']);
+    Route::get('/chat/history', [App\Http\Controllers\Api\ChatwootApiController::class, 'getHistory']);
+});

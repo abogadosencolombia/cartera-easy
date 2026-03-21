@@ -18,10 +18,11 @@ import './bootstrap';
 import '../css/app.css';
 
 // 4. Iniciar la aplicación principal de Inertia/Vue
-import { createApp, h } from 'vue';
+import { createApp, h, Fragment } from 'vue';
 import { createInertiaApp, Link, Head } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy/dist/vue.m.js';
+import ChatwootLogin from '@/Components/ChatwootLogin.vue';
 
 const appName = import.meta.env.VITE_APP_NAME || window.document.getElementsByTagName('title')[0]?.innerText || 'Cobro Cartera';
 
@@ -34,7 +35,13 @@ createInertiaApp({
     // --- FIN DE LA LÍNEA ---
 
     setup({ el, App, props, plugin }) {
-        return createApp({ render: () => h(App, props) })
+        return createApp({
+            render: () =>
+                h(Fragment, [
+                    h(App, props),
+                    h(ChatwootLogin),
+                ]),
+        })
             .use(plugin)
             .use(ZiggyVue) 
             .component('Link', Link)

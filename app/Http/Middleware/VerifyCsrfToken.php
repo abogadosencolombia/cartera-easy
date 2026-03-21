@@ -14,5 +14,16 @@ class VerifyCsrfToken extends Middleware
     protected $except = [
         // Le decimos a Laravel que no pida el token CSRF para esta ruta.
         'chatbot/notify',
+        'api/webhook/chatwoot',
+        'chatwoot-proxy/*',
+        'app/*',
+        'auth/*',
+        'api/v1/*',
+        'rails/*',
+        'vite/*',
+        'assets/*',
+        'cable/*',
+        'storage/*',
+        'packs/*',
     ];
 }
