@@ -15,6 +15,7 @@ import NavLink from "@/Components/NavLink.vue";
 import ResponsiveNavLink from "@/Components/ResponsiveNavLink.vue";
 import ToastList from "@/Components/ToastList.vue";
 import GestionDiariaPanel from "@/Components/GestionDiariaPanel.vue";
+import ChatwootLogin from "@/Components/ChatwootLogin.vue";
 
 import {
     ChartBarIcon,
@@ -795,5 +796,6 @@ onMounted(() => {
             @close="showGestionPanel = false"
         />
         <ToastList />
+        <ChatwootLogin />
     </div>
 </template>
