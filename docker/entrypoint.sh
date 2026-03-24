@@ -17,5 +17,6 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
-# servir
-exec php -S 0.0.0.0:8000 -t public
+# servir (EasyPanel suele inyectar PORT)
+PORT="${PORT:-8000}"
+exec php -S 0.0.0.0:${PORT} -t public
