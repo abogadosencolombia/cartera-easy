@@ -120,6 +120,15 @@ class ReporteController extends Controller
             ->groupBy('cooperativas.nombre')
             ->orderByDesc('total_fallas')->limit(5)->get();
 
+        $alertasPorTipo = NotificacionCaso::where(function($q) use ($casosIds, $radicadosIds) {
+                $q->whereIn('caso_id', $casosIds)
+                  ->orWhereIn('proceso_id', $radicadosIds);
+            })
+            ->whereNull('atendida_en')
+            ->select('tipo', DB::raw('count(*) as total'))
+            ->groupBy('tipo')
+            ->get();
+
         $listadoFallas = (clone $baseValidacionesQuery)
             ->where('estado', 'incumple')
             ->with(['caso.deudor' => fn($q) => $q->withTrashed(), 'caso.cooperativa'])
