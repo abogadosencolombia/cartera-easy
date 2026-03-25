@@ -17,7 +17,6 @@ class ProcesarAlertasGestion extends Command
     {
         $this->info("--> Iniciando escaneo de Hoja de Ruta Diaria...");
 
-        // Limitamos la carga inicial para no saturar memoria
         $notas = NotaGestion::where("is_completed", false)
             ->with("user")
             ->get();
@@ -26,7 +25,6 @@ class ProcesarAlertasGestion extends Command
         $maximoCorreosPorRonda = 15; // Límite de seguridad para Hostinger
 
         foreach ($notas as $nota) {
-            // Si ya alcanzamos el límite de ráfaga, paramos para esperar a la siguiente ejecución del cron
             if ($enviadosEnEstaRonda >= $maximoCorreosPorRonda) {
                 $this->warn("Límite de ráfaga alcanzado ($maximoCorreosPorRonda). El resto se procesará en la próxima ejecución.");
                 break;
@@ -38,49 +36,51 @@ class ProcesarAlertasGestion extends Command
             $expira = Carbon::parse($nota->expires_at);
             $notificado = false;
 
-            // CASO 1: Vence en menos de 1 hora (60 mins)
-            if ($expira->isFuture() && $ahora->diffInMinutes($expira) <= 60) {
-                if (!$this->yaNotificadoRecientemente($nota->user_id, $nota->id, "proxima", 2)) {
-                    $notificado = $this->enviarNotificacionSegura($nota, "proxima");
+            try {
+                // CASO 1: Vence en menos de 1 hora
+                if ($expira->isFuture() && $ahora->diffInMinutes($expira) <= 60) {
+                    if (!$this->yaNotificadoRecientemente($nota->user_id, $nota->id, "proxima", 2)) {
+                        $nota->user->notify(new GestionDiariaNotification($nota, "proxima"));
+                        $this->info("OK: Notificación proxima enviada a {$nota->user->name} (Tarea #{$nota->id})");
+                        $notificado = true;
+                    }
                 }
-            }
 
-            // CASO 2: Ya está vencida
-            if ($expira->isPast()) {
-                if (!$this->yaNotificadoRecientemente($nota->user_id, $nota->id, "vencida", 1)) {
-                    $notificado = $this->enviarNotificacionSegura($nota, "vencida");
+                // CASO 2: Ya está vencida
+                if (!$notificado && $expira->isPast()) {
+                    if (!$this->yaNotificadoRecientemente($nota->user_id, $nota->id, "vencida", 1)) {
+                        $nota->user->notify(new GestionDiariaNotification($nota, "vencida"));
+                        $this->info("OK: Notificación vencida enviada a {$nota->user->name} (Tarea #{$nota->id})");
+                        $notificado = true;
+                    }
                 }
-            }
 
-            if ($notificado) {
-                $enviadosEnEstaRonda++;
-                // Pausa de 3 segundos para estabilizar la conexión SMTP
-                sleep(3); 
+                if ($notificado) {
+                    $enviadosEnEstaRonda++;
+                    $this->info("Pausa de 3s para SMTP...");
+                    sleep(3); 
+                }
+            } catch (\Exception $e) {
+                $errorMessage = $e->getMessage();
+                \Log::error("Error SMTP en ProcesarAlertasGestion (Tarea #{$nota->id}): " . $errorMessage);
+                $this->error("FAIL: No se pudo enviar a {$nota->user->name}. " . $errorMessage);
+
+                // CIRCUIT BREAKER: Detenemos si es Rate Limit
+                if (str_contains($errorMessage, 'Ratelimit') || str_contains($errorMessage, '451')) {
+                    $this->error("ALERTA: Rate Limit detectado en Hostinger. Abortando ejecución.");
+                    return;
+                }
+                
+                // Aun en error no crítico, pausamos 3s
+                sleep(3);
             }
         }
 
-        $this->info("--> Escaneo finalizado. Enviados en esta ronda: $enviadosEnEstaRonda");
-    }
-
-    /**
-     * Envía la notificación capturando errores de SMTP para no romper el ciclo.
-     */
-    private function enviarNotificacionSegura($nota, $tipo)
-    {
-        try {
-            $nota->user->notify(new GestionDiariaNotification($nota, $tipo));
-            $this->info("OK: Notificación $tipo enviada a {$nota->user->name} (Tarea #{$nota->id})");
-            return true;
-        } catch (\Exception $e) {
-            \Log::error("Error SMTP en ProcesarAlertasGestion (Tarea #{$nota->id}): " . $e->getMessage());
-            $this->error("FAIL: No se pudo enviar a {$nota->user->name}. Error registrado en log.");
-            return false;
-        }
+        $this->info("--> Escaneo finalizado. Enviados: $enviadosEnEstaRonda");
     }
 
     private function yaNotificadoRecientemente($userId, $notaId, $estado, $horas = 1)
     {
-        // Buscamos en la tabla de notificaciones de Laravel (notifications)
         return DB::table("notifications")
             ->where("notifiable_id", $userId)
             ->where("data", "like", "%\"nota_id\":$notaId%")
