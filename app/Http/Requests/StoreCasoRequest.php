@@ -63,6 +63,7 @@ class StoreCasoRequest extends FormRequest
             // --- DEUDOR HÍBRIDO ---
             'deudor_id' => ['nullable', 'exists:personas,id'],
             'deudor' => ['required', 'array'],
+            'deudor.id' => ['required_if:deudor.is_new,false', 'nullable', 'exists:personas,id'],
             'deudor.is_new' => ['required', 'boolean'],
             'deudor.nombre_completo' => ['required_if:deudor.is_new,true', 'nullable', 'string', 'max:255'],
             'deudor.tipo_documento' => ['required_if:deudor.is_new,true', 'nullable', 'string', 'max:10'],

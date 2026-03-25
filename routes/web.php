@@ -61,6 +61,18 @@ Route::get('/', function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+    // --- RUTAS DE BÚSQUEDA ---
+    Route::get('cooperativas/search', [CooperativaController::class, 'search'])->name('cooperativas.search');
+    Route::get('personas/search', [PersonaController::class, 'search'])->name('personas.search');
+    Route::get('users/search', [UserController::class, 'search'])->name('users.search');
+    Route::get('juzgados/search', [JuzgadoController::class, 'search'])->name('juzgados.search');
+    Route::get('tipos-proceso/search', function (Request $request) {
+        $term = $request->input('term', '');
+        return \App\Models\TipoProceso::where('nombre', 'ilike', "%{$term}%")
+            ->limit(20)
+            ->get(['id', 'nombre']);
+    })->name('tipos-proceso.search');
+
     Route::prefix('api/gestion-diaria')->name('api.gestion.')->group(function () {
         Route::get('/', [\App\Http\Controllers\Api\GestionDiariaController::class, 'index'])->name('index');
         Route::post('/', [\App\Http\Controllers\Api\GestionDiariaController::class, 'store'])->name('store');

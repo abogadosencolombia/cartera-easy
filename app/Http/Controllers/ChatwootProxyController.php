@@ -52,6 +52,7 @@ class ChatwootProxyController extends Controller
 
     public function proxy(Request $request)
     {
+        Log::info("[Chatwoot Proxy] Petición recibida: " . $request->getRequestUri());
         // 1. Obtener la ruta solicitada (ej: /app/login)
         $uri = $request->getRequestUri();
         $proxyUri = $uri === '/chatwoot-sw.js' ? '/sw.js' : $uri;

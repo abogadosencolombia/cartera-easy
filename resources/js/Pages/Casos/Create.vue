@@ -99,8 +99,8 @@ const rememberedData = useRemember(initialData, 'CreateCasoData');
 const form = useForm(rememberedData.value);
 
 // Sincronizar el form con el remember para que persista al escribir
-watch(form, (val) => {
-    rememberedData.value = { ...val };
+watch(() => form.data(), (val) => {
+    rememberedData.value = val;
 }, { deep: true });
 
 // --- HELPERS DINÁMICOS ---
@@ -152,19 +152,30 @@ watch(form, debounce(() => {
     window.history.replaceState({}, '', url);
 }, 500), { deep: true });
 
+// Mantener deudor_id sincronizado con la selección
+watch(() => form.deudor.selected, (newVal) => {
+    if (newVal && !form.deudor.is_new) {
+        form.deudor_id = newVal.id;
+        form.deudor.id = newVal.id;
+    }
+}, { deep: true });
+
 const submit = () => {
     form.transform(data => ({
         ...data,
-        cooperativa_id: data.cooperativa_id?.id ?? null,
-        user_id: Array.isArray(data.user_id) ? data.user_id.map(u => u.id) : [],
-        juzgado_id: data.juzgado_id?.id ?? null,
+        cooperativa_id: data.cooperativa_id?.id ?? data.cooperativa_id,
+        user_id: Array.isArray(data.user_id) ? data.user_id.map(u => u.id ?? u) : [],
+        juzgado_id: data.juzgado_id?.id ?? data.juzgado_id,
         deudor: data.deudor.is_new ? {
             ...data.deudor,
             is_new: true,
-            cooperativas_ids: data.deudor.cooperativas_ids.map(c => c.id),
-            abogados_ids: data.deudor.abogados_ids.map(a => a.id),
-        } : { is_new: false, id: data.deudor.selected?.id },
-        deudor_id: data.deudor.is_new ? null : data.deudor.selected?.id,
+            cooperativas_ids: data.deudor.cooperativas_ids.map(c => c.id ?? c),
+            abogados_ids: data.deudor.abogados_ids.map(a => a.id ?? a),
+        } : { 
+            is_new: false, 
+            id: data.deudor.selected?.id ?? data.deudor_id 
+        },
+        deudor_id: data.deudor.is_new ? null : (data.deudor.selected?.id ?? data.deudor_id),
     })).post(route('casos.store'));
 };
 </script>

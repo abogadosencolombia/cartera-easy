@@ -54,6 +54,7 @@ class UpdateCasoRequest extends FormRequest
             // DEUDOR HÍBRIDO EN UPDATE
             'deudor_id' => ['nullable', 'exists:personas,id'],
             'deudor' => ['required', 'array'],
+            'deudor.id' => ['required_if:deudor.is_new,false', 'nullable', 'exists:personas,id'],
             'deudor.is_new' => ['required', 'boolean'],
             'deudor.nombre_completo' => ['required_if:deudor.is_new,true', 'nullable', 'string'],
             'deudor.tipo_documento' => ['required_if:deudor.is_new,true', 'nullable', 'string'],

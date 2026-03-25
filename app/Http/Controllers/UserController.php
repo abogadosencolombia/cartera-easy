@@ -282,4 +282,20 @@ class UserController extends Controller
         return back()->with('success', 'Documento eliminado exitosamente.');
     }
 
+    /**
+     * API para búsqueda de usuarios (abogados/gestores) para selectores asíncronos.
+     */
+    public function search(Request $request)
+    {
+        $term = $request->input('term', '');
+
+        $users = User::whereIn('tipo_usuario', ['abogado', 'gestor', 'admin'])
+            ->when($term, function($q) use ($term) {
+                $q->where('name', 'ilike', "%{$term}%");
+            })
+            ->limit(20)
+            ->get(['id', 'name']);
+
+        return response()->json($users);
+    }
 }

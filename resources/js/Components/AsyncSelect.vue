@@ -49,9 +49,9 @@ const handleClickOutside = (e) => {
     }
 };
 
-const fetchResults = (q) => {
+const fetchResults = (term) => {
     loading.value = true;
-    axios.get(props.endpoint, { params: { q } })
+    axios.get(props.endpoint, { params: { term } })
         .then(res => {
             results.value = Array.isArray(res.data) ? res.data : [];
         })

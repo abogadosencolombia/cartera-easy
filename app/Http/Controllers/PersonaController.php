@@ -289,4 +289,34 @@ class PersonaController extends Controller
         $doc->delete(); 
         return back()->with('success', 'Documento eliminado.'); 
     }
+
+    /**
+     * API para búsqueda de personas para selectores asíncronos.
+     */
+    public function search(Request $request)
+    {
+        $user = Auth::user();
+        $term = $request->input('term', '');
+
+        $query = Persona::query();
+
+        // Aplicamos el filtro de seguridad por cooperativa (mismo que en index)
+        if ($user->tipo_usuario !== 'admin') {
+            $cooperativaIds = $user->cooperativas->pluck('id');
+            $query->whereHas('cooperativas', function ($q) use ($cooperativaIds) {
+                $q->whereIn('cooperativas.id', $cooperativaIds);
+            });
+        }
+
+        $personas = $query->when($term, function($q) use ($term) {
+                $q->where(function($subq) use ($term) {
+                    $subq->where('nombre_completo', 'ilike', "%{$term}%")
+                         ->orWhere('numero_documento', 'ilike', "%{$term}%");
+                });
+            })
+            ->limit(20)
+            ->get(['id', 'nombre_completo', 'numero_documento']);
+
+        return response()->json($personas);
+    }
 }
