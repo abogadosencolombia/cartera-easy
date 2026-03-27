@@ -1,6 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, router } from '@inertiajs/vue3';
+import DatePicker from '@/Components/DatePicker.vue';
 import { ref, watch, computed } from 'vue'; // <-- AÑADIDO: computed para el JSON formateado
 import throttle from 'lodash/throttle';
 
@@ -77,11 +78,11 @@ watch(formFilters, throttle(() => {
             </div>
             <div>
                 <label for="fecha_desde" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Desde</label>
-                <input v-model="formFilters.fecha_desde" type="date" id="fecha_desde" class="mt-1 block w-full rounded-md ...">
+                <DatePicker v-model="formFilters.fecha_desde" id="fecha_desde" class="mt-1 block w-full" />
             </div>
             <div>
                 <label for="fecha_hasta" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Hasta</label>
-                <input v-model="formFilters.fecha_hasta" type="date" id="fecha_hasta" class="mt-1 block w-full rounded-md ...">
+                <DatePicker v-model="formFilters.fecha_hasta" id="fecha_hasta" class="mt-1 block w-full" />
             </div>
         </div>
         <!-- Contenedor del Botón de Exportar -->

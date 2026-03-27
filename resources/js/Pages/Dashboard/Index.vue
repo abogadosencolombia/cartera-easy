@@ -8,6 +8,7 @@ import TextInput from '@/Components/TextInput.vue';
 import Textarea from '@/Components/Textarea.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import InputError from '@/Components/InputError.vue';
+import DatePicker from '@/Components/DatePicker.vue';
 import { ref, computed, watch, onMounted } from 'vue';
 import { debounce, pickBy } from 'lodash';
 import { Bar, Line } from 'vue-chartjs';
@@ -275,9 +276,9 @@ const lineData = computed(() => {
                             </select>
                         </div>
                         <div class="flex items-center gap-3 w-full md:w-auto">
-                            <input type="date" v-model="form.fecha_desde" class="form-input-minimal"/>
+                            <DatePicker v-model="form.fecha_desde" class="w-full md:w-40" placeholder="Desde" />
                             <span class="text-gray-400">-</span>
-                            <input type="date" v-model="form.fecha_hasta" class="form-input-minimal"/>
+                            <DatePicker v-model="form.fecha_hasta" class="w-full md:w-40" placeholder="Hasta" />
                             <button @click="resetFilters" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Limpiar">
                                 <ArrowPathIcon class="w-5 h-5"/>
                             </button>

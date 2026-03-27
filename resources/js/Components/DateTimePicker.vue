@@ -9,6 +9,7 @@ import {
     ChevronDownIcon,
     ClockIcon
 } from '@heroicons/vue/20/solid';
+import { isHoliday } from '@/Utils/holidays';
 
 const props = defineProps({
     modelValue: { type: [String, null], default: null },
@@ -70,6 +71,15 @@ const emitValue = () => {
     emit('update:modelValue', `${year}-${month}-${day} ${hours.value}:${minutes.value}:00`);
 };
 
+// Generación de años
+const years = computed(() => {
+    const cy = new Date().getFullYear();
+    const arr = [];
+    for (let i = cy - 20; i <= cy + 10; i++) arr.push(i);
+    if (!arr.includes(currentYear.value)) arr.push(currentYear.value);
+    return arr.sort((a, b) => a - b);
+});
+
 const days = computed(() => {
     const year = currentYear.value;
     const month = currentMonth.value;
@@ -77,16 +87,32 @@ const days = computed(() => {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const dateArray = [];
     const prevMonthLastDay = new Date(year, month, 0).getDate();
-    for (let i = firstDay - 1; i >= 0; i--) dateArray.push({ date: new Date(year, month - 1, prevMonthLastDay - i), currentMonth: false });
-    for (let i = 1; i <= daysInMonth; i++) dateArray.push({ date: new Date(year, month, i), currentMonth: true });
+    for (let i = firstDay - 1; i >= 0; i--) {
+        const d = new Date(year, month - 1, prevMonthLastDay - i);
+        dateArray.push({ date: d, currentMonth: false, holiday: isHoliday(d) });
+    }
+    for (let i = 1; i <= daysInMonth; i++) {
+        const d = new Date(year, month, i);
+        dateArray.push({ date: d, currentMonth: true, holiday: isHoliday(d) });
+    }
     const remaining = 42 - dateArray.length;
-    for (let i = 1; i <= remaining; i++) dateArray.push({ date: new Date(year, month + 1, i), currentMonth: false });
+    for (let i = 1; i <= remaining; i++) {
+        const d = new Date(year, month + 1, i);
+        dateArray.push({ date: d, currentMonth: false, holiday: isHoliday(d) });
+    }
     return dateArray;
 });
 
 const handleDateSelect = (date) => {
     selectedDate.value = date;
     emitValue();
+};
+
+const updateViewDate = (part, value) => {
+    const newDate = new Date(viewDate.value);
+    if (part === 'month') newDate.setMonth(value);
+    if (part === 'year') newDate.setFullYear(value);
+    viewDate.value = newDate;
 };
 
 const setHour = (h) => { hours.value = h; showHourDropdown.value = false; emitValue(); };
@@ -114,14 +140,34 @@ const displayValue = computed(() => {
         </div>
 
         <transition enter-active-class="transition duration-200 ease-out" enter-from-class="translate-y-1 opacity-0" enter-to-class="translate-y-0 opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="translate-y-0 opacity-100" leave-to-class="translate-y-1 opacity-0">
-            <PopoverPanel v-slot="{ close }" class="absolute z-[100] mt-2 w-72 transform -translate-x-1/2 left-1/2 sm:left-auto sm:right-0 sm:translate-x-0">
+            <PopoverPanel v-slot="{ close }" class="absolute z-[9999] mt-2 left-0 w-72 origin-top-left">
                 <div class="overflow-visible rounded-xl shadow-2xl ring-1 ring-black ring-opacity-5 bg-white dark:bg-gray-800 border dark:border-gray-700">
                     
-                    <!-- Header -->
-                    <div class="px-2 py-3 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between rounded-t-xl">
-                        <button @click="viewDate = new Date(currentYear, currentMonth - 1, 1)" type="button" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-600"><ChevronLeftIcon class="h-4 w-4" /></button>
-                        <span class="text-[10px] font-black uppercase text-gray-900 dark:text-white tracking-widest">{{ monthNames[currentMonth] }} {{ currentYear }}</span>
-                        <button @click="viewDate = new Date(currentYear, currentMonth + 1, 1)" type="button" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-600"><ChevronRightIcon class="h-4 w-4" /></button>
+                    <!-- Header con selectores mejorados -->
+                    <div class="px-3 py-3 border-b dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center gap-2 rounded-t-xl">
+                        <button @click="updateViewDate('month', currentMonth - 1)" type="button" class="p-1.5 hover:bg-white dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400 border border-transparent hover:border-gray-200 dark:hover:border-gray-600 transition-all shadow-sm">
+                            <ChevronLeftIcon class="h-4 w-4" />
+                        </button>
+                        
+                        <div class="flex flex-1 items-center gap-1.5">
+                            <div class="relative flex-1 group">
+                                <select :value="currentMonth" @change="updateViewDate('month', parseInt($event.target.value))" class="appearance-none w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg py-1 px-2 pr-6 text-[11px] font-extrabold uppercase tracking-tight text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-all shadow-sm">
+                                    <option v-for="(name, i) in monthNames" :key="name" :value="i" class="bg-white dark:bg-gray-800">{{ name }}</option>
+                                </select>
+                                <ChevronDownIcon class="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none group-hover:text-indigo-500 transition-colors" />
+                            </div>
+
+                            <div class="relative group">
+                                <select :value="currentYear" @change="updateViewDate('year', parseInt($event.target.value))" class="appearance-none bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg py-1 px-2 pr-6 text-[11px] font-extrabold text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-all shadow-sm">
+                                    <option v-for="y in years" :key="y" :value="y" class="bg-white dark:bg-gray-800">{{ y }}</option>
+                                </select>
+                                <ChevronDownIcon class="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none group-hover:text-indigo-500 transition-colors" />
+                            </div>
+                        </div>
+
+                        <button @click="updateViewDate('month', currentMonth + 1)" type="button" class="p-1.5 hover:bg-white dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400 border border-transparent hover:border-gray-200 dark:hover:border-gray-600 transition-all shadow-sm">
+                            <ChevronRightIcon class="h-4 w-4" />
+                        </button>
                     </div>
 
                     <!-- Calendario -->
@@ -130,15 +176,19 @@ const displayValue = computed(() => {
                             <div v-for="day in daysOfWeek" :key="day" class="text-center text-[10px] font-black text-gray-400 uppercase">{{ day }}</div>
                         </div>
                         <div class="grid grid-cols-7 gap-1">
-                            <button v-for="(item, idx) in days" :key="idx" @click="handleDateSelect(item.date)" type="button" class="h-8 w-8 flex items-center justify-center rounded-lg text-xs transition-all relative" :class="[
+                            <button v-for="(item, idx) in days" :key="idx" @click="handleDateSelect(item.date)" type="button" class="h-8 w-8 flex flex-col items-center justify-center rounded-lg text-xs transition-all relative" :title="item.holiday || ''" :class="[
                                 item.currentMonth ? 'text-gray-700 dark:text-gray-200' : 'text-gray-300 dark:text-gray-600 opacity-50',
                                 item.date.toDateString() === (selectedDate?.toDateString()) ? 'bg-indigo-600 text-white font-bold' : 'hover:bg-indigo-50 dark:hover:bg-indigo-900/30',
-                                item.date.toDateString() === new Date().toDateString() && !isSelected ? 'ring-1 ring-indigo-500' : ''
-                            ]">{{ item.date.getDate() }}</button>
+                                item.date.toDateString() === new Date().toDateString() ? 'ring-1 ring-indigo-500' : '',
+                                item.holiday ? 'text-red-600 dark:text-red-400 font-bold' : ''
+                            ]">
+                                {{ item.date.getDate() }}
+                                <span v-if="item.holiday" class="absolute bottom-0.5 w-1 h-1 bg-red-500 rounded-full"></span>
+                            </button>
                         </div>
                     </div>
 
-                    <!-- Selector de Tiempo CORREGIDO -->
+                    <!-- Selector de Tiempo -->
                     <div class="px-4 py-3 border-t dark:border-gray-700 bg-indigo-50/30 dark:bg-indigo-900/10 relative">
                         <div class="flex items-center justify-center gap-4">
                             <ClockIcon class="h-4 w-4 text-indigo-500 shrink-0" />
@@ -151,7 +201,7 @@ const displayValue = computed(() => {
                                         <ChevronDownIcon class="h-3 w-3 opacity-40" />
                                     </button>
                                     
-                                    <!-- Dropdown Hora (Hacia ARRIBA para no empujar el layout) -->
+                                    <!-- Dropdown Hora -->
                                     <div v-if="showHourDropdown" class="absolute bottom-full mb-2 left-0 w-12 max-h-40 overflow-y-auto bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl z-[120] custom-scrollbar">
                                         <button v-for="h in hourOptions" :key="h" @click="setHour(h)" class="w-full py-1.5 text-[10px] font-bold hover:bg-indigo-600 hover:text-white transition-colors border-b dark:border-gray-700 last:border-0" :class="hours === h ? 'bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300'">{{ h }}</button>
                                     </div>
@@ -166,7 +216,7 @@ const displayValue = computed(() => {
                                         <ChevronDownIcon class="h-3 w-3 opacity-40" />
                                     </button>
                                     
-                                    <!-- Dropdown Minuto (Hacia ARRIBA) -->
+                                    <!-- Dropdown Minuto -->
                                     <div v-if="showMinuteDropdown" class="absolute bottom-full mb-2 left-0 w-12 max-h-40 overflow-y-auto bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl z-[120] custom-scrollbar">
                                         <button v-for="m in minuteOptions" :key="m" @click="setMinute(m)" class="w-full py-1.5 text-[10px] font-bold hover:bg-indigo-600 hover:text-white transition-colors border-b dark:border-gray-700 last:border-0" :class="minutes === m ? 'bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300'">{{ m }}</button>
                                     </div>

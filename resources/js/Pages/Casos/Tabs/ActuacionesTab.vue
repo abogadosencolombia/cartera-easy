@@ -7,6 +7,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import Textarea from '@/Components/Textarea.vue';
+import DatePicker from '@/Components/DatePicker.vue';
 import { useForm, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import { useNotifications } from '@/composables/useNotifications';
@@ -155,9 +156,8 @@ const eliminarActuacion = async (actuacionId) => {
                         </div>
                         <div>
                             <InputLabel for="fecha_actuacion" value="Fecha de Actuación" />
-                            <TextInput
+                            <DatePicker
                                 id="fecha_actuacion"
-                                type="date"
                                 v-model="actuacionForm.fecha_actuacion"
                                 class="mt-1 block w-full"
                                 required
@@ -218,9 +218,8 @@ const eliminarActuacion = async (actuacionId) => {
                      </div>
                      <div>
                          <InputLabel for="edit_fecha_actuacion" value="Fecha de Actuación" />
-                         <TextInput
+                         <DatePicker
                              id="edit_fecha_actuacion"
-                             type="date"
                              v-model="editActuacionForm.fecha_actuacion"
                              class="mt-1 block w-full"
                              required

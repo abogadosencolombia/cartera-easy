@@ -1,7 +1,8 @@
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/vue';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarDaysIcon, XMarkIcon, ChevronDownIcon } from '@heroicons/vue/20/solid';
+import { isHoliday } from '@/Utils/holidays';
 
 const props = defineProps({
     modelValue: { type: [String, null], default: null },
@@ -9,22 +10,6 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:modelValue']);
-
-// --- LÓGICA DE POSICIONAMIENTO (Anti-recorte en modales) ---
-const triggerRef = ref(null);
-const panelStyle = ref({ position: 'fixed', zIndex: 9999 });
-
-const updatePanelPosition = () => {
-    if (!triggerRef.value) return;
-    const rect = triggerRef.value.getBoundingClientRect();
-    panelStyle.value = {
-        top: `${rect.bottom + 8}px`,
-        left: `${rect.left}px`,
-        width: '18rem',
-        position: 'fixed',
-        zIndex: 99999
-    };
-};
 
 // --- LÓGICA DE FECHA SEGURA ---
 const parseDate = (dateStr) => {
@@ -49,10 +34,9 @@ const formatDate = (date) => {
 const selectedDate = computed(() => parseDate(props.modelValue));
 const viewDate = ref(selectedDate.value || new Date());
 
-// Sincronizar vista si el valor externo cambia
 watch(() => props.modelValue, (newVal) => {
     const parsed = parseDate(newVal);
-    if (parsed) viewDate.ref = parsed;
+    if (parsed) viewDate.value = parsed;
 });
 
 const currentMonth = computed(() => viewDate.value.getMonth());
@@ -60,6 +44,14 @@ const currentYear = computed(() => viewDate.value.getFullYear());
 
 const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const daysOfWeek = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
+
+const years = computed(() => {
+    const cy = new Date().getFullYear();
+    const arr = [];
+    for (let i = cy - 20; i <= cy + 10; i++) arr.push(i);
+    if (!arr.includes(currentYear.value)) arr.push(currentYear.value);
+    return arr.sort((a, b) => a - b);
+});
 
 const days = computed(() => {
     const year = currentYear.value;
@@ -69,10 +61,19 @@ const days = computed(() => {
     const prevLastDate = new Date(year, month, 0).getDate();
     
     const res = [];
-    for (let i = firstDay - 1; i >= 0; i--) res.push({ date: new Date(year, month - 1, prevLastDate - i), current: false });
-    for (let i = 1; i <= lastDate; i++) res.push({ date: new Date(year, month, i), current: true });
+    for (let i = firstDay - 1; i >= 0; i--) {
+        const d = new Date(year, month - 1, prevLastDate - i);
+        res.push({ date: d, current: false, holiday: isHoliday(d) });
+    }
+    for (let i = 1; i <= lastDate; i++) {
+        const d = new Date(year, month, i);
+        res.push({ date: d, current: true, holiday: isHoliday(d) });
+    }
     const remain = 42 - res.length;
-    for (let i = 1; i <= remain; i++) res.push({ date: new Date(year, month + 1, i), current: false });
+    for (let i = 1; i <= remain; i++) {
+        const d = new Date(year, month + 1, i);
+        res.push({ date: d, current: false, holiday: isHoliday(d) });
+    }
     return res;
 });
 
@@ -87,25 +88,18 @@ const displayValue = computed(() => {
     return d.toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' });
 });
 
-// --- FESTIVOS ---
-const getHolidayName = (date) => {
-    const d = date.getDate();
-    const m = date.getMonth();
-    // Simplificado para brevedad, pero manteniendo lógica básica
-    if (d === 1 && m === 0) return 'Año Nuevo';
-    if (d === 1 && m === 4) return 'Día del Trabajo';
-    if (d === 20 && m === 6) return 'Independencia';
-    if (d === 7 && m === 7) return 'Batalla de Boyacá';
-    if (d === 8 && m === 11) return 'Inmaculada Concepción';
-    if (d === 25 && m === 11) return 'Navidad';
-    return null;
+const updateViewDate = (part, value) => {
+    const newDate = new Date(viewDate.value);
+    if (part === 'month') newDate.setMonth(value);
+    if (part === 'year') newDate.setFullYear(value);
+    viewDate.value = newDate;
 };
 </script>
 
 <template>
     <Popover v-slot="{ open }" class="relative w-full">
-        <div ref="triggerRef" class="relative group">
-            <PopoverButton as="div" class="w-full" @click="updatePanelPosition">
+        <div class="relative group">
+            <PopoverButton as="div" class="w-full">
                 <button type="button" class="flex w-full items-center justify-between gap-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer">
                     <div class="flex items-center gap-2 truncate">
                         <CalendarDaysIcon class="h-5 w-5 text-gray-400 group-hover:text-indigo-500" />
@@ -118,30 +112,68 @@ const getHolidayName = (date) => {
             <button v-if="modelValue" @click.stop="emit('update:modelValue', '')" type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-red-500 z-10"><XMarkIcon class="h-4 w-4" /></button>
         </div>
 
-        <teleport to="body">
-            <transition enter-active-class="transition duration-200 ease-out" enter-from-class="translate-y-1 opacity-0" enter-to-class="translate-y-0 opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="translate-y-0 opacity-100" leave-to-class="translate-y-1 opacity-0">
-                <PopoverPanel v-slot="{ close }" class="fixed shadow-2xl z-[99999]" :style="panelStyle">
-                    <div class="overflow-hidden rounded-xl bg-white dark:bg-gray-800 border dark:border-gray-700 shadow-2xl">
-                        <div class="px-2 py-3 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
-                            <button @click="viewDate = new Date(currentYear, currentMonth - 1, 1)" type="button" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-400"><ChevronLeftIcon class="h-4 w-4" /></button>
-                            <span class="text-xs font-black uppercase text-gray-900 dark:text-white">{{ monthNames[currentMonth] }} {{ currentYear }}</span>
-                            <button @click="viewDate = new Date(currentYear, currentMonth + 1, 1)" type="button" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-400"><ChevronRightIcon class="h-4 w-4" /></button>
-                        </div>
-                        <div class="p-3">
-                            <div class="grid grid-cols-7 mb-2">
-                                <div v-for="day in daysOfWeek" :key="day" class="text-center text-[10px] font-black text-gray-400 uppercase">{{ day }}</div>
+        <transition enter-active-class="transition duration-200 ease-out" enter-from-class="translate-y-1 opacity-0" enter-to-class="translate-y-0 opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="translate-y-0 opacity-100" leave-to-class="translate-y-1 opacity-0">
+            <PopoverPanel v-slot="{ close }" class="absolute z-[9999] mt-2 left-0 w-72 origin-top-left">
+                <div class="overflow-hidden rounded-xl bg-white dark:bg-gray-800 border dark:border-gray-700 shadow-2xl ring-1 ring-black ring-opacity-5">
+                    <!-- Header con selectores de mes y año mejorados -->
+                    <div class="px-3 py-3 border-b dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center gap-2">
+                        <button @click="updateViewDate('month', currentMonth - 1)" type="button" class="p-1.5 hover:bg-white dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400 border border-transparent hover:border-gray-200 dark:hover:border-gray-600 transition-all shadow-sm">
+                            <ChevronLeftIcon class="h-4 w-4" />
+                        </button>
+                        
+                        <div class="flex flex-1 items-center gap-1.5">
+                            <div class="relative flex-1 group">
+                                <select :value="currentMonth" @change="updateViewDate('month', parseInt($event.target.value))" class="appearance-none w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg py-1 px-2 pr-6 text-[11px] font-extrabold uppercase tracking-tight text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-all shadow-sm custom-select-compact">
+                                    <option v-for="(name, i) in monthNames" :key="name" :value="i" class="bg-white dark:bg-gray-800">{{ name }}</option>
+                                </select>
+                                <ChevronDownIcon class="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none group-hover:text-indigo-500 transition-colors" />
                             </div>
-                            <div class="grid grid-cols-7 gap-1">
-                                <button v-for="(item, idx) in days" :key="idx" @click="selectDate(item.date, close)" type="button" class="h-8 w-8 flex items-center justify-center rounded-lg text-xs transition-all" :class="[item.current ? 'text-gray-700 dark:text-gray-200' : 'text-gray-300 dark:text-gray-600 opacity-50', (modelValue && item.date.toDateString() === selectedDate?.toDateString()) ? 'bg-indigo-600 text-white font-bold' : 'hover:bg-indigo-50 dark:hover:bg-indigo-900/30']">{{ item.date.getDate() }}</button>
+
+                            <div class="relative group">
+                                <select :value="currentYear" @change="updateViewDate('year', parseInt($event.target.value))" class="appearance-none bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg py-1 px-2 pr-6 text-[11px] font-extrabold text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-all shadow-sm custom-select-compact">
+                                    <option v-for="y in years" :key="y" :value="y" class="bg-white dark:bg-gray-800">{{ y }}</option>
+                                </select>
+                                <ChevronDownIcon class="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none group-hover:text-indigo-500 transition-colors" />
                             </div>
                         </div>
-                        <div class="px-4 py-2 border-t dark:border-gray-700 flex justify-between bg-gray-50 dark:bg-gray-800/50">
-                            <button @click="viewDate = new Date();" type="button" class="text-[10px] font-bold text-indigo-600 uppercase">Hoy</button>
-                            <button @click="emit('update:modelValue', ''); close();" type="button" class="text-[10px] font-bold text-gray-500 uppercase">Limpiar</button>
+
+                        <button @click="updateViewDate('month', currentMonth + 1)" type="button" class="p-1.5 hover:bg-white dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400 border border-transparent hover:border-gray-200 dark:hover:border-gray-600 transition-all shadow-sm">
+                            <ChevronRightIcon class="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    <div class="p-3">
+                        <div class="grid grid-cols-7 mb-2">
+                            <div v-for="day in daysOfWeek" :key="day" class="text-center text-[10px] font-black text-gray-400 uppercase">{{ day }}</div>
+                        </div>
+                        <div class="grid grid-cols-7 gap-1">
+                            <button v-for="(item, idx) in days" :key="idx" @click="selectDate(item.date, close)" type="button" class="h-8 w-8 flex flex-col items-center justify-center rounded-lg text-xs transition-all relative" :title="item.holiday || ''" :class="[
+                                item.current ? 'text-gray-700 dark:text-gray-200' : 'text-gray-300 dark:text-gray-600 opacity-50', 
+                                (modelValue && item.date.toDateString() === selectedDate?.toDateString()) ? 'bg-indigo-600 text-white font-bold' : 'hover:bg-indigo-50 dark:hover:bg-indigo-900/30',
+                                item.holiday ? 'text-red-600 dark:text-red-400 font-bold' : ''
+                            ]">
+                                {{ item.date.getDate() }}
+                                <span v-if="item.holiday" class="absolute bottom-0.5 w-1 h-1 bg-red-500 rounded-full"></span>
+                            </button>
                         </div>
                     </div>
-                </PopoverPanel>
-            </transition>
-        </teleport>
+                    <div class="px-4 py-2 border-t dark:border-gray-700 flex justify-between bg-gray-50 dark:bg-gray-800/50">
+                        <button @click="viewDate = new Date();" type="button" class="text-[10px] font-bold text-indigo-600 uppercase hover:underline transition-all">Hoy</button>
+                        <button @click="emit('update:modelValue', ''); close();" type="button" class="text-[10px] font-bold text-gray-500 uppercase hover:underline transition-all">Limpiar</button>
+                    </div>
+                </div>
+            </PopoverPanel>
+        </transition>
     </Popover>
 </template>
+
+<style scoped>
+.custom-select-compact {
+    max-height: 150px;
+}
+/* Estilo para que el menú del select nativo no sea tan largo en navegadores que lo soportan */
+select option {
+    padding: 8px;
+    font-size: 14px;
+}
+</style>
