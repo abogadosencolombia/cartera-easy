@@ -37,35 +37,45 @@ class NuevaTareaAsignada extends Notification
         // 1. Valores por defecto (Caso: Nota General / Tarea Suelta)
         $link = '#'; 
         $tipo = 'Nota General';
+        $detalleVinculo = '';
         
         $tareaType = $this->tarea->tarea_type;
+        $this->tarea->load('tarea'); // Cargar la entidad vinculada (proceso, caso o contrato)
+        $entidad = $this->tarea->tarea;
 
         // 2. Si hay vinculación, calculamos el link y el nombre del tipo
-        if ($tareaType) {
+        if ($tareaType && $entidad) {
             if ($tareaType === 'App\Models\ProcesoRadicado' || $tareaType === 'proceso') {
-                $link = '/procesos/' . $this->tarea->tarea_id;
+                $link = route('procesos.show', $this->tarea->tarea_id);
                 $tipo = 'Proceso/Radicado';
+                $detalleVinculo = $entidad->radicado ?? 'ID: ' . $entidad->id;
             } elseif ($tareaType === 'App\Models\Caso' || $tareaType === 'caso') {
-                $link = '/casos/' . $this->tarea->tarea_id;
+                $link = route('casos.show', $this->tarea->tarea_id);
                 $tipo = 'Caso';
+                $detalleVinculo = $entidad->asunto ?? 'ID: ' . $entidad->id;
             } elseif ($tareaType === 'App\Models\Contrato' || $tareaType === 'contrato') {
-                $link = '/gestion/honorarios/contratos/' . $this->tarea->tarea_id;
+                $link = route('honorarios.contratos.show', $this->tarea->tarea_id);
                 $tipo = 'Contrato de Honorarios';
+                $detalleVinculo = 'N° ' . ($entidad->id ?? '');
             }
+        }
+
+        $mensaje = "Se te asignó la tarea: '{$this->tarea->titulo}'";
+        if ($detalleVinculo) {
+            $mensaje .= " ({$tipo}: {$detalleVinculo})";
         }
 
         return [
             'icon' => 'task',
             'title' => 'Nueva Tarea Asignada',
-            'message' => "Se te asignó la tarea: '{$this->tarea->titulo}'",
-            'description' => $this->tarea->descripcion,
+            'message' => $mensaje,
+            'description' => $this->tarea->description ?? $this->tarea->descripcion,
             
             // 3. Manejo seguro de la fecha límite (puede ser null)
-            // Si hay fecha, la formateamos. Si no, enviamos null.
             'deadline' => $this->tarea->fecha_limite ? $this->tarea->fecha_limite->format('d/m/Y h:i A') : null,
             
             // 4. Detalle dinámico
-            'details' => $tareaType ? "Vinculada a: {$tipo}" : "Tarea General",
+            'details' => $entidad ? "Vinculada a {$tipo}: {$detalleVinculo}" : "Tarea General",
             
             'link' => $link,
             'tarea_id' => $this->tarea->id

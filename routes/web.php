@@ -186,7 +186,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // --- Documentos para Radicados ---
     Route::post('procesos/{proceso}/documentos', [DocumentoProcesoController::class, 'store'])->name('procesos.documentos.store');
     Route::delete('procesos/{proceso}/documentos/{documento}', [DocumentoProcesoController::class, 'destroy'])->name('procesos.documentos.destroy');
-    Route::get('documentos-proceso/{documento}/view', [DocumentoProcesoController::class, 'view'])->name('documentos-proceso.view');
     Route::patch('/procesos/{proceso}/close', [ProcesoRadicadoController::class, 'close'])->name('procesos.close');
     Route::patch('/procesos/{proceso}/reopen', [ProcesoRadicadoController::class, 'reopen'])->name('procesos.reopen');
 
@@ -399,8 +398,6 @@ Route::get('/revision-diaria/exportar-pendientes', [App\Http\Controllers\Revisio
 Route::model('proceso', ProcesoRadicado::class);
 
 // Rutas de descarga de documentos (requieren autenticación)
-Route::get('documentos-proceso/{documento}', [DocumentoProcesoController::class, 'show'])
-    ->middleware('auth')->name('documentos-proceso.show');
 Route::get('documentos-proceso/{documento}/ver', [DocumentoProcesoController::class, 'view'])
     ->middleware('auth')->name('documentos-proceso.view');
 Route::get('documentos-proceso/{documento}/descargar', [DocumentoProcesoController::class, 'download'])

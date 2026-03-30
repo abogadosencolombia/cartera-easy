@@ -40,7 +40,7 @@ class ProcesoRadicadoPolicy
      */
     public function viewAny(User $user): bool
     {
-        return (in_array($user->tipo_usuario, ['gestor', 'abogado'])) && $this->belongsToRadicadosCoop($user);
+        return in_array($user->tipo_usuario, ['gestor', 'abogado']);
     }
 
     /**
@@ -48,7 +48,7 @@ class ProcesoRadicadoPolicy
      */
     public function view(User $user, ProcesoRadicado $procesoRadicado): bool
     {
-        return (in_array($user->tipo_usuario, ['gestor', 'abogado'])) && $this->belongsToRadicadosCoop($user);
+        return in_array($user->tipo_usuario, ['gestor', 'abogado']);
     }
 
     /**
@@ -56,7 +56,7 @@ class ProcesoRadicadoPolicy
      */
     public function create(User $user): bool
     {
-        return (in_array($user->tipo_usuario, ['gestor', 'abogado'])) && $this->belongsToRadicadosCoop($user);
+        return in_array($user->tipo_usuario, ['gestor', 'abogado']);
     }
 
     /**
@@ -64,7 +64,7 @@ class ProcesoRadicadoPolicy
      */
     public function update(User $user, ProcesoRadicado $procesoRadicado): bool
     {
-        return (in_array($user->tipo_usuario, ['gestor', 'abogado'])) && $this->belongsToRadicadosCoop($user);
+        return in_array($user->tipo_usuario, ['gestor', 'abogado']);
     }
 
     /**
