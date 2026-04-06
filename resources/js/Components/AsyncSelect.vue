@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
+import { useElementBounding, useWindowSize } from '@vueuse/core';
 import axios from 'axios';
 import { 
     MagnifyingGlassIcon, 
@@ -26,6 +27,21 @@ const isOpen = ref(false);
 const loading = ref(false);
 const container = ref(null);
 let timeout = null;
+
+const { bottom, left, width, top } = useElementBounding(container);
+const { height: windowHeight } = useWindowSize();
+
+const floatingStyles = computed(() => {
+    const dropdownHeight = 320; 
+    const spaceBelow = windowHeight.value - bottom.value;
+    const showAbove = spaceBelow < dropdownHeight && top.value > dropdownHeight;
+
+    return {
+        top: showAbove ? `${top.value - dropdownHeight - 8}px` : `${bottom.value}px`,
+        left: `${left.value}px`,
+        width: `${width.value}px`,
+    };
+});
 
 // Normalizar el valor para mostrarlo
 const displayLabel = (item) => {
@@ -159,56 +175,59 @@ const toggle = () => {
     </div>
 
     <!-- Panel Dropdown Premium -->
-    <div 
-        v-if="isOpen" 
-        class="absolute z-[60] mt-2 w-full rounded-xl bg-white dark:bg-gray-800 shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top"
-    >
-        <!-- Buscador interno -->
-        <div class="p-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
-            <div class="relative">
-                <input 
-                    v-model="query"
-                    type="text"
-                    class="w-full pl-9 pr-4 py-2 text-sm rounded-lg border-gray-200 dark:border-gray-600 dark:bg-gray-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                    placeholder="Escribe para filtrar..."
-                    @click.stop
-                    autoFocus
-                />
-                <MagnifyingGlassIcon class="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+    <Teleport to="body">
+        <div 
+            v-if="isOpen" 
+            class="fixed z-[9999] mt-1 rounded-xl bg-white dark:bg-gray-800 shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top"
+            :style="floatingStyles"
+        >
+            <!-- Buscador interno -->
+            <div class="p-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
+                <div class="relative">
+                    <input 
+                        v-model="query"
+                        type="text"
+                        class="w-full pl-9 pr-4 py-2 text-sm rounded-lg border-gray-200 dark:border-gray-600 dark:bg-gray-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        placeholder="Escribe para filtrar..."
+                        @click.stop
+                        autoFocus
+                    />
+                    <MagnifyingGlassIcon class="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                </div>
+            </div>
+
+            <!-- Lista de Resultados -->
+            <ul class="max-h-64 overflow-y-auto py-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
+                <li v-if="results.length === 0 && !loading" class="px-4 py-8 text-sm text-center text-gray-500 italic">
+                    <div class="flex flex-col items-center">
+                        <MagnifyingGlassIcon class="h-8 w-8 text-gray-300 mb-2" />
+                        No se encontraron coincidencias
+                    </div>
+                </li>
+                
+                <li 
+                    v-for="item in results" 
+                    :key="item.id"
+                    @click="select(item)"
+                    class="px-4 py-2.5 text-sm cursor-pointer transition-all flex items-center justify-between group mx-2 rounded-lg mb-0.5"
+                    :class="isSelected(item) 
+                        ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-bold' 
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'"
+                >
+                    <div class="flex flex-col min-w-0">
+                        <span class="truncate">{{ displayLabel(item) }}</span>
+                        <span v-if="item.numero_documento" class="text-[10px] opacity-50 font-mono tracking-tighter">{{ item.numero_documento }}</span>
+                    </div>
+                    
+                    <CheckIcon v-if="isSelected(item)" class="h-4 w-4 text-indigo-600 shrink-0" />
+                </li>
+            </ul>
+            
+            <!-- Footer Info si es multiple -->
+            <div v-if="multiple && Array.isArray(modelValue) && modelValue.length > 0" class="p-2 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/20 text-[10px] text-center text-gray-500">
+                {{ modelValue.length }} elemento(s) seleccionado(s)
             </div>
         </div>
-
-        <!-- Lista de Resultados -->
-        <ul class="max-h-64 overflow-y-auto py-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
-            <li v-if="results.length === 0 && !loading" class="px-4 py-8 text-sm text-center text-gray-500 italic">
-                <div class="flex flex-col items-center">
-                    <MagnifyingGlassIcon class="h-8 w-8 text-gray-300 mb-2" />
-                    No se encontraron coincidencias
-                </div>
-            </li>
-            
-            <li 
-                v-for="item in results" 
-                :key="item.id"
-                @click="select(item)"
-                class="px-4 py-2.5 text-sm cursor-pointer transition-all flex items-center justify-between group mx-2 rounded-lg mb-0.5"
-                :class="isSelected(item) 
-                    ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-bold' 
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'"
-            >
-                <div class="flex flex-col min-w-0">
-                    <span class="truncate">{{ displayLabel(item) }}</span>
-                    <span v-if="item.numero_documento" class="text-[10px] opacity-50 font-mono tracking-tighter">{{ item.numero_documento }}</span>
-                </div>
-                
-                <CheckIcon v-if="isSelected(item)" class="h-4 w-4 text-indigo-600 shrink-0" />
-            </li>
-        </ul>
-        
-        <!-- Footer Info si es multiple -->
-        <div v-if="multiple && Array.isArray(modelValue) && modelValue.length > 0" class="p-2 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/20 text-[10px] text-center text-gray-500">
-            {{ modelValue.length }} elemento(s) seleccionado(s)
-        </div>
-    </div>
+    </Teleport>
   </div>
 </template>

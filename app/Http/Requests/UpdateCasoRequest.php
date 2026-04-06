@@ -62,6 +62,8 @@ class UpdateCasoRequest extends FormRequest
             'deudor.dv' => ['nullable', 'string', 'max:1'],
             'deudor.celular_1' => ['nullable', 'string', 'max:20'],
             'deudor.correo_1' => ['nullable', 'email', 'max:255'],
+            'deudor.cooperativas_ids' => ['required_if:deudor.is_new,true', 'nullable', 'array', 'min:1'],
+            'deudor.abogados_ids' => ['nullable', 'array'],
             
             'codeudores' => ['nullable', 'array'],
             'codeudores.*.id' => ['nullable', 'exists:codeudores,id'],
@@ -74,6 +76,20 @@ class UpdateCasoRequest extends FormRequest
             'codeudores.*.addresses' => ['nullable', 'array'],
             'codeudores.*.social_links' => ['nullable', 'array'],
             'juzgado_id' => ['nullable', 'integer', 'exists:juzgados,id'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'deudor.cooperativas_ids.required_if' => 'Debe asignar al menos una cooperativa o empresa al nuevo deudor.',
+            'deudor.cooperativas_ids.min' => 'Debe seleccionar al menos una cooperativa o empresa.',
+            'deudor.nombre_completo.required_if' => 'El nombre del deudor es obligatorio.',
+            'deudor.numero_documento.required_if' => 'El número de documento es obligatorio.',
+            'monto_total.required' => 'El monto del crédito es obligatorio.',
+            'tasa_interes_corriente.required' => 'La tasa de interés es obligatoria.',
+            'user_id.required' => 'Debe asignar al menos un responsable.',
+            'cooperativa_id.required' => 'Debe seleccionar la cooperativa o empresa del caso.',
         ];
     }
 }

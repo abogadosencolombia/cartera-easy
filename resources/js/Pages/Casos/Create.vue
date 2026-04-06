@@ -153,10 +153,24 @@ watch(form, debounce(() => {
 }, 500), { deep: true });
 
 // Mantener deudor_id sincronizado con la selección
+const casosExistentes = ref([]);
+const buscandoCasos = ref(false);
+
 watch(() => form.deudor.selected, (newVal) => {
     if (newVal && !form.deudor.is_new) {
         form.deudor_id = newVal.id;
         form.deudor.id = newVal.id;
+        
+        // Consultar casos existentes
+        buscandoCasos.value = true;
+        axios.get(route('personas.casos_existentes', newVal.id))
+            .then(res => {
+                casosExistentes.value = res.data;
+            })
+            .catch(err => console.error('Error buscando casos:', err))
+            .finally(() => buscandoCasos.value = false);
+    } else {
+        casosExistentes.value = [];
     }
 }, { deep: true });
 
@@ -218,6 +232,32 @@ const submit = () => {
                                         </div>
                                         <div v-if="!form.deudor.is_new">
                                             <AsyncSelect v-model="form.deudor.selected" :endpoint="route('personas.search')" placeholder="Buscar por nombre o documento..." label-key="nombre_completo" />
+                                            
+                                            <!-- Listado de Casos Existentes -->
+                                            <div v-if="buscandoCasos" class="mt-2 flex items-center gap-2 text-xs text-gray-500 italic">
+                                                <ArrowPathIcon class="w-3 h-3 animate-spin" /> Buscando antecedentes...
+                                            </div>
+                                            
+                                            <div v-if="casosExistentes.length > 0" class="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl animate-in fade-in slide-in-from-top-2">
+                                                <div class="flex items-center gap-2 mb-3">
+                                                    <ClockIcon class="w-4 h-4 text-amber-600" />
+                                                    <h4 class="text-xs font-black text-amber-800 dark:text-amber-300 uppercase tracking-wider">Atención: Esta persona ya tiene casos registrados ({{ casosExistentes.length }})</h4>
+                                                </div>
+                                                <div class="space-y-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                                                    <div v-for="(item, idx) in casosExistentes" :key="idx" class="flex items-center justify-between bg-white dark:bg-gray-800 p-2.5 rounded-lg border border-amber-100 dark:border-amber-900 shadow-sm group">
+                                                        <div class="flex flex-col">
+                                                            <span class="text-[10px] font-black text-indigo-600 uppercase tracking-tighter">{{ item.tipo }} · ID #{{ item.id }}</span>
+                                                            <span class="text-xs font-bold text-gray-700 dark:text-gray-200">{{ item.radicado }}</span>
+                                                            <span class="text-[9px] text-gray-500 font-medium uppercase">{{ item.cooperativa }} · Registrado: {{ item.fecha }}</span>
+                                                        </div>
+                                                        <a :href="item.link" target="_blank" class="p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-indigo-600 hover:text-white">
+                                                            <DocumentTextIcon class="w-4 h-4" />
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                                <p class="mt-3 text-[10px] text-amber-700 dark:text-amber-400 italic">Haga clic en el icono para revisar el expediente en una pestaña nueva.</p>
+                                            </div>
+
                                             <InputError :message="form.errors.deudor_id" />
                                             <InputError :message="form.errors['deudor.id']" />
                                         </div>

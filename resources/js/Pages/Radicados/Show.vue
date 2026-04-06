@@ -328,11 +328,11 @@ const eliminarActuacion = (actuacionId) => {
                         <ul v-else class="divide-y divide-gray-200 dark:divide-gray-700">
                           <li v-for="doc in files" :key="doc.id" class="py-3 flex items-start justify-between gap-4">
                             <div class="min-w-0 flex-1">
-                                <a :href="route('documentos-proceso.view', doc.id)" target="_blank" class="font-medium text-gray-900 dark:text-gray-100 hover:underline break-all">{{ asText(doc.file_name) }}</a>
+                                <a :href="route('documentos-proceso.show', doc.id)" target="_blank" class="font-medium text-gray-900 dark:text-gray-100 hover:underline break-all">{{ asText(doc.file_name) }}</a>
                                 <p class="text-xs text-gray-500 mt-1">{{ formatDate(doc.created_at) }} <span v-if="doc.descripcion"> · {{ doc.descripcion }}</span></p>
                             </div>
                             <div class="shrink-0 flex items-center gap-2">
-                                <a :href="route('documentos-proceso.view', doc.id)" target="_blank" class="text-gray-400 hover:text-indigo-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5c-7.633 0-10 7-10 7s2.367 7 10 7 10-7 10-7-2.367-7-10-7Zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10Z"/></svg></a>
+                                <a :href="route('documentos-proceso.show', doc.id)" target="_blank" class="text-gray-400 hover:text-indigo-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5c-7.633 0-10 7-10 7s2.367 7 10 7 10-7 10-7-2.367-7-10-7Zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10Z"/></svg></a>
                                 <button @click="askDeleteDoc(doc)" class="text-gray-400 hover:text-red-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                             </div>
                           </li>

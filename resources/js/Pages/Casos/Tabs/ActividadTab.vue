@@ -1,6 +1,15 @@
 <script setup>
 import HistorialAuditoria from '@/Components/HistorialAuditoria.vue';
-import { ClockIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/24/outline';
+import { 
+    ClockIcon, 
+    ChevronLeftIcon, 
+    ChevronRightIcon,
+    ShieldCheckIcon,
+    ArrowPathIcon,
+    FingerPrintIcon,
+    UserIcon,
+    DocumentMagnifyingGlassIcon
+} from '@heroicons/vue/24/outline';
 import { ref, computed } from 'vue';
 
 const props = defineProps({
@@ -9,11 +18,9 @@ const props = defineProps({
 });
 
 // --- Paginación Local para Bitácora ---
-const itemsPerPage = 10;
+const itemsPerPage = 8;
 const currentPage = ref(1);
-
 const totalPages = computed(() => Math.ceil(props.bitacoras.length / itemsPerPage));
-
 const paginatedBitacoras = computed(() => {
     const start = (currentPage.value - 1) * itemsPerPage;
     const end = start + itemsPerPage;
@@ -23,93 +30,120 @@ const paginatedBitacoras = computed(() => {
 const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++; };
 const prevPage = () => { if (currentPage.value > 1) currentPage.value--; };
 
-// --- Lógica de formato ---
-const parseDate = (s) => {
-    if (!s) return null;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-        const [y, m, d] = s.split('-').map(Number);
-        return new Date(y, m - 1, d);
-    }
-    return new Date(String(s).replace(' ', 'T'));
+const formatDateTime = (s) => {
+    if (!s) return 'N/A';
+    const date = new Date(s);
+    return date.toLocaleString('es-CO', {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+    });
 };
-const formatDateTime = (s) =>
-    parseDate(s)?.toLocaleString('es-CO', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    }) || 'N/A';
 </script>
 
 <template>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- BITÁCORA DE ACTIVIDAD -->
-        <div class="bg-gray-50 dark:bg-gray-900/50 p-6 rounded-lg flex flex-col h-[600px]">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-lg font-bold flex items-center">
-                    <ClockIcon class="h-6 w-6 mr-2 text-indigo-500" />Bitácora de Actividad
-                </h3>
-                <span class="text-xs font-medium text-gray-500 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-full">
-                    {{ bitacoras.length }} registros
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in duration-500">
+        
+        <!-- BITÁCORA DE ACTIVIDAD (DIARIO DE TRABAJO) -->
+        <div class="lg:col-span-7 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col min-h-[700px] overflow-hidden">
+            <div class="px-8 py-6 border-b border-gray-50 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl">
+                        <ClockIcon class="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <div>
+                        <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Bitácora Procesal</h3>
+                        <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Diario de acciones del equipo</p>
+                    </div>
+                </div>
+                <span class="px-3 py-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-full text-[10px] font-black text-gray-500">
+                    {{ bitacoras.length }} EVENTOS
                 </span>
             </div>
 
-            <div class="flex-grow overflow-y-auto pr-4 custom-scrollbar">
-                <div v-if="!bitacoras || !bitacoras.length" class="text-center py-12">
-                    <p class="text-sm text-gray-500 italic">No hay actividades registradas aún.</p>
+            <div class="flex-grow overflow-y-auto p-8 custom-scrollbar relative">
+                <div v-if="!bitacoras.length" class="flex flex-col items-center justify-center h-full text-center opacity-40">
+                    <DocumentMagnifyingGlassIcon class="w-16 h-16 mb-4 text-gray-300" />
+                    <p class="text-sm font-black uppercase tracking-widest text-gray-400">Sin historial registrado</p>
                 </div>
                 
-                <ol v-else class="relative border-l-2 border-gray-200 dark:border-gray-700 ml-3 space-y-8">
-                    <li v-for="item in paginatedBitacoras" :key="item.id" class="relative pl-8 group">
-                        <div class="absolute -left-[7px] top-1 h-3 w-3 rounded-full bg-indigo-500 ring-4 ring-gray-50 dark:ring-gray-900/50 transition-transform group-hover:scale-125"></div>
+                <div v-else class="space-y-8 relative before:absolute before:inset-0 before:ml-4 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-100 dark:before:via-gray-700 before:to-transparent">
+                    <div v-for="(item, idx) in paginatedBitacoras" :key="item.id" class="relative pl-10 group">
+                        <div class="absolute left-0 top-1.5 h-8 w-8 rounded-xl bg-white dark:bg-gray-800 border-2 border-indigo-500 shadow-sm flex items-center justify-center z-10 group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
+                            <FingerPrintIcon class="w-4 h-4" />
+                        </div>
                         
-                        <div class="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-                            <p class="text-sm font-bold text-gray-900 dark:text-gray-100">
-                                {{ item.accion }}
+                        <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm group-hover:shadow-md transition-all">
+                            <div class="flex justify-between items-start mb-3">
+                                <span class="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">{{ item.accion }}</span>
+                                <span class="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">{{ formatDateTime(item.created_at) }}</span>
+                            </div>
+                            <p v-if="item.comentario" class="text-sm text-gray-700 dark:text-gray-300 font-medium leading-relaxed italic">
+                                "{{ item.comentario }}"
                             </p>
-                            <p v-if="item.comentario" class="text-sm text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">
-                                {{ item.comentario }}
-                            </p>
-                            <div class="mt-3 flex items-center justify-between text-[11px] text-gray-400 dark:text-gray-500 border-t dark:border-gray-700 pt-2">
-                                <span>Por <span class="font-bold text-gray-600 dark:text-gray-300">{{ item.user ? item.user.name : 'Sistema' }}</span></span>
-                                <span>{{ formatDateTime(item.created_at) }}</span>
+                            <div class="mt-4 pt-3 border-t border-gray-50 dark:border-gray-700 flex items-center gap-2">
+                                <div class="w-5 h-5 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center overflow-hidden">
+                                    <UserIcon class="w-3 h-3 text-gray-400" />
+                                </div>
+                                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Ejecutado por <span class="text-gray-900 dark:text-white font-black">{{ item.user ? item.user.name : 'Sistema Inteligente' }}</span></span>
                             </div>
                         </div>
-                    </li>
-                </ol>
+                    </div>
+                </div>
             </div>
 
             <!-- Controles de Paginación Local -->
-            <div v-if="totalPages > 1" class="mt-6 pt-4 border-t dark:border-gray-700 flex items-center justify-between">
-                <p class="text-xs text-gray-500">
-                    Página <span class="font-bold">{{ currentPage }}</span> de {{ totalPages }}
+            <div v-if="totalPages > 1" class="px-8 py-4 border-t border-gray-50 dark:border-gray-700 bg-gray-50/30 flex items-center justify-between">
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                    Página <span class="text-indigo-600 font-black">{{ currentPage }}</span> / {{ totalPages }}
                 </p>
                 <div class="flex gap-2">
-                    <button 
-                        @click="prevPage" 
-                        :disabled="currentPage === 1"
-                        class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-30 transition-colors"
-                    >
-                        <ChevronLeftIcon class="h-5 w-5" />
+                    <button @click="prevPage" :disabled="currentPage === 1" class="p-2 bg-white dark:bg-gray-700 rounded-xl border border-gray-200 dark:border-gray-600 disabled:opacity-30 hover:bg-indigo-50 transition-colors shadow-sm">
+                        <ChevronLeftIcon class="h-4 w-4" />
                     </button>
-                    <button 
-                        @click="nextPage" 
-                        :disabled="currentPage === totalPages"
-                        class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-30 transition-colors"
-                    >
-                        <ChevronRightIcon class="h-5 w-5" />
+                    <button @click="nextPage" :disabled="currentPage === totalPages" class="p-2 bg-white dark:bg-gray-700 rounded-xl border border-gray-200 dark:border-gray-600 disabled:opacity-30 hover:bg-indigo-50 transition-colors shadow-sm">
+                        <ChevronRightIcon class="h-4 w-4" />
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- HISTORIAL DE AUDITORÍA -->
-        <div class="bg-gray-50 dark:bg-gray-900/50 p-6 rounded-lg h-[600px] overflow-y-auto custom-scrollbar">
-            <HistorialAuditoria :eventos="auditoria" />
+        <!-- HISTORIAL DE AUDITORÍA (CONTROL TÉCNICO) -->
+        <div class="lg:col-span-5 flex flex-col gap-6">
+            <div class="bg-gray-900 rounded-3xl p-8 shadow-2xl relative overflow-hidden h-full flex flex-col">
+                <div class="absolute -right-10 -bottom-10 opacity-5">
+                    <ShieldCheckIcon class="w-64 h-64 text-white" />
+                </div>
+                <div class="flex items-center gap-3 mb-8 relative z-10">
+                    <div class="p-2 bg-green-500/20 rounded-xl border border-green-500/30">
+                        <ShieldCheckIcon class="w-5 h-5 text-green-400" />
+                    </div>
+                    <div>
+                        <h3 class="font-black text-white uppercase tracking-wider text-xs">Registro de Auditoría</h3>
+                        <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Trazabilidad Técnica de cambios</p>
+                    </div>
+                </div>
+                
+                <div class="relative z-10 flex-grow">
+                    <HistorialAuditoria :eventos="auditoria" />
+                </div>
+
+                <div class="mt-8 p-4 bg-white/5 border border-white/10 rounded-2xl relative z-10">
+                    <div class="flex items-center gap-3">
+                        <ArrowPathIcon class="w-4 h-4 text-green-400 animate-spin" />
+                        <span class="text-[10px] font-bold text-gray-300 uppercase tracking-widest">Monitoreo Activo de Integridad</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </template>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(79, 70, 229, 0.1); border-radius: 20px; }
+.custom-scrollbar-dark::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar-dark::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, 0.1); border-radius: 20px; }
+</style>
 
 <style scoped>
 .custom-scrollbar::-webkit-scrollbar {

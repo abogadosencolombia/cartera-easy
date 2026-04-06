@@ -3,18 +3,18 @@
 namespace App\Exports;
 
 use App\Models\Caso;
+use App\Models\Cooperativa;
+use App\Models\Juzgado;
+use App\Models\EspecialidadJuridica;
+use App\Models\User;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-use Maatwebsite\Excel\Concerns\WithColumnFormatting;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use Carbon\Carbon;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 
-class CasosExport implements FromQuery, WithHeadings, WithMapping, WithStyles, ShouldAutoSize, WithColumnFormatting
+class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
 {
     protected $filtros;
 
@@ -25,222 +25,169 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithStyles, S
 
     public function query()
     {
-        $query = Caso::query()
-            ->with([
-                'deudor',
-                'codeudores',
-                'cooperativa',
-                'user',         // Abogado/Gestor responsable
-                'juzgado',
-                'especialidad',
-                'actuaciones'   // Cargamos actuaciones para mostrar la última
-            ])
-            ->latest('updated_at');
+        $query = Caso::query()->with(['deudor', 'cooperativa', 'juzgado', 'especialidad', 'users', 'codeudores']);
 
         if (!empty($this->filtros['search'])) {
             $search = $this->filtros['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('radicado', 'ilike', "%{$search}%")
                   ->orWhere('referencia_credito', 'ilike', "%{$search}%")
-                  ->orWhereHas('deudor', function($sq) use ($search) {
-                      $sq->where('nombre_completo', 'ilike', "%{$search}%")
-                         ->orWhere('numero_documento', 'ilike', "%{$search}%");
-                  });
+                  ->orWhereHas('deudor', fn($sq) => $sq->where('nombre_completo', 'ilike', "%{$search}%"));
             });
         }
         
-        if (!empty($this->filtros['abogado_id'])) {
-            $query->where('user_id', $this->filtros['abogado_id']);
+        if (!empty($this->filtros['abogado_id'])) $query->where('user_id', $this->filtros['abogado_id']);
+        if (!empty($this->filtros['cooperativa_id'])) $query->where('cooperativa_id', $this->filtros['cooperativa_id']);
+        if (!empty($this->filtros['etapa_procesal'])) $query->where('etapa_procesal', $this->filtros['etapa_procesal']);
+        if (!empty($this->filtros['sin_radicado'])) {
+            $query->where(function($q) { $q->whereNull('radicado')->orWhere('radicado', ''); });
         }
 
-        return $query;
+        return $query->latest('updated_at');
     }
 
     public function headings(): array
     {
         return [
-            'ID Caso',
-            'Referencia Crédito',
-            'Radicado',
-            'Número Caso (Interno)',
-            'Estado',
-            'Etapa Procesal',
-            'Cooperativa',
-            'Abogado / Gestor',
-            
-            // --- DATOS DEUDOR ---
-            'Deudor: Nombre',
-            'Deudor: Documento',
-            'Deudor: Teléfono',
-            'Deudor: Email',
-            'Deudor: Dirección',
-            
-            // --- CODEUDORES ---
-            'Codeudores (Detalle Completo)',
-
-            // --- JURÍDICO ---
-            'Especialidad',
+            'ID SISTEMA (NO MODIFICAR)',
+            'Radicado (23 digitos)',
+            'Referencia Credito / Pagare',
+            'Nombre Deudor',
+            'Documento Deudor',
+            'Tipo Doc',
+            'DV',
+            'Celular Deudor',
+            'Correo Deudor',
+            'Direccion Deudor',
+            'Ciudad Deudor',
+            'Codeudores (Nombre (CC: 123); ...)',
+            'Abogados Responsables',
+            'Cooperativa (Seleccionar lista)',
+            'Juzgado (Seleccionar lista)',
+            'Especialidad (Seleccionar lista)',
             'Tipo Proceso',
             'Subtipo Proceso',
             'Subproceso',
-            'Juzgado',
-            'Tipo Garantía',
+            'Etapa Procesal (Seleccionar lista)',
+            'Estado Caso (ACTIVO/CERRADO)',
+            'Estado Proceso',
+            'Tipo Garantia',
             'Origen Documental',
-
-            // --- FINANCIERO ---
-            'Monto Inicial',
-            'Deuda Actual',
+            'Medio de Contacto',
+            'Monto Credito Inicial',
+            'Deuda Actual (Capital)',
             'Total Pagado',
-
-            // --- FECHAS ---
-            'Fecha Apertura',
+            'Tasa Interes Corriente (%)',
+            'Fecha Inicio Credito (AAAA-MM-DD)',
+            'Fecha Demanda/Apertura',
             'Fecha Vencimiento',
-            'Fecha Inicio Crédito',
-            'Fecha Creación',
-
-            // --- GESTIÓN ---
-            'Medio Contacto',
-            'Link Carpeta Drive',
-            'Última Actuación (Notas)', // Renombrado para que sea más claro
-            'Bloqueado',
+            'Fecha Ultimo Pago',
+            'Fecha Tasa Interes',
+            'URL Carpeta Drive',
+            'URL Expediente Digital',
+            'Notas Legales / Observaciones',
+            'Nota de Cierre',
+            'Bloqueado (SI/NO)',
             'Motivo Bloqueo',
-            'Nota Cierre'
+            'Registrado Por',
+            'Fecha Registro Sistema',
+            'Ultima Actualizacion',
         ];
     }
 
     public function map($caso): array
     {
-        $deudor = $caso->deudor;
-        
-        // --- LÓGICA DE DATOS DEUDOR ---
-        $telefono = $deudor ? ($deudor->celular_1 ?? $deudor->celular_2 ?? $deudor->telefono_fijo ?? $deudor->celular ?? '') : '';
-        $email = $deudor ? ($deudor->correo_1 ?? $deudor->correo_2 ?? $deudor->email ?? '') : '';
-        
-        $direccion = '';
-        if ($deudor) {
-            $direccion = $deudor->direccion ?? $deudor->direccion_residencia ?? '';
-            if (empty($direccion) && !empty($deudor->addresses)) {
-                $addrs = is_string($deudor->addresses) ? json_decode($deudor->addresses, true) : $deudor->addresses;
-                if (is_array($addrs) && !empty($addrs)) {
-                    $first = reset($addrs);
-                    $direccion = is_string($first) ? $first : ($first['direccion'] ?? implode(' ', $first));
-                }
-            }
-        }
-        
-        // --- CODEUDORES ---
-        $listaCodeudores = "Sin codeudores";
-        if ($caso->codeudores && $caso->codeudores->count() > 0) {
-            $listaCodeudores = $caso->codeudores->map(function($c) {
-                $tel = $c->celular_1 ?? $c->celular ?? $c->telefono ?? 'Sin tel';
-                return "• " . strtoupper($c->nombre_completo) . " (CC: {$c->numero_documento}) - Tel: {$tel}";
-            })->implode("\n");
-        }
-
-        // --- ÚLTIMA ACTUACIÓN ---
-        // Buscamos la actuación más reciente para mostrar algo útil en "Notas"
-        $ultimaActuacion = $caso->actuaciones->sortByDesc('fecha_actuacion')->first();
-        $textoActuacion = '';
-        if ($ultimaActuacion) {
-            $fechaAct = Carbon::parse($ultimaActuacion->fecha_actuacion)->format('d/m/Y');
-            $textoActuacion = "({$fechaAct}) - " . strip_tags($ultimaActuacion->nota); // strip_tags limpia HTML si usas editor enriquecido
-        } else {
-            $textoActuacion = $caso->notas_legales; // Fallback al campo antiguo si no hay actuaciones
-        }
-
-        // --- SOLUCIÓN CAMPOS VACÍOS ---
-        $numeroCaso = $caso->numero_caso ?? $caso->numero_interno ?? $caso->id;
+        $abogados = $caso->users->pluck('name')->implode(', ');
+        $codeudores = $caso->codeudores->map(fn($c) => "{$c->nombre_completo} ({$c->tipo_documento}: {$c->numero_documento})")->implode('; ');
 
         return [
             $caso->id,
-            $caso->referencia_credito . ' ', 
             $caso->radicado,
-            $numeroCaso,
-            strtoupper($caso->estado ?? 'ACTIVO'),
-            $caso->etapa_procesal,
-            $caso->cooperativa ? $caso->cooperativa->nombre : 'N/A',
-            $caso->user ? $caso->user->name : 'Sin Asignar',
-
-            // Deudor
-            $deudor ? strtoupper($deudor->nombre_completo) : 'N/A',
-            $deudor ? ($deudor->tipo_documento . ' ' . $deudor->numero_documento) : 'N/A',
-            $telefono,
-            $email,
-            $direccion, // La ciudad va implícita aquí o no se muestra por solicitud
-
-            // Codeudores
-            $listaCodeudores,
-
-            // Jurídico
-            $caso->especialidad ? $caso->especialidad->nombre : '',
+            $caso->referencia_credito,
+            $caso->deudor?->nombre_completo,
+            $caso->deudor?->numero_documento,
+            $caso->deudor?->tipo_documento,
+            $caso->deudor?->dv,
+            $caso->deudor?->celular_1,
+            $caso->deudor?->correo_1,
+            $caso->deudor?->direccion,
+            $caso->deudor?->ciudad,
+            $codeudores,
+            $abogados,
+            $caso->cooperativa?->nombre,
+            $caso->juzgado?->nombre,
+            $caso->especialidad?->nombre,
             $caso->tipo_proceso,
             $caso->subtipo_proceso,
             $caso->subproceso,
-            $caso->juzgado ? $caso->juzgado->nombre : '',
+            $caso->etapa_procesal,
+            $caso->estado ?? 'ACTIVO',
+            $caso->estado_proceso,
             $caso->tipo_garantia_asociada,
             $caso->origen_documental,
-
-            // Financiero
+            $caso->medio_contacto,
             $caso->monto_total,
             $caso->monto_deuda_actual,
             $caso->monto_total_pagado,
-
-            // Fechas
-            $this->formatDate($caso->fecha_apertura),
-            $this->formatDate($caso->fecha_vencimiento),
-            $this->formatDate($caso->fecha_inicio_credito),
-            $caso->created_at->format('d/m/Y H:i'),
-
-            // Gestión
-            $caso->medio_contacto,
+            $caso->tasa_interes_corriente,
+            $caso->fecha_inicio_credito ? $caso->fecha_inicio_credito->format('Y-m-d') : '',
+            $caso->fecha_apertura ? $caso->fecha_apertura->format('Y-m-d') : '',
+            $caso->fecha_vencimiento ? $caso->fecha_vencimiento->format('Y-m-d') : '',
+            $caso->fecha_ultimo_pago ? $caso->fecha_ultimo_pago->format('Y-m-d') : '',
+            $caso->fecha_tasa_interes ? $caso->fecha_tasa_interes->format('Y-m-d') : '',
             $caso->link_drive,
-            $textoActuacion, // Aquí va la última actuación real
-            $caso->bloqueado ? 'SÍ' : 'NO',
-            $caso->motivo_bloqueo,
+            $caso->link_expediente,
+            $caso->notas_legales,
             $caso->nota_cierre,
+            $caso->bloqueado ? 'SI' : 'NO',
+            $caso->motivo_bloqueo,
+            $caso->user?->name ?? 'Sistema',
+            $caso->created_at->format('Y-m-d H:i'),
+            $caso->updated_at->format('Y-m-d H:i'),
         ];
     }
 
-    private function formatDate($date)
-    {
-        return $date ? Carbon::parse($date)->format('d/m/Y') : '';
-    }
-
-    public function columnFormats(): array
+    public function registerEvents(): array
     {
         return [
-            // Ajustamos las columnas financieras (R, S, T)
-            'R' => NumberFormat::FORMAT_CURRENCY_USD_SIMPLE, 
-            'S' => NumberFormat::FORMAT_CURRENCY_USD_SIMPLE,
-            'T' => NumberFormat::FORMAT_CURRENCY_USD_SIMPLE,
+            AfterSheet::class => function(AfterSheet $event) {
+                $sheet = $event->sheet->getDelegate();
+                $spreadsheet = $sheet->getParent();
+                $dataSheet = $spreadsheet->createSheet();
+                $dataSheet->setTitle('DATA_SISTEMA');
+                $dataSheet->setSheetState(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet::SHEETSTATE_VERYHIDDEN);
+
+                $cooperativas = Cooperativa::pluck('nombre')->toArray();
+                $juzgados = Juzgado::pluck('nombre')->toArray();
+                $especialidades = EspecialidadJuridica::pluck('nombre')->toArray();
+                $etapas = \DB::table('etapas_procesales')->pluck('nombre')->toArray();
+
+                $this->fillColumn($dataSheet, 'A', $cooperativas);
+                $this->fillColumn($dataSheet, 'B', $juzgados);
+                $this->fillColumn($dataSheet, 'C', $especialidades);
+                $this->fillColumn($dataSheet, 'D', $etapas);
+
+                $this->applyValidation($sheet, 'N2:N5000', 'DATA_SISTEMA!$A$1:$A$' . count($cooperativas));
+                $this->applyValidation($sheet, 'O2:O5000', 'DATA_SISTEMA!$B$1:$B$' . count($juzgados));
+                $this->applyValidation($sheet, 'P2:P5000', 'DATA_SISTEMA!$C$1:$C$' . count($especialidades));
+                $this->applyValidation($sheet, 'T2:T5000', 'DATA_SISTEMA!$D$1:$D$' . count($etapas));
+
+                $sheet->getStyle('A1:AQ1')->getFont()->setBold(true);
+                $sheet->getStyle('A1:AQ1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('4F46E5');
+                $sheet->getStyle('A1:AQ1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+                foreach(range('A','Z') as $col) { $sheet->getColumnDimension($col)->setAutoSize(true); }
+                foreach(['AA','AB','AC','AD','AE','AF','AG','AH','AI','AJ','AK','AL','AM','AN','AO','AP','AQ'] as $col) { $sheet->getColumnDimension($col)->setAutoSize(true); }
+            },
         ];
     }
 
-    public function styles(Worksheet $sheet)
-    {
-        $sheet->getStyle('1')->getFont()->setBold(true);
-        $sheet->getStyle('1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FFCCCCCC');
-        
-        $sheet->getStyle($sheet->calculateWorksheetDimension())->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
-
-        // Codeudores
-        $sheet->getStyle('N')->getAlignment()->setWrapText(true); 
-        $sheet->getColumnDimension('N')->setWidth(50);
-        
-        // Notas / Actuaciones (Columna AA aprox, ajustada por eliminaciones)
-        // Calculamos la letra: A=1... Z=26, AA=27.
-        // ID(A), Ref(B), Rad(C), Num(D), Est(E), Eta(F), Coop(G), Abo(H)
-        // DeuNom(I), Doc(J), Tel(K), Mail(L), Dir(M)
-        // Cod(N)
-        // Esp(O), Tip(P), Sub(Q), SubP(R), Juz(S), Gar(T), Ori(U)
-        // Mon(V), Deu(W), Pag(X)
-        // FecAp(Y), FecVen(Z), FecIni(AA), FecCre(AB)
-        // Med(AC), Link(AD), Not(AE)...
-        
-        // Ajustamos la columna de Notas (AE según cálculo rápido, pero usamos getHighestColumn para seguridad en estilos generales o letras fijas si estamos seguros)
-        $sheet->getStyle('AE')->getAlignment()->setWrapText(true);
-        $sheet->getColumnDimension('AE')->setWidth(60); 
-
-        $sheet->getColumnDimension('I')->setWidth(30); // Nombre deudor
+    private function fillColumn($sheet, $col, $data) { foreach ($data as $i => $val) { $sheet->setCellValue($col . ($i + 1), $val); } }
+    private function applyValidation($sheet, $range, $formula) {
+        $validation = $sheet->getDataValidation($range);
+        $validation->setType(DataValidation::TYPE_LIST);
+        $validation->setErrorStyle(DataValidation::STYLE_STOP);
+        $validation->setAllowBlank(false);
+        $validation->setShowDropDown(true);
+        $validation->setFormula1($formula);
     }
 }

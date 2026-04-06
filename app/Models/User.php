@@ -32,6 +32,7 @@ class User extends Authenticatable
         'persona_id',
         'preferencias_notificacion',
         'addresses',
+        'tour_seen',
     ];
 
     /**
@@ -59,6 +60,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'estado_activo' => 'boolean',
+            'tour_seen' => 'boolean',
             'preferencias_notificacion' => 'array',
         ];
     }

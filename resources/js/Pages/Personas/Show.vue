@@ -1,55 +1,46 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import { 
     PencilSquareIcon, ArrowLeftIcon, MapPinIcon, LinkIcon, 
     ArrowTopRightOnSquareIcon, PaperClipIcon, TrashIcon, 
     ArrowDownTrayIcon, DocumentPlusIcon, DocumentIcon,
-    EyeIcon, ExclamationTriangleIcon
+    EyeIcon, ExclamationTriangleIcon, UserIcon, PhoneIcon,
+    EnvelopeIcon, BuildingOfficeIcon, BriefcaseIcon,
+    IdentificationIcon, GlobeAltIcon, FolderIcon,
+    ScaleIcon, CheckCircleIcon, UserGroupIcon, CloudArrowUpIcon
 } from '@heroicons/vue/24/outline';
 import { ref, computed } from 'vue';
+import Swal from 'sweetalert2';
 
 const props = defineProps({
-  persona: {
-    type: Object,
-    required: true,
-  },
+  persona: { type: Object, required: true },
 });
 
 const isViewable = (mimeType) => {
     if (!mimeType) return false;
-    const viewableTypes = [
-        'application/pdf', 
-        'image/jpeg', 
-        'image/png', 
-        'image/jpg', 
-        'image/webp'
-    ];
-    return viewableTypes.includes(mimeType);
+    return ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg', 'image/webp'].includes(mimeType);
 };
 
-// Helper para verificar si hay datos en arrays
 const hasData = (arr) => Array.isArray(arr) && arr.length > 0;
 
-// Lógica de Información Incompleta
 const missingInfo = computed(() => {
     const p = props.persona;
     const missing = [];
-    if (!p.celular_1 && !p.correo_1) missing.push('Información de contacto (Celular o Correo)');
+    if (!p.celular_1 && !p.correo_1) missing.push('Contacto (Celular/Correo)');
     if (!p.fecha_nacimiento) missing.push('Fecha de nacimiento');
-    if (!p.fecha_expedicion) missing.push('Fecha de expedición del documento');
-    if (!hasData(p.cooperativas)) missing.push('Asignación a Cooperativa/Empresa');
-    if (!hasData(p.abogados)) missing.push('Asignación de Abogado/Gestor');
+    if (!p.fecha_expedicion) missing.push('Fecha de expedición');
+    if (!hasData(p.cooperativas)) missing.push('Asignación de Empresa');
+    if (!hasData(p.abogados)) missing.push('Asignación de Responsable');
     return missing;
 });
 
-// Helper simple para formatear fecha
 const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' });
+    const date = new Date(dateString);
+    return isNaN(date.getTime()) ? dateString : date.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
 };
 
-// Formato de tamaño de archivo
 const formatBytes = (bytes, decimals = 2) => {
     if (!+bytes) return '0 Bytes';
     const k = 1024;
@@ -59,475 +50,391 @@ const formatBytes = (bytes, decimals = 2) => {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 };
 
-// Lógica de Subida de Archivos
-const formUpload = useForm({
-    documento: null,
-});
-
+const formUpload = useForm({ documento: null });
 const fileInput = ref(null);
 
-const triggerFileInput = () => {
-    fileInput.value.click();
-};
-
 const handleFileChange = (e) => {
-    formUpload.documento = e.target.files[0];
-    if (formUpload.documento) {
-        submitUpload();
-    }
-};
-
-const submitUpload = () => {
-    formUpload.post(route('personas.upload_document', props.persona.id), {
-        preserveScroll: true,
-        onSuccess: () => {
-            formUpload.reset();
-            // Limpiar input file
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    Swal.fire({
+        title: '¿Subir documento?',
+        text: `Se adjuntará "${file.name}" al expediente.`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, subir ahora',
+        confirmButtonColor: '#4f46e5'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            formUpload.documento = file;
+            formUpload.post(route('personas.upload_document', props.persona.id), {
+                preserveScroll: true,
+                onSuccess: () => {
+                    formUpload.reset();
+                    if (fileInput.value) fileInput.value.value = null;
+                    Swal.fire('¡Éxito!', 'Documento cargado correctamente.', 'success');
+                },
+            });
+        } else {
             if (fileInput.value) fileInput.value.value = null;
-        },
+        }
     });
 };
 
 const deleteDocument = (docId) => {
-    if (confirm('¿Estás seguro de eliminar este documento? Esta acción no se puede deshacer.')) {
-        useForm({}).delete(route('personas.delete_document', docId), {
-            preserveScroll: true,
-        });
-    }
+    Swal.fire({
+        title: '¿Eliminar archivo?',
+        text: "Esta acción no se puede deshacer.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Sí, eliminar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            router.delete(route('personas.delete_document', docId), {
+                onSuccess: () => Swal.fire('Eliminado', 'El archivo ha sido borrado.', 'success')
+            });
+        }
+    });
+};
+
+const getRandomColor = (id) => {
+  const colors = ['bg-indigo-600', 'bg-emerald-600', 'bg-violet-600', 'bg-amber-600', 'bg-rose-600'];
+  return colors[id % colors.length];
 };
 </script>
 
 <template>
-  <Head :title="`Ver ${persona.nombre_completo}`" />
+  <Head :title="persona.nombre_completo" />
 
   <AuthenticatedLayout>
     <template #header>
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-4">
-            <Link :href="route('personas.index')" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition">
-                <ArrowLeftIcon class="w-5 h-5 text-gray-500 dark:text-gray-400" />
+      <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+        <div class="flex items-center gap-5">
+            <Link :href="route('personas.index')" class="p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-400 hover:text-indigo-600 transition-all shadow-sm">
+                <ArrowLeftIcon class="w-6 h-6" />
             </Link>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">
-            Detalles de la Persona
-            </h2>
+            <div class="flex items-center gap-4">
+                <div :class="`w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-xl ${getRandomColor(persona.id)}`">
+                    {{ persona.nombre_completo[0] }}
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-[10px] font-black uppercase rounded-md border border-indigo-200">SUJETO REGISTRADO</span>
+                        <span v-if="persona.es_demandado" class="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-black uppercase rounded-md border border-red-200">Demandado</span>
+                        <span v-else class="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase rounded-md border border-emerald-200">Cliente</span>
+                    </div>
+                    <h2 class="font-black text-2xl text-gray-900 dark:text-white leading-tight">
+                        {{ persona.nombre_completo }}
+                    </h2>
+                </div>
+            </div>
         </div>
         
-        <Link :href="route('personas.edit', persona.id)">
-            <button class="inline-flex items-center gap-2 rounded-md bg-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 transition-colors">
-                <PencilSquareIcon class="h-4 w-4" />
-                Editar
-            </button>
-        </Link>
+        <div class="flex items-center gap-3 w-full md:w-auto">
+            <Link :href="route('personas.edit', persona.id)" class="flex-1 md:flex-none inline-flex items-center justify-center px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-none">
+                <PencilSquareIcon class="w-4 h-4 mr-2" /> Editar Perfil
+            </Link>
+        </div>
       </div>
     </template>
 
-    <div class="py-12">
-      <div class="mx-auto max-w-5xl sm:px-6 lg:px-8 space-y-6">
+    <div class="py-12 bg-gray-50/50 dark:bg-gray-900/50 min-h-screen">
+      <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
         
-        <!-- Alerta de Información Incompleta -->
-        <div v-if="missingInfo.length > 0" class="rounded-md bg-amber-50 p-4 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
-            <div class="flex">
-                <div class="flex-shrink-0">
-                    <ExclamationTriangleIcon class="h-5 w-5 text-amber-400" aria-hidden="true" />
+        <!-- DASHBOARD DE ESTADÍSTICAS RÁPIDAS -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4 group hover:border-indigo-200 transition-all">
+                <div class="p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl">
+                    <FolderIcon class="w-8 h-8 text-indigo-600" />
                 </div>
-                <div class="ml-3">
-                    <h3 class="text-sm font-bold text-amber-800 dark:text-amber-200 uppercase tracking-wide">
-                        Perfil con información pendiente
-                    </h3>
-                    <div class="mt-2 text-xs text-amber-700 dark:text-amber-300">
-                        <p>Para una gestión óptima, se recomienda completar:</p>
-                        <ul role="list" class="list-disc pl-5 mt-1 space-y-1">
-                            <li v-for="item in missingInfo" :key="item">{{ item }}</li>
+                <div>
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Casos de Cobro</p>
+                    <p class="text-2xl font-black text-gray-900 dark:text-white">{{ persona.casos_count || 0 }}</p>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4 group hover:border-blue-200 transition-all">
+                <div class="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-2xl">
+                    <ScaleIcon class="w-8 h-8 text-blue-600" />
+                </div>
+                <div>
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Procesos Judiciales</p>
+                    <p class="text-2xl font-black text-gray-900 dark:text-white">{{ persona.procesos_count || 0 }}</p>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4 group hover:border-emerald-200 transition-all">
+                <div class="p-4 bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl">
+                    <PaperClipIcon class="w-8 h-8 text-emerald-600" />
+                </div>
+                <div>
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Archivos Digitales</p>
+                    <p class="text-2xl font-black text-gray-900 dark:text-white">{{ persona.documentos?.length || 0 }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerta de Información Incompleta -->
+        <div v-if="missingInfo.length > 0" class="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800 p-6 rounded-[2rem] flex items-start gap-4 animate-in fade-in duration-500">
+            <div class="p-3 bg-white dark:bg-gray-800 rounded-2xl shadow-sm">
+                <ExclamationTriangleIcon class="w-8 h-8 text-amber-500" />
+            </div>
+            <div>
+                <h3 class="text-sm font-black text-amber-900 dark:text-amber-200 uppercase tracking-widest">Atención: Perfil con datos pendientes</h3>
+                <p class="text-xs text-amber-700 dark:text-amber-400 mt-1 font-medium">Se recomienda completar la siguiente información para una gestión jurídica integral:</p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    <span v-for="item in missingInfo" :key="item" class="px-2.5 py-1 bg-amber-100 dark:bg-amber-800 text-amber-800 dark:text-amber-200 text-[10px] font-bold rounded-lg border border-amber-200 dark:border-amber-700">{{ item }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            <!-- COLUMNA IZQUIERDA: INFORMACIÓN CORE (8/12) -->
+            <div class="lg:col-span-8 space-y-8">
+                
+                <!-- Card: Información Personal y Contacto -->
+                <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+                    <div class="px-10 py-6 bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
+                        <IdentificationIcon class="w-5 h-5 text-indigo-500" />
+                        <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Identificación y Bio</h3>
+                    </div>
+                    <div class="p-10">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-10">
+                            <div class="space-y-1">
+                                <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Documento de Identidad</span>
+                                <div class="flex items-center gap-3">
+                                    <span class="px-2 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-black rounded-lg border border-indigo-100 uppercase">{{ persona.tipo_documento }}</span>
+                                    <p class="text-lg font-mono font-black text-gray-900 dark:text-white">{{ persona.numero_documento }}<span v-if="persona.dv" class="text-indigo-500">-{{ persona.dv }}</span></p>
+                                </div>
+                            </div>
+                            <div class="space-y-1">
+                                <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Fechas Clave</span>
+                                <div class="flex flex-col gap-1">
+                                    <p class="text-sm font-bold text-gray-700 dark:text-gray-300">Nacimiento: <span class="font-normal">{{ formatDate(persona.fecha_nacimiento) }}</span></p>
+                                    <p class="text-sm font-bold text-gray-700 dark:text-gray-300">Expedición: <span class="font-normal">{{ formatDate(persona.fecha_expedicion) }}</span></p>
+                                </div>
+                            </div>
+                            <div class="space-y-1">
+                                <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Canales de Contacto</span>
+                                <div class="space-y-2 pt-1">
+                                    <div v-if="persona.celular_1" class="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-200">
+                                        <div class="p-1.5 bg-emerald-50 rounded-lg"><PhoneIcon class="w-4 h-4 text-emerald-600" /></div> {{ persona.celular_1 }}
+                                    </div>
+                                    <div v-if="persona.correo_1" class="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-200">
+                                        <div class="p-1.5 bg-blue-50 rounded-lg"><EnvelopeIcon class="w-4 h-4 text-blue-600" /></div> {{ persona.correo_1 }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="space-y-1">
+                                <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Perfil Laboral</span>
+                                <div class="flex items-start gap-3 pt-1">
+                                    <div class="p-1.5 bg-amber-50 rounded-lg"><BriefcaseIcon class="w-4 h-4 text-amber-600" /></div>
+                                    <div>
+                                        <p class="text-sm font-bold text-gray-900 dark:text-white leading-tight">{{ persona.empresa || 'Empresa no registrada' }}</p>
+                                        <p class="text-xs text-gray-500 font-medium">{{ persona.cargo || 'Cargo no especificado' }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-12 pt-10 border-t border-gray-50 dark:border-gray-700">
+                            <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-4">Notas y Observaciones</span>
+                            <div class="p-6 bg-gray-50 dark:bg-gray-900/50 rounded-[2rem] border border-gray-100 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400 leading-relaxed italic">
+                                "{{ persona.observaciones || 'Sin anotaciones adicionales en el perfil.' }}"
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card: Gestión Documental -->
+                <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+                    <div class="px-10 py-6 bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <CloudArrowUpIcon class="w-5 h-5 text-indigo-500" />
+                            <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Repositorio de Archivos</h3>
+                        </div>
+                        <div>
+                            <input type="file" ref="fileInput" class="hidden" @change="handleFileChange">
+                            <button @click="fileInput.click()" class="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl font-black text-[10px] uppercase tracking-widest text-indigo-600 hover:bg-indigo-50 transition-all shadow-sm">
+                                <DocumentPlusIcon class="w-4 h-4 mr-2" /> Adjuntar Soportes
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="p-10">
+                        <div v-if="!hasData(persona.documentos)" class="text-center py-16 opacity-40">
+                            <DocumentIcon class="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                            <p class="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Sin documentos vinculados</p>
+                        </div>
+                        <ul v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <li v-for="doc in persona.documentos" :key="doc.id" class="p-5 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm hover:border-indigo-200 transition-all flex items-start gap-4 group">
+                                <div class="p-3 bg-gray-50 dark:bg-gray-900 rounded-2xl group-hover:bg-indigo-50 transition-colors">
+                                    <DocumentIcon class="w-8 h-8 text-gray-400 group-hover:text-indigo-600" />
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex justify-between items-start">
+                                        <h4 class="text-xs font-black text-gray-900 dark:text-white truncate pr-2" :title="doc.nombre_original">{{ doc.nombre_original }}</h4>
+                                        <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <a :href="route('personas.view_document', doc.id)" target="_blank" class="p-1.5 text-gray-400 hover:text-indigo-600"><EyeIcon class="w-4 h-4" /></a>
+                                            <button @click="deleteDocument(doc.id)" class="p-1.5 text-gray-400 hover:text-red-600"><TrashIcon class="w-4 h-4" /></button>
+                                        </div>
+                                    </div>
+                                    <p class="text-[9px] font-bold text-gray-400 uppercase tracking-tighter mt-1">{{ formatBytes(doc.size) }} • {{ formatDate(doc.created_at) }}</p>
+                                    <div class="mt-4 flex items-center gap-2">
+                                        <a :href="route('personas.download_document', doc.id)" class="text-[9px] font-black uppercase text-indigo-600 hover:underline">Descargar</a>
+                                        <span class="w-1 h-1 bg-gray-200 rounded-full"></span>
+                                        <span class="text-[9px] font-bold text-gray-400">{{ doc.mime_type.split('/')[1].toUpperCase() }}</span>
+                                    </div>
+                                </div>
+                            </li>
                         </ul>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- TARJETA PRINCIPAL: DATOS PERSONALES -->
-        <div class="overflow-hidden bg-white shadow-sm dark:bg-gray-800 sm:rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">Información Personal</h3>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Datos básicos y de identificación.</p>
-            </div>
-            <div class="border-t border-gray-200 dark:border-gray-700">
-                <dl class="divide-y divide-gray-200 dark:divide-gray-700">
-                    <div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Nombre Completo</dt>
-                        <dd class="mt-1 text-sm font-bold text-gray-900 dark:text-white sm:col-span-2 sm:mt-0 text-lg">{{ persona.nombre_completo }}</dd>
-                    </div>
-                    <div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 bg-gray-50 dark:bg-gray-700/20">
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Identificación</dt>
-                        <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100 sm:col-span-2 sm:mt-0">
-                            <span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-900/30 dark:text-blue-400">
-                                {{ persona.tipo_documento }}
-                            </span>
-                            <span class="ml-2 font-mono text-base">
-                                {{ persona.numero_documento }}<template v-if="persona.tipo_documento === 'NIT' && persona.dv">-{{ persona.dv }}</template>
-                            </span>
-                        </dd>
-                    </div>
-                    <div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Fecha Nacimiento</dt>
-                        <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100 sm:col-span-2 sm:mt-0">
-                            {{ persona.fecha_nacimiento || 'No registrada' }}
-                        </dd>
-                    </div>
-                    <div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 bg-gray-50 dark:bg-gray-700/20">
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Fecha Expedición</dt>
-                        <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100 sm:col-span-2 sm:mt-0">
-                            {{ persona.fecha_expedicion || 'No registrada' }}
-                        </dd>
-                    </div>
-                </dl>
-            </div>
-        </div>
-
-        <!-- SEGUNDA FILA: CONTACTO Y EMPRESA -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- CONTACTO -->
-            <div class="overflow-hidden bg-white shadow-sm dark:bg-gray-800 sm:rounded-lg h-full">
-                <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
-                    <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">Información de Contacto</h3>
-                </div>
-                <div class="px-4 py-5 sm:p-6">
-                    <ul class="space-y-4">
-                        <li class="flex flex-col">
-                            <span class="text-xs font-medium text-gray-500 uppercase">Celulares</span>
-                            <div class="mt-1 flex gap-4">
-                                <span v-if="persona.celular_1" class="text-gray-900 dark:text-gray-100">{{ persona.celular_1 }}</span>
-                                <span v-if="persona.celular_2" class="text-gray-500 dark:text-gray-400 border-l pl-4">{{ persona.celular_2 }}</span>
-                                <span v-if="!persona.celular_1 && !persona.celular_2" class="text-gray-400 italic">Sin celulares</span>
-                            </div>
-                        </li>
-                        <li class="flex flex-col">
-                            <span class="text-xs font-medium text-gray-500 uppercase">Teléfono Fijo</span>
-                            <span class="text-gray-900 dark:text-gray-100">{{ persona.telefono_fijo || 'N/A' }}</span>
-                        </li>
-                        <li class="flex flex-col">
-                            <span class="text-xs font-medium text-gray-500 uppercase">Correos Electrónicos</span>
-                            <div class="mt-1 space-y-1">
-                                <div v-if="persona.correo_1">
-                                    <a :href="`mailto:${persona.correo_1}`" class="text-indigo-600 hover:underline dark:text-indigo-400">{{ persona.correo_1 }}</a>
-                                </div>
-                                <div v-if="persona.correo_2">
-                                    <a :href="`mailto:${persona.correo_2}`" class="text-indigo-600 hover:underline dark:text-indigo-400">{{ persona.correo_2 }}</a>
-                                </div>
-                                <span v-if="!persona.correo_1 && !persona.correo_2" class="text-gray-400 italic">Sin correos</span>
-                            </div>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- EMPRESA Y OBSERVACIONES -->
-            <div class="overflow-hidden bg-white shadow-sm dark:bg-gray-800 sm:rounded-lg h-full flex flex-col">
-                <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
-                    <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">Datos Laborales & Notas</h3>
-                </div>
-                <div class="px-4 py-5 sm:p-6 flex-1">
-                    <div class="mb-6">
-                        <span class="block text-xs font-medium text-gray-500 uppercase">Empresa / Cargo</span>
-                        <p class="mt-1 text-gray-900 dark:text-gray-100">
-                            {{ persona.empresa || 'N/A' }}
-                            <span v-if="persona.cargo" class="text-gray-500"> — {{ persona.cargo }}</span>
-                        </p>
-                    </div>
-                    <div>
-                        <span class="block text-xs font-medium text-gray-500 uppercase">Observaciones</span>
-                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-300 whitespace-pre-line bg-gray-50 dark:bg-gray-700/30 p-3 rounded-md">
-                            {{ persona.observaciones || 'Sin observaciones registradas.' }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- TERCERA FILA: DIRECCIONES Y REDES -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- DIRECCIONES -->
-            <div class="overflow-hidden bg-white shadow-sm dark:bg-gray-800 sm:rounded-lg">
-                <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
-                    <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">Direcciones Físicas</h3>
-                </div>
-                <div class="px-4 py-5 sm:p-6">
-                    <ul v-if="hasData(persona.addresses)" class="space-y-3 max-h-48 overflow-y-auto">
-                        <li v-for="(addr, idx) in persona.addresses" :key="idx" class="flex items-start gap-3 p-3 rounded-md border border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/20">
-                            <MapPinIcon class="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
-                            <div>
-                                <span class="block text-sm font-bold text-gray-800 dark:text-gray-200">{{ addr.label || 'Dirección' }}</span>
-                                <span class="block text-sm text-gray-600 dark:text-gray-400">{{ addr.address }}</span>
-                                <span class="block text-xs text-gray-500">{{ addr.city }}</span>
-                            </div>
-                        </li>
-                    </ul>
-                    <p v-else class="text-sm text-gray-500 italic text-center py-4">No hay direcciones registradas.</p>
-                </div>
-            </div>
-
-            <!-- REDES SOCIALES -->
-            <div class="overflow-hidden bg-white shadow-sm dark:bg-gray-800 sm:rounded-lg">
-                <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
-                    <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">Redes Sociales</h3>
-                </div>
-                <div class="px-4 py-5 sm:p-6">
-                    <ul v-if="hasData(persona.social_links)" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto">
-                        <li v-for="(link, idx) in persona.social_links" :key="idx">
-                            <a :href="link.url" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 p-3 rounded-md border border-gray-200 dark:border-gray-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200 transition group">
-                                <LinkIcon class="w-4 h-4 text-indigo-500 group-hover:text-indigo-700" />
-                                <div class="overflow-hidden">
-                                    <span class="block text-sm font-bold text-gray-800 dark:text-gray-200 truncate">{{ link.label || 'Enlace' }}</span>
-                                    <span class="block text-xs text-gray-500 truncate">{{ link.url }}</span>
-                                </div>
-                            </a>
-                        </li>
-                    </ul>
-                    <p v-else class="text-sm text-gray-500 italic text-center py-4">No hay redes sociales registradas.</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- CUARTA FILA: RELACIONES (COOPERATIVAS Y ABOGADOS) -->
-        <div class="overflow-hidden bg-white shadow-sm dark:bg-gray-800 sm:rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
-                <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">Relaciones y Asignaciones</h3>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-200 dark:divide-gray-700">
-                <!-- COOPERATIVAS -->
-                <div class="p-6">
-                    <h4 class="text-sm font-medium text-gray-500 uppercase mb-4">Cooperativas Asociadas</h4>
-                    <div v-if="hasData(persona.cooperativas)" class="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                        <span v-for="coop in persona.cooperativas" :key="coop.id" class="inline-flex items-center rounded-full bg-green-50 px-3 py-1 text-sm font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-900/30 dark:text-green-400">
-                            {{ coop.nombre }}
-                        </span>
-                    </div>
-                    <p v-else class="text-sm text-gray-500 italic">No pertenece a ninguna cooperativa.</p>
-                </div>
-
-                <!-- ABOGADOS -->
-                <div class="p-6">
-                    <h4 class="text-sm font-medium text-gray-500 uppercase mb-4">Abogados / Gestores Asignados</h4>
-                    <div v-if="hasData(persona.abogados)" class="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                        <span v-for="user in persona.abogados" :key="user.id" class="inline-flex items-center rounded-full bg-purple-50 px-3 py-1 text-sm font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10 dark:bg-purple-900/30 dark:text-purple-400">
-                            {{ user.name }}
-                        </span>
-                    </div>
-                    <p v-else class="text-sm text-gray-500 italic">No tiene abogados asignados.</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- SECCIÓN DE DOCUMENTOS -->
-        <div class="mt-6 overflow-hidden bg-white shadow-sm dark:bg-gray-800 sm:rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-700/30">
-                <div>
-                    <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">Gestión Documental</h3>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Archivos adjuntos (contratos, cédulas, soportes).</p>
-                </div>
-                <div>
-                    <input 
-                        type="file" 
-                        ref="fileInput" 
-                        class="hidden" 
-                        @change="handleFileChange"
-                    >
-                    <button 
-                        @click="triggerFileInput"
-                        :disabled="formUpload.processing"
-                        class="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600"
-                    >
-                        <DocumentPlusIcon v-if="!formUpload.processing" class="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                        <span v-else class="animate-spin h-5 w-5 border-2 border-indigo-500 border-t-transparent rounded-full"></span>
-                        {{ formUpload.processing ? 'Subiendo...' : 'Adjuntar Archivo' }}
-                    </button>
-                    <div v-if="formUpload.errors.documento" class="text-red-500 text-xs mt-1 text-right">
-                        {{ formUpload.errors.documento }}
-                    </div>
-                </div>
-            </div>
-            
-            <div class="border-t border-gray-200 dark:border-gray-700">
-                <ul v-if="hasData(persona.documentos)" role="list" class="divide-y divide-gray-100 dark:divide-gray-700">
-                    <li v-for="doc in persona.documentos" :key="doc.id" class="flex items-center justify-between gap-x-6 py-5 px-6 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
-                        <div class="min-w-0">
-                            <div class="flex items-start gap-x-3">
-                                <DocumentIcon class="h-6 w-6 text-gray-400" />
-                                <div>
-                                    <p class="text-sm font-semibold leading-6 text-gray-900 dark:text-white">{{ doc.nombre_original }}</p>
-                                    <p class="mt-1 truncate text-xs leading-5 text-gray-500 dark:text-gray-400">
-                                        {{ formatBytes(doc.size) }} · Subido por {{ doc.uploader?.name || 'Sistema' }} el {{ formatDate(doc.created_at) }}
-                                    </p>
-                                </div>
-                            </div>
+                <!-- Card: Historial Judicial (Casos y Procesos) -->
+                <div class="space-y-8">
+                    <!-- Casos de Cobro -->
+                    <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+                        <div class="px-10 py-6 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center bg-indigo-50/30 dark:bg-indigo-900/20">
+                            <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Historial de Cobro Carteras</h3>
+                            <Link v-if="persona.casos_count > persona.casos?.length" :href="route('casos.index', { search: persona.numero_documento })" class="text-[10px] font-black text-indigo-600 uppercase hover:underline">Ver todos los casos</Link>
                         </div>
-                        <div class="flex flex-none items-center gap-x-4">
-                            <a v-if="isViewable(doc.mime_type)" 
-                                :href="route('personas.view_document', doc.id)" 
-                                target="_blank"
-                                class="rounded-md bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:ring-gray-600 dark:hover:bg-gray-600 flex items-center gap-1"
-                                title="Ver en nueva pestaña">
-                                <EyeIcon class="h-4 w-4" />
-                                Ver
-                            </a>
-                            <a :href="route('personas.download_document', doc.id)" class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:ring-gray-600 dark:hover:bg-gray-600 flex items-center gap-1">
-                                <ArrowDownTrayIcon class="h-3 w-3" /> Descargar
-                            </a>
-                            <button @click="deleteDocument(doc.id)" class="rounded-full p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition">
-                                <TrashIcon class="h-5 w-5" />
-                            </button>
+                        <div class="p-0">
+                            <div v-if="!hasData(persona.casos)" class="p-16 text-center opacity-40 font-bold text-gray-400 uppercase text-xs tracking-widest">Sin registros de cobro</div>
+                            <table v-else class="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
+                                <thead class="bg-gray-50/50 dark:bg-gray-900/40">
+                                    <tr class="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">
+                                        <th class="px-10 py-4 text-left">Expediente</th>
+                                        <th class="px-6 py-4 text-left">Estado</th>
+                                        <th class="px-6 py-4 text-left">Responsable</th>
+                                        <th class="px-10 py-4 text-right">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                                    <tr v-for="caso in persona.casos" :key="caso.id" class="hover:bg-gray-50 transition-colors">
+                                        <td class="px-10 py-4 text-sm font-bold text-gray-900 dark:text-white">#{{ caso.id }} <br/><span class="text-[10px] font-normal text-gray-500">{{ caso.radicado || 'Sin radicar' }}</span></td>
+                                        <td class="px-6 py-4">
+                                            <span class="px-2 py-0.5 text-[10px] font-black rounded-lg border uppercase tracking-widest" :class="caso.estado === 'ACTIVO' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'">{{ caso.estado }}</span>
+                                        </td>
+                                        <td class="px-6 py-4 text-xs font-medium text-gray-600">{{ caso.user?.name.split(' ')[0] || '—' }}</td>
+                                        <td class="px-10 py-4 text-right">
+                                            <Link :href="route('casos.show', caso.id)" class="text-[10px] font-black text-indigo-600 uppercase hover:underline">Ver Ficha</Link>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
-                    </li>
-                </ul>
-                <p v-else class="text-sm text-gray-500 italic text-center py-8">No hay documentos adjuntos.</p>
-            </div>
-        </div>
+                    </div>
 
-
-        <!-- QUINTA SECCIÓN: GESTIÓN DE CASOS -->
-        <div class="mt-6 overflow-hidden bg-white shadow-sm dark:bg-gray-800 sm:rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/20">
-                <div>
-                    <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">Casos de Cobro</h3>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Listado de casos recientes.</p>
-                </div>
-                <div class="flex items-center gap-3">
-                    <span v-if="persona.casos_count" class="inline-flex items-center rounded-md bg-white px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-200 shadow-sm">
-                        Total: {{ persona.casos_count }}
-                    </span>
-                    <!-- BOTÓN VER TODOS: Solo aparece si el total > casos mostrados -->
-                    <Link v-if="persona.casos_count > (persona.casos?.length || 0)" 
-                          :href="route('casos.index', { search: persona.numero_documento })" 
-                          class="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline">
-                        Ver todos
-                        <ArrowTopRightOnSquareIcon class="w-4 h-4" />
-                    </Link>
+                    <!-- Procesos Judiciales -->
+                    <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+                        <div class="px-10 py-6 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center bg-blue-50/30 dark:bg-blue-900/20">
+                            <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Expedientes Judiciales (Radicados)</h3>
+                            <Link v-if="persona.procesos_count > persona.procesos?.length" :href="route('procesos.index', { search: persona.numero_documento })" class="text-[10px] font-black text-blue-600 uppercase hover:underline">Ver todos los radicados</Link>
+                        </div>
+                        <div class="p-0">
+                            <div v-if="!hasData(persona.procesos)" class="p-16 text-center opacity-40 font-bold text-gray-400 uppercase text-xs tracking-widest">Sin procesos registrados</div>
+                            <table v-else class="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
+                                <thead class="bg-gray-50/50 dark:bg-gray-900/40">
+                                    <tr class="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">
+                                        <th class="px-10 py-4 text-left">Radicado / Asunto</th>
+                                        <th class="px-6 py-4 text-left">Rol</th>
+                                        <th class="px-6 py-4 text-left">Estado</th>
+                                        <th class="px-10 py-4 text-right">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                                    <tr v-for="proc in persona.procesos" :key="proc.id" class="hover:bg-gray-50 transition-colors">
+                                        <td class="px-10 py-4">
+                                            <p class="text-sm font-black text-gray-900 dark:text-white leading-tight truncate max-w-[200px]" :title="proc.radicado">{{ proc.radicado || 'S.R' }}</p>
+                                            <p class="text-[10px] text-gray-500 truncate max-w-[200px]">{{ proc.asunto || 'Sin asunto' }}</p>
+                                        </td>
+                                        <td class="px-6 py-4"><span class="text-[10px] font-bold uppercase text-gray-500">{{ proc.pivot?.tipo || 'Vinculado' }}</span></td>
+                                        <td class="px-6 py-4"><span class="px-2 py-0.5 text-[10px] font-black rounded-lg border border-blue-100 bg-blue-50 text-blue-600 uppercase tracking-widest">{{ proc.estado || 'Activo' }}</span></td>
+                                        <td class="px-10 py-4 text-right">
+                                            <Link :href="route('procesos.show', proc.id)" class="text-[10px] font-black text-indigo-600 uppercase hover:underline">Ver Proceso</Link>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
-            
-            <div class="border-t border-gray-200 dark:border-gray-700">
-                <div v-if="hasData(persona.casos)" class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-300 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-700/50">
-                            <tr>
-                                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 dark:text-white sm:pl-6">Nro. Caso</th>
-                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Estado</th>
-                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Abogado</th>
-                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Fecha Creación</th>
-                                <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
-                                    <span class="sr-only">Acciones</span>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
-                            <tr v-for="caso in persona.casos" :key="caso.id">
-                                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 dark:text-white sm:pl-6">
-                                    {{ caso.numero_caso || ('Caso #' + caso.id) }}
-                                    <div class="text-xs text-gray-500 font-normal">
-                                        <span v-if="caso.radicado">Rad: {{ caso.radicado }}</span>
-                                        <span v-else class="italic text-amber-600">Sin Radicado</span>
-                                    </div>
-                                </td>
-                                <td class="whitespace-nowrap px-3 py-4 text-sm">
-                                    <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset"
-                                        :class="caso.estado === 'ACTIVO' ? 'bg-green-50 text-green-700 ring-green-600/20' : 'bg-blue-50 text-blue-700 ring-blue-700/10'">
-                                        {{ caso.estado || 'Sin Estado' }}
-                                    </span>
-                                </td>
-                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-300">
-                                    {{ caso.user ? caso.user.name : 'Sin asignar' }}
-                                </td>
-                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-300">
-                                    {{ formatDate(caso.created_at) }}
-                                </td>
-                                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                                    <Link :href="route('casos.show', caso.id)" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">Ver</Link>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <p v-else class="text-sm text-gray-500 italic text-center py-6">No hay casos recientes para esta persona.</p>
+
+            <!-- COLUMNA DERECHA: RELACIONES Y LOCALIZACIÓN (4/12) -->
+            <div class="lg:col-span-4 space-y-8">
                 
-                <!-- Footer de la tabla si hay datos -->
-                <div v-if="hasData(persona.casos)" class="bg-gray-50 dark:bg-gray-700/30 px-4 py-3 border-t border-gray-200 dark:border-gray-700 text-center">
-                     <span class="text-xs text-gray-500">Mostrando los {{ persona.casos.length }} casos más recientes de {{ persona.casos_count }}.</span>
+                <!-- Card: Direcciones -->
+                <div class="bg-white dark:bg-gray-800 rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+                    <div class="px-8 py-5 border-b border-gray-50 dark:border-gray-700 flex items-center gap-3">
+                        <MapPinIcon class="w-5 h-5 text-red-500" />
+                        <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-[10px]">Ubicaciones Registradas</h3>
+                    </div>
+                    <div class="p-8">
+                        <ul v-if="hasData(persona.addresses)" class="space-y-4">
+                            <li v-for="(addr, idx) in persona.addresses" :key="idx" class="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700 relative group">
+                                <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">{{ addr.label || 'Dirección' }}</span>
+                                <p class="text-xs font-bold text-gray-700 dark:text-gray-200 leading-tight">{{ addr.address }}</p>
+                                <p class="text-[10px] text-gray-500 mt-1 font-medium">{{ addr.city }}</p>
+                            </li>
+                        </ul>
+                        <div v-else class="text-center py-10 opacity-30">
+                            <MapPinIcon class="w-10 h-10 mx-auto text-gray-300 mb-2" />
+                            <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Sin direcciones</p>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- SEXTA SECCIÓN: EXPEDIENTES JUDICIALES (PROCESOS) -->
-        <div class="mt-6 overflow-hidden bg-white shadow-sm dark:bg-gray-800 sm:rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-blue-50 dark:bg-blue-900/20">
-                <div>
-                    <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">Expedientes Judiciales</h3>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Seguimiento de procesos recientes.</p>
-                </div>
-                <div class="flex items-center gap-3">
-                    <span v-if="persona.procesos_count" class="inline-flex items-center rounded-md bg-white px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-200 shadow-sm">
-                        Total: {{ persona.procesos_count }}
-                    </span>
-                    <!-- BOTÓN VER TODOS: Redirige al buscador de procesos -->
-                    <Link v-if="persona.procesos_count > (persona.procesos?.length || 0)" 
-                          :href="route('procesos.index', { search: persona.numero_documento })" 
-                          class="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline">
-                        Ver todos
-                        <ArrowTopRightOnSquareIcon class="w-4 h-4" />
-                    </Link>
-                </div>
-            </div>
-            
-            <div class="border-t border-gray-200 dark:border-gray-700">
-                <div v-if="hasData(persona.procesos)" class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-300 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-700/50">
-                            <tr>
-                                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 dark:text-white sm:pl-6">Radicado / Asunto</th>
-                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Juzgado</th>
-                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Partes</th>
-                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Estado</th>
-                                <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
-                                    <span class="sr-only">Acciones</span>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
-                            <tr v-for="proceso in persona.procesos" :key="proceso.id">
-                                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 dark:text-white sm:pl-6">
-                                    <div class="flex flex-col">
-                                        <span v-if="proceso.radicado" class="font-mono text-indigo-600 dark:text-indigo-400 font-bold">{{ proceso.radicado }}</span>
-                                        <span v-else class="italic text-amber-600 font-bold text-xs uppercase">Sin Radicado</span>
-                                        <span class="text-xs text-gray-500 truncate max-w-xs" :title="proceso.asunto">{{ proceso.asunto || 'Sin asunto' }}</span>
+                <!-- Card: Redes y Enlaces -->
+                <div class="bg-white dark:bg-gray-800 rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+                    <div class="px-8 py-5 border-b border-gray-50 dark:border-gray-700 flex items-center gap-3">
+                        <GlobeAltIcon class="w-5 h-5 text-blue-500" />
+                        <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-[10px]">Redes y Perfiles Digitales</h3>
+                    </div>
+                    <div class="p-8">
+                        <ul v-if="hasData(persona.social_links)" class="space-y-3">
+                            <li v-for="(link, idx) in persona.social_links" :key="idx">
+                                <a :href="link.url" target="_blank" class="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-transparent hover:border-blue-200 hover:bg-blue-50 transition-all group">
+                                    <div class="p-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm"><LinkIcon class="w-4 h-4 text-blue-500" /></div>
+                                    <div class="min-w-0">
+                                        <span class="text-[10px] font-black text-gray-900 dark:text-white uppercase tracking-tighter truncate block">{{ link.label || 'Enlace' }}</span>
+                                        <span class="text-[9px] text-gray-400 truncate block">{{ link.url }}</span>
                                     </div>
-                                </td>
-                                <td class="px-3 py-4 text-sm text-gray-500 dark:text-gray-300 max-w-xs truncate">
-                                    <div class="flex items-start gap-1">
-                                        <MapPinIcon class="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-400" />
-                                        <span class="truncate" :title="proceso.juzgado_entidad">{{ proceso.juzgado_entidad || (proceso.juzgado ? proceso.juzgado.nombre : 'N/A') }}</span>
-                                    </div>
-                                </td>
-                                <td class="px-3 py-4 text-sm text-gray-500 dark:text-gray-300">
-                                    <div class="flex flex-col gap-1">
-                                        <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 w-fit">
-                                            {{ (proceso.pivot?.tipo || 'Vinculado') }}
-                                        </span>
-                                    </div>
-                                </td>
-                                <td class="whitespace-nowrap px-3 py-4 text-sm">
-                                    <span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-900/30 dark:text-green-400">
-                                        {{ proceso.estado || 'Activo' }}
-                                    </span>
-                                </td>
-                                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                                    <Link :href="route('procesos.show', proceso.id)" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">Ver</Link>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                                </a>
+                            </li>
+                        </ul>
+                        <div v-else class="text-center py-10 opacity-30">
+                            <GlobeAltIcon class="w-10 h-10 mx-auto text-gray-300 mb-2" />
+                            <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Sin enlaces digitales</p>
+                        </div>
+                    </div>
                 </div>
-                <p v-else class="text-sm text-gray-500 italic text-center py-6">No hay expedientes judiciales recientes.</p>
-                 <div v-if="hasData(persona.procesos)" class="bg-gray-50 dark:bg-gray-700/30 px-4 py-3 border-t border-gray-200 dark:border-gray-700 text-center">
-                     <span class="text-xs text-gray-500">Mostrando los {{ persona.procesos.length }} procesos más recientes de {{ persona.procesos_count }}.</span>
+
+                <!-- Card: Relaciones Corporativas -->
+                <div class="bg-white dark:bg-gray-800 rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+                    <div class="px-8 py-5 border-b border-gray-50 dark:border-gray-700 flex items-center gap-3">
+                        <ShieldCheckIcon class="w-5 h-5 text-emerald-500" />
+                        <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-[10px]">Control y Asignaciones</h3>
+                    </div>
+                    <div class="p-8 space-y-8">
+                        <div>
+                            <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-3">Cooperativas / Empresas</span>
+                            <div v-if="hasData(persona.cooperativas)" class="flex flex-wrap gap-2">
+                                <span v-for="c in persona.cooperativas" :key="c.id" class="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-black rounded-lg border border-emerald-100 uppercase tracking-tighter">{{ c.nombre }}</span>
+                            </div>
+                            <p v-else class="text-[10px] font-bold text-gray-400 italic">No hay empresas vinculadas</p>
+                        </div>
+                        <div class="pt-6 border-t border-gray-50 dark:border-gray-700">
+                            <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-3">Abogados / Gestores Responsables</span>
+                            <div v-if="hasData(persona.abogados)" class="flex flex-wrap gap-2">
+                                <span v-for="a in persona.abogados" :key="a.id" class="px-2.5 py-1 bg-violet-50 text-violet-700 text-[10px] font-black rounded-lg border border-violet-100 uppercase tracking-tighter">{{ a.name }}</span>
+                            </div>
+                            <p v-else class="text-[10px] font-bold text-gray-400 italic">Sin responsables asignados</p>
+                        </div>
+                    </div>
                 </div>
+
             </div>
         </div>
 
@@ -535,3 +442,9 @@ const deleteDocument = (docId) => {
     </div>
   </AuthenticatedLayout>
 </template>
+
+<style scoped>
+.custom-scrollbar-horizontal::-webkit-scrollbar { height: 4px; }
+.custom-scrollbar-horizontal::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+.animate-in { animation-duration: 0.4s; animation-fill-mode: both; }
+</style>

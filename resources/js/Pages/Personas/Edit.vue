@@ -3,12 +3,19 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import DatePicker from '@/Components/DatePicker.vue';
 import Textarea from '@/Components/Textarea.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline';
-import { reactive } from 'vue';
+import { 
+    PlusIcon, XMarkIcon, IdentificationIcon, PhoneIcon, 
+    EnvelopeIcon, MapPinIcon, GlobeAltIcon, BriefcaseIcon,
+    BuildingOfficeIcon, ShieldCheckIcon, CheckCircleIcon,
+    ArrowPathIcon, ArrowLeftIcon, UserIcon, TrashIcon, LinkIcon
+} from '@heroicons/vue/24/outline';
+import { reactive, computed } from 'vue';
+import Swal from 'sweetalert2';
 
 const props = defineProps({
   persona: { type: Object, required: true },
@@ -38,42 +45,38 @@ const form = useForm(`EditPersona:${props.persona.id}`, {
   abogados_ids: props.persona.abogados ? props.persona.abogados.map(a => a.id) : [],
 });
 
-const addAddressRow = () => {
-  form.addresses.push(reactive({ label: 'Casa', address: '', city: '' }));
-};
-const removeAddressRow = (idx) => {
-  form.addresses.splice(idx, 1);
-};
+const addAddressRow = () => { form.addresses.push(reactive({ label: 'Casa', address: '', city: '' })); };
+const removeAddressRow = (idx) => { form.addresses.splice(idx, 1); };
 
-const addLinkRow = () => {
-  form.social_links.push(reactive({ label: '', url: '' }));
-};
-const removeLinkRow = (idx) => {
-  form.social_links.splice(idx, 1);
-};
-const normalizeUrl = (l) => {
-  if (!l.url) return;
-  if (!/^https?:\/\//i.test(l.url)) l.url = `https://${l.url}`;
-};
+const addLinkRow = () => { form.social_links.push(reactive({ label: '', url: '' })); };
+const removeLinkRow = (idx) => { form.social_links.splice(idx, 1); };
+const normalizeUrl = (l) => { if (l.url && !/^https?:\/\//i.test(l.url)) l.url = `https://${l.url}`; };
 
-// --- LÓGICA DE SELECCIONAR TODOS ---
 const toggleCooperativas = () => {
-    if (form.cooperativas_ids.length === props.allCooperativas.length) {
-        form.cooperativas_ids = [];
-    } else {
-        form.cooperativas_ids = props.allCooperativas.map(c => c.id);
-    }
+    form.cooperativas_ids = form.cooperativas_ids.length === props.allCooperativas.length ? [] : props.allCooperativas.map(c => c.id);
 };
 
 const toggleAbogados = () => {
-    if (form.abogados_ids.length === props.allAbogados.length) {
-        form.abogados_ids = [];
-    } else {
-        form.abogados_ids = props.allAbogados.map(a => a.id);
-    }
+    form.abogados_ids = form.abogados_ids.length === props.allAbogados.length ? [] : props.allAbogados.map(a => a.id);
 };
 
-const submit = () => form.post(route('personas.update', props.persona.id));
+const submit = () => {
+    form.post(route('personas.update', props.persona.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            Swal.fire({ title: '¡Actualizado!', text: 'Los datos han sido guardados correctamente.', icon: 'success', timer: 2000, showConfirmButton: false });
+        },
+        onError: (errors) => {
+            const firstErr = Object.values(errors)[0];
+            Swal.fire({ title: 'Atención', text: firstErr || 'Revise los campos marcados en rojo.', icon: 'warning', confirmButtonColor: '#4f46e5' });
+        }
+    });
+};
+
+const getRandomColor = (id) => {
+  const colors = ['bg-indigo-600', 'bg-emerald-600', 'bg-violet-600', 'bg-amber-600', 'bg-rose-600'];
+  return colors[id % colors.length];
+};
 </script>
 
 <template>
@@ -81,240 +84,269 @@ const submit = () => form.post(route('personas.update', props.persona.id));
 
   <AuthenticatedLayout>
     <template #header>
-      <div class="flex items-center justify-between">
-        <h2 class="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">
-          Editar Persona
-        </h2>
-        <Link :href="route('personas.index')" class="text-sm text-gray-600 hover:underline">&larr; Volver</Link>
+      <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+        <div class="flex items-center gap-4">
+            <Link :href="route('personas.show', persona.id)" class="p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-400 hover:text-indigo-600 transition-all shadow-sm">
+                <ArrowLeftIcon class="w-6 h-6" />
+            </Link>
+            <div class="flex items-center gap-4">
+                <div :class="`w-14 h-14 rounded-2xl flex items-center justify-center text-white text-xl font-black shadow-lg ${getRandomColor(persona.id)}`">
+                    {{ persona.nombre_completo[0] }}
+                </div>
+                <div>
+                    <h2 class="font-black text-2xl text-gray-900 dark:text-white leading-tight">
+                        Editar: {{ persona.nombre_completo }}
+                    </h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Actualice la ficha de información personal y profesional.</p>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-3 w-full md:w-auto">
+            <PrimaryButton @click="submit" class="w-full md:w-auto !bg-indigo-600 hover:!bg-indigo-700 !px-10 !py-3 !text-sm !font-black !rounded-xl !shadow-xl !shadow-indigo-200 dark:!shadow-none flex items-center justify-center gap-2" :disabled="form.processing">
+                <CheckCircleIcon v-if="!form.processing" class="w-5 h-5" />
+                <ArrowPathIcon v-else class="w-5 h-5 animate-spin" />
+                Guardar Cambios
+            </PrimaryButton>
+        </div>
       </div>
     </template>
 
-    <div class="py-12">
-      <div class="mx-auto max-w-4xl sm:px-6 lg:px-8">
-        <div class="overflow-hidden bg-white shadow-sm dark:bg-gray-800 sm:rounded-lg">
-          <div class="p-6 md:p-8">
-            <form @submit.prevent="submit" class="space-y-8">
-              
-              <section>
-                <h3 class="mb-4 text-lg font-medium text-gray-900 dark:text-gray-100">Datos de {{ persona.nombre_completo }}</h3>
-                <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                  <div class="md:col-span-2">
-                    <InputLabel for="nombre_completo" value="Nombre Completo" />
-                    <TextInput v-model="form.nombre_completo" id="nombre_completo" type="text" class="mt-1 block w-full" required autofocus />
-                    <InputError :message="form.errors.nombre_completo" class="mt-2" />
-                  </div>
-                  <div>
-                    <InputLabel for="tipo_documento" value="Tipo de Documento" />
-                    <select v-model="form.tipo_documento" id="tipo_documento" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                      <option>CC</option><option>CE</option><option>NIT</option><option>Pasaporte</option>
+    <div class="py-12 bg-gray-50/50 dark:bg-gray-900/50 min-h-screen">
+      <div class="max-w-5xl mx-auto sm:px-6 lg:px-8 space-y-10">
+        
+        <form @submit.prevent="submit" class="space-y-10">
+          
+          <!-- SECCIÓN 1: IDENTIDAD -->
+          <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div class="px-8 py-5 bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
+                <IdentificationIcon class="w-5 h-5 text-indigo-500" />
+                <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Identidad y Documentación</h3>
+            </div>
+            <div class="p-8 md:p-10 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="md:col-span-2 space-y-2">
+                    <InputLabel value="Nombre Completo o Razón Social *" class="font-bold text-xs uppercase" />
+                    <TextInput v-model="form.nombre_completo" type="text" class="w-full rounded-2xl border-gray-200 font-bold text-lg" required />
+                    <InputError :message="form.errors.nombre_completo" />
+                </div>
+                <div class="space-y-2">
+                    <InputLabel value="Tipo de Documento *" class="font-bold text-xs uppercase" />
+                    <select v-model="form.tipo_documento" class="w-full rounded-xl border-gray-200 bg-gray-50 font-bold text-sm">
+                        <option>CC</option><option>CE</option><option>NIT</option><option>Pasaporte</option>
                     </select>
-                  </div>
-                  <div>
-                    <InputLabel for="numero_documento" value="Número de Documento" />
-                    <div :class="form.tipo_documento === 'NIT' ? 'grid grid-cols-4 gap-2' : ''">
-                        <div :class="form.tipo_documento === 'NIT' ? 'col-span-3' : ''">
-                            <TextInput v-model="form.numero_documento" id="numero_documento" type="text" class="mt-1 block w-full" required />
-                        </div>
-                        <div v-if="form.tipo_documento === 'NIT'">
-                            <TextInput v-model="form.dv" id="dv" type="text" class="mt-1 block w-full text-center" maxlength="1" placeholder="DV" />
-                        </div>
+                </div>
+                <div class="space-y-2">
+                    <InputLabel value="Número de Identificación *" class="font-bold text-xs uppercase" />
+                    <div :class="form.tipo_documento === 'NIT' ? 'flex gap-2' : ''">
+                        <TextInput v-model="form.numero_documento" type="text" class="flex-1 rounded-xl border-gray-200 font-mono font-bold" required />
+                        <TextInput v-if="form.tipo_documento === 'NIT'" v-model="form.dv" maxlength="1" placeholder="DV" class="w-12 text-center rounded-xl border-gray-200 font-bold" />
                     </div>
-                    <InputError :message="form.errors.numero_documento" class="mt-2" />
-                    <InputError :message="form.errors.dv" class="mt-2" />
-                  </div>
-                  
-                  <div>
-                    <InputLabel for="fecha_expedicion" value="Fecha de Expedición (Opcional)" />
-                    <DatePicker v-model="form.fecha_expedicion" id="fecha_expedicion" class="mt-1 block w-full" />
-                    <InputError :message="form.errors.fecha_expedicion" class="mt-2" />
-                  </div>
-                  <div>
-                    <InputLabel for="fecha_nacimiento" value="Fecha de Nacimiento (Opcional)" />
-                    <DatePicker v-model="form.fecha_nacimiento" id="fecha_nacimiento" class="mt-1 block w-full" />
-                    <InputError :message="form.errors.fecha_nacimiento" class="mt-2" />
-                  </div>
-
+                    <InputError :message="form.errors.numero_documento" />
                 </div>
-              </section>
-
-              <section>
-                <h3 class="mb-4 text-lg font-medium text-gray-900 dark:text-gray-100">Información de Contacto</h3>
-                <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                  <div>
-                    <InputLabel for="celular_1" value="Celular Principal (Opcional)" />
-                    <TextInput v-model="form.celular_1" id="celular_1" type="text" class="mt-1 block w-full" />
-                    <InputError :message="form.errors.celular_1" class="mt-2" />
-                  </div>
-                  <div>
-                    <InputLabel for="celular_2" value="Celular Secundario (Opcional)" />
-                    <TextInput v-model="form.celular_2" id="celular_2" type="text" class="mt-1 block w-full" />
-                  </div>
-                  <div>
-                    <InputLabel for="correo_1" value="Correo Principal (Opcional)" />
-                    <TextInput v-model="form.correo_1" id="correo_1" type="email" class="mt-1 block w-full" />
-                    <InputError :message="form.errors.correo_1" class="mt-2" />
-                  </div>
-                  <div>
-                    <InputLabel for="correo_2" value="Correo Secundario (Opcional)" />
-                    <TextInput v-model="form.correo_2" id="correo_2" type="email" class="mt-1 block w-full" />
-                  </div>
-                  <div>
-                    <InputLabel for="telefono_fijo" value="Teléfono Fijo (Opcional)" />
-                    <TextInput v-model="form.telefono_fijo" id="telefono_fijo" type="text" class="mt-1 block w-full" />
-                    <InputError :message="form.errors.telefono_fijo" class="mt-2" />
-                  </div>
+                <div class="space-y-2">
+                    <InputLabel value="Fecha de Expedición" class="font-bold text-xs uppercase" />
+                    <DatePicker v-model="form.fecha_expedicion" class="w-full" />
                 </div>
-              </section>
-              
-              <section>
-                <div class="mb-2 flex items-center justify-between">
-                  <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Direcciones</h3>
-                  <button type="button" @click="addAddressRow" class="inline-flex items-center gap-2 rounded-md bg-blue-500 px-3 py-1.5 text-sm text-white hover:bg-blue-600 transition shadow-sm">
-                    <PlusIcon class="h-4 w-4" /> Agregar Dirección
-                  </button>
+                <div class="space-y-2">
+                    <InputLabel value="Fecha de Nacimiento" class="font-bold text-xs uppercase" />
+                    <DatePicker v-model="form.fecha_nacimiento" class="w-full" />
                 </div>
-                <div v-if="!form.addresses.length" class="mt-3 rounded-md border border-dashed border-gray-300 p-4 text-center text-sm text-gray-500 dark:border-gray-600">
-                  No hay direcciones todavía.
-                </div>
-                <div v-for="(addr, idx) in form.addresses" :key="idx" class="mt-3 grid grid-cols-1 gap-3 rounded-md border border-gray-200 p-3 dark:border-gray-700 sm:grid-cols-12">
-                  <div class="sm:col-span-3">
-                    <InputLabel :for="`addr-label-${idx}`" value="Etiqueta" />
-                    <TextInput v-model.trim="addr.label" :id="`addr-label-${idx}`" type="text" class="mt-1 block w-full" placeholder="Casa, Trabajo..." list="address-presets" />
-                  </div>
-                  <div class="sm:col-span-5">
-                    <InputLabel :for="`addr-address-${idx}`" value="Dirección" />
-                    <TextInput v-model.trim="addr.address" :id="`addr-address-${idx}`" type="text" class="mt-1 block w-full" placeholder="Calle 123 #45-67" />
-                  </div>
-                  <div class="sm:col-span-3">
-                    <InputLabel :for="`addr-city-${idx}`" value="Ciudad" />
-                    <TextInput v-model.trim="addr.city" :id="`addr-city-${idx}`" type="text" class="mt-1 block w-full" placeholder="Medellín" />
-                  </div>
-                  <div class="flex items-end sm:col-span-1">
-                    <button type="button" @click="removeAddressRow(idx)" class="inline-flex h-10 w-full items-center justify-center rounded-md border border-gray-300 px-2 py-2 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
-                      <XMarkIcon class="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
-                 <datalist id="address-presets">
-                    <option value="Casa" />
-                    <option value="Trabajo" />
-                    <option value="Oficina" />
-                    <option value="Apartamento" />
-                    <option value="Finca" />
-                 </datalist>
-              </section>
-
-              <section>
-                  <h3 class="mb-4 text-lg font-medium text-gray-900 dark:text-gray-100">Información Adicional</h3>
-                    <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                      <div>
-                          <InputLabel for="empresa" value="Empresa (Opcional)" />
-                          <TextInput v-model="form.empresa" id="empresa" type="text" class="mt-1 block w-full" />
-                      </div>
-                      <div>
-                          <InputLabel for="cargo" value="Cargo (Opcional)" />
-                          <TextInput v-model="form.cargo" id="cargo" type="text" class="mt-1 block w-full" />
-                      </div>
-                      <div class="md:col-span-2">
-                          <InputLabel for="observaciones" value="Observaciones (Opcional)" />
-                          <Textarea v-model="form.observaciones" id="observaciones" class="mt-1 block w-full" rows="3" />
-                      </div>
-                    </div>
-              </section>
-
-              <section>
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Asignar Cooperativas</h3>
-                    <button type="button" @click="toggleCooperativas" class="text-sm text-indigo-600 hover:text-indigo-800 hover:underline dark:text-indigo-400">
-                        {{ form.cooperativas_ids.length === props.allCooperativas.length ? 'Deseleccionar todas' : 'Seleccionar todas' }}
-                    </button>
-                </div>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Selecciona las cooperativas a las que pertenece esta persona.</p>
-                
-                <div v-if="!props.allCooperativas.length" class="rounded-md border border-dashed border-gray-300 dark:border-gray-600 p-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                  No hay cooperativas para asignar.
-                </div>
-                
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3">
-                  <label v-for="coop in props.allCooperativas" :key="coop.id" class="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      :value="coop.id"
-                      v-model="form.cooperativas_ids"
-                      class="rounded border-gray-300 dark:border-gray-700 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:bg-gray-900 dark:focus:ring-indigo-600"
-                    />
-                    <span class="text-gray-700 dark:text-gray-300">{{ coop.nombre }}</span>
-                  </label>
-                </div>
-                <InputError :message="form.errors.cooperativas_ids" class="mt-2" />
-              </section>
-
-              <section>
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Asignar Abogados / Gestores</h3>
-                    <button type="button" @click="toggleAbogados" class="text-sm text-indigo-600 hover:text-indigo-800 hover:underline dark:text-indigo-400">
-                        {{ form.abogados_ids.length === props.allAbogados.length ? 'Deseleccionar todos' : 'Seleccionar todos' }}
-                    </button>
-                </div>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Selecciona los abogados o gestores que manejarán esta persona.</p>
-                
-                <div v-if="!props.allAbogados.length" class="rounded-md border border-dashed border-gray-300 dark:border-gray-600 p-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                  No hay abogados o gestores para asignar.
-                </div>
-                
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3">
-                  <label v-for="abogado in props.allAbogados" :key="abogado.id" class="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      :value="abogado.id"
-                      v-model="form.abogados_ids"
-                      class="rounded border-gray-300 dark:border-gray-700 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:bg-gray-900 dark:focus:ring-indigo-600"
-                    />
-                    <span class="text-gray-700 dark:text-gray-300">{{ abogado.name }}</span>
-                  </label>
-                </div>
-                <InputError :message="form.errors.abogados_ids" class="mt-2" />
-              </section>
-
-              <section>
-                <div class="mb-2 flex items-center justify-between">
-                  <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Redes Sociales</h3>
-                  <button type="button" @click="addLinkRow" class="inline-flex items-center gap-2 rounded-md bg-blue-500 px-3 py-1.5 text-sm text-white hover:bg-blue-600 transition shadow-sm">
-                    <PlusIcon class="h-4 w-4" /> Agregar enlace
-                  </button>
-                </div>
-                <div v-if="!form.social_links.length" class="rounded-md border border-dashed border-gray-300 p-4 text-center text-sm text-gray-500 dark:border-gray-600">
-                  No hay enlaces todavía.
-                </div>
-                <div v-for="(l, idx) in form.social_links" :key="idx" class="mt-3 grid grid-cols-1 gap-3 rounded-md border border-gray-200 p-3 dark:border-gray-700 sm:grid-cols-12">
-                  <div class="sm:col-span-4">
-                    <InputLabel :for="`link-label-${idx}`" value="Etiqueta / Red" />
-                    <TextInput v-model.trim="l.label" :id="`link-label-${idx}`" type="text" class="mt-1 block w-full" list="social-presets" placeholder="Instagram, LinkedIn..." />
-                  </div>
-                  <div class="sm:col-span-7">
-                    <InputLabel :for="`link-url-${idx}`" value="URL" />
-                    <TextInput v-model.trim="l.url" :id="`link-url-${idx}`" type="url" class="mt-1 block w-full" placeholder="https://ejemplo.com/usuario" @blur="normalizeUrl(l)" />
-                  </div>
-                  <div class="flex items-end sm:col-span-1">
-                    <button type="button" @click="removeLinkRow(idx)" class="inline-flex h-10 w-full items-center justify-center rounded-md border border-gray-300 px-2 py-2 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
-                      <XMarkIcon class="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
-                <datalist id="social-presets">
-                  <option value="WhatsApp" /><option value="Facebook" /><option value="Instagram" /><option value="X / Twitter" /><option value="LinkedIn" /><option value="TikTok" /><option value="YouTube" /><option value="GitHub" /><option value="Sitio Web" />
-                </datalist>
-              </section>
-
-              <div class="flex justify-end">
-                <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                  Actualizar Persona
-                </PrimaryButton>
-              </div>
-            </form>
+            </div>
           </div>
-        </div>
+
+          <!-- SECCIÓN 2: CONTACTO -->
+          <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div class="px-8 py-5 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
+                <EnvelopeIcon class="w-5 h-5 text-indigo-500" />
+                <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Canales de Contacto</h3>
+            </div>
+            <div class="p-8 md:p-10 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="space-y-2">
+                    <InputLabel value="Celular Principal" class="font-bold text-xs uppercase" />
+                    <div class="relative">
+                        <PhoneIcon class="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                        <TextInput v-model="form.celular_1" class="pl-10 w-full rounded-xl border-gray-200" />
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <InputLabel value="Correo Principal" class="font-bold text-xs uppercase" />
+                    <div class="relative">
+                        <EnvelopeIcon class="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                        <TextInput v-model="form.correo_1" type="email" class="pl-10 w-full rounded-xl border-gray-200" />
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <InputLabel value="Celular Alternativo" class="font-bold text-xs uppercase" />
+                    <TextInput v-model="form.celular_2" class="w-full rounded-xl border-gray-200" />
+                </div>
+                <div class="space-y-2">
+                    <InputLabel value="Correo Alternativo" class="font-bold text-xs uppercase" />
+                    <TextInput v-model="form.correo_2" type="email" class="w-full rounded-xl border-gray-200" />
+                </div>
+                <div class="space-y-2">
+                    <InputLabel value="Teléfono Fijo" class="font-bold text-xs uppercase" />
+                    <TextInput v-model="form.telefono_fijo" class="w-full rounded-xl border-gray-200" />
+                </div>
+            </div>
+          </div>
+
+          <!-- SECCIÓN 3: LOCALIZACIÓN -->
+          <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div class="px-8 py-5 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <MapPinIcon class="w-5 h-5 text-red-500" />
+                    <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Direcciones Físicas</h3>
+                </div>
+                <button type="button" @click="addAddressRow" class="inline-flex items-center px-4 py-2 bg-red-50 text-red-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm">
+                    <PlusIcon class="w-4 h-4 mr-2" /> Añadir Ubicación
+                </button>
+            </div>
+            <div class="p-8 md:p-10">
+                <div v-if="!form.addresses.length" class="text-center py-10 opacity-30">
+                    <MapPinIcon class="w-12 h-12 mx-auto text-gray-300 mb-2" />
+                    <p class="text-xs font-black uppercase tracking-widest text-gray-400">No hay direcciones registradas</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div v-for="(addr, idx) in form.addresses" :key="idx" class="p-6 bg-gray-50 dark:bg-gray-900/50 rounded-3xl border border-gray-100 dark:border-gray-700 relative group animate-in zoom-in-95 duration-200">
+                        <button type="button" @click="removeAddressRow(idx)" class="absolute -top-2 -right-2 p-1.5 bg-white dark:bg-gray-800 text-red-500 rounded-full shadow-md border dark:border-gray-700 opacity-0 group-hover:opacity-100 transition-all"><XMarkIcon class="w-4 h-4"/></button>
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="space-y-1">
+                                    <InputLabel value="Etiqueta" class="text-[10px] font-black uppercase text-gray-400" />
+                                    <TextInput v-model="addr.label" class="w-full text-xs font-bold rounded-lg" placeholder="Casa, Oficina..." />
+                                </div>
+                                <div class="space-y-1">
+                                    <InputLabel value="Ciudad" class="text-[10px] font-black uppercase text-gray-400" />
+                                    <TextInput v-model="addr.city" class="w-full text-xs font-bold rounded-lg" placeholder="Ciudad" />
+                                </div>
+                            </div>
+                            <div class="space-y-1">
+                                <InputLabel value="Dirección Completa" class="text-[10px] font-black uppercase text-gray-400" />
+                                <TextInput v-model="addr.address" class="w-full text-xs font-medium rounded-lg" placeholder="Calle... Carrera..." />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+          </div>
+
+          <!-- SECCIÓN 4: LABORAL -->
+          <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div class="px-8 py-5 border-b border-gray-50 dark:border-gray-700 flex items-center gap-3">
+                <BriefcaseIcon class="w-5 h-5 text-indigo-500" />
+                <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Entorno Profesional</h3>
+            </div>
+            <div class="p-8 md:p-10 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="space-y-2">
+                    <InputLabel value="Empresa / Entidad" class="font-bold text-xs uppercase" />
+                    <TextInput v-model="form.empresa" class="w-full rounded-xl" />
+                </div>
+                <div class="space-y-2">
+                    <InputLabel value="Cargo Actual" class="font-bold text-xs uppercase" />
+                    <TextInput v-model="form.cargo" class="w-full rounded-xl" />
+                </div>
+                <div class="md:col-span-2 space-y-2">
+                    <InputLabel value="Observaciones Internas" class="font-bold text-xs uppercase" />
+                    <Textarea v-model="form.observaciones" rows="3" class="w-full rounded-2xl border-gray-200" />
+                </div>
+            </div>
+          </div>
+
+          <!-- SECCIÓN 5: ASIGNACIONES CORPORATIVAS -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+                <div class="px-8 py-5 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <BuildingOfficeIcon class="w-5 h-5 text-emerald-500" />
+                        <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-[10px]">Vincular Empresas</h3>
+                    </div>
+                    <button type="button" @click="toggleCooperativas" class="text-[9px] font-black uppercase text-indigo-600 hover:underline">Alternar Todos</button>
+                </div>
+                <div class="p-8 max-h-64 overflow-y-auto custom-scrollbar">
+                    <div class="grid grid-cols-1 gap-2">
+                        <label v-for="c in allCooperativas" :key="c.id" class="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-xl cursor-pointer hover:bg-emerald-50 transition-all border border-transparent hover:border-emerald-100 group">
+                            <input type="checkbox" :value="c.id" v-model="form.cooperativas_ids" class="rounded-lg border-gray-300 text-emerald-600" />
+                            <span class="text-xs font-bold text-gray-700 dark:text-gray-300 group-hover:text-emerald-700 transition-colors">{{ c.nombre }}</span>
+                        </label>
+                    </div>
+                </div>
+              </div>
+
+              <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+                <div class="px-8 py-5 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <ShieldCheckIcon class="w-5 h-5 text-violet-500" />
+                        <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-[10px]">Asignar Responsables</h3>
+                    </div>
+                    <button type="button" @click="toggleAbogados" class="text-[9px] font-black uppercase text-indigo-600 hover:underline">Alternar Todos</button>
+                </div>
+                <div class="p-8 max-h-64 overflow-y-auto custom-scrollbar">
+                    <div class="grid grid-cols-1 gap-2">
+                        <label v-for="a in allAbogados" :key="a.id" class="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-xl cursor-pointer hover:bg-violet-50 transition-all border border-transparent hover:border-violet-100 group">
+                            <input type="checkbox" :value="a.id" v-model="form.abogados_ids" class="rounded-lg border-gray-300 text-violet-600" />
+                            <span class="text-xs font-bold text-gray-700 dark:text-gray-300 group-hover:text-violet-700 transition-colors">{{ a.name }}</span>
+                        </label>
+                    </div>
+                </div>
+              </div>
+          </div>
+
+          <!-- SECCIÓN 6: REDES SOCIALES -->
+          <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div class="px-8 py-5 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <GlobeAltIcon class="w-5 h-5 text-blue-500" />
+                    <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Redes y Enlaces Digitales</h3>
+                </div>
+                <button type="button" @click="addLinkRow" class="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+                    <PlusIcon class="w-4 h-4 mr-2" /> Añadir Perfil
+                </button>
+            </div>
+            <div class="p-8 md:p-10">
+                <div v-if="!form.social_links.length" class="text-center py-10 opacity-30">
+                    <GlobeAltIcon class="w-12 h-12 mx-auto text-gray-300 mb-2" />
+                    <p class="text-xs font-black uppercase tracking-widest text-gray-400">Sin presencia digital registrada</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div v-for="(l, idx) in form.social_links" :key="idx" class="p-5 bg-gray-50 dark:bg-gray-900/50 rounded-3xl border border-gray-100 dark:border-gray-700 flex items-end gap-3 animate-in zoom-in-95 duration-200">
+                        <div class="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="space-y-1">
+                                <InputLabel value="Red / Plataforma" class="text-[9px] font-black uppercase text-gray-400" />
+                                <TextInput v-model="l.label" class="w-full text-xs font-bold rounded-lg" placeholder="LinkedIn, Facebook..." />
+                            </div>
+                            <div class="space-y-1">
+                                <InputLabel value="URL" class="text-[9px] font-black uppercase text-gray-400" />
+                                <TextInput v-model="l.url" @blur="normalizeUrl(l)" class="w-full text-xs font-medium rounded-lg" placeholder="https://..." />
+                            </div>
+                        </div>
+                        <button type="button" @click="removeLinkRow(idx)" class="p-2.5 bg-white text-red-500 rounded-xl shadow-sm border border-gray-100 hover:bg-red-50 transition-all"><TrashIcon class="w-4 h-4"/></button>
+                    </div>
+                </div>
+            </div>
+          </div>
+
+          <!-- BOTONES DE ACCIÓN FINAL -->
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-xl border border-indigo-100 dark:border-indigo-900/30 mt-12">
+            <Link :href="route('personas.show', persona.id)" class="order-2 sm:order-1 flex items-center justify-center gap-2 px-8 py-3 text-sm font-bold text-gray-500 hover:text-red-600 transition-all">
+                <XMarkIcon class="w-5 h-5" /> Descartar cambios
+            </Link>
+            <PrimaryButton 
+                class="order-1 sm:order-2 w-full sm:w-auto !bg-indigo-600 hover:!bg-indigo-700 !px-16 !py-4 !text-lg !font-black !rounded-2xl !shadow-2xl !shadow-indigo-200 dark:!shadow-none flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02]" 
+                :disabled="form.processing"
+            >
+                <CheckCircleIcon v-if="!form.processing" class="w-7 h-7" />
+                <ArrowPathIcon v-else class="w-7 h-7 animate-spin" />
+                Actualizar Perfil Completo
+            </PrimaryButton>
+          </div>
+
+        </form>
       </div>
     </div>
   </AuthenticatedLayout>
 </template>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(79, 70, 229, 0.1); border-radius: 10px; }
+.animate-in { animation-fill-mode: both; }
+</style>

@@ -56,7 +56,7 @@ class HandleInertiaRequests extends Middleware
 
         return array_merge(parent::share($request), [
             'auth' => [
-                'user' => $user ? $user->only('id', 'name', 'email', 'tipo_usuario') : null,
+                'user' => $user ? $user->only('id', 'name', 'email', 'tipo_usuario', 'tour_seen') : null,
                 'unreadNotifications' => $countCasos + $countTareas,
                 'pendingGestionDiaria' => $countGestionDiaria,
             ],

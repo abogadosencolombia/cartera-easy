@@ -319,4 +319,73 @@ class PersonaController extends Controller
 
         return response()->json($personas);
     }
+
+    /**
+     * Obtiene los casos asociados a una persona para mostrar advertencias en la creación.
+     */
+    public function getCasos(Persona $persona)
+    {
+        // 1. Casos donde es Deudor Principal
+        $casosDeudor = $persona->casosComoDeudor()
+            ->with(['cooperativa:id,nombre'])
+            ->select('id', 'radicado', 'tipo_proceso', 'cooperativa_id', 'created_at')
+            ->get();
+
+        // 2. Casos donde es Codeudor (Buscando por número de documento ya que son tablas separadas)
+        $casosCodeudor = collect();
+        if (!empty($persona->numero_documento)) {
+            $casosCodeudor = \App\Models\Caso::whereHas('codeudores', function($q) use ($persona) {
+                    $q->where('numero_documento', $persona->numero_documento);
+                })
+                ->with(['cooperativa:id,nombre'])
+                ->select('id', 'radicado', 'tipo_proceso', 'cooperativa_id', 'created_at')
+                ->get();
+        }
+
+        // 3. Procesos Judiciales (Radicados) directos
+        $procesos = $persona->procesos()
+            ->with(['juzgado:id,nombre'])
+            ->select('proceso_radicados.id', 'radicado', 'asunto', 'juzgado_id', 'proceso_radicados.created_at')
+            ->get();
+
+        // Combinamos y formateamos
+        $resultado = collect();
+
+        foreach ($casosDeudor as $c) {
+            $resultado->push([
+                'id' => $c->id,
+                'radicado' => $c->radicado ?? 'SIN RADICADO',
+                'tipo' => 'CASO: ' . ($c->tipo_proceso ?? 'General'),
+                'cooperativa' => $c->cooperativa?->nombre ?? 'N/A',
+                'fecha' => $c->created_at->format('Y-m-d'),
+                'link' => route('casos.show', $c->id)
+            ]);
+        }
+
+        foreach ($casosCodeudor as $c) {
+            if ($resultado->where('id', $c->id)->where('tipo', 'like', 'CASO%')->isEmpty()) {
+                $resultado->push([
+                    'id' => $c->id,
+                    'radicado' => $c->radicado ?? 'SIN RADICADO',
+                    'tipo' => 'CASO (CODEUDOR)',
+                    'cooperativa' => $c->cooperativa?->nombre ?? 'N/A',
+                    'fecha' => $c->created_at->format('Y-m-d'),
+                    'link' => route('casos.show', $c->id)
+                ]);
+            }
+        }
+
+        foreach ($procesos as $p) {
+            $resultado->push([
+                'id' => $p->id,
+                'radicado' => $p->radicado ?? 'SIN RADICADO',
+                'tipo' => 'PROCESO JUDICIAL',
+                'cooperativa' => $p->juzgado?->nombre ?? 'Juzgado N/A',
+                'fecha' => $p->created_at->format('Y-m-d'),
+                'link' => route('procesos.show', $p->id)
+            ]);
+        }
+
+        return response()->json($resultado->values());
+    }
 }

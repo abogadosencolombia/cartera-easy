@@ -10,7 +10,14 @@ use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\Exportable;
 use Illuminate\Database\Eloquent\Builder;
 
-class PersonasExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize
+use Maatwebsite\Excel\Concerns\WithStyles;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Color;
+
+class PersonasExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize, WithStyles
 {
     use Exportable;
 
@@ -19,6 +26,38 @@ class PersonasExport implements FromQuery, WithHeadings, WithMapping, ShouldAuto
     public function __construct(array $filters = [])
     {
         $this->filters = $filters;
+    }
+
+    public function styles(Worksheet $sheet)
+    {
+        // Estilo para el encabezado
+        $sheet->getStyle('1')->getFont()->setBold(true)->setColor(new Color(Color::COLOR_WHITE));
+        $sheet->getStyle('1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF4F46E5'); // Indigo 600
+        $sheet->getStyle('1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        
+        // Estilos generales
+        $highestRow = $sheet->getHighestRow();
+        $highestColumn = $sheet->getHighestColumn();
+        $range = 'A1:' . $highestColumn . $highestRow;
+
+        $sheet->getStyle($range)->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
+        $sheet->getStyle($range)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setARGB('FFD1D5DB'); // Gray 300
+
+        // Ajuste de columnas específicas
+        $sheet->getStyle('K')->getAlignment()->setWrapText(true);
+        $sheet->getColumnDimension('K')->setWidth(50); // Direcciones
+        $sheet->getColumnDimension('B')->setWidth(35); // Nombre completo
+        
+        // Alternar colores de filas (Zebra)
+        for ($i = 2; $i <= $highestRow; $i++) {
+            if ($i % 2 == 0) {
+                $sheet->getStyle('A' . $i . ':' . $highestColumn . $highestRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFF9FAFB');
+            }
+        }
+
+        return [
+            1    => ['font' => ['size' => 12]],
+        ];
     }
 
     public function query(): Builder

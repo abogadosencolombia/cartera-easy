@@ -7,6 +7,7 @@ use App\Models\Cooperativa;
 use App\Models\Persona;
 use App\Models\Codeudor;
 use App\Models\User;
+use App\Models\Juzgado;
 use App\Models\PlantillaDocumento;
 use App\Models\EspecialidadJuridica;
 use App\Models\TipoProceso;
@@ -67,7 +68,17 @@ class CasoController extends Controller
             });
         });
 
-        // --- 3. Filtro de Búsqueda General ---
+        // --- 3. Filtro por Cooperativa ---
+        $query->when($request->input('cooperativa_id'), function ($q, $cooperativaId) {
+            $q->where('cooperativa_id', $cooperativaId);
+        });
+
+        // --- 4. Filtro por Etapa Procesal ---
+        $query->when($request->input('etapa_procesal'), function ($q, $etapa) {
+            $q->where('etapa_procesal', $etapa);
+        });
+
+        // --- 5. Filtro de Búsqueda General ---
         $query->when($request->input('search'), function ($q, $search) {
             $q->where(function ($subq) use ($search) {
                 $subq->where('tipo_proceso', 'ilike', "%{$search}%")
@@ -94,17 +105,29 @@ class CasoController extends Controller
             });
         });
 
+        if ($request->boolean('sin_radicado')) {
+            $query->where(function ($q) {
+                $q->whereNull('radicado')->orWhere('radicado', '');
+            });
+        }
+
         $casos = $query->orderBy('updated_at', 'desc')->paginate(20)->withQueryString();
 
         $abogados = [];
+        $cooperativas = [];
         if (in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
             $abogados = User::whereIn('tipo_usuario', ['abogado', 'gestor'])->select('id', 'name')->orderBy('name')->get();
+            $cooperativas = Cooperativa::select('id', 'nombre')->orderBy('nombre')->get();
         }
+
+        $etapas_procesales = DB::table('etapas_procesales')->orderBy('nombre')->pluck('nombre')->all();
 
         return Inertia::render('Casos/Index', [
             'casos' => $casos,
             'abogados' => $abogados,
-            'filters' => $request->only(['search', 'abogado_id']),
+            'cooperativas' => $cooperativas,
+            'etapas_procesales' => $etapas_procesales,
+            'filters' => $request->only(['search', 'abogado_id', 'cooperativa_id', 'etapa_procesal', 'sin_radicado']),
             'can' => ['delete_cases' => true],
         ]);
     }
@@ -125,6 +148,242 @@ class CasoController extends Controller
         ]);
 
         return Excel::download(new CasosExport($filtros), $nombreArchivo);
+    }
+
+    public function importForm(): Response
+    {
+        $this->authorize('create', Caso::class);
+        return Inertia::render('Casos/Import', [
+            'cooperativas' => Cooperativa::all(['id', 'nombre']),
+            'juzgados' => Juzgado::all(['id', 'nombre']),
+        ]);
+    }
+
+    public function downloadTemplate()
+    {
+        return Excel::download(new \App\Exports\CasosTemplateExport, 'Plantilla_Importacion_Casos.xlsx');
+    }
+
+    public function importValidate(Request $request)
+    {
+        $this->authorize('create', Caso::class);
+        $request->validate(['file' => 'required|mimes:xlsx,xls']);
+
+        $import = new \App\Imports\CasosImport;
+        Excel::import($import, $request->file('file'));
+
+        $rows = $import->getProcessedRows();
+        
+        foreach ($rows as &$row) {
+            if ($row['status'] === 'error') continue;
+
+            // 1. Mapear Cooperativa
+            $coop = Cooperativa::where('nombre', 'ilike', trim($row['cooperativa_nombre']))->first();
+            if ($coop) {
+                $row['cooperativa_id'] = $coop->id;
+                $row['cooperativa_nombre'] = $coop->nombre;
+            } else {
+                $row['status'] = 'error';
+                $row['messages'][] = "Empresa '{$row['cooperativa_nombre']}' no existe.";
+            }
+
+            // 2. Mapear Juzgado y Especialidad
+            $row['juzgado_id'] = Juzgado::where('nombre', 'ilike', trim($row['juzgado_nombre']))->value('id');
+            $row['especialidad_id'] = EspecialidadJuridica::where('nombre', 'ilike', trim($row['especialidad_nombre']))->value('id');
+
+            // 3. Buscar Deudor (Normalizando documento en DB y Excel)
+            $docLimpio = preg_replace('/[^0-9]/', '', $row['documento_deudor']);
+            $deudor = Persona::whereRaw("regexp_replace(numero_documento, '[^0-9]', '', 'g') = ?", [$docLimpio])->first();
+            
+            if (!$deudor) {
+                $row['status'] = ($row['status'] === 'error') ? 'error' : 'warning';
+                $row['messages'][] = "DEUDOR NUEVO: Se creará un perfil para '{$row['nombre_deudor']}'.";
+            } else {
+                $row['messages'][] = "Deudor vinculado: {$deudor->nombre_completo}";
+            }
+
+            // 4. Buscar Caso Existente para comparar
+            $existente = null;
+            if (!empty($row['id_sistema'])) {
+                $existente = Caso::find($row['id_sistema']);
+            }
+            
+            // --- VALIDACIÓN DE UNICIDAD OBLIGATORIA (PAGARÉ Y RADICADO) ---
+            
+            // Validar Referencia de Crédito (Pagaré) Único
+            if (!empty($row['referencia_credito'])) {
+                $conflictoRef = Caso::where('referencia_credito', 'ilike', trim($row['referencia_credito']))
+                    ->when($existente, fn($q) => $q->where('id', '!=', $existente->id))
+                    ->first();
+                
+                if ($conflictoRef) {
+                    $row['status'] = 'error';
+                    $row['messages'][] = "ERROR: El Pagaré '{$row['referencia_credito']}' ya está registrado en el Caso #{$conflictoRef->id}. No puede duplicarse.";
+                }
+            }
+
+            // Validar Radicado Único
+            if (!empty($row['radicado']) && strlen($row['radicado']) === 23) {
+                $conflictoRad = Caso::where('radicado', $row['radicado'])
+                    ->when($existente, fn($q) => $q->where('id', '!=', $existente->id ?? 0))
+                    ->first();
+                
+                if ($conflictoRad) {
+                    $row['status'] = 'error';
+                    $row['messages'][] = "ERROR: El Radicado '{$row['radicado']}' ya existe en el Caso #{$conflictoRad->id}.";
+                }
+            }
+
+            if (!$existente && $row['status'] !== 'error') {
+                // Si no hay ID de sistema, intentar emparejar por Radicado o Pagaré para evitar duplicados si no se marcó el error antes
+                if (!empty($row['radicado'])) {
+                    $existente = Caso::where('radicado', $row['radicado'])->first();
+                }
+                if (!$existente && $deudor && !empty($row['referencia_credito'])) {
+                    $existente = Caso::where('deudor_id', $deudor->id)
+                                     ->where('referencia_credito', 'ilike', trim($row['referencia_credito']))
+                                     ->first();
+                }
+            }
+
+            if ($existente && $row['status'] !== 'error') {
+                // Sincronizar ID de sistema para el guardado posterior
+                $row['id_sistema'] = $existente->id;
+                $cambios = [];
+                $sonIguales = fn($a, $b) => mb_strtolower(trim((string)$a)) === mb_strtolower(trim((string)$b));
+                
+                if (abs((float)$existente->monto_total - (float)$row['monto_total']) > 1) $cambios[] = "Monto Inicial";
+                if (!$sonIguales($existente->etapa_procesal, $row['etapa_procesal'])) $cambios[] = "Etapa";
+                
+                // Comparación de Referencia (Numérica si es posible)
+                $refExistente = trim((string)$existente->referencia_credito);
+                $refExcel = trim((string)$row['referencia_credito']);
+                if (is_numeric($refExistente) && is_numeric($refExcel)) {
+                    if (abs((float)$refExistente - (float)$refExcel) > 0.1) $cambios[] = "Referencia";
+                } elseif (!$sonIguales($refExistente, $refExcel)) {
+                    $cambios[] = "Referencia";
+                }
+
+                if (!empty($cambios)) {
+                    $row['status'] = 'warning';
+                    $row['messages'][] = "ACTUALIZACIÓN DETECTADA (ID #{$existente->id}): Se modificará " . implode(", ", $cambios);
+                } else {
+                    $row['messages'][] = "Sin cambios (Datos idénticos).";
+                }
+            } else {
+                $row['messages'][] = "NUEVO CASO: Se creará un expediente desde cero.";
+            }
+        }
+        
+        return response()->json([
+            'rows' => $rows,
+            'total_rows' => count($rows),
+            'valid_rows' => collect($rows)->whereIn('status', ['success', 'warning'])->count(),
+            'warning_rows' => collect($rows)->where('status', 'warning')->count(),
+            'error_rows' => collect($rows)->where('status', 'error')->count(),
+        ]);
+    }
+
+    public function importStore(Request $request)
+    {
+        $this->authorize('create', Caso::class);
+        $data = $request->input('data', []);
+
+        DB::transaction(function () use ($data) {
+            foreach ($data as $row) {
+                // 1. Upsert Persona (Deudor)
+                $deudor = Persona::withTrashed()->updateOrCreate(
+                    ['numero_documento' => trim($row['documento_deudor'])],
+                    [
+                        'nombre_completo' => trim($row['nombre_deudor']),
+                        'tipo_documento' => $row['tipo_documento'] ?? 'CC',
+                        'dv' => $row['dv'] ?? null,
+                        'celular_1' => $row['celular_deudor'] ?? null,
+                        'correo_1' => $row['correo_deudor'] ?? null,
+                        'deleted_at' => null,
+                    ]
+                );
+
+                // 2. Vincular Deudor a Cooperativa (Si se indica)
+                if (!empty($row['cooperativa_id'])) {
+                    $deudor->cooperativas()->syncWithoutDetaching([$row['cooperativa_id']]);
+                }
+
+                // 3. Upsert Caso (Llave: Radicado o Deudor+Referencia)
+                $defaultUserId = User::where('name', 'ilike', 'NUBIA AIDE GALLEGO')->value('id') ?? Auth::id();
+                
+                $casoData = [
+                    'user_id' => $defaultUserId, 
+                    'deudor_id' => $deudor->id,
+                    'cooperativa_id' => $row['cooperativa_id'],
+                    'juzgado_id' => $row['juzgado_id'],
+                    'especialidad_id' => $row['especialidad_id'],
+                    'tipo_proceso' => $row['tipo_proceso'],
+                    'subtipo_proceso' => $row['subtipo_proceso'],
+                    'subproceso' => $row['subproceso'],
+                    'etapa_procesal' => !empty($row['etapa_procesal']) ? $row['etapa_procesal'] : 'INICIAL',
+                    'radicado' => $row['radicado'],
+                    'referencia_credito' => $row['referencia_credito'],
+                    'monto_total' => $row['monto_total'] ?? 0,
+                    'monto_deuda_actual' => $row['monto_deuda_actual'] ?? 0,
+                    'monto_total_pagado' => $row['monto_total_pagado'] ?? 0,
+                    'tasa_interes_corriente' => $row['tasa_interes_corriente'] ?? 0,
+                    'fecha_inicio_credito' => $row['fecha_inicio_credito'] ?? now(),
+                    'fecha_apertura' => $row['fecha_apertura'] ?? now(),
+                    'fecha_vencimiento' => $row['fecha_vencimiento'],
+                    'fecha_ultimo_pago' => $row['fecha_ultimo_pago'],
+                    'fecha_tasa_interes' => $row['fecha_tasa_interes'],
+                    'tipo_garantia_asociada' => !empty($row['tipo_garantia_asociada']) ? $row['tipo_garantia_asociada'] : 'sin garantía',
+                    'origen_documental' => !empty($row['origen_documental']) ? $row['origen_documental'] : 'otro',
+                    'medio_contacto' => !empty($row['medio_contacto']) ? $row['medio_contacto'] : 'otro',
+                    'link_drive' => $row['link_drive'],
+                    'link_expediente' => $row['link_expediente'],
+                    'notas_legales' => $row['notas_legales'],
+                    'nota_cierre' => $row['nota_cierre'],
+                    'bloqueado' => $row['bloqueado'] ?? false,
+                    'motivo_bloqueo' => $row['motivo_bloqueo'],
+                    'estado' => $row['estado'] ?? 'ACTIVO',
+                    'estado_proceso' => $row['estado_proceso'],
+                ];
+
+                // Si vienen abogados en el Excel, intentamos asignar el primero
+                if (!empty($row['abogados_nombres'])) {
+                    $primerNombre = trim(explode(',', $row['abogados_nombres'])[0]);
+                    $uid = User::where('name', 'ilike', $primerNombre)->value('id');
+                    if ($uid) $casoData['user_id'] = $uid;
+                }
+
+                $caso = null;
+                if (!empty($row['id_sistema'])) {
+                    $caso = Caso::updateOrCreate(['id' => $row['id_sistema']], $casoData);
+                } elseif (!empty($row['radicado']) && strlen($row['radicado']) === 23) {
+                    $caso = Caso::updateOrCreate(['radicado' => $row['radicado']], $casoData);
+                } else {
+                    // Si no hay radicado ni ID, buscar por deudor y referencia para evitar duplicados
+                    $caso = Caso::updateOrCreate(
+                        ['deudor_id' => $deudor->id, 'referencia_credito' => $row['referencia_credito']],
+                        $casoData
+                    );
+                }
+
+                // 4. Sincronizar Abogados desde el Excel (si se proporcionan nombres)
+                if (!empty($row['abogados_nombres'])) {
+                    $nombres = explode(',', $row['abogados_nombres']);
+                    $userIds = [];
+                    foreach ($nombres as $nombre) {
+                        $uid = User::where('name', 'ilike', trim($nombre))->value('id');
+                        if ($uid) $userIds[] = $uid;
+                    }
+                    if (!empty($userIds)) {
+                        $caso->users()->sync($userIds);
+                        // También actualizamos el user_id principal con el primero de la lista
+                        $caso->update(['user_id' => $userIds[0]]);
+                    }
+                }
+            }
+        });
+
+        return to_route('casos.index')->with('success', 'Importación completada con éxito.');
     }
 
     public function create(): Response
@@ -231,7 +490,7 @@ class CasoController extends Controller
         $this->registrarRevisionAutomatica($caso);
 
         $caso->load([
-            'deudor:id,nombre_completo,numero_documento,tipo_documento,celular_1,celular_2,correo_1,correo_2,addresses',
+            'deudor:id,nombre_completo,numero_documento,tipo_documento,dv,celular_1,celular_2,correo_1,correo_2,addresses',
             'codeudores',
             'cooperativa',
             'user',
@@ -243,6 +502,7 @@ class CasoController extends Controller
             'actuaciones' => fn($q) => $q->with('user:id,name')->orderBy('fecha_actuacion', 'desc'),
             'juzgado:id,nombre',
             'especialidad:id,nombre',
+            'validacionesLegales',
         ]);
 
         $contratoActual = Contrato::where('caso_id', $caso->id)->where('estado', '!=', 'REESTRUCTURADO')->orderBy('id', 'desc')->first() 

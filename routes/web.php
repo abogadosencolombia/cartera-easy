@@ -149,6 +149,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/revision-diaria/toggle', [RevisionDiariaController::class, 'toggle'])->name('revision.toggle');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile/tour-seen', [ProfileController::class, 'markTourSeen'])->name('profile.tour.seen');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::patch('/profile/preferences', [ProfileController::class, 'updatePreferences'])->name('profile.preferences.update');
@@ -169,6 +170,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // =================================================================
     Route::get('procesos', [ProcesoRadicadoController::class, 'index'])->name('procesos.index');
     Route::get('procesos/exportar', [ProcesoRadicadoController::class, 'exportarExcel'])->name('procesos.exportar');
+    Route::get('procesos/importar', [ProcesoRadicadoController::class, 'importForm'])->name('procesos.import.show');
+    Route::get('procesos/importar/template', [ProcesoRadicadoController::class, 'downloadTemplate'])->name('procesos.import.template');
+    Route::post('procesos/importar/validate', [ProcesoRadicadoController::class, 'importValidate'])->name('procesos.import.validate');
+    Route::post('procesos/importar/store', [ProcesoRadicadoController::class, 'importStore'])->name('procesos.import.store');
     Route::get('procesos/create', [ProcesoRadicadoController::class, 'create'])->name('procesos.create');
     Route::post('procesos', [ProcesoRadicadoController::class, 'store'])->name('procesos.store');
     Route::get('procesos/{proceso}', [ProcesoRadicadoController::class, 'show'])->name('procesos.show');
@@ -238,6 +243,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('role:admin,gestor,abogado')->group(function() {
 
         Route::get('casos/exportar', [CasoController::class, 'export'])->name('casos.export');
+        
+        // --- RUTAS DE IMPORTACIÓN DE CASOS ---
+        Route::get('casos/importar', [CasoController::class, 'importForm'])->name('casos.import.show');
+        Route::get('casos/importar/template', [CasoController::class, 'downloadTemplate'])->name('casos.import.template');
+        Route::post('casos/importar/validate', [CasoController::class, 'importValidate'])->name('casos.import.validate');
+        Route::post('casos/importar/store', [CasoController::class, 'importStore'])->name('casos.import.store');
+
         Route::resource('casos', CasoController::class);
         Route::patch('/casos/{caso}/unlock', [CasoController::class, 'unlock'])->name('casos.unlock');
         Route::patch('/casos/{caso}/reopen', [CasoController::class, 'reopen'])->name('casos.reopen');
@@ -250,6 +262,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Personas
         Route::get('/personas/exportar-excel', [PersonaController::class, 'exportExcel'])->name('personas.export.excel');
+        Route::get('/personas/{persona}/casos-existentes', [PersonaController::class, 'getCasos'])->name('personas.casos_existentes');
         Route::resource('personas', PersonaController::class);
 
         Route::post('/personas/{persona}/documentos', [PersonaController::class, 'uploadDocument'])->name('personas.upload_document');
@@ -399,7 +412,7 @@ Route::model('proceso', ProcesoRadicado::class);
 
 // Rutas de descarga de documentos (requieren autenticación)
 Route::get('documentos-proceso/{documento}/ver', [DocumentoProcesoController::class, 'view'])
-    ->middleware('auth')->name('documentos-proceso.view');
+    ->middleware('auth')->name('documentos-proceso.show');
 Route::get('documentos-proceso/{documento}/descargar', [DocumentoProcesoController::class, 'download'])
     ->middleware('auth')->name('documentos-proceso.download');
 

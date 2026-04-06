@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
+import { useElementBounding, useWindowSize } from '@vueuse/core';
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/vue';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarDaysIcon, XMarkIcon, ChevronDownIcon } from '@heroicons/vue/20/solid';
 import { isHoliday } from '@/Utils/holidays';
@@ -10,6 +11,21 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:modelValue']);
+const container = ref(null);
+
+const { bottom, left, top } = useElementBounding(container);
+const { height: windowHeight } = useWindowSize();
+
+const floatingStyles = computed(() => {
+    const dropdownHeight = 380; // Aproximado para el calendario
+    const spaceBelow = windowHeight.value - bottom.value;
+    const showAbove = spaceBelow < dropdownHeight && top.value > dropdownHeight;
+
+    return {
+        top: showAbove ? `${top.value - dropdownHeight - 8}px` : `${bottom.value}px`,
+        left: `${left.value}px`,
+    };
+});
 
 // --- LÓGICA DE FECHA SEGURA ---
 const parseDate = (dateStr) => {
@@ -97,7 +113,7 @@ const updateViewDate = (part, value) => {
 </script>
 
 <template>
-    <Popover v-slot="{ open }" class="relative w-full">
+    <Popover v-slot="{ open }" class="relative w-full" ref="container">
         <div class="relative group">
             <PopoverButton as="div" class="w-full">
                 <button type="button" class="flex w-full items-center justify-between gap-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer">
@@ -112,58 +128,60 @@ const updateViewDate = (part, value) => {
             <button v-if="modelValue" @click.stop="emit('update:modelValue', '')" type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-red-500 z-10"><XMarkIcon class="h-4 w-4" /></button>
         </div>
 
-        <transition enter-active-class="transition duration-200 ease-out" enter-from-class="translate-y-1 opacity-0" enter-to-class="translate-y-0 opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="translate-y-0 opacity-100" leave-to-class="translate-y-1 opacity-0">
-            <PopoverPanel v-slot="{ close }" class="absolute z-[9999] mt-2 left-0 w-72 origin-top-left">
-                <div class="overflow-hidden rounded-xl bg-white dark:bg-gray-800 border dark:border-gray-700 shadow-2xl ring-1 ring-black ring-opacity-5">
-                    <!-- Header con selectores de mes y año mejorados -->
-                    <div class="px-3 py-3 border-b dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center gap-2">
-                        <button @click="updateViewDate('month', currentMonth - 1)" type="button" class="p-1.5 hover:bg-white dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400 border border-transparent hover:border-gray-200 dark:hover:border-gray-600 transition-all shadow-sm">
-                            <ChevronLeftIcon class="h-4 w-4" />
-                        </button>
-                        
-                        <div class="flex flex-1 items-center gap-1.5">
-                            <div class="relative flex-1 group">
-                                <select :value="currentMonth" @change="updateViewDate('month', parseInt($event.target.value))" class="appearance-none w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg py-1 px-2 pr-6 text-[11px] font-extrabold uppercase tracking-tight text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-all shadow-sm custom-select-compact">
-                                    <option v-for="(name, i) in monthNames" :key="name" :value="i" class="bg-white dark:bg-gray-800">{{ name }}</option>
-                                </select>
-                                <ChevronDownIcon class="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none group-hover:text-indigo-500 transition-colors" />
+        <Teleport to="body">
+            <transition enter-active-class="transition duration-200 ease-out" enter-from-class="translate-y-1 opacity-0" enter-to-class="translate-y-0 opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="translate-y-0 opacity-100" leave-to-class="translate-y-1 opacity-0">
+                <PopoverPanel v-slot="{ close }" class="fixed z-[9999] mt-2 w-72 origin-top-left" :style="floatingStyles">
+                    <div class="overflow-hidden rounded-xl bg-white dark:bg-gray-800 border dark:border-gray-700 shadow-2xl ring-1 ring-black ring-opacity-5">
+                        <!-- Header con selectores de mes y año mejorados -->
+                        <div class="px-3 py-3 border-b dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center gap-2">
+                            <button @click="updateViewDate('month', currentMonth - 1)" type="button" class="p-1.5 hover:bg-white dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400 border border-transparent hover:border-gray-200 dark:hover:border-gray-600 transition-all shadow-sm">
+                                <ChevronLeftIcon class="h-4 w-4" />
+                            </button>
+                            
+                            <div class="flex flex-1 items-center gap-1.5">
+                                <div class="relative flex-1 group">
+                                    <select :value="currentMonth" @change="updateViewDate('month', parseInt($event.target.value))" class="appearance-none w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg py-1 px-2 pr-6 text-[11px] font-extrabold uppercase tracking-tight text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-all shadow-sm custom-select-compact">
+                                        <option v-for="(name, i) in monthNames" :key="name" :value="i" class="bg-white dark:bg-gray-800">{{ name }}</option>
+                                    </select>
+                                    <ChevronDownIcon class="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none group-hover:text-indigo-500 transition-colors" />
+                                </div>
+
+                                <div class="relative group">
+                                    <select :value="currentYear" @change="updateViewDate('year', parseInt($event.target.value))" class="appearance-none bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg py-1 px-2 pr-6 text-[11px] font-extrabold text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-all shadow-sm custom-select-compact">
+                                        <option v-for="y in years" :key="y" :value="y" class="bg-white dark:bg-gray-800">{{ y }}</option>
+                                    </select>
+                                    <ChevronDownIcon class="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none group-hover:text-indigo-500 transition-colors" />
+                                </div>
                             </div>
 
-                            <div class="relative group">
-                                <select :value="currentYear" @change="updateViewDate('year', parseInt($event.target.value))" class="appearance-none bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg py-1 px-2 pr-6 text-[11px] font-extrabold text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-all shadow-sm custom-select-compact">
-                                    <option v-for="y in years" :key="y" :value="y" class="bg-white dark:bg-gray-800">{{ y }}</option>
-                                </select>
-                                <ChevronDownIcon class="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none group-hover:text-indigo-500 transition-colors" />
-                            </div>
-                        </div>
-
-                        <button @click="updateViewDate('month', currentMonth + 1)" type="button" class="p-1.5 hover:bg-white dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400 border border-transparent hover:border-gray-200 dark:hover:border-gray-600 transition-all shadow-sm">
-                            <ChevronRightIcon class="h-4 w-4" />
-                        </button>
-                    </div>
-
-                    <div class="p-3">
-                        <div class="grid grid-cols-7 mb-2">
-                            <div v-for="day in daysOfWeek" :key="day" class="text-center text-[10px] font-black text-gray-400 uppercase">{{ day }}</div>
-                        </div>
-                        <div class="grid grid-cols-7 gap-1">
-                            <button v-for="(item, idx) in days" :key="idx" @click="selectDate(item.date, close)" type="button" class="h-8 w-8 flex flex-col items-center justify-center rounded-lg text-xs transition-all relative" :title="item.holiday || ''" :class="[
-                                item.current ? 'text-gray-700 dark:text-gray-200' : 'text-gray-300 dark:text-gray-600 opacity-50', 
-                                (modelValue && item.date.toDateString() === selectedDate?.toDateString()) ? 'bg-indigo-600 text-white font-bold' : 'hover:bg-indigo-50 dark:hover:bg-indigo-900/30',
-                                item.holiday ? 'text-red-600 dark:text-red-400 font-bold' : ''
-                            ]">
-                                {{ item.date.getDate() }}
-                                <span v-if="item.holiday" class="absolute bottom-0.5 w-1 h-1 bg-red-500 rounded-full"></span>
+                            <button @click="updateViewDate('month', currentMonth + 1)" type="button" class="p-1.5 hover:bg-white dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400 border border-transparent hover:border-gray-200 dark:hover:border-gray-600 transition-all shadow-sm">
+                                <ChevronRightIcon class="h-4 w-4" />
                             </button>
                         </div>
+
+                        <div class="p-3">
+                            <div class="grid grid-cols-7 mb-2">
+                                <div v-for="day in daysOfWeek" :key="day" class="text-center text-[10px] font-black text-gray-400 uppercase">{{ day }}</div>
+                            </div>
+                            <div class="grid grid-cols-7 gap-1">
+                                <button v-for="(item, idx) in days" :key="idx" @click="selectDate(item.date, close)" type="button" class="h-8 w-8 flex flex-col items-center justify-center rounded-lg text-xs transition-all relative" :title="item.holiday || ''" :class="[
+                                    item.current ? 'text-gray-700 dark:text-gray-200' : 'text-gray-300 dark:text-gray-600 opacity-50', 
+                                    (modelValue && item.date.toDateString() === selectedDate?.toDateString()) ? 'bg-indigo-600 text-white font-bold' : 'hover:bg-indigo-50 dark:hover:bg-indigo-900/30',
+                                    item.holiday ? 'text-red-600 dark:text-red-400 font-bold' : ''
+                                ]">
+                                    {{ item.date.getDate() }}
+                                    <span v-if="item.holiday" class="absolute bottom-0.5 w-1 h-1 bg-red-500 rounded-full"></span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="px-4 py-2 border-t dark:border-gray-700 flex justify-between bg-gray-50 dark:bg-gray-800/50">
+                            <button @click="viewDate = new Date();" type="button" class="text-[10px] font-bold text-indigo-600 uppercase hover:underline transition-all">Hoy</button>
+                            <button @click="emit('update:modelValue', ''); close();" type="button" class="text-[10px] font-bold text-gray-500 uppercase hover:underline transition-all">Limpiar</button>
+                        </div>
                     </div>
-                    <div class="px-4 py-2 border-t dark:border-gray-700 flex justify-between bg-gray-50 dark:bg-gray-800/50">
-                        <button @click="viewDate = new Date();" type="button" class="text-[10px] font-bold text-indigo-600 uppercase hover:underline transition-all">Hoy</button>
-                        <button @click="emit('update:modelValue', ''); close();" type="button" class="text-[10px] font-bold text-gray-500 uppercase hover:underline transition-all">Limpiar</button>
-                    </div>
-                </div>
-            </PopoverPanel>
-        </transition>
+                </PopoverPanel>
+            </transition>
+        </Teleport>
     </Popover>
 </template>
 

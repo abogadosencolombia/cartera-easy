@@ -9,7 +9,7 @@ import TextInput from '@/Components/TextInput.vue';
 import SelectInput from '@/Components/SelectInput.vue';
 import Checkbox from '@/Components/Checkbox.vue';
 import Textarea from '@/Components/Textarea.vue';
-import { Link, useForm } from '@inertiajs/vue3';
+import { Link, useForm, router } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 import {
     LockClosedIcon,
@@ -19,7 +19,14 @@ import {
     UsersIcon,
     TrashIcon,
     ChatBubbleLeftEllipsisIcon,
+    DocumentArrowUpIcon,
+    EyeIcon,
+    DocumentTextIcon,
+    CloudArrowUpIcon,
+    SparklesIcon,
+    FolderPlusIcon
 } from '@heroicons/vue/24/outline';
+import Swal from 'sweetalert2';
 
 const props = defineProps({
     caso: Object,
@@ -27,39 +34,24 @@ const props = defineProps({
     puedeEditar: Boolean,
 });
 
-// --- Lógica de formato (copiada) ---
 const formatDate = (s) => {
-    if (!s) return null;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-        const [y, m, d] = s.split('-').map(Number);
-        return new Date(y, m - 1, d).toLocaleDateString('es-CO', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            timeZone: 'UTC'
-        });
-    }
-    return new Date(String(s).replace(' ', 'T')).toLocaleDateString('es-CO', {
+    if (!s) return 'N/A';
+    const date = new Date(s);
+    return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('es-CO', {
         year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        timeZone: 'UTC'
-    }) || 'No especificada';
+        month: 'short',
+        day: 'numeric'
+    });
 };
 
-// --- Lógica de Documentos (Movida aquí) ---
 const docsGenerados = computed(() =>
-    [...(props.caso.documentos_generados || [])].sort(
-        (a, b) => new Date(b.created_at) - new Date(a.created_at)
-    )
+    [...(props.caso.documentos_generados || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 );
 const adjuntos = computed(() =>
-    [...(props.caso.documentos || [])].sort(
-        (a, b) => new Date(b.fecha_carga) - new Date(a.fecha_carga)
-    )
+    [...(props.caso.documentos || [])].sort((a, b) => new Date(b.fecha_carga) - new Date(a.fecha_carga))
 );
 
-// --- Lógica Modal Subir Documento ---
+// Lógica Modal Subir
 const confirmingDocumentUpload = ref(false);
 const docFormProgress = ref(null);
 const docForm = useForm({
@@ -70,448 +62,223 @@ const docForm = useForm({
     nota: '',
 });
 
-const openUploadModal = () => {
-    docForm.reset();
-    docForm.fecha_carga = new Date().toISOString().slice(0, 10);
-    docForm.asociado_a = props.caso.deudor ? `persona-${props.caso.deudor.id}` : null;
-    confirmingDocumentUpload.value = true;
-};
-const closeUploadModal = () => {
-    confirmingDocumentUpload.value = false;
-    docFormProgress.value = null;
-    docForm.reset();
-};
-const MAX_128MB = 128 * 1024 * 1024;
+const openUploadModal = () => { docForm.reset(); confirmingDocumentUpload.value = true; };
+const closeUploadModal = () => { confirmingDocumentUpload.value = false; docForm.reset(); };
+
 const submitDocument = () => {
-    if (docForm.archivo && docForm.archivo.size > MAX_128MB) {
-        docForm.setError('archivo', 'Tamaño máximo permitido: 128MB.');
-        return;
-    }
     docForm.post(route('casos.documentos.store', props.caso.id), {
         preserveScroll: true,
-        forceFormData: true,
         onProgress: (e) => (docFormProgress.value = e?.percentage ?? null),
-        onSuccess: () => closeUploadModal(),
-        onFinish: () => (docFormProgress.value = null),
-    });
-};
-
-// --- Lógica Modal Eliminar Documento ---
-const confirmingDocumentDeletion = ref(false);
-const documentToDelete = ref(null);
-const confirmDocumentDeletion = (documento) => {
-    documentToDelete.value = documento;
-    confirmingDocumentDeletion.value = true;
-};
-const closeDeleteModal = () => {
-    confirmingDocumentDeletion.value = false;
-    documentToDelete.value = null;
-};
-const deleteDocument = () => {
-    useForm({}).delete(route('documentos-caso.destroy', documentToDelete.value.id), {
-        preserveScroll: true,
-        onSuccess: () => closeDeleteModal(),
-    });
-};
-
-// --- Lógica Modal Generar Documento ---
-const mostrandoModalGenerar = ref(false);
-const generarDocForm = useForm({
-    plantilla_id: null,
-    caso_id: props.caso.id,
-    es_confidencial: false,
-    observaciones: '',
-});
-const abrirModalGenerar = () => {
-    generarDocForm.reset();
-    generarDocForm.caso_id = props.caso.id;
-    mostrandoModalGenerar.value = true;
-};
-const cerrarModalGenerar = () => {
-    mostrandoModalGenerar.value = false;
-};
-const submitGenerarDocumento = () => {
-    generarDocForm.post(route('documentos.generar'), {
-        preserveScroll: true,
-        onSuccess: () => cerrarModalGenerar(),
-    });
-};
-
-// --- Lógica Modal Alerta ---
-const mostrandoModalAlerta = ref(false);
-const alertaForm = useForm({
-    mensaje: '',
-    fecha_programada: null,
-    prioridad: 'media',
-});
-const abrirModalAlerta = () => {
-    alertaForm.reset();
-    mostrandoModalAlerta.value = true;
-};
-const cerrarModalAlerta = () => {
-    mostrandoModalAlerta.value = false;
-};
-const submitAlerta = () => {
-    alertaForm.post(route('casos.notificaciones.store', props.caso.id), {
-        preserveScroll: true,
         onSuccess: () => {
-            cerrarModalAlerta();
-            alertaForm.reset();
-            router.reload({ only: ['auth'] });
+            closeUploadModal();
+            Swal.fire({ title: '¡Subido!', text: 'Documento adjuntado con éxito.', icon: 'success', timer: 1500, showConfirmButton: false });
         },
     });
 };
 
+// Lógica Modal Eliminar
+const confirmingDocumentDeletion = ref(false);
+const documentToDelete = ref(null);
+const confirmDocumentDeletion = (documento) => { documentToDelete.value = documento; confirmingDocumentDeletion.value = true; };
+const deleteDocument = () => {
+    useForm({}).delete(route('documentos-caso.destroy', documentToDelete.value.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            confirmingDocumentDeletion.value = false;
+            Swal.fire('Eliminado', 'El archivo ha sido borrado.', 'success');
+        },
+    });
+};
+
+// Lógica Generar
+const mostrandoModalGenerar = ref(false);
+const generarDocForm = useForm({ plantilla_id: null, caso_id: props.caso.id, es_confidencial: false, observaciones: '' });
+const submitGenerarDocumento = () => {
+    generarDocForm.post(route('documentos.generar'), {
+        preserveScroll: true,
+        onSuccess: () => {
+            mostrandoModalGenerar.value = false;
+            Swal.fire({ title: '¡Generado!', text: 'El documento se está procesando.', icon: 'info', timer: 2000, showConfirmButton: false });
+        },
+    });
+};
 </script>
 
 <template>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Columna Documentos Generados -->
-        <div class="bg-gray-50 dark:bg-gray-900/50 p-6 rounded-lg">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-bold flex items-center">
-                    <DocumentDuplicateIcon class="h-6 w-6 mr-2 text-indigo-500" />Documentos Generados
-                </h3>
-                <PrimaryButton v-if="puedeEditar" @click="abrirModalGenerar" class="!text-xs">
-                    Generar +
-                </PrimaryButton>
+    <div class="space-y-12">
+        
+        <!-- SECCIÓN: DOCUMENTOS GENERADOS (IA / PLANTILLAS) -->
+        <section>
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                    <h3 class="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+                        <SparklesIcon class="w-6 h-6 text-indigo-500" /> Documentos Inteligentes
+                    </h3>
+                    <p class="text-xs text-gray-500 font-medium">Archivos generados automáticamente a partir de plantillas legales.</p>
+                </div>
+                <button v-if="puedeEditar" @click="mostrandoModalGenerar = true" class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-lg shadow-indigo-100 dark:shadow-none">
+                    <DocumentDuplicateIcon class="w-4 h-4 mr-2" /> Generar Nuevo
+                </button>
             </div>
 
-            <div
-                v-if="!docsGenerados.length"
-                class="text-center py-6 text-gray-500 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg"
-            >
-                No hay documentos generados.
+            <div v-if="!docsGenerados.length" class="bg-gray-50 dark:bg-gray-900/30 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700 py-12 text-center">
+                <DocumentTextIcon class="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p class="text-sm font-bold text-gray-400">No se han generado documentos aún.</p>
             </div>
 
-            <ul v-else class="space-y-2">
-                <li
-                    v-for="doc in docsGenerados"
-                    :key="doc.id"
-                    class="p-3 bg-white dark:bg-gray-800 rounded-md shadow-sm flex items-center justify-between"
-                >
-                    <div class="flex items-center truncate">
-                        <LockClosedIcon
-                            v-if="doc.es_confidencial"
-                            class="h-5 w-5 text-yellow-500 mr-3 flex-shrink-0"
-                            title="Confidencial"
-                        />
-                        <div class="truncate">
-                            <p
-                                class="text-sm font-medium text-gray-900 dark:text-white truncate"
-                                :title="`${doc.nombre_base}.docx`"
-                            >
-                                {{ doc.nombre_base }}.docx
-                            </p>
-                            <p class="text-xs text-gray-500">
-                                Generado por {{ doc.usuario?.name || 'N/A' }} (v{{ doc.version_plantilla }})
-                            </p>
+            <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div v-for="doc in docsGenerados" :key="doc.id" class="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all group">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
+                            <DocumentTextIcon class="w-6 h-6 text-indigo-600" />
+                        </div>
+                        <div class="flex gap-1">
+                            <a :href="route('documentos.descargar.docx', doc.id)" class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Descargar Word">
+                                <ArrowDownTrayIcon class="w-4 h-4" />
+                            </a>
+                            <a :href="route('documentos.descargar.pdf', doc.id)" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Descargar PDF">
+                                <ArrowDownTrayIcon class="w-4 h-4" />
+                            </a>
                         </div>
                     </div>
-                    <div class="flex items-center space-x-2 flex-shrink-0 ml-4">
-                        <a
-                            :href="route('documentos.descargar.docx', doc.id)"
-                            class="text-blue-600 hover:text-blue-800 p-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50"
-                            title="Descargar .docx"
-                            aria-label="Descargar DOCX"
-                        >
-                            <ArrowDownTrayIcon class="h-5 w-5" />
-                        </a>
-                        <a
-                            :href="route('documentos.descargar.pdf', doc.id)"
-                            class="text-red-600 hover:text-red-800 p-1.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50"
-                            title="Descargar .pdf"
-                            aria-label="Descargar PDF"
-                        >
-                            <ArrowDownTrayIcon class="h-5 w-5" />
-                        </a>
-                    </div>
-                </li>
-            </ul>
-        </div>
-
-        <!-- Columna Documentos Adjuntos -->
-        <div class="bg-gray-50 dark:bg-gray-900/50 p-6 rounded-lg">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-bold">Documentos Adjuntos</h3>
-                <PrimaryButton v-if="puedeEditar" @click="openUploadModal" class="!text-xs">
-                    Subir +
-                </PrimaryButton>
-            </div>
-
-            <div
-                v-if="!adjuntos.length"
-                class="text-center py-6 text-gray-500 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg"
-            >
-                No hay documentos adjuntos.
-            </div>
-
-            <ul v-else class="space-y-3">
-                <li
-                    v-for="doc in adjuntos"
-                    :key="doc.id"
-                    class="p-3 bg-white dark:bg-gray-800 rounded-md shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2"
-                >
-                    <div class="flex-grow pr-4">
-                        <p class="text-sm font-medium text-gray-900 dark:text-white capitalize">
-                            {{ doc.tipo_documento }}
-                        </p>
-                        <p class="text-xs text-indigo-700 dark:text-indigo-400 font-semibold">
-                            <UsersIcon class="h-3 w-3 inline-block -mt-0.5 mr-1" />
-                            <span v-if="doc.persona">
-                                Adjunto a Deudor: {{ doc.persona.nombre_completo }}
-                            </span>
-                            <span v-else-if="doc.codeudor">
-                                Adjunto a Codeudor: {{ doc.codeudor.nombre_completo }}
-                            </span>
-                            <span v-else>
-                                Adjunto al Caso
-                            </span>
-                        </p>
-                        <p class="text-xs text-gray-500">
-                            Subido el {{ formatDate(doc.fecha_carga) }}
-                        </p>
-                        <div v-if="doc.nota" class="mt-2 flex items-start text-xs text-gray-600 dark:text-gray-400 border-l-2 border-gray-300 dark:border-gray-600 pl-2">
-                            <ChatBubbleLeftEllipsisIcon class="h-4 w-4 mr-1.5 flex-shrink-0 text-gray-400" />
-                            <span class="italic whitespace-pre-wrap">{{ doc.nota }}</span>
+                    <div class="mt-4">
+                        <h4 class="text-sm font-black text-gray-900 dark:text-white truncate" :title="doc.nombre_base">{{ doc.nombre_base }}</h4>
+                        <div class="mt-1 flex items-center gap-2 text-[10px] text-gray-500 font-bold uppercase tracking-tighter">
+                            <span>v{{ doc.version_plantilla }}</span>
+                            <span>•</span>
+                            <span>{{ formatDate(doc.created_at) }}</span>
+                        </div>
+                        <div v-if="doc.es_confidencial" class="mt-2 inline-flex items-center px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-[9px] font-black uppercase">
+                            <LockClosedIcon class="w-3 h-3 mr-1" /> Confidencial
                         </div>
                     </div>
-
-                    <div class="flex items-center space-x-2 flex-shrink-0 w-full sm:w-auto justify-end">
-                        <a
-                            :href="route('documentos-caso.view', doc.id)"
-                            target="_blank"
-                            class="inline-flex items-center px-3 py-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none disabled:opacity-25 transition ease-in-out duration-150"
-                        >
-                            Ver
-                        </a>
-                        <DangerButton
-                            v-if="puedeEditar"
-                            @click="confirmDocumentDeletion(doc)"
-                            class="!py-2 !text-xs"
-                            aria-label="Eliminar adjunto"
-                        >
-                            <TrashIcon class="h-4 w-4" />
-                        </DangerButton>
-                    </div>
-                </li>
-            </ul>
-        </div>
-
-        <!-- Modales -->
-        <Modal :show="confirmingDocumentUpload" @close="closeUploadModal">
-            <div class="p-6">
-                <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-                    Subir Nuevo Documento Adjunto
-                </h2>
-                <form @submit.prevent="submitDocument" class="mt-6 space-y-6">
-                    <div>
-                        <InputLabel for="tipo_documento_upload" value="Tipo de Documento *" />
-                        <select
-                            v-model="docForm.tipo_documento"
-                            id="tipo_documento_upload"
-                            class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm"
-                        >
-                            <option>pagaré</option>
-                            <option>carta instrucciones</option>
-                            <option>certificación saldo</option>
-                            <option>libranza</option>
-                            <!-- =============================================================== -->
-                            <!-- --- INICIO: CAMBIO DE DOCUMENTO --- -->
-                            <!-- =============================================================== -->
-                            <option>demanda</option>
-                            <option>autos</option>
-                            <option>memorial</option>
-                            <!-- =============================================================== -->
-                            <!-- --- FIN: CAMBIO DE DOCUMENTO --- -->
-                            <!-- =============================================================== -->
-                            <option>cédula deudor</option>
-                            <option>cédula codeudor</option>
-                            <option>otros</option>
-                        </select>
-                        <InputError :message="docForm.errors.tipo_documento" class="mt-2" />
-                    </div>
-                    <div>
-                        <InputLabel for="asociado_a_upload" value="Asociar a *" />
-                        <SelectInput
-                            v-model="docForm.asociado_a"
-                            id="asociado_a_upload"
-                            class="mt-1 block w-full"
-                        >
-                            <option v-if="caso.deudor" :value="`persona-${caso.deudor.id}`">
-                                Deudor Principal: {{ caso.deudor.nombre_completo }}
-                            </option>
-                            <option v-else :value="null">
-                                Al Caso (Sin Deudor Asignado)
-                            </option>
-                            <option v-for="codeudor in caso.codeudores" 
-                                    :key="codeudor.id" 
-                                    :value="`codeudor-${codeudor.id}`"
-                            >
-                                Codeudor: {{ codeudor.nombre_completo }}
-                            </option>
-                        </SelectInput>
-                        <InputError :message="docForm.errors.asociado_a" class="mt-2" />
-                    </div>
-                    <div>
-                        <InputLabel for="fecha_carga" value="Fecha de Carga *" />
-                        <TextInput
-                            v-model="docForm.fecha_carga"
-                            id="fecha_carga"
-                            type="date"
-                            class="mt-1 block w-full"
-                            required
-                        />
-                        <InputError :message="docForm.errors.fecha_carga" class="mt-2" />
-                    </div>
-                    <div>
-                        <InputLabel for="nota_upload" value="Nota (Opcional)" />
-                        <Textarea
-                            v-model="docForm.nota"
-                            id="nota_upload"
-                            rows="3"
-                            class="mt-1 block w-full"
-                            placeholder="Añada una breve descripción o contexto sobre este archivo..."
-                        />
-                        <InputError :message="docForm.errors.nota" class="mt-2" />
-                    </div>
-                    <div>
-                        <InputLabel for="archivo_upload" value="Archivo (Máx 128MB) *" />
-                        <input
-                        id="archivo_upload"
-                        type="file"
-                        @input="docForm.archivo = $event.target.files[0]"
-                        class="mt-1 block w-full text-sm text-gray-500
-                                file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0
-                                file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                        accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,image/*"
-                        />                        <InputError :message="docForm.errors.archivo" class="mt-2" />
-                        <div v-if="docFormProgress !== null" class="mt-2 w-full bg-gray-200 rounded h-2">
-                            <div class="h-2 rounded bg-indigo-600" :style="{ width: docFormProgress + '%' }"></div>
-                        </div>
-                    </div>
-                    <div class="mt-6 flex justify-end">
-                        <SecondaryButton @click="closeUploadModal">Cancelar</SecondaryButton>
-                        <PrimaryButton class="ms-3" :class="{ 'opacity-25': docForm.processing }" :disabled="docForm.processing">
-                            Guardar Documento
-                        </PrimaryButton>
-                    </div>
-                </form>
-            </div>
-        </Modal>
-
-        <Modal :show="confirmingDocumentDeletion" @close="closeDeleteModal">
-            <div class="p-6">
-                <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">¿Eliminar Documento?</h2>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400" v-if="documentToDelete">
-                    ¿Estás seguro de que quieres eliminar permanentemente el documento:
-                    <span class="font-medium">{{ documentToDelete.tipo_documento }}</span>?
-                </p>
-                <div class="mt-6 flex justify-end">
-                    <SecondaryButton @click="closeDeleteModal">Cancelar</SecondaryButton>
-                    <DangerButton class="ms-3" @click="deleteDocument">Eliminar Documento</DangerButton>
                 </div>
             </div>
-        </Modal>
+        </section>
 
-        <Modal :show="mostrandoModalGenerar" @close="cerrarModalGenerar">
-            <div class="p-6">
-                <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Generar Documento desde Plantilla</h2>
-                <form @submit.prevent="submitGenerarDocumento" class="mt-6 space-y-6">
-                    <div>
-                        <InputLabel for="plantilla_id_generate" value="Plantilla a utilizar" />
-                        <SelectInput
-                            id="plantilla_id_generate"
-                            class="mt-1 block w-full"
-                            v-model="generarDocForm.plantilla_id"
-                            required
-                        >
-                            <option disabled :value="null">-- Seleccione una plantilla --</option>
-                            <option v-for="plantilla in plantillas" :key="plantilla.id" :value="plantilla.id">
-                                {{ plantilla.nombre }} (v{{ plantilla.version }})
-                            </option>
-                        </SelectInput>
-                        <InputError class="mt-2" :message="generarDocForm.errors.plantilla_id" />
+        <!-- SECCIÓN: ARCHIVOS ADJUNTOS (SOPORTES) -->
+        <section>
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                    <h3 class="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+                        <CloudArrowUpIcon class="w-6 h-6 text-indigo-500" /> Repositorio de Soportes
+                    </h3>
+                    <p class="text-xs text-gray-500 font-medium">Expediente digital, pruebas y documentos cargados manualmente.</p>
+                </div>
+                <button v-if="puedeEditar" @click="openUploadModal" class="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl font-bold text-xs text-gray-600 dark:text-gray-300 uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm">
+                    <CloudArrowUpIcon class="w-4 h-4 mr-2" /> Subir Archivo
+                </button>
+            </div>
+
+            <div v-if="!adjuntos.length" class="bg-gray-50 dark:bg-gray-900/30 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700 py-12 text-center">
+                <FolderPlusIcon class="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p class="text-sm font-bold text-gray-400">El repositorio de adjuntos está vacío.</p>
+            </div>
+
+            <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div v-for="doc in adjuntos" :key="doc.id" class="flex gap-4 bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm hover:border-indigo-200 transition-all">
+                    <div class="p-3 bg-gray-50 dark:bg-gray-900 rounded-xl h-fit">
+                        <DocumentArrowUpIcon class="w-8 h-8 text-gray-400" />
                     </div>
-                    <div>
-                        <InputLabel for="observaciones_generate" value="Observaciones (Opcional)" />
-                        <Textarea
-                            id="observaciones_generate"
-                            class="mt-1 block w-full"
-                            v-model="generarDocForm.observaciones"
-                            rows="3"
-                        />
-                        <InputError class="mt-2" :message="generarDocForm.errors.observaciones" />
-                    </div>
-                    <div class="flex items-start">
-                        <div class="flex items-center h-5">
-                            <Checkbox id="es_confidencial_generate" v-model:checked="generarDocForm.es_confidencial" />
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <span class="text-[9px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">{{ doc.tipo_documento }}</span>
+                                <h4 class="text-sm font-bold text-gray-900 dark:text-white truncate">Archivo Cargado</h4>
+                            </div>
+                            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <a :href="route('documentos-caso.view', doc.id)" target="_blank" class="p-1.5 text-gray-400 hover:text-indigo-600 rounded-lg"><EyeIcon class="w-4 h-4" /></a>
+                                <button v-if="puedeEditar" @click="confirmDocumentDeletion(doc)" class="p-1.5 text-gray-400 hover:text-red-600 rounded-lg"><TrashIcon class="w-4 h-4" /></button>
+                            </div>
                         </div>
-                        <div class="ml-3 text-sm">
-                            <InputLabel for="es_confidencial_generate" value="Documento Confidencial" />
-                            <p class="text-xs text-gray-500 dark:text-gray-400">
-                                Si se marca, no será visible para usuarios con rol de cliente.
-                            </p>
+                        <div class="mt-2 flex items-center gap-3 text-[10px] text-gray-500 font-medium">
+                            <span class="flex items-center gap-1"><UsersIcon class="w-3 h-3" /> {{ doc.persona?.nombre_completo || doc.codeudor?.nombre_completo || 'Caso' }}</span>
+                            <span>•</span>
+                            <span>{{ formatDate(doc.fecha_carga) }}</span>
+                        </div>
+                        <div v-if="doc.nota" class="mt-3 p-2 bg-gray-50/50 dark:bg-gray-900/50 rounded-lg border-l-2 border-gray-200 text-[10px] text-gray-600 italic">
+                            "{{ doc.nota }}"
+                        </div>
+                        <div class="mt-4 flex gap-2">
+                            <a :href="route('documentos-caso.view', doc.id)" target="_blank" class="text-[10px] font-black uppercase text-indigo-600 hover:underline">Visualizar</a>
+                            <button v-if="puedeEditar" @click="confirmDocumentDeletion(doc)" class="text-[10px] font-black uppercase text-red-500 hover:underline">Eliminar</button>
                         </div>
                     </div>
-                    <div class="mt-6 flex justify-end">
-                        <SecondaryButton @click="cerrarModalGenerar">Cancelar</SecondaryButton>
-                        <PrimaryButton
-                            class="ms-3"
-                            :class="{ 'opacity-25': generarDocForm.processing }"
-                            :disabled="generarDocForm.processing"
-                        >
-                            Generar Documento
-                        </PrimaryButton>
+                </div>
+            </div>
+        </section>
+
+        <!-- MODAL: GENERAR -->
+        <Modal :show="mostrandoModalGenerar" @close="mostrandoModalGenerar = false">
+            <div class="p-8">
+                <h2 class="text-xl font-black text-gray-900 mb-6">Generar Documento Inteligente</h2>
+                <form @submit.prevent="submitGenerarDocumento" class="space-y-6">
+                    <div>
+                        <InputLabel value="Seleccione la Plantilla Legal *" class="font-bold text-xs uppercase" />
+                        <select v-model="generarDocForm.plantilla_id" class="mt-1 block w-full rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900" required>
+                            <option :value="null">-- Seleccione --</option>
+                            <option v-for="p in plantillas" :key="p.id" :value="p.id">{{ p.nombre }} (v{{ p.version }})</option>
+                        </select>
+                    </div>
+                    <div>
+                        <InputLabel value="Observaciones Adicionales" class="font-bold text-xs uppercase" />
+                        <Textarea v-model="generarDocForm.observaciones" rows="3" class="mt-1 block w-full rounded-xl border-gray-200" placeholder="Información opcional para incluir..." />
+                    </div>
+                    <div class="flex items-center gap-3 p-4 bg-indigo-50 rounded-xl">
+                        <Checkbox v-model:checked="generarDocForm.es_confidencial" />
+                        <span class="text-xs font-bold text-indigo-900 uppercase">Marcar como confidencial (Solo equipo interno)</span>
+                    </div>
+                    <div class="flex justify-end gap-3 pt-4 border-t">
+                        <SecondaryButton @click="mostrandoModalGenerar = false" class="!rounded-xl !px-6">Cancelar</SecondaryButton>
+                        <PrimaryButton class="!bg-indigo-600 !rounded-xl !px-10 !font-black" :disabled="generarDocForm.processing">Generar Archivo</PrimaryButton>
                     </div>
                 </form>
             </div>
         </Modal>
 
-        <Modal :show="mostrandoModalAlerta" @close="cerrarModalAlerta">
-            <div class="p-6">
-                <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Programar Alerta Manual</h2>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Cree un recordatorio para usted mismo sobre este caso. La alerta aparecerá en su bandeja de
-                    notificaciones.
-                </p>
-                <form @submit.prevent="submitAlerta" class="mt-6 space-y-6">
-                    <div>
-                        <InputLabel for="mensaje_alerta" value="Mensaje del Recordatorio" />
-                        <Textarea v-model="alertaForm.mensaje" id="mensaje_alerta" class="mt-1 block w-full" required rows="4" />
-                        <InputError :message="alertaForm.errors.mensaje" class="mt-2" />
+        <!-- MODAL: SUBIR -->
+        <Modal :show="confirmingDocumentUpload" @close="closeUploadModal">
+            <div class="p-8">
+                <h2 class="text-xl font-black text-gray-900 mb-6">Cargar Soporte al Expediente</h2>
+                <form @submit.prevent="submitDocument" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <InputLabel value="Categoría del Archivo *" class="font-bold text-xs uppercase" />
+                            <select v-model="docForm.tipo_documento" class="mt-1 block w-full rounded-xl border-gray-200 bg-gray-50" required>
+                                <option>pagaré</option><option>demanda</option><option>autos</option><option>memorial</option><option>otros</option>
+                            </select>
+                        </div>
+                        <div>
+                            <InputLabel value="Fecha del Documento *" class="font-bold text-xs uppercase" />
+                            <TextInput v-model="docForm.fecha_carga" type="date" class="mt-1 block w-full rounded-xl" required />
+                        </div>
                     </div>
-                    <InputLabel for="prioridad" value="Prioridad" />
-                        <SelectInput id="prioridad" v-model="alertaForm.prioridad" class="mt-1 block w-full">
-                            <option value="baja">Baja</option>
-                            <option value="media">Media</option>
-                            <option value="alta">Alta</option>
-                        </SelectInput>
-                    <InputError :message="alertaForm.errors.prioridad" class="mt-2" />
                     <div>
-                        <InputLabel for="fecha_programada" value="Fecha de la Alerta (Opcional)" />
-                        <TextInput
-                            v-model="alertaForm.fecha_programada"
-                            id="fecha_programada"
-                            type="datetime-local"
-                            class="mt-1 block w-full"
-                        />
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            Si no selecciona fecha, la alerta se creará inmediatamente.
-                        </p>
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                S te enviaremos un recordatorio diario hasta esta fecha y hora (zona horaria del sistema).
-                        </p>
-                        <InputError :message="alertaForm.errors.fecha_programada" class="mt-2" />
+                        <InputLabel value="Vincular a *" class="font-bold text-xs uppercase" />
+                        <select v-model="docForm.asociado_a" class="mt-1 block w-full rounded-xl border-gray-200 bg-gray-50">
+                            <option v-if="caso.deudor" :value="`persona-${caso.deudor.id}`">Deudor: {{ caso.deudor.nombre_completo }}</option>
+                            <option v-for="c in caso.codeudores" :key="c.id" :value="`codeudor-${c.id}`">Codeudor: {{ c.nombre_completo }}</option>
+                        </select>
                     </div>
-                    <div class="mt-6 flex justify-end">
-                        <SecondaryButton @click="cerrarModalAlerta">Cancelar</SecondaryButton>
-                        <PrimaryButton class="ms-3" :class="{ 'opacity-25': alertaForm.processing }" :disabled="alertaForm.processing">
-                            Programar Alerta
-                        </PrimaryButton>
+                    <div>
+                        <InputLabel value="Nota / Descripción" class="font-bold text-xs uppercase" />
+                        <TextInput v-model="docForm.nota" class="mt-1 block w-full rounded-xl" placeholder="Breve contexto..." />
+                    </div>
+                    <div>
+                        <label class="block w-full cursor-pointer p-8 border-2 border-dashed border-indigo-200 bg-indigo-50/30 rounded-2xl text-center hover:border-indigo-400 transition-all">
+                            <input type="file" @input="docForm.archivo = $event.target.files[0]" class="hidden" />
+                            <CloudArrowUpIcon class="w-10 h-10 text-indigo-400 mx-auto mb-2" />
+                            <p class="text-xs font-black text-indigo-600 uppercase tracking-widest">{{ docForm.archivo ? docForm.archivo.name : 'Seleccionar Archivo (Máx 128MB)' }}</p>
+                        </label>
+                        <InputError :message="docForm.errors.archivo" class="mt-2" />
+                    </div>
+                    <div class="flex justify-end gap-3 pt-4 border-t">
+                        <SecondaryButton @click="closeUploadModal" class="!rounded-xl !px-6">Cancelar</SecondaryButton>
+                        <PrimaryButton class="!bg-indigo-600 !rounded-xl !px-10 !font-black" :disabled="docForm.processing">Guardar en Nube</PrimaryButton>
                     </div>
                 </form>
             </div>
         </Modal>
+
     </div>
 </template>

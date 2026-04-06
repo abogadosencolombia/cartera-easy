@@ -15,6 +15,7 @@ import NavLink from "@/Components/NavLink.vue";
 import ResponsiveNavLink from "@/Components/ResponsiveNavLink.vue";
 import ToastList from "@/Components/ToastList.vue";
 import GestionDiariaPanel from "@/Components/GestionDiariaPanel.vue";
+import WelcomeTour from "@/Components/WelcomeTour.vue";
 
 import {
     ChartBarIcon,
@@ -52,12 +53,12 @@ const NAV_ITEMS = [
         roles: ["admin", "gestor", "abogado"],
     },
 
-    // --- GRUPO: CASOS (Unificado) ---
+    // --- GRUPO: CASOS ---
     {
         type: "dropdown",
         label: "Casos",
         icon: FolderIcon,
-        active: ["casos.*", "procesos.*"],
+        active: ["casos.*", "procesos.*", "revision.*", "reportes.*"],
         roles: ["admin", "gestor", "abogado"],
         items: [
             {
@@ -72,13 +73,26 @@ const NAV_ITEMS = [
                 active: "procesos.*",
                 roles: ["admin", "gestor", "abogado"],
             },
+            { type: "divider", roles: ["admin", "gestor", "abogado"] },
+            {
+                label: "Revisión Diaria",
+                href: route("revision.index"),
+                active: "revision.*",
+                roles: ["admin", "gestor", "abogado"],
+            },
+            {
+                label: "Reportes",
+                href: route("reportes.index"),
+                active: "reportes.*",
+                roles: ["admin", "gestor", "abogado"],
+            },
         ],
     },
 
-    // --- GRUPO: ENTIDADES (Sin Abogados/Gestores) ---
+    // --- GRUPO: DIRECTORIO ---
     {
         type: "dropdown",
-        label: "Entidades",
+        label: "Directorio",
         icon: UsersIcon,
         active: ["cooperativas.*", "personas.*", "admin.users.*", "juzgados.*"],
         roles: ["admin", "gestor", "abogado"],
@@ -95,13 +109,13 @@ const NAV_ITEMS = [
                 active: "personas.*",
                 roles: ["admin", "gestor", "abogado"],
             },
+            { type: "divider", roles: ["admin"] },
             {
                 label: "Directorio de Juzgados",
                 href: route("juzgados.index"),
                 active: "juzgados.*",
                 roles: ["admin"],
             },
-            { type: "divider", roles: ["admin"] },
             {
                 label: "Usuarios del Sistema",
                 href: route("admin.users.index"),
@@ -111,15 +125,21 @@ const NAV_ITEMS = [
         ],
     },
 
-    // --- GRUPO: GESTIÓN (Con Abogados/Gestores y Contratos renombrado) ---
+    // --- GRUPO: ADMINISTRACIÓN ---
     {
         type: "dropdown",
-        label: "Gestión",
-        icon: ScaleIcon,
+        label: "Administración",
+        icon: Cog6ToothIcon,
         active: [
             "gestion.honorarios.*",
             "honorarios.contratos.*",
             "admin.gestores.*",
+            "admin.tareas.*",
+            "plantillas.*",
+            "requisitos.*",
+            "admin.tasas.*",
+            "admin.auditoria.*",
+            "admin.reglas-alerta.*",
         ],
         roles: ["admin", "gestor", "abogado"],
         items: [
@@ -136,91 +156,43 @@ const NAV_ITEMS = [
                 active: "admin.gestores.*",
                 roles: ["admin"],
             },
-        ],
-    },
-
-    // --- GRUPO: CONFIGURACIÓN (Solo Admin) ---
-    {
-        type: "dropdown",
-        label: "Configuración",
-        icon: Cog6ToothIcon,
-        active: [
-            "plantillas.*",
-            "requisitos.*",
-            "admin.tasas.*",
-            "admin.tareas.*",
-            "revision.*",
-            "admin.auditoria.*",
-            "admin.reglas-alerta.*",
-        ],
-        roles: ["admin"],
-        items: [
-            // --- FLUJO DE TRABAJO DIARIO ---
             {
-                label: "Gestión de Tareas para Usuarios",
+                label: "Gestión de Tareas",
                 href: route("admin.tareas.index"),
                 active: "admin.tareas.*",
-                icon: ListBulletIcon,
                 roles: ["admin"],
             },
-            {
-                type: "link",
-                label: "Revisión Diaria",
-                href: route("revision.index"),
-                active: "revision.*",
-                icon: ClipboardDocumentCheckIcon,
-                roles: ["admin", "gestor", "abogado"],
-            },
-
             { type: "divider", roles: ["admin"] },
-
-            // --- PARAMETRIZACIÓN ---
             {
                 label: "Plantillas de Documentos",
                 href: route("plantillas.index"),
                 active: "plantillas.*",
-                icon: DocumentTextIcon,
                 roles: ["admin"],
             },
             {
                 label: "Requisitos de Documentos",
                 href: route("requisitos.index"),
                 active: "requisitos.*",
-                icon: ListBulletIcon,
                 roles: ["admin"],
             },
             {
                 label: "Tasas de Interés",
                 href: route("admin.tasas.index"),
                 active: "admin.tasas.*",
-                icon: BanknotesIcon,
                 roles: ["admin"],
             },
-
             { type: "divider", roles: ["admin"] },
-
-            // --- SEGURIDAD Y AUTOMATIZACIÓN ---
             {
                 label: "Reglas de Alerta",
                 href: route("admin.reglas-alerta.index"),
                 active: "admin.reglas-alerta.*",
-                icon: ExclamationTriangleIcon,
                 roles: ["admin"],
             },
             {
                 label: "Auditoría Global",
                 href: route("admin.auditoria.index"),
                 active: "admin.auditoria.index",
-                icon: ShieldCheckIcon,
                 roles: ["admin"],
-            },
-            {
-                type: "link",
-                label: "Reportes",
-                href: route("reportes.index"),
-                active: "reportes.*",
-                icon: ChartBarIcon,
-                roles: ["admin", "gestor", "abogado"],
             },
         ],
     },
@@ -795,5 +767,6 @@ onMounted(() => {
             @close="showGestionPanel = false"
         />
         <ToastList />
+        <WelcomeTour />
     </div>
 </template>

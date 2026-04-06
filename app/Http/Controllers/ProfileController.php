@@ -14,7 +14,7 @@ use Inertia\Response;
 class ProfileController extends Controller
 {
     /**
-     * Muestra el formulario de perfil del usuario.
+     * Display the user's profile form.
      */
     public function edit(Request $request): Response
     {
@@ -24,37 +24,24 @@ class ProfileController extends Controller
         ]);
     }
 
+    /**
+     * Update the user's profile information.
+     */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $user = $request->user();
+        $request->user()->fill($request->validated());
 
-        // Rellena todos los datos validados.
-        // Esto funciona para el nombre/email y también para las notificaciones.
-        $user->fill($request->validated());
-
-        // Si el email fue modificado, se anula la verificación.
-        if ($user->isDirty('email')) {
-            $user->email_verified_at = null;
-        }
-        
-        // Aquí es donde manejamos las casillas de notificaciones.
-        // Si el formulario de perfil se envía, esta parte no se ejecuta y no borra tus preferencias.
-        if ($request->has('preferencias_notificacion')) {
-            $preferencias = $request->input('preferencias_notificacion', []);
-            // Nos aseguramos de guardar 'true' o 'false'.
-            $user->preferencias_notificacion = [
-                'email' => !empty($preferencias['email']),
-                'in-app' => !empty($preferencias['in-app']), 
-            ];
+        if ($request->user()->isDirty('email')) {
+            $request->user()->email_verified_at = null;
         }
 
-        $user->save();
+        $request->user()->save();
 
-        return Redirect::route('profile.edit')->with('status', 'profile-updated');
+        return Redirect::route('profile.edit');
     }
 
     /**
-     * Elimina la cuenta del usuario.
+     * Delete the user's account.
      */
     public function destroy(Request $request): RedirectResponse
     {
@@ -75,7 +62,6 @@ class ProfileController extends Controller
     }
 
     /**
-     * ===== INICIO DE LA CORRECCIÓN =====
      * Actualiza las preferencias de notificación del usuario.
      */
     public function updatePreferences(Request $request): RedirectResponse
@@ -94,5 +80,13 @@ class ProfileController extends Controller
 
         return Redirect::route('profile.edit')->with('status', 'notification-preferences-updated');
     }
-    // ===== FIN DE LA CORRECCIÓN =====
+
+    /**
+     * Marca el tour de bienvenida como visto.
+     */
+    public function markTourSeen(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $request->user()->update(['tour_seen' => true]);
+        return response()->json(['success' => true]);
+    }
 }
