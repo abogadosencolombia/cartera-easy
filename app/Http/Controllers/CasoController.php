@@ -39,7 +39,15 @@ class CasoController extends Controller
         $this->authorize('viewAny', Caso::class);
         $user = Auth::user();
 
-        $query = Caso::with(['cooperativa', 'deudor', 'user', 'users']);
+        $query = Caso::with([
+            'cooperativa', 
+            'deudor:id,nombre_completo,numero_documento,celular_1,correo_1,celular_2,correo_2', 
+            'codeudores:id,nombre_completo,numero_documento',
+            'especialidad:id,nombre',
+            'user', 
+            'users', 
+            'juzgado'
+        ]);
 
         // --- 1. Filtros por Rol de Usuario (Seguridad) ---
         if ($user->tipo_usuario === 'admin') {
@@ -122,12 +130,24 @@ class CasoController extends Controller
 
         $etapas_procesales = DB::table('etapas_procesales')->orderBy('nombre')->pluck('nombre')->all();
 
+        // --- Estadísticas para los KPI Cards (SQL puro para máxima velocidad y alcance global) ---
+        $statsQuery = (clone $query)->reorder(); // <--- Eliminamos cualquier ORDER BY heredado
+        $stats = Inertia::defer(function() use ($statsQuery) {
+            return [
+                'total' => (clone $statsQuery)->count(),
+                'sin_radicado' => (clone $statsQuery)->where(fn($q) => $q->whereNull('radicado')->orWhere('radicado', ''))->count(),
+                'saldo_total' => (clone $statsQuery)->selectRaw('SUM(COALESCE(monto_total, 0) - COALESCE(monto_total_pagado, 0)) as total')->value('total') ?? 0,
+                'actualizados_hoy' => (clone $statsQuery)->whereDate('updated_at', Carbon::today())->count(),
+            ];
+        });
+
         return Inertia::render('Casos/Index', [
             'casos' => $casos,
             'abogados' => $abogados,
             'cooperativas' => $cooperativas,
             'etapas_procesales' => $etapas_procesales,
             'filters' => $request->only(['search', 'abogado_id', 'cooperativa_id', 'etapa_procesal', 'sin_radicado']),
+            'stats' => $stats,
             'can' => ['delete_cases' => true],
         ]);
     }
@@ -497,8 +517,6 @@ class CasoController extends Controller
             'users',
             'documentos.persona:id,nombre_completo',
             'documentosGenerados.plantilla',
-            'bitacoras.user',
-            'auditoria.usuario',
             'actuaciones' => fn($q) => $q->with('user:id,name')->orderBy('fecha_actuacion', 'desc'),
             'juzgado:id,nombre',
             'especialidad:id,nombre',
@@ -526,6 +544,8 @@ class CasoController extends Controller
             'caso' => $caso,
             'resumen_financiero' => ['monto_total' => $montoMostrar, 'total_pagado' => $totalPagado, 'saldo_pendiente' => max(0, $saldo), 'dias_mora' => $caso->dias_en_mora],
             'actuaciones' => $caso->actuaciones,
+            'bitacoras' => Inertia::defer(fn() => $caso->bitacoras()->with('user')->latest()->get()),
+            'auditoria' => Inertia::defer(fn() => $caso->auditoria()->with('usuario')->latest()->get()),
             'plantillas' => PlantillaDocumento::where('activa', true)->where(fn($q) => $q->where('cooperativa_id', $caso->cooperativa_id)->orWhereNull('cooperativa_id'))->orderBy('nombre')->get(['id', 'nombre', 'version']),
             'can' => ['update' => Auth::user()->can('update', $caso), 'delete' => Auth::user()->can('delete', $caso)],
         ]);

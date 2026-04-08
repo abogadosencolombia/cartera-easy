@@ -26,6 +26,8 @@ const props = defineProps({
     plantillas: { type: Array, default: () => [] },
     actuaciones: { type: Array, default: () => [] },
     resumen_financiero: { type: Object, required: true },
+    bitacoras: { type: Array, default: () => [] },
+    auditoria: { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -349,6 +351,7 @@ const montoParaContrato = computed(() => {
                         
                         <FinancieroTab
                             v-show="activeTab === 'financiero'"
+                            :caso="caso"
                             :resumen_financiero="resumen_financiero"
                             :contrato_id="caso.contrato?.id"
                             :formatCurrency="formatCurrency"
@@ -363,8 +366,8 @@ const montoParaContrato = computed(() => {
                         
                         <ActividadTab
                             v-show="activeTab === 'actividad'"
-                            :bitacoras="caso.bitacoras"
-                            :auditoria="caso.auditoria"
+                            :bitacoras="bitacoras"
+                            :auditoria="auditoria"
                         />
                     </div>
                 </div>

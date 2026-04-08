@@ -6,8 +6,8 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
-import { ref, watch, reactive, computed } from 'vue';
-import { TrashIcon, MagnifyingGlassIcon, InboxIcon, EyeIcon, ArrowDownTrayIcon, FunnelIcon, ArchiveBoxXMarkIcon, ChevronDownIcon, XMarkIcon, DocumentDuplicateIcon, CloudArrowUpIcon } from '@heroicons/vue/24/outline'; 
+import { ref, watch, reactive, computed, onMounted } from 'vue';
+import { TrashIcon, MagnifyingGlassIcon, InboxIcon, EyeIcon, ArrowDownTrayIcon, FunnelIcon, ArchiveBoxXMarkIcon, ChevronDownIcon, XMarkIcon, DocumentDuplicateIcon, CloudArrowUpIcon, BanknotesIcon, ExclamationCircleIcon, ArrowPathIcon, CheckCircleIcon, UserGroupIcon, ScaleIcon, PhoneIcon, EnvelopeIcon, BuildingOfficeIcon, ClockIcon, ExclamationTriangleIcon, UserIcon, ClipboardDocumentListIcon, LinkIcon } from '@heroicons/vue/24/outline'; 
 import { debounce } from 'lodash';
 
 const props = defineProps({
@@ -17,6 +17,7 @@ const props = defineProps({
     abogados: Array,
     cooperativas: Array,
     etapas_procesales: Array,
+    stats: Object,
 });
 
 // --- Lógica de Búsqueda y Filtros Combinada ---
@@ -129,6 +130,10 @@ const formatLabel = (text) => {
             .replace(/\b\w/g, char => char.toUpperCase());
 };
 
+const formatCurrency = (value) =>
+    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })
+    .format(value || 0);
+
 // --- Lógica de Eliminación ---
 const confirmingCaseDeletion = ref(false);
 const caseToDelete = ref(null);
@@ -154,6 +159,84 @@ const deleteCase = () => {
         onFinish: () => deleteForm.reset(),
     });
 };
+
+// --- Lógica de Quick View Modal ---
+const selectedCaso = ref(null);
+const showQuickViewModal = ref(false);
+
+const openQuickView = (caso) => {
+    selectedCaso.value = caso;
+    showQuickViewModal.value = true;
+};
+
+const closeQuickView = () => {
+    showQuickViewModal.value = false;
+    setTimeout(() => { selectedCaso.value = null; }, 300);
+};
+
+const currentIndex = computed(() => {
+    if (!selectedCaso.value) return -1;
+    return props.casos.data.findIndex(c => c.id === selectedCaso.value.id);
+});
+
+const nextCaso = () => {
+    const idx = currentIndex.value;
+    if (idx < props.casos.data.length - 1) {
+        selectedCaso.value = props.casos.data[idx + 1];
+    } else if (props.casos.next_page_url) {
+        router.get(props.casos.next_page_url, {}, {
+            preserveScroll: true,
+            onSuccess: () => {
+                const params = new URLSearchParams(window.location.search);
+                params.set('autonext', 'first');
+                window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+            }
+        });
+    }
+};
+
+const prevCaso = () => {
+    const idx = currentIndex.value;
+    if (idx > 0) {
+        selectedCaso.value = props.casos.data[idx - 1];
+    } else if (props.casos.prev_page_url) {
+        router.get(props.casos.prev_page_url, {}, {
+            preserveScroll: true,
+            onSuccess: () => {
+                const params = new URLSearchParams(window.location.search);
+                params.set('autonext', 'last');
+                window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+            }
+        });
+    }
+};
+
+onMounted(() => {
+    const params = new URLSearchParams(window.location.search);
+    const autonext = params.get('autonext');
+    if (autonext && props.casos.data.length > 0) {
+        if (autonext === 'first') {
+            openQuickView(props.casos.data[0]);
+        } else if (autonext === 'last') {
+            openQuickView(props.casos.data[props.casos.data.length - 1]);
+        }
+        params.delete('autonext');
+        const newRelativePathQuery = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+        window.history.replaceState({}, '', newRelativePathQuery);
+    }
+});
+
+const caseStatus = computed(() => {
+    if (!selectedCaso.value) return null;
+    const c = selectedCaso.value;
+    return {
+        hasRadicado: !!c.radicado,
+        hasJuzgado: !!c.juzgado,
+        hasAbogado: c.users && c.users.length > 0,
+        hasFinancial: (c.monto_total || 0) > 0,
+        isCompleted: !!c.radicado && !!c.juzgado && (c.users && c.users.length > 0)
+    };
+});
 </script>
 
 <template>
@@ -197,6 +280,49 @@ const deleteCase = () => {
                         >
                             + Registrar Caso
                         </Link>
+                    </div>
+                </div>
+
+                <!-- STATS / KPI CARDS -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md">
+                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform">
+                            <ArchiveBoxXMarkIcon class="w-16 h-16 text-indigo-600" />
+                        </div>
+                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Casos</p>
+                        <div v-if="!stats" class="h-8 w-16 bg-gray-100 dark:bg-gray-700 animate-pulse rounded"></div>
+                        <p v-else class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.total }}</p>
+                        <p class="text-[9px] text-gray-500 font-bold mt-1 uppercase tracking-tighter">En base de datos</p>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md">
+                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-amber-600">
+                            <ExclamationCircleIcon class="w-16 h-16" />
+                        </div>
+                        <p class="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Sin Radicado</p>
+                        <div v-if="!stats" class="h-8 w-16 bg-gray-100 dark:bg-gray-700 animate-pulse rounded"></div>
+                        <p v-else class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.sin_radicado }}</p>
+                        <p class="text-[9px] text-amber-500 font-bold mt-1 uppercase tracking-tighter">Pendientes de trámite</p>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md">
+                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-green-600">
+                            <BanknotesIcon class="w-16 h-16" />
+                        </div>
+                        <p class="text-[10px] font-black text-green-600 uppercase tracking-widest mb-1">Saldo Recuperable</p>
+                        <div v-if="!stats" class="h-8 w-32 bg-gray-100 dark:bg-gray-700 animate-pulse rounded"></div>
+                        <p v-else class="text-2xl font-black text-gray-900 dark:text-white">{{ formatCurrency(stats.saldo_total) }}</p>
+                        <p class="text-[9px] text-green-500 font-bold mt-1 uppercase tracking-tighter">Cartera total pendiente</p>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md">
+                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-indigo-600">
+                            <ArrowPathIcon class="w-16 h-16" />
+                        </div>
+                        <p class="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Actualizados Hoy</p>
+                        <div v-if="!stats" class="h-8 w-16 bg-gray-100 dark:bg-gray-700 animate-pulse rounded"></div>
+                        <p v-else class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.actualizados_hoy }}</p>
+                        <p class="text-[9px] text-indigo-500 font-bold mt-1 uppercase tracking-tighter">Gestiones en las últimas 24h</p>
                     </div>
                 </div>
 
@@ -327,7 +453,7 @@ const deleteCase = () => {
                                     </td>
                                 </tr>
                                 
-                                <tr v-else v-for="caso in casos.data" :key="caso.id" class="hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10 transition-colors group">
+                                <tr v-else v-for="caso in casos.data" :key="caso.id" class="hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10 transition-colors group cursor-pointer" @click="openQuickView(caso)">
                                     <!-- Deudor / Expediente -->
                                     <td class="px-6 py-4">
                                         <div class="flex flex-col">
@@ -371,13 +497,20 @@ const deleteCase = () => {
 
                                     <!-- Responsable -->
                                     <td class="px-6 py-4">
-                                        <div class="flex flex-wrap gap-1">
+                                        <div class="flex -space-x-2 overflow-hidden">
                                             <template v-if="caso.users && caso.users.length > 0">
-                                                <span v-for="u in caso.users" :key="u.id" class="text-[10px] font-bold text-gray-500 dark:text-gray-400 flex items-center bg-gray-50 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-100 dark:border-gray-600">
-                                                    {{ u.name.split(' ')[0] }}
-                                                </span>
+                                                <div 
+                                                    v-for="u in caso.users" 
+                                                    :key="u.id" 
+                                                    class="inline-flex items-center justify-center h-8 w-8 rounded-full ring-2 ring-white dark:ring-gray-800 bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 transition-transform hover:z-10 hover:scale-110 cursor-help"
+                                                    :title="u.name"
+                                                >
+                                                    <span class="text-[10px] font-black text-indigo-700 dark:text-indigo-300 uppercase">
+                                                        {{ u.name.split(' ').map(n => n[0]).join('').substring(0, 2) }}
+                                                    </span>
+                                                </div>
                                             </template>
-                                            <span v-else class="text-[10px] text-gray-400">Sin asignar</span>
+                                            <span v-else class="text-[10px] text-gray-400 font-bold italic">Sin asignar</span>
                                         </div>
                                     </td>
 
@@ -390,7 +523,7 @@ const deleteCase = () => {
                                     </td>
 
                                     <!-- Acciones Sticky -->
-                                    <td class="sticky right-0 bg-white dark:bg-gray-800 group-hover:bg-indigo-50/50 dark:group-hover:bg-gray-700 px-6 py-4 whitespace-nowrap text-right z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] transition-colors">
+                                    <td class="sticky right-0 bg-white dark:bg-gray-800 group-hover:bg-indigo-50/50 dark:group-hover:bg-gray-700 px-6 py-4 whitespace-nowrap text-right z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] transition-colors" @click.stop>
                                         <div class="flex items-center justify-end gap-2">
                                             <Link
                                                 :href="route('casos.show', caso.id)"
@@ -436,22 +569,244 @@ const deleteCase = () => {
         </div>
 
         <Modal :show="confirmingCaseDeletion" @close="closeModal">
-            <div class="p-6">
-                <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-                    ¿Estás seguro de que quieres eliminar este caso?
-                </h2>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400" v-if="caseToDelete">
-                    Estás a punto de eliminar permanentemente el Caso #{{ caseToDelete.id }} del deudor
-                    <span class="font-bold">{{ caseToDelete.deudor?.nombre_completo ?? 'N/A' }}</span>. Esta acción no se puede deshacer.
-                </p>
-                <div class="mt-6 flex justify-end">
-                    <SecondaryButton @click="closeModal">Cancelar</SecondaryButton>
-                    <DangerButton class="ms-3" :class="{ 'opacity-25': deleteForm.processing }" :disabled="deleteForm.processing" @click="deleteCase">
-                        Sí, Eliminar Caso
-                    </DangerButton>
+...
+        </Modal>
+
+        <!-- MODAL DE VISTA RÁPIDA (V5: Ficha Optimizada y Responsiva) -->
+        <Modal :show="showQuickViewModal" @close="closeQuickView" max-width="3xl">
+            <div v-if="selectedCaso" class="overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-2xl transition-all border border-gray-100 dark:border-gray-800 flex flex-col h-[85vh] sm:h-[90vh]">
+                <!-- Header: Título y Navegación (Fijo) -->
+                <div class="px-4 py-3 sm:px-8 sm:py-5 bg-indigo-600 dark:bg-indigo-700 text-white flex justify-between items-center shrink-0 shadow-lg relative z-10 w-full">
+                    <div class="flex items-center gap-3 sm:gap-4 overflow-hidden min-w-0">
+                        <div class="hidden sm:flex h-10 w-10 bg-white/10 rounded-xl items-center justify-center border border-white/20 shrink-0">
+                            <ArchiveBoxXMarkIcon class="w-6 h-6" />
+                        </div>
+                        <div class="truncate min-w-0">
+                            <p class="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-indigo-100/70 truncate">Expediente #{{ selectedCaso.id }}</p>
+                            <h2 class="text-base sm:text-lg font-black leading-tight truncate">{{ selectedCaso.deudor?.nombre_completo }}</h2>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 sm:gap-4 shrink-0 ml-2">
+                        <div class="flex bg-black/10 rounded-lg p-0.5">
+                            <button @click="prevCaso" :disabled="currentIndex === 0" class="p-1 sm:p-1.5 hover:bg-white/10 disabled:opacity-20 rounded-md transition-all active:scale-90" title="Anterior">
+                                <ChevronDownIcon class="w-4 h-4 rotate-90" />
+                            </button>
+                            <div class="px-1.5 sm:px-3 flex items-center border-x border-white/5">
+                                <span class="text-[9px] sm:text-[10px] font-black tracking-widest">{{ currentIndex + 1 }}<span class="opacity-50 mx-0.5">/</span>{{ casos.data.length }}</span>
+                            </div>
+                            <button @click="nextCaso" :disabled="currentIndex === casos.data.length - 1" class="p-1 sm:p-1.5 hover:bg-white/10 disabled:opacity-20 rounded-md transition-all active:scale-90" title="Siguiente">
+                                <ChevronDownIcon class="w-4 h-4 -rotate-90" />
+                            </button>
+                        </div>
+                        <button @click="closeQuickView" class="p-1.5 sm:p-2 hover:bg-white/10 rounded-lg transition-colors">
+                            <XMarkIcon class="w-5 h-5" />
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Cuerpo: Todos los detalles con Scroll Interno -->
+                <div class="flex-grow overflow-y-auto p-4 sm:p-8 custom-scrollbar space-y-8 sm:space-y-10 bg-gray-50/30 dark:bg-gray-900/50 w-full">
+                    
+                    <!-- 1. IDENTIFICACIÓN Y CONTACTO -->
+                    <section class="space-y-4">
+                        <div class="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-2">
+                            <UserIcon class="w-4 h-4 text-indigo-500" />
+                            <h3 class="text-[10px] sm:text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest">Partes Involucradas</h3>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                            <div class="space-y-3 min-w-0">
+                                <div class="group/item">
+                                    <p class="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Titular Principal</p>
+                                    <p class="text-sm font-black text-gray-900 dark:text-white group-hover/item:text-indigo-600 transition-colors break-words">{{ selectedCaso.deudor?.nombre_completo || 'No especificado' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Identificación</p>
+                                    <p class="text-xs font-bold text-gray-700 dark:text-gray-300">{{ selectedCaso.deudor?.numero_documento || 'Sin documento' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Cooperativa</p>
+                                    <p class="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded-md inline-block max-w-full truncate">{{ selectedCaso.cooperativa?.nombre || 'N/A' }}</p>
+                                </div>
+                            </div>
+                            <div class="space-y-3 pt-3 md:pt-0 border-t md:border-t-0 border-gray-100 dark:border-gray-700 min-w-0">
+                                <div>
+                                    <p class="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Celular / Teléfono</p>
+                                    <p class="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                        <PhoneIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                        {{ selectedCaso.deudor?.celular_1 || 'No registrado' }}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p class="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Correo Electrónico</p>
+                                    <p class="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2 truncate">
+                                        <EnvelopeIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                        {{ selectedCaso.deudor?.correo_1 || 'Sin correo' }}
+                                    </p>
+                                </div>
+                                <div v-if="selectedCaso.codeudores?.length">
+                                    <p class="text-[9px] font-bold text-gray-400 uppercase mb-1.5">Codeudores ({{ selectedCaso.codeudores.length }})</p>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        <span v-for="c in selectedCaso.codeudores" :key="c.id" class="text-[9px] font-black px-2 py-1 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg uppercase text-gray-600 dark:text-gray-400">
+                                            {{ c.nombre_completo.split(' ')[0] }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- 2. DETALLES JUDICIALES COMPLETOS -->
+                    <section class="space-y-4">
+                        <div class="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-2">
+                            <ScaleIcon class="w-4 h-4 text-indigo-500" />
+                            <h3 class="text-[10px] sm:text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest">Detalles del Proceso Judicial</h3>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 px-1">
+                            <div class="space-y-1 min-w-0">
+                                <p class="text-[9px] font-bold text-gray-400 uppercase">Radicado Judicial</p>
+                                <p class="text-xs font-black text-gray-800 dark:text-gray-200 flex items-center gap-2 break-all">
+                                    {{ selectedCaso.radicado || 'SIN CARGAR' }}
+                                    <button v-if="selectedCaso.radicado" @click="copyToClipboard(selectedCaso.radicado)" class="text-gray-400 hover:text-indigo-500 transition-colors shrink-0">
+                                        <DocumentDuplicateIcon class="w-3.5 h-3.5" />
+                                    </button>
+                                </p>
+                            </div>
+                            <div class="space-y-1">
+                                <p class="text-[9px] font-bold text-gray-400 uppercase">Estado / Etapa</p>
+                                <p class="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase break-words">{{ selectedCaso.etapa_procesal || selectedCaso.estado_proceso || 'N/A' }}</p>
+                            </div>
+                            <div class="space-y-1">
+                                <p class="text-[9px] font-bold text-gray-400 uppercase">Especialidad</p>
+                                <p class="text-xs font-black text-gray-800 dark:text-gray-200 uppercase">{{ selectedCaso.especialidad?.nombre || 'CIVIL' }}</p>
+                            </div>
+                            <div class="sm:col-span-2 lg:col-span-3 space-y-1 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
+                                <p class="text-[9px] font-bold text-gray-400 uppercase">Juzgado</p>
+                                <p class="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2 break-words">
+                                    <BuildingOfficeIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                    {{ selectedCaso.juzgado?.nombre || 'POR DEFINIR DESPACHO' }}
+                                </p>
+                            </div>
+                            <div class="space-y-1">
+                                <p class="text-[9px] font-bold text-gray-400 uppercase">Tipo Proceso</p>
+                                <p class="text-xs font-bold text-gray-800 dark:text-gray-200">{{ selectedCaso.tipo_proceso || 'N/A' }}</p>
+                            </div>
+                            <div class="space-y-1">
+                                <p class="text-[9px] font-bold text-gray-400 uppercase">Subproceso</p>
+                                <p class="text-xs font-bold text-gray-800 dark:text-gray-200">{{ selectedCaso.subproceso || 'N/A' }}</p>
+                            </div>
+                            <div class="space-y-1">
+                                <p class="text-[9px] font-bold text-gray-400 uppercase">Etapa Actual</p>
+                                <p class="text-xs font-bold text-gray-800 dark:text-gray-200">{{ selectedCaso.etapa_actual || 'N/A' }}</p>
+                            </div>
+                        </div>
+                        <div class="p-4 bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-[9px] font-bold text-amber-600 uppercase mb-0.5">Garantía Asociada</p>
+                                <p class="text-xs font-black text-amber-800 dark:text-amber-400">{{ selectedCaso.tipo_garantia_asociada || 'Sin garantía registrada' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[9px] font-bold text-amber-600 uppercase mb-0.5">Origen Documental</p>
+                                <p class="text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-tighter">{{ selectedCaso.origen_documental || 'N/A' }}</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- 3. RESUMEN FINANCIERO -->
+                    <section class="space-y-4">
+                        <div class="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-2">
+                            <BanknotesIcon class="w-4 h-4 text-indigo-500" />
+                            <h3 class="text-[10px] sm:text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest">Situación Económica</h3>
+                        </div>
+                        <div class="bg-gray-900 dark:bg-black p-5 sm:p-7 rounded-3xl text-white relative overflow-hidden shadow-xl w-full">
+                            <div class="absolute right-0 top-0 p-4 opacity-5 pointer-events-none">
+                                <BanknotesIcon class="w-32 h-32 rotate-12" />
+                            </div>
+                            <div class="relative z-10">
+                                <p class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400 mb-2">Deuda Pendiente Actual</p>
+                                <h4 class="text-xl sm:text-4xl font-black tracking-tight break-all">{{ formatCurrency(selectedCaso.monto_total - selectedCaso.monto_total_pagado) }}</h4>
+                                
+                                <div class="grid grid-cols-1 xs:grid-cols-2 gap-4 sm:gap-8 mt-8 border-t border-white/10 pt-5">
+                                    <div class="min-w-0">
+                                        <p class="text-[9px] font-black text-gray-500 uppercase tracking-wider mb-1">Obligación Base</p>
+                                        <p class="text-sm font-black text-gray-200 truncate">{{ formatCurrency(selectedCaso.monto_total) }}</p>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="text-[9px] font-black text-green-500 uppercase tracking-wider mb-1">Total Recaudado</p>
+                                        <p class="text-sm font-black text-green-400 truncate">{{ formatCurrency(selectedCaso.monto_total_pagado) }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-4 px-1 pt-2">
+                            <div class="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
+                                <p class="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Tasa Interés</p>
+                                <p class="text-xs font-black text-gray-800 dark:text-gray-200">{{ selectedCaso.tasa_interes_corriente || '0.00' }}%</p>
+                            </div>
+                            <div class="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
+                                <p class="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Apertura</p>
+                                <p class="text-xs font-black text-gray-800 dark:text-gray-200">{{ formatDate(selectedCaso.fecha_apertura) }}</p>
+                            </div>
+                            <div class="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
+                                <p class="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Vencimiento</p>
+                                <p class="text-xs font-black text-gray-800 dark:text-gray-200">{{ formatDate(selectedCaso.fecha_vencimiento) }}</p>
+                            </div>
+                            <div class="bg-red-50 dark:bg-red-900/10 p-3 rounded-xl border border-red-100 dark:border-red-900/20">
+                                <p class="text-[9px] font-black text-red-500 uppercase mb-0.5">Días en Mora</p>
+                                <p class="text-xs font-black text-red-600 dark:text-red-400">{{ selectedCaso.dias_en_mora || 0 }} días</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- 4. GESTIÓN Y NOTAS LEGALES -->
+                    <section class="space-y-4">
+                        <div class="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-2">
+                            <ClipboardDocumentListIcon class="w-4 h-4 text-indigo-500" />
+                            <h3 class="text-[10px] sm:text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest">Gestión Técnica</h3>
+                        </div>
+                        <div class="space-y-6 px-1">
+                            <div>
+                                <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Abogados Asignados</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <div v-for="u in selectedCaso.users" :key="u.id" class="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 text-[10px] font-black uppercase rounded-xl border border-indigo-100 dark:border-indigo-800">
+                                        <div class="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+                                        {{ u.name }}
+                                    </div>
+                                    <span v-if="!selectedCaso.users?.length" class="text-xs italic text-gray-400">Sin abogados asignados</span>
+                                </div>
+                            </div>
+                            
+                            <div v-if="selectedCaso.notas_legales">
+                                <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Observaciones de Proceso</p>
+                                <div class="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-indigo-500">
+                                    <p class="text-xs text-gray-600 dark:text-gray-400 italic leading-relaxed">{{ selectedCaso.notas_legales }}</p>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                                <a v-if="selectedCaso.link_drive" :href="selectedCaso.link_drive" target="_blank" class="flex items-center justify-center gap-2 p-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-200 dark:shadow-none active:scale-95">
+                                    <LinkIcon class="w-4 h-4" /> Carpeta Drive
+                                </a>
+                                <a v-if="selectedCaso.link_expediente" :href="selectedCaso.link_expediente" target="_blank" class="flex items-center justify-center gap-2 p-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-purple-200 dark:shadow-none active:scale-95">
+                                    <CloudArrowUpIcon class="w-4 h-4" /> Expediente Digital
+                                </a>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Footer: Acción de Ingreso Full (Fijo) -->
+                <div class="px-4 py-4 sm:px-8 sm:py-5 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.03)] relative z-10">
+                    <p class="text-[10px] font-bold text-gray-400 italic flex items-center gap-2">
+                        <ClockIcon class="w-3.5 h-3.5" /> 
+                        Última actualización: {{ formatDate(selectedCaso.updated_at) }} (hace {{ formatTimeAgo(selectedCaso.updated_at) }})
+                    </p>
+                    <Link :href="route('casos.show', selectedCaso.id)" class="w-full sm:w-auto px-8 py-3.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] transition-all hover:bg-black dark:hover:bg-gray-100 shadow-xl shadow-gray-200 dark:shadow-none active:scale-[0.98] text-center">
+                        Ver Expediente Completo &rarr;
+                    </Link>
                 </div>
             </div>
         </Modal>
+
     </AuthenticatedLayout>
 </template>
 

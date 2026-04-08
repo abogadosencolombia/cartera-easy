@@ -7,11 +7,20 @@ import {
     CheckBadgeIcon, 
     ExclamationTriangleIcon,
     ArrowTopRightOnSquareIcon,
-    CalculatorIcon
+    CalculatorIcon,
+    ShieldCheckIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
-    resumen_financiero: Object,
+    caso: Object,
+    resumen_financiero: {
+        type: Object,
+        default: () => ({
+            monto_total: 0,
+            total_pagado: 0,
+            saldo_pendiente: 0
+        })
+    },
     contrato_id: Number,
     formatCurrency: Function,
 });
@@ -27,7 +36,7 @@ const props = defineProps({
                     <CalculatorIcon class="w-24 h-24 text-gray-600" />
                 </div>
                 <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Total Obligación</p>
-                <p class="text-2xl font-black text-gray-900 dark:text-white">{{ formatCurrency(resumen_financiero.monto_total) }}</p>
+                <p class="text-2xl font-black text-gray-900 dark:text-white">{{ formatCurrency(resumen_financiero?.monto_total || 0) }}</p>
                 <p class="mt-2 text-[10px] text-gray-500 font-medium italic">Capital + Cargos acumulados</p>
             </div>
 
@@ -36,12 +45,17 @@ const props = defineProps({
                     <CheckBadgeIcon class="w-24 h-24 text-green-600" />
                 </div>
                 <p class="text-[10px] font-black text-green-600 dark:text-green-400 uppercase tracking-widest mb-2">Total Recaudado</p>
-                <p class="text-2xl font-black text-green-700 dark:text-green-300">{{ formatCurrency(resumen_financiero.total_pagado) }}</p>
+                <p class="text-2xl font-black text-green-700 dark:text-green-300">{{ formatCurrency(resumen_financiero?.total_pagado || 0) }}</p>
                 <div class="mt-2 flex items-center gap-1.5">
                     <div class="flex-1 h-1.5 bg-green-200 dark:bg-green-900 rounded-full overflow-hidden">
-                        <div class="h-full bg-green-500" :style="{ width: (resumen_financiero.total_pagado / resumen_financiero.monto_total * 100) + '%' }"></div>
+                        <div 
+                            class="h-full bg-green-500" 
+                            :style="{ width: (resumen_financiero?.monto_total > 0 ? (resumen_financiero.total_pagado / resumen_financiero.monto_total * 100) : 0) + '%' }"
+                        ></div>
                     </div>
-                    <span class="text-[10px] font-black text-green-600">{{ Math.round(resumen_financiero.total_pagado / resumen_financiero.monto_total * 100) }}%</span>
+                    <span class="text-[10px] font-black text-green-600">
+                        {{ resumen_financiero?.monto_total > 0 ? Math.round(resumen_financiero.total_pagado / resumen_financiero.monto_total * 100) : 0 }}%
+                    </span>
                 </div>
             </div>
 
@@ -50,7 +64,7 @@ const props = defineProps({
                     <ExclamationTriangleIcon class="w-24 h-24 text-red-600" />
                 </div>
                 <p class="text-[10px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest mb-2">Saldo en Riesgo</p>
-                <p class="text-2xl font-black text-red-700 dark:text-red-300">{{ formatCurrency(resumen_financiero.saldo_pendiente) }}</p>
+                <p class="text-2xl font-black text-red-700 dark:text-red-300">{{ formatCurrency(resumen_financiero?.saldo_pendiente || 0) }}</p>
                 <p class="mt-2 text-[10px] text-red-500 font-bold uppercase tracking-tighter">Pendiente por cobro judicial</p>
             </div>
         </div>
@@ -109,7 +123,7 @@ const props = defineProps({
                             No se ha detectado un contrato de honorarios vinculado a este proceso. Debe generarlo para iniciar el seguimiento financiero.
                         </p>
                         <Link
-                            :href="route('honorarios.contratos.create', { caso_id: $parent.props.caso.id, monto: resumen_financiero.saldo_pendiente })"
+                            :href="route('honorarios.contratos.create', { caso_id: caso?.id, monto: resumen_financiero?.saldo_pendiente || 0 })"
                             class="inline-flex items-center justify-center w-full px-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-xl"
                         >
                             Generar Contrato Ahora
