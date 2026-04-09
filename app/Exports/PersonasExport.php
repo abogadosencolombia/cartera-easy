@@ -102,9 +102,24 @@ class PersonasExport implements FromQuery, WithHeadings, WithMapping, ShouldAuto
         }
 
         // 6. Orden
-        $sort = $filters['sort'] ?? 'created_at';
+        $sort = $filters['sort'] ?? 'updated_at';
         $direction = $filters['direction'] ?? 'desc';
-        $query->orderBy($sort, $direction);
+
+        // Validar campos permitidos
+        $allowedSorts = ['updated_at', 'created_at', 'nombre_completo', 'id'];
+        if (!in_array($sort, $allowedSorts)) {
+            $sort = 'updated_at';
+        }
+
+        // Validar dirección
+        $direction = (strtolower($direction) === 'asc') ? 'asc' : 'desc';
+
+        $query->orderBy("personas.{$sort}", $direction);
+
+        // Si es por fecha, añadir ID para consistencia
+        if (in_array($sort, ['updated_at', 'created_at'])) {
+            $query->orderBy('personas.id', $direction);
+        }
 
         return $query;
     }

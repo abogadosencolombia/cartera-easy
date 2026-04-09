@@ -569,7 +569,41 @@ const caseStatus = computed(() => {
         </div>
 
         <Modal :show="confirmingCaseDeletion" @close="closeModal">
-...
+            <div class="p-6">
+                <div class="flex items-center gap-3 mb-4 text-red-600">
+                    <ExclamationTriangleIcon class="w-8 h-8" />
+                    <h2 class="text-xl font-black uppercase tracking-tight">
+                        ¿Confirmar Eliminación?
+                    </h2>
+                </div>
+
+                <p class="text-sm text-gray-600 dark:text-gray-400 font-medium leading-relaxed">
+                    ¿Estás seguro de que deseas eliminar este caso? Esta acción es irreversible y eliminará todos los registros asociados, incluyendo actuaciones, documentos y pagos.
+                </p>
+
+                <div v-if="caseToDelete" class="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Caso a eliminar:</p>
+                    <p class="text-sm font-bold text-gray-900 dark:text-white">
+                        {{ caseToDelete.deudor?.nombre_completo || 'Sin nombre' }}
+                    </p>
+                    <p class="text-xs text-gray-500">ID: #{{ caseToDelete.id }} | Radicado: {{ caseToDelete.radicado || 'Sin radicar' }}</p>
+                </div>
+
+                <div class="mt-8 flex justify-end gap-3">
+                    <SecondaryButton @click="closeModal" class="uppercase text-[10px] font-black tracking-widest">
+                        Cancelar
+                    </SecondaryButton>
+
+                    <DangerButton
+                        @click="deleteCase"
+                        :class="{ 'opacity-25': deleteForm.processing }"
+                        :disabled="deleteForm.processing"
+                        class="uppercase text-[10px] font-black tracking-widest"
+                    >
+                        Eliminar Caso Permanentemente
+                    </DangerButton>
+                </div>
+            </div>
         </Modal>
 
         <!-- MODAL DE VISTA RÁPIDA (V5: Ficha Optimizada y Responsiva) -->

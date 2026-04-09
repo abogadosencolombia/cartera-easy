@@ -28,25 +28,39 @@ const params = reactive({
   cooperativa_id: props.filters.cooperativa_id || '',
   abogado_id: props.filters.abogado_id || '',
   tipo_rol: props.filters.tipo_rol || '', // 'deudor', 'demandado'
-  sort: props.filters.sort || 'created_at',
+  sort: props.filters.sort || 'updated_at',
   direction: props.filters.direction || 'desc',
 });
 
 const sortOption = computed({
   get: () => `${params.sort}|${params.direction}`,
-  set: (val) => { const [field, dir] = val.split('|'); params.sort = field; params.direction = dir; }
+  set: (val) => { 
+    const [field, dir] = val.split('|'); 
+    params.sort = field; 
+    params.direction = dir; 
+  }
 });
 
 const isDirty = computed(() => {
-    return params.search !== '' || params.cooperativa_id !== '' || params.abogado_id !== '' || params.tipo_rol !== '' || params.status !== 'active';
+    return params.search !== '' || params.cooperativa_id !== '' || params.abogado_id !== '' || params.tipo_rol !== '' || params.status !== 'active' || params.sort !== 'updated_at' || params.direction !== 'desc';
 });
 
 watch(params, debounce(() => {
-  router.get(route('personas.index'), params, { preserveState: true, preserveScroll: true, replace: true });
+  // Limpiar el parámetro de página al cambiar cualquier filtro para volver a la pág 1
+  const searchParams = { ...params };
+  router.get(route('personas.index'), searchParams, { preserveState: true, preserveScroll: true, replace: true });
 }, 300));
 
 const clearAllFilters = () => {
-  Object.assign(params, { search: '', cooperativa_id: '', abogado_id: '', tipo_rol: '', status: 'active', sort: 'created_at', direction: 'desc' });
+  Object.assign(params, { 
+    search: '', 
+    cooperativa_id: '', 
+    abogado_id: '', 
+    tipo_rol: '', 
+    status: 'active', 
+    sort: 'updated_at', 
+    direction: 'desc' 
+  });
 };
 
 const exportExcel = () => {
@@ -169,7 +183,7 @@ const copyToClipboard = (text) => {
                     <div>
                         <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1 ml-1">Orden</label>
                         <select v-model="sortOption" class="w-full rounded-xl border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs font-bold uppercase tracking-tight py-2.5">
-                            <option value="created_at|desc">Más Recientes</option>
+                            <option value="updated_at|desc">Más Recientes</option>
                             <option value="nombre_completo|asc">A - Z</option>
                         </select>
                     </div>

@@ -78,9 +78,25 @@ class PersonaController extends Controller
         });
 
         // --- 6. Ordenamiento ---
-        $sort = $request->input('sort', 'created_at');
+        $sort = $request->input('sort', 'updated_at');
         $direction = $request->input('direction', 'desc');
-        $query->orderBy($sort, $direction);
+
+        // Validar campos permitidos para evitar inyección o errores
+        $allowedSorts = ['updated_at', 'created_at', 'nombre_completo', 'id'];
+        if (!in_array($sort, $allowedSorts)) {
+            $sort = 'updated_at';
+        }
+
+        // Validar dirección
+        $direction = (strtolower($direction) === 'asc') ? 'asc' : 'desc';
+
+        // Aplicar ordenamiento explícito
+        $query->orderBy("personas.{$sort}", $direction);
+
+        // Si el orden es por fecha, añadir ID como desempate para consistencia total
+        if (in_array($sort, ['updated_at', 'created_at'])) {
+            $query->orderBy('personas.id', $direction);
+        }
 
         return Inertia::render('Personas/Index', [
             'personas' => $query->paginate(15)->withQueryString(),
