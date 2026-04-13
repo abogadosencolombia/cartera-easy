@@ -49,9 +49,20 @@ class ProcesoRadicadoController extends Controller
             $query->whereHas('juzgado', fn($q) => $q->where('nombre', 'ilike', "%{$tipo}%"));
         }
 
+        // --- Estadísticas para los KPI Cards ---
+        $statsQuery = (clone $query)->reorder();
+        $stats = [
+            'total' => (clone $statsQuery)->count(),
+            'sin_radicado' => (clone $statsQuery)->where(fn($q) => $q->whereNull('radicado')->orWhere('radicado', ''))->count(),
+            'vencidos' => (clone $statsQuery)->where('fecha_proxima_revision', '<', now()->toDateString())->where('estado', 'ACTIVO')->count(),
+            'revisar_hoy' => (clone $statsQuery)->where('fecha_proxima_revision', now()->toDateString())->where('estado', 'ACTIVO')->count(),
+        ];
+
         return Inertia::render('Radicados/Index', [
-            'procesos' => $query->latest('updated_at')->paginate(15)->withQueryString(),
+            'procesos' => $query->orderBy('is_pinned', 'desc')->latest('updated_at')->paginate(15)->withQueryString(),
             'filtros'  => $request->all(),
+            'juzgados' => Juzgado::select('id', 'nombre')->orderBy('nombre')->get(),
+            'stats'    => $stats,
         ]);
     }
 
@@ -59,6 +70,43 @@ class ProcesoRadicadoController extends Controller
     {
         $fecha = date('Y-m-d_H-i');
         return Excel::download(new ProcesosExport($request->all()), "Export_Radicados_{$fecha}.xlsx");
+    }
+
+    public function togglePin(ProcesoRadicado $proceso)
+    {
+        $this->authorize('update', $proceso);
+        $proceso->update(['is_pinned' => !$proceso->is_pinned]);
+        
+        return back()->with('success', $proceso->is_pinned ? 'Proceso fijado correctamente.' : 'Proceso desfijado.');
+    }
+
+    public function quickReview(ProcesoRadicado $proceso)
+    {
+        $this->authorize('update', $proceso);
+        
+        // Actualizamos fecha de revisión hoy y sumamos 15 días para la próxima
+        $proceso->update([
+            'fecha_revision' => now(),
+            'fecha_proxima_revision' => now()->addDays(15)
+        ]);
+
+        // Registro en Auditoría
+        $proceso->auditoria()->create([
+            'user_id' => Auth::id(),
+            'evento' => 'REVISIÓN_RÁPIDA',
+            'descripcion_breve' => 'El abogado marcó el proceso como revisado mediante acción rápida. Próxima revisión en 15 días.',
+            'criticidad' => 'baja',
+            'direccion_ip' => request()->ip()
+        ]);
+
+        return back()->with('success', 'Expediente marcado como revisado. Próxima revisión en 15 días.');
+    }
+
+    public function updateChecklist(Request $request, ProcesoRadicado $proceso)
+    {
+        $this->authorize('update', $proceso);
+        $proceso->update(['checklist_seguimiento' => $request->input('checklist', [])]);
+        return back()->with('success', 'Checklist actualizado.');
     }
 
     public function downloadTemplate()
@@ -267,12 +315,140 @@ class ProcesoRadicadoController extends Controller
             ->syncWithPivotValues($ids, ['tipo' => $tipo], false);
     }
 
-    public function create(): Response { $this->authorize('create', ProcesoRadicado::class); return Inertia::render('Radicados/Create', ['etapas' => EtapaProcesal::orderBy('orden')->get(['id', 'nombre'])]); }
-    public function store(StoreProcesoRadicadoRequest $request) { $this->authorize('create', ProcesoRadicado::class); $data = $request->validated(); $data['created_by'] = Auth::id(); $data['fecha_cambio_etapa'] = now(); $proceso = ProcesoRadicado::create($data); return to_route('procesos.show', $proceso->id)->with('success', 'Radicado creado.'); }
-    public function show(ProcesoRadicado $proceso): Response { $this->authorize('view', $proceso); $proceso->load(['abogado', 'responsableRevision', 'juzgado', 'tipoProceso', 'demandantes', 'demandados', 'etapaActual', 'actuaciones.user', 'documentos']); return Inertia::render('Radicados/Show', ['proceso' => $proceso, 'etapas' => EtapaProcesal::orderBy('orden')->get(['id', 'nombre'])]); }
+    public function create(): Response 
+    { 
+        $this->authorize('create', ProcesoRadicado::class); 
+        return Inertia::render('Radicados/Create', [
+            'etapas' => EtapaProcesal::orderBy('orden')->get(['id', 'nombre'])
+        ]); 
+    }
+
+    public function store(StoreProcesoRadicadoRequest $request) 
+    { 
+        $this->authorize('create', ProcesoRadicado::class); 
+        
+        return DB::transaction(function() use ($request) {
+            $data = $request->validated(); 
+            $data['created_by'] = Auth::id(); 
+            $data['fecha_cambio_etapa'] = now(); 
+            
+            $proceso = ProcesoRadicado::create($data); 
+            
+            $this->syncPersonasFrontend($proceso, $request->input('demandantes', []), $request->input('demandados', []));
+            
+            return to_route('procesos.show', $proceso->id)->with('success', 'Radicado creado correctamente.'); 
+        });
+    }
+
+    public function show(ProcesoRadicado $proceso): Response 
+    { 
+        $this->authorize('view', $proceso); 
+        $proceso->load(['abogado', 'responsableRevision', 'juzgado', 'tipoProceso', 'demandantes', 'demandados', 'etapaActual', 'actuaciones.user', 'documentos']); 
+        
+        return Inertia::render('Radicados/Show', [
+            'proceso' => $proceso, 
+            'etapas' => EtapaProcesal::orderBy('orden')->get(['id', 'nombre']),
+            'auditoria' => $proceso->auditoria()->with('usuario:id,name')->latest()->take(50)->get(),
+        ]); 
+    }
     public function edit(ProcesoRadicado $proceso): Response { $this->authorize('update', $proceso); $proceso->load(['demandantes', 'demandados', 'abogado', 'responsableRevision', 'juzgado', 'tipoProceso']); return Inertia::render('Radicados/Edit', ['proceso' => $proceso, 'etapas' => EtapaProcesal::orderBy('orden')->get(['id', 'nombre'])]); }
-    public function update(UpdateProcesoRadicadoRequest $request, ProcesoRadicado $proceso) { $this->authorize('update', $proceso); $proceso->update($request->validated()); return to_route('procesos.show', $proceso->id)->with('success', 'Actualizado.'); }
-    public function destroy(ProcesoRadicado $proceso) { $this->authorize('delete', $proceso); $proceso->delete(); return to_route('procesos.index')->with('success', 'Eliminado.'); }
+    
+    public function update(UpdateProcesoRadicadoRequest $request, ProcesoRadicado $proceso) 
+    { 
+        $this->authorize('update', $proceso); 
+        
+        return DB::transaction(function() use ($request, $proceso) {
+            $proceso->update($request->validated()); 
+            
+            $this->syncPersonasFrontend($proceso, $request->input('demandantes', []), $request->input('demandados', []));
+            
+            return to_route('procesos.show', $proceso->id)->with('success', 'Radicado actualizado correctamente.'); 
+        });
+    }
+
+    /**
+     * Sincroniza las personas (demandantes y demandados) enviadas desde el frontend.
+     */
+    private function syncPersonasFrontend(ProcesoRadicado $proceso, array $demandantes, array $demandados)
+    {
+        $syncData = [];
+        
+        // 1. Procesar Demandantes
+        foreach ($demandantes as $d) {
+            $personaId = $d['id'] ?? ($d['selected']['id'] ?? null);
+            
+            if (!empty($d['is_new'])) {
+                // Si es nuevo o estamos editando uno incompleto sin ID aún
+                $persona = Persona::withTrashed()->updateOrCreate(
+                    ['id' => $personaId],
+                    [
+                        'nombre_completo' => $d['nombre_completo'],
+                        'tipo_documento' => $d['tipo_documento'] ?? 'CC',
+                        'numero_documento' => $d['numero_documento'],
+                        'dv' => $d['dv'] ?? null,
+                        'deleted_at' => null
+                    ]
+                );
+                if (!empty($d['cooperativas_ids'])) $persona->cooperativas()->sync($d['cooperativas_ids']);
+                if (!empty($d['abogados_ids'])) $persona->abogados()->sync($d['abogados_ids']);
+                $personaId = $persona->id;
+            }
+
+            if ($personaId) $syncData[$personaId] = ['tipo' => 'DEMANDANTE'];
+        }
+        
+        // 2. Procesar Demandados
+        foreach ($demandados as $d) {
+            $personaId = $d['id'] ?? ($d['selected']['id'] ?? null);
+
+            if (!empty($d['is_new'])) {
+                $numDoc = $d['numero_documento'] ?? null;
+                if (!empty($d['sin_info']) && empty($numDoc)) {
+                    $numDoc = 'TEMP-' . substr(md5(uniqid()), 0, 12);
+                }
+                
+                $persona = Persona::withTrashed()->updateOrCreate(
+                    ['id' => $personaId],
+                    [
+                        'nombre_completo' => $d['nombre_completo'],
+                        'tipo_documento' => $d['tipo_documento'] ?? 'CC',
+                        'numero_documento' => $numDoc,
+                        'dv' => $d['dv'] ?? null,
+                        'deleted_at' => null
+                    ]
+                );
+                if (!empty($d['cooperativas_ids'])) $persona->cooperativas()->sync($d['cooperativas_ids']);
+                if (!empty($d['abogados_ids'])) $persona->abogados()->sync($d['abogados_ids']);
+                $personaId = $persona->id;
+            }
+
+            if ($personaId) $syncData[$personaId] = ['tipo' => 'DEMANDADO'];
+        }
+        
+        $proceso->personas()->sync($syncData);
+    }
+    
+    public function destroy(ProcesoRadicado $proceso) 
+    { 
+        $this->authorize('delete', $proceso); 
+        
+        $radicado = $proceso->radicado ?: "ID #{$proceso->id}";
+        
+        AuditoriaEvento::create([
+            'user_id' => Auth::id(),
+            'evento' => 'SUSPENDER_RADICADO',
+            'descripcion_breve' => "Proceso judicial suspendido (movido a papelera): {$radicado}",
+            'auditable_id' => $proceso->id,
+            'auditable_type' => ProcesoRadicado::class,
+            'criticidad' => 'alta',
+            'direccion_ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        $proceso->delete(); 
+        return to_route('procesos.index')->with('success', 'El proceso ha sido suspendido y movido a la papelera.'); 
+    }
+
     public function close(Request $request, ProcesoRadicado $proceso) { $proceso->update(['estado' => 'CERRADO', 'nota_cierre' => $request->nota_cierre]); return back()->with('success', 'Cerrado.'); }
     public function reopen(ProcesoRadicado $proceso) { $proceso->update(['estado' => 'ACTIVO', 'nota_cierre' => null]); return back()->with('success', 'Reabierto.'); }
 }

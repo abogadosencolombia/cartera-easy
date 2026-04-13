@@ -23,7 +23,8 @@ class StorePersonaRequest extends FormRequest
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('personas', 'numero_documento')->whereNull('deleted_at')
+                // Eliminamos Rule::unique porque el PersonaController usa updateOrCreate(withTrashed())
+                // Si pusiéramos unique aquí, fallaría antes de llegar al controlador si la persona está en la papelera.
             ],
             'dv'                 => 'nullable|string|max:1',
 

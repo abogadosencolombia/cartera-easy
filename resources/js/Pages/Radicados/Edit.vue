@@ -13,6 +13,7 @@ import Textarea from '@/Components/Textarea.vue';
 import AsyncSelect from '@/Components/AsyncSelect.vue';
 import Modal from '@/Components/Modal.vue';
 import Dropdown from '@/Components/Dropdown.vue';
+import { formatRadicado, addDaysToDate, addMonthsToDate, toUpperCase, calculateDV } from '@/Utils/formatters';
 import { PlusIcon, TrashIcon, ChevronDownIcon, CalendarDaysIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -26,6 +27,20 @@ const filteredEtapas = computed(() => {
         e.nombre.toLowerCase().includes(searchEtapa.value.toLowerCase())
     );
 });
+
+const handleRadicadoInput = (e) => {
+    const formatted = formatRadicado(e.target.value);
+    form.radicado = formatted;
+    e.target.value = formatted;
+};
+
+const addDays = (field, days) => {
+    form[field] = addDaysToDate(form[field], days);
+};
+
+const addMonths = (field, months) => {
+    form[field] = addMonthsToDate(form[field], months);
+};
 
 // --- LÓGICA DE COMPROMISO DE REVISIÓN (OBLIGATORIO) ---
 const showCommitmentModal = ref(false);
@@ -107,6 +122,23 @@ const form = useForm(`EditRadicado:${props.proceso.id}`, {
   correos_juzgado: props.proceso.correos_juzgado ?? '',
   observaciones: props.proceso.observaciones ?? '',
 });
+
+// --- AUTO-FORMATO ---
+watch(() => form.demandantes, (newVal) => {
+    newVal.forEach(d => {
+        if (d.is_new && d.tipo_documento === 'NIT' && d.numero_documento) {
+            d.dv = calculateDV(d.numero_documento).toString();
+        }
+    });
+}, { deep: true });
+
+watch(() => form.demandados, (newVal) => {
+    newVal.forEach(d => {
+        if (d.is_new && d.tipo_documento === 'NIT' && d.numero_documento) {
+            d.dv = calculateDV(d.numero_documento).toString();
+        }
+    });
+}, { deep: true });
 
 const addDemandante = () => form.demandantes.push({ 
     id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', sin_info: false, cooperativas_ids: [], abogados_ids: []
@@ -212,6 +244,7 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                                 <PlusIcon class="w-3 h-3 mr-1"/> Agregar otro
                             </button>
                         </div>
+                        <InputError :message="form.errors.demandantes" />
                         <div v-for="(item, index) in form.demandantes" :key="index" class="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50/50 dark:bg-gray-900/20 space-y-3 relative group">
                             <div class="flex justify-between items-center mb-1">
                                 <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Demandante #{{ index + 1 }}</span>
@@ -228,7 +261,8 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                                 <AsyncSelect v-model="item.selected" :endpoint="route('personas.search')" placeholder="Buscar persona..." label-key="nombre_completo" />
                             </div>
                             <div v-else class="space-y-3 animate-in fade-in slide-in-from-top-1">
-                                <TextInput v-model="item.nombre_completo" placeholder="Nombre Completo *" class="text-sm w-full" />
+                                <TextInput v-model="item.nombre_completo" @blur="item.nombre_completo = toUpperCase(item.nombre_completo)" placeholder="Nombre Completo *" class="text-sm w-full" />
+                                <InputError :message="form.errors[`demandantes.${index}.nombre_completo`]" />
                                 <div class="grid grid-cols-3 gap-2 items-end">
                                     <select v-model="item.tipo_documento" class="text-sm rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm h-[42px]">
                                         <option>CC</option>
@@ -243,6 +277,7 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                                         </div>
                                     </div>
                                 </div>
+                                <InputError :message="form.errors[`demandantes.${index}.numero_documento`]" />
                                 <div class="space-y-2">
                                     <AsyncSelect v-model="item.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Asignar empresas..." multiple label-key="nombre" />
                                     <AsyncSelect v-model="item.abogados_ids" :endpoint="route('users.search')" placeholder="Asignar abogados..." multiple label-key="name" />
@@ -258,6 +293,7 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                                 <PlusIcon class="w-3 h-3 mr-1"/> Agregar otro
                             </button>
                         </div>
+                        <InputError :message="form.errors.demandados" />
                         <div v-for="(item, index) in form.demandados" :key="index" class="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50/50 dark:bg-gray-900/20 space-y-3 relative group">
                             <div class="flex justify-between items-center mb-1">
                                 <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Demandado #{{ index + 1 }}</span>
@@ -278,7 +314,8 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                                     <input type="checkbox" v-model="item.sin_info" class="rounded border-gray-300 text-indigo-600 shadow-sm" />
                                     <span class="text-[10px] font-bold text-amber-600 uppercase">Sin info completa</span>
                                 </label>
-                                <TextInput v-model="item.nombre_completo" placeholder="Nombre Completo *" class="text-sm w-full" />
+                                <TextInput v-model="item.nombre_completo" @blur="item.nombre_completo = toUpperCase(item.nombre_completo)" placeholder="Nombre Completo *" class="text-sm w-full" />
+                                <InputError :message="form.errors[`demandados.${index}.nombre_completo`]" />
                                 <div v-if="!item.sin_info" class="grid grid-cols-3 gap-2 items-end">
                                     <select v-model="item.tipo_documento" class="text-sm rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm h-[42px]">
                                         <option>CC</option>
@@ -293,6 +330,7 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                                         </div>
                                     </div>
                                 </div>
+                                <InputError :message="form.errors[`demandados.${index}.numero_documento`]" />
                                 <div class="space-y-2">
                                     <AsyncSelect v-model="item.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Asignar empresas..." multiple label-key="nombre" />
                                     <AsyncSelect v-model="item.abogados_ids" :endpoint="route('users.search')" placeholder="Asignar abogados..." multiple label-key="name" />
@@ -301,10 +339,22 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                         </div>
                   </div>
 
-                  <div class="md:col-span-2"><InputLabel value="Asunto" /><Textarea v-model="form.asunto" rows="2" class="mt-1 block w-full" /></div>
-                  <div class="md:col-span-2"><InputLabel value="Juzgado / Entidad" /><AsyncSelect v-model="form.juzgado_id" :endpoint="route('juzgados.search')" placeholder="Buscar juzgado..." label-key="nombre" /></div>
+                  <div class="md:col-span-2">
+                      <InputLabel value="Asunto" />
+                      <Textarea v-model="form.asunto" rows="2" class="mt-1 block w-full" />
+                      <InputError :message="form.errors.asunto" />
+                  </div>
+                  <div class="md:col-span-2">
+                      <InputLabel value="Juzgado / Entidad" />
+                      <AsyncSelect v-model="form.juzgado_id" :endpoint="route('juzgados.search')" placeholder="Buscar juzgado..." label-key="nombre" />
+                      <InputError :message="form.errors.juzgado_id" />
+                  </div>
                   
-                  <div><InputLabel value="Tipo de Proceso" /><AsyncSelect v-model="form.tipo_proceso_id" :endpoint="route('tipos-proceso.search')" placeholder="Buscar tipo..." label-key="nombre" /></div>
+                  <div>
+                      <InputLabel value="Tipo de Proceso" />
+                      <AsyncSelect v-model="form.tipo_proceso_id" :endpoint="route('tipos-proceso.search')" placeholder="Buscar tipo..." label-key="nombre" />
+                      <InputError :message="form.errors.tipo_proceso_id" />
+                  </div>
                   
                   <div>
                       <InputLabel value="Etapa Procesal" />
@@ -322,10 +372,11 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                               </div>
                           </template>
                       </Dropdown>
+                      <InputError :message="form.errors.etapa_procesal_id" />
                   </div>
 
-                  <div><InputLabel value="Naturaleza" /><TextInput v-model="form.naturaleza" class="mt-1 block w-full" /></div>
-                  <div class="md:col-span-2"><InputLabel value="Observaciones" /><Textarea v-model="form.observaciones" rows="4" class="mt-1 block w-full" /></div>
+                  <div><InputLabel value="Naturaleza" /><TextInput v-model="form.naturaleza" class="mt-1 block w-full" /><InputError :message="form.errors.naturaleza" /></div>
+                  <div class="md:col-span-2"><InputLabel value="Observaciones" /><Textarea v-model="form.observaciones" rows="4" class="mt-1 block w-full" /><InputError :message="form.errors.observaciones" /></div>
                 </div>
               </div>
             </fieldset>
@@ -337,14 +388,23 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                 <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg p-6 border border-gray-200 dark:border-gray-700">
                   <h3 class="text-lg font-bold mb-4">Seguimiento y Fechas</h3>
                   <div class="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-6">
-                      <div><InputLabel value="Radicado" /><TextInput v-model="form.radicado" class="mt-1 block w-full" /></div>
-                      <div><InputLabel value="Fecha de Radicado" /><DatePicker v-model="form.fecha_radicado" class="mt-1 block w-full" /></div>
+                      <div>
+                          <InputLabel value="Radicado" />
+                          <TextInput 
+                              v-model="form.radicado" 
+                              @input="handleRadicadoInput"
+                              class="mt-1 block w-full font-mono" 
+                              placeholder="XXXXX-XX-XX-XXX-XXXX-XXXXX-XX"
+                          />
+                          <InputError :message="form.errors.radicado" />
+                      </div>
+                      <div><InputLabel value="Fecha de Radicado" /><DatePicker v-model="form.fecha_radicado" class="mt-1 block w-full" /><InputError :message="form.errors.fecha_radicado" /></div>
                       <div><InputLabel value="Abogado / Gestor" /><AsyncSelect v-model="form.abogado_id" :endpoint="route('users.search')" placeholder="Asignar gestor..." label-key="name" /></div>
                       <div><InputLabel value="Responsable de Revisión" /><AsyncSelect v-model="form.responsable_revision_id" :endpoint="route('users.search')" placeholder="Asignar responsable..." label-key="name" /></div>
-                      <div><InputLabel value="Correo Radicación" /><TextInput v-model="form.correo_radicacion" type="email" class="mt-1 block w-full" /></div>
-                      <div><InputLabel value="Correo(s) del Juzgado" /><TextInput v-model="form.correos_juzgado" class="mt-1 block w-full" placeholder="correo1@juzgado.com, correo2@..." /></div>
-                      <div><InputLabel value="Link Expediente" /><TextInput v-model="form.link_expediente" type="url" class="mt-1 block w-full" /></div>
-                      <div><InputLabel value="Ubicación Drive" /><TextInput v-model="form.ubicacion_drive" type="url" class="mt-1 block w-full" /></div>
+                      <div><InputLabel value="Correo Radicación" /><TextInput v-model="form.correo_radicacion" type="email" class="mt-1 block w-full" /><InputError :message="form.errors.correo_radicacion" /></div>
+                      <div><InputLabel value="Correo(s) del Juzgado" /><TextInput v-model="form.correos_juzgado" class="mt-1 block w-full" placeholder="correo1@juzgado.com, correo2@..." /><InputError :message="form.errors.correos_juzgado" /></div>
+                      <div><InputLabel value="Link Expediente" /><TextInput v-model="form.link_expediente" type="url" class="mt-1 block w-full" /><InputError :message="form.errors.link_expediente" /></div>
+                      <div><InputLabel value="Ubicación Drive" /><TextInput v-model="form.ubicacion_drive" type="url" class="mt-1 block w-full" /><InputError :message="form.errors.ubicacion_drive" /></div>
                   </div>
                 </div>
               </div>
@@ -381,6 +441,12 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                         class="mt-1 block w-full" 
                         required 
                     />
+                    <div class="mt-2 flex gap-1">
+                        <button type="button" @click="globalRevisionDate = addDaysToDate(globalRevisionDate, 3)" class="text-[9px] bg-white dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+3d</button>
+                        <button type="button" @click="globalRevisionDate = addDaysToDate(globalRevisionDate, 5)" class="text-[9px] bg-white dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+5d</button>
+                        <button type="button" @click="globalRevisionDate = addDaysToDate(globalRevisionDate, 10)" class="text-[9px] bg-white dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+10d</button>
+                        <button type="button" @click="globalRevisionDate = addMonthsToDate(globalRevisionDate, 1)" class="text-[9px] bg-white dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+1m</button>
+                    </div>
                 </div>
                 
                 <div class="flex flex-col gap-2 pt-4">

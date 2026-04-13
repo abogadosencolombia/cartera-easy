@@ -16,6 +16,7 @@ import SearchableSelect from '@/Components/SearchableSelect.vue';
 import { Head, Link, useForm, usePage, useRemember, router } from '@inertiajs/vue3';
 import { ref, computed, watch, onMounted } from 'vue';
 import axios from 'axios';
+import { formatRadicado, addDaysToDate, addMonthsToDate, toUpperCase, calculateDV } from '@/Utils/formatters';
 import { 
     TrashIcon, InformationCircleIcon, ScaleIcon, UsersIcon, LockClosedIcon, 
     PlusIcon, ChevronUpIcon, ChevronDownIcon, ArchiveBoxXMarkIcon, ArrowPathIcon,
@@ -106,10 +107,31 @@ const form = useForm(`EditCaso:${props.caso.id}`, {
     link_expediente: props.caso.link_expediente || '',
 });
 
+// --- AUTO-FORMATO ---
+watch(() => form.deudor.numero_documento, (newVal) => {
+    if (form.deudor.is_new && form.deudor.tipo_documento === 'NIT' && newVal) {
+        form.deudor.dv = calculateDV(newVal).toString();
+    }
+});
+
 const addCodeudor = () => { form.codeudores.push({ id: null, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', celular: '', correo: '', addresses: [], social_links: [], showDetails: true }); activeTab.value = 'codeudores'; };
 const removeCodeudor = (idx) => form.codeudores.splice(idx, 1);
 const addAddress = (idx) => form.codeudores[idx].addresses.push({ label: 'Casa', address: '', city: '' });
 const removeAddress = (idx, addrIdx) => form.codeudores[idx].addresses.splice(addrIdx, 1);
+
+const handleRadicadoInput = (e) => {
+    const formatted = formatRadicado(e.target.value);
+    form.radicado = formatted;
+    e.target.value = formatted;
+};
+
+const addDays = (field, days) => {
+    form[field] = addDaysToDate(form[field], days);
+};
+
+const addMonths = (field, months) => {
+    form[field] = addMonthsToDate(form[field], months);
+};
 
 // --- CASCADA ---
 const formatLabel = (text) => text?.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) || '';
@@ -224,7 +246,7 @@ const submit = () => {
                                         </div>
                                         <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg dark:border-gray-700">
                                             <div>
-                                                <TextInput v-model="form.deudor.nombre_completo" placeholder="Nombre completo" class="w-full" />
+                                                <TextInput v-model="form.deudor.nombre_completo" @blur="form.deudor.nombre_completo = toUpperCase(form.deudor.nombre_completo)" placeholder="Nombre completo" class="w-full" />
                                                 <InputError :message="form.errors['deudor.nombre_completo']" />
                                             </div>
                                             <div>
@@ -264,8 +286,25 @@ const submit = () => {
                                     <div><InputLabel value="Monto Deuda Actual" /><TextInput v-model="form.monto_deuda_actual" type="number" step="0.01" class="w-full" /><InputError :message="form.errors.monto_deuda_actual" /></div>
                                     <div><InputLabel value="Total Pagado" /><TextInput v-model="form.monto_total_pagado" type="number" step="0.01" class="w-full" /><InputError :message="form.errors.monto_total_pagado" /></div>
                                     <div><InputLabel value="Tasa Interés Corriente *" /><TextInput v-model="form.tasa_interes_corriente" type="number" step="0.01" class="w-full" /><InputError :message="form.errors.tasa_interes_corriente" /></div>
-                                    <div><InputLabel value="Fecha de Demanda *" /><DatePicker v-model="form.fecha_apertura" class="w-full" /><InputError :message="form.errors.fecha_apertura" /></div>
-                                    <div><InputLabel value="Fecha Vencimiento" /><DatePicker v-model="form.fecha_vencimiento" class="w-full" /><InputError :message="form.errors.fecha_vencimiento" /></div>
+                                    <div>
+                                        <InputLabel value="Fecha de Demanda *" />
+                                        <DatePicker v-model="form.fecha_apertura" class="w-full" />
+                                        <div class="mt-1 flex gap-1">
+                                            <button type="button" @click="addDays('fecha_apertura', 3)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+3d</button>
+                                            <button type="button" @click="addDays('fecha_apertura', 5)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+5d</button>
+                                            <button type="button" @click="addMonths('fecha_apertura', 1)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+1m</button>
+                                        </div>
+                                        <InputError :message="form.errors.fecha_apertura" />
+                                    </div>
+                                    <div>
+                                        <InputLabel value="Fecha Vencimiento" />
+                                        <DatePicker v-model="form.fecha_vencimiento" class="w-full" />
+                                        <div class="mt-1 flex gap-1">
+                                            <button type="button" @click="addMonths('fecha_vencimiento', 6)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+6m</button>
+                                            <button type="button" @click="addMonths('fecha_vencimiento', 12)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+1a</button>
+                                        </div>
+                                        <InputError :message="form.errors.fecha_vencimiento" />
+                                    </div>
                                     <div><InputLabel value="Fecha Inicio Crédito" /><DatePicker v-model="form.fecha_inicio_credito" class="w-full" /><InputError :message="form.errors.fecha_inicio_credito" /></div>
                                 </div>
                             </section>
@@ -273,7 +312,16 @@ const submit = () => {
                             <!-- TAB 2 -->
                             <section v-show="activeTab === 'proceso-judicial'" class="space-y-8">
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div><InputLabel value="Radicado" /><TextInput v-model="form.radicado" class="w-full" /><InputError :message="form.errors.radicado" /></div>
+                                    <div>
+                                        <InputLabel value="Radicado" />
+                                        <TextInput 
+                                            v-model="form.radicado" 
+                                            @input="handleRadicadoInput"
+                                            class="w-full font-mono" 
+                                            placeholder="XXXXX-XX-XX-XXX-XXXX-XXXXX-XX"
+                                        />
+                                        <InputError :message="form.errors.radicado" />
+                                    </div>
                                     <div><InputLabel value="Juzgado" /><AsyncSelect v-model="form.juzgado_id" :endpoint="route('juzgados.search')" label-key="nombre" /><InputError :message="form.errors.juzgado_id" /></div>
                                     <div>
                                         <InputLabel value="Especialidad *" />
@@ -353,7 +401,7 @@ const submit = () => {
                                 <div v-for="(c, i) in form.codeudores" :key="i" class="p-6 border rounded-lg dark:border-gray-700 bg-gray-50/20 relative">
                                     <button @click="removeCodeudor(i)" class="absolute top-4 right-4 text-red-500 hover:text-red-700"><TrashIcon class="h-5 w-5"/></button>
                                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div class="md:col-span-1"><InputLabel value="Nombre Completo *" /><TextInput v-model="c.nombre_completo" class="mt-1 block w-full" required/><InputError :message="form.errors[`codeudores.${i}.nombre_completo`]" /></div>
+                                        <div class="md:col-span-1"><InputLabel value="Nombre Completo *" /><TextInput v-model="c.nombre_completo" @blur="c.nombre_completo = toUpperCase(c.nombre_completo)" class="mt-1 block w-full" required/><InputError :message="form.errors[`codeudores.${i}.nombre_completo`]" /></div>
                                         <div><InputLabel value="Tipo Documento" /><select v-model="c.tipo_documento" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option value="CC">Cédula de Ciudadanía</option><option value="NIT">NIT</option><option value="CE">Cédula de Extranjería</option></select></div>
                                         <div>
                                             <InputLabel value="Número Documento *" />

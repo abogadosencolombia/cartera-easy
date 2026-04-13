@@ -43,9 +43,6 @@ class User extends Authenticatable
         'remember_token',
     ];
     
-    // --- PROTECCIÓN EXTRA: FECHAS ---
-    protected $dates = ['deleted_at'];
-
     /**
      * The accessors to append to the model's array form.
      */

@@ -14,13 +14,35 @@ import DateTimePicker from '@/Components/DateTimePicker.vue';
 import DatePicker from '@/Components/DatePicker.vue';
 import Textarea from '@/Components/Textarea.vue';
 import Dropdown from '@/Components/Dropdown.vue';
+import GuiaEtapa from '@/Components/GuiaEtapa.vue';
+import HistorialAuditoria from '@/Components/HistorialAuditoria.vue';
 import { useProcesos } from '@/composables/useProcesos';
-import { ArrowPathIcon, ChevronDownIcon, BellIcon, CalendarDaysIcon } from '@heroicons/vue/24/outline';
+import { addDaysToDate, addMonthsToDate } from '@/Utils/formatters';
+import { ArrowPathIcon, ChevronDownIcon, BellIcon, CalendarDaysIcon, DocumentDuplicateIcon, ClockIcon, ShieldCheckIcon } from '@heroicons/vue/24/outline';
+import Swal from 'sweetalert2';
 
 const props = defineProps({
     proceso: { type: Object, required: true },
     etapas: { type: Array, required: true }, // Recibir etapas para el modal
+    auditoria: { type: Array, default: () => [] },
 });
+
+const validTabs = ['resumen', 'actividad'];
+const getInitialTab = () => {
+    if (typeof window === 'undefined') return 'resumen';
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    return (tabParam && validTabs.includes(tabParam)) ? tabParam : 'resumen';
+};
+
+const activeTab = ref(getInitialTab());
+
+const setActiveTab = (tab) => {
+    activeTab.value = tab;
+    const url = new URL(window.location);
+    url.searchParams.set('tab', tab);
+    window.history.replaceState({}, '', url);
+};
 
 // --- LÓGICA DE COMPROMISO DE REVISIÓN (OBLIGATORIO) ---
 const showCommitmentModal = ref(false);
@@ -204,6 +226,38 @@ const actualizarActuacion = () => {
 const eliminarActuacion = (actuacionId) => {
     if (confirm('¿Eliminar actuación?')) router.delete(route('procesos.actuaciones.destroy', actuacionId), { preserveScroll: true, onSuccess: () => router.reload({ only: ['proceso'], preserveState: true }) });
 };
+
+const copyLegalInfo = () => {
+    const radicado = props.proceso.radicado || 'SIN RADICADO';
+    const juzgado = props.proceso.juzgado?.nombre || 'POR DEFINIR';
+    const demandantes = props.proceso.demandantes?.map(p => p.nombre_completo).join(', ') || 'SIN REGISTRO';
+    const demandados = props.proceso.demandados?.map(p => p.nombre_completo).join(', ') || 'SIN REGISTRO';
+    const asunto = props.proceso.asunto || 'N/A';
+    
+    let text = `EXPEDIENTE JUDICIAL\n`;
+    text += `--------------------\n`;
+    text += `Radicado: ${radicado}\n`;
+    text += `Juzgado: ${juzgado}\n`;
+    text += `Demandante(s): ${demandantes}\n`;
+    text += `Demandado(s): ${demandados}\n`;
+    text += `Asunto: ${asunto}\n`;
+    
+    navigator.clipboard.writeText(text).then(() => {
+        Swal.fire({
+            title: '¡Copiado!',
+            text: 'Información judicial en el portapapeles.',
+            icon: 'success',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2500,
+            timerProgressBar: true,
+            background: '#EEF2FF',
+            iconColor: '#4F46E5',
+            color: '#312E81',
+        });
+    });
+};
 </script>
 
 <template>
@@ -230,6 +284,14 @@ const eliminarActuacion = (actuacionId) => {
         </div>
 
         <div class="flex items-center gap-3 flex-shrink-0 flex-wrap justify-end">
+          <SecondaryButton
+              @click="copyLegalInfo"
+              class="!bg-indigo-50 !text-indigo-700 !border-indigo-200 hover:!bg-indigo-100"
+          >
+              <DocumentDuplicateIcon class="h-4 w-4 mr-2" />
+              Copiar Info Legal
+          </SecondaryButton>
+
           <!-- BOTÓN CAMBIAR ETAPA -->
           <PrimaryButton @click="openEtapaModal" v-if="!isClosed">
               <ArrowPathIcon class="w-4 h-4 mr-2" />
@@ -309,14 +371,36 @@ const eliminarActuacion = (actuacionId) => {
             <!-- Documentos -->
             <fieldset :disabled="isClosed" :class="{ 'opacity-60': isClosed }">
               <div class="grid grid-cols-1 md:grid-cols-5 gap-8">
-                <div class="md:col-span-2 bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg">
+                <div class="md:col-span-2 bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
                   <div class="p-6">
-                    <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Agregar documento</h3>
-                    <form @submit.prevent="submitUpload" class="space-y-4">
-                      <div><input ref="fileInput" type="file" @change="onPickFile" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-indigo-50 file:text-indigo-700" /><InputError :message="uploadForm.errors.archivo" class="mt-2" /></div>
-                      <div><InputLabel for="nombre" value="Nombre" /><TextInput id="nombre" v-model="uploadForm.nombre" class="mt-1 block w-full" /><InputError :message="uploadForm.errors.nombre" class="mt-2" /></div>
-                      <div><InputLabel for="nota" value="Nota" /><Textarea id="nota" v-model="uploadForm.nota" rows="2" class="mt-1 block w-full" /></div>
-                      <PrimaryButton :disabled="uploadForm.processing || !uploadForm.archivo" type="submit">{{ uploadForm.processing ? 'Subiendo…' : 'Subir Documento' }}</PrimaryButton>
+                    <h3 class="text-lg font-black text-gray-900 dark:text-white mb-6 uppercase tracking-wider text-xs flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                        Anexar al Expediente
+                    </h3>
+                    <form @submit.prevent="submitUpload" class="space-y-6">
+                      <div class="space-y-2">
+                        <label class="block w-full cursor-pointer p-8 border-2 border-dashed border-indigo-100 dark:border-indigo-900/30 bg-indigo-50/30 dark:bg-indigo-900/10 rounded-2xl text-center hover:border-indigo-400 transition-all group">
+                            <input ref="fileInput" type="file" @change="onPickFile" class="hidden" />
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-indigo-400 mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                            <p class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{{ uploadForm.archivo ? uploadForm.archivo.name : 'Seleccionar Archivo' }}</p>
+                        </label>
+                        <InputError :message="uploadForm.errors.archivo" />
+                      </div>
+
+                      <div>
+                        <InputLabel for="nombre" value="Nombre del Documento *" class="!text-[10px] font-black uppercase text-gray-400 mb-1" />
+                        <TextInput id="nombre" v-model="uploadForm.nombre" class="w-full rounded-xl border-gray-200 text-sm" placeholder="Ej: Demanda Inicial..." />
+                        <InputError :message="uploadForm.errors.nombre" />
+                      </div>
+
+                      <div>
+                        <InputLabel for="nota" value="Nota u Observación" class="!text-[10px] font-black uppercase text-gray-400 mb-1" />
+                        <Textarea id="nota" v-model="uploadForm.nota" rows="2" class="w-full rounded-xl border-gray-200 text-xs" placeholder="Contexto sobre el contenido..." />
+                      </div>
+
+                      <PrimaryButton :disabled="uploadForm.processing || !uploadForm.archivo" type="submit" class="w-full !py-4 !bg-indigo-600 hover:!bg-indigo-700 !rounded-xl !font-black uppercase tracking-[0.2em] shadow-lg shadow-indigo-100 dark:shadow-none">
+                        {{ uploadForm.processing ? 'Subiendo…' : 'Subir al Expediente' }}
+                      </PrimaryButton>
                     </form>
                   </div>
                 </div>
@@ -446,6 +530,11 @@ const eliminarActuacion = (actuacionId) => {
                               v-model="notifForm.fecha_programada" 
                               placeholder="Clic para agendar..."
                           />
+                          <div class="mt-1 flex gap-1">
+                              <button type="button" @click="notifForm.fecha_programada = addDaysToDate(notifForm.fecha_programada, 3)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+3d</button>
+                              <button type="button" @click="notifForm.fecha_programada = addDaysToDate(notifForm.fecha_programada, 5)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+5d</button>
+                              <button type="button" @click="notifForm.fecha_programada = addMonthsToDate(notifForm.fecha_programada, 1)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+1m</button>
+                          </div>
                           <InputError :message="notifForm.errors.fecha_programada" class="mt-1" />
                       </div>
                       

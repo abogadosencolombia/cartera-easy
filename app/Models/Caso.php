@@ -41,9 +41,10 @@ class Caso extends Model
         'juzgado_id', 'especialidad_id',
         'estado',
         'nota_cierre', // <--- ¡AQUÍ ESTABA EL PROBLEMA! Faltaba esta autorización.
-    ];
+        'clonado_de_id', 'is_pinned', 'checklist_seguimiento'
+        ];
 
-    protected $casts = [
+        protected $casts = [
         'fecha_apertura' => 'date',
         'fecha_vencimiento' => 'date',
         'monto_total' => 'decimal:2',
@@ -52,10 +53,25 @@ class Caso extends Model
         'tasa_interes_corriente' => 'decimal:2',
         'fecha_inicio_credito' => 'date',
         'bloqueado' => 'boolean',
-        'ultima_actividad' => 'datetime',
-    ];
+        'ultima_actvidad' => 'datetime',
+        'is_pinned' => 'boolean',
+        'checklist_seguimiento' => 'array',
+        ];
+
+    /**
+     * Mutator para normalizar el radicado.
+     */
+    protected function radicado(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
+            set: function ($value) {
+                if (empty($value)) return null;
+                $clean = preg_replace('/[^0-9]/', '', $value);
+                return (strlen($clean) === 23) ? $clean : trim($value);
+            }
+        );
+    }
     
-    protected $dates = ['deleted_at'];
 
     protected $appends = ['semaforo', 'dias_en_mora'];
 

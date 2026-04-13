@@ -68,14 +68,49 @@ const exportExcel = () => {
 };
 
 const deletePersona = (id) => {
+  const persona = props.personas.data.find(p => p.id === id);
+  const nombre = persona ? persona.nombre_completo : 'esta persona';
+
   Swal.fire({
-    title: '¿Suspender registro?',
-    text: "La persona será movida a la papelera y no aparecerá en búsquedas comunes.",
+    title: '¿Suspender Registro?',
+    html: `
+      <div class="text-left space-y-3">
+        <p class="text-sm text-gray-600 font-medium">Estás a punto de mover a <b>${nombre}</b> a la papelera.</p>
+        <div class="p-3 bg-amber-50 border border-amber-100 rounded-lg">
+          <p class="text-[11px] text-amber-700 font-bold uppercase tracking-tight mb-1">⚠️ IMPORTANTE:</p>
+          <ul class="text-[10px] text-amber-600 space-y-1 list-disc pl-4 font-medium">
+            <li>No se borrarán sus datos, solo se ocultarán de la lista activa.</li>
+            <li>Seguirá vinculado a sus casos y procesos actuales.</li>
+            <li>Podrás restaurarlo en cualquier momento desde el filtro de "Papelera".</li>
+          </ul>
+        </div>
+        <p class="text-[11px] text-gray-400 italic text-center">Recomendado para registros duplicados o inactivos.</p>
+      </div>
+    `,
     icon: 'warning',
     showCancelButton: true,
-    confirmButtonColor: '#ef4444',
-    confirmButtonText: 'Sí, suspender'
-  }).then((res) => { if (res.isConfirmed) router.delete(route('personas.destroy', id)); });
+    confirmButtonColor: '#4f46e5',
+    cancelButtonColor: '#6b7280',
+    confirmButtonText: 'Sí, suspender registro',
+    cancelButtonText: 'Cancelar',
+    customClass: {
+        confirmButton: 'rounded-xl font-black text-[10px] uppercase tracking-widest px-6 py-3',
+        cancelButton: 'rounded-xl font-black text-[10px] uppercase tracking-widest px-6 py-3'
+    }
+  }).then((res) => { 
+    if (res.isConfirmed) {
+        router.delete(route('personas.destroy', id), {
+            preserveScroll: true,
+            onSuccess: () => Swal.fire({
+                title: 'Suspendido',
+                text: 'El registro se movió a la papelera correctamente.',
+                icon: 'success',
+                timer: 2000,
+                showConfirmButton: false
+            })
+        });
+    }
+  });
 };
 
 const restorePersona = (id) => {

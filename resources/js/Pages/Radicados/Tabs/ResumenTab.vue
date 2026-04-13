@@ -9,6 +9,7 @@ import {
     ChatBubbleBottomCenterTextIcon,
     ClipboardDocumentCheckIcon
 } from '@heroicons/vue/24/outline';
+import GuiaEtapa from '@/Components/GuiaEtapa.vue';
 
 const props = defineProps({
     proceso: { type: Object, required: true },
@@ -103,6 +104,15 @@ const asText = (v) => v ?? '—';
                     </p>
                 </div>
             </div>
+
+            <!-- GUÍA DE GESTIÓN POR ETAPA -->
+            <GuiaEtapa 
+                v-if="proceso.etapa_actual"
+                :etapa="proceso.etapa_actual.nombre" 
+                :checklist-completados="proceso.checklist_seguimiento || []"
+                :model-id="proceso.id"
+                model-type="proceso"
+            />
         </div>
 
         <!-- COLUMNA DERECHA: CONTACTO Y COMUNICACIÓN (4/12) -->

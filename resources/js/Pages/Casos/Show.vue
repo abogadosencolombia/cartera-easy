@@ -2,6 +2,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, usePage, useRemember, router } from '@inertiajs/vue3';
 import { ref, computed, onMounted, watch } from 'vue';
+import { addDaysToDate, addMonthsToDate } from '@/Utils/formatters';
+import Swal from 'sweetalert2';
 
 // --- IMPORTAMOS LOS NUEVOS COMPONENTES DE PESTAÑA ---
 import ResumenTab from './Tabs/ResumenTab.vue';
@@ -18,6 +20,7 @@ import {
     ClipboardDocumentListIcon,
     ClockIcon,
     LockOpenIcon,
+    DocumentDuplicateIcon,
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -123,6 +126,40 @@ const montoParaContrato = computed(() => {
     return props.resumen_financiero.saldo_pendiente; 
 });
 
+const copyLegalInfo = () => {
+    const radicado = props.caso.radicado || 'SIN RADICADO';
+    const juzgado = props.caso.juzgado?.nombre || 'POR DEFINIR';
+    const deudor = props.caso.deudor?.nombre_completo || 'SIN DEUDOR';
+    const cooperativa = props.caso.cooperativa?.nombre || 'N/A';
+    
+    let text = `EXPEDIENTE LEGAL\n`;
+    text += `-----------------\n`;
+    text += `Radicado: ${radicado}\n`;
+    text += `Juzgado: ${juzgado}\n`;
+    text += `Deudor: ${deudor}\n`;
+    text += `Cooperativa: ${cooperativa}\n`;
+    
+    if (props.caso.codeudores?.length > 0) {
+        text += `Codeudores: ${props.caso.codeudores.map(c => c.nombre_completo).join(', ')}\n`;
+    }
+    
+    navigator.clipboard.writeText(text).then(() => {
+        Swal.fire({
+            title: '¡Copiado!',
+            text: 'Información legal lista para pegar.',
+            icon: 'success',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2500,
+            timerProgressBar: true,
+            background: '#EEF2FF',
+            iconColor: '#4F46E5',
+            color: '#312E81',
+        });
+    });
+};
+
 </script>
 
 <template>
@@ -157,6 +194,13 @@ const montoParaContrato = computed(() => {
                     </h2>
                 </div>
                 <div class="flex items-center space-x-2 flex-shrink-0">
+                    <button
+                        @click="copyLegalInfo"
+                        class="inline-flex items-center px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-md font-bold text-xs text-indigo-700 dark:text-indigo-300 uppercase tracking-widest shadow-sm hover:bg-indigo-100 dark:hover:bg-indigo-900/50 focus:outline-none transition ease-in-out duration-150"
+                    >
+                        <DocumentDuplicateIcon class="h-4 w-4 mr-1.5" />
+                        Copiar Info Legal
+                    </button>
                     <Link
                         v-if="puedeEditar"
                         :href="route('casos.clonar', caso.id)"

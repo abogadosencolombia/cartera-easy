@@ -36,8 +36,19 @@ class StoreProcesoRadicadoRequest extends FormRequest
             
             // --- CAMBIO: AHORA SON ARRAYS DE OBJETOS O IDS ---
             'demandantes'             => ['required', 'array', 'min:1'],
+            'demandantes.*.id'        => ['nullable', 'integer', 'exists:personas,id'],
+            'demandantes.*.is_new'    => ['nullable', 'boolean'],
+            'demandantes.*.nombre_completo' => ['required_if:demandantes.*.is_new,true', 'nullable', 'string', 'max:255'],
+            'demandantes.*.numero_documento' => ['required_if:demandantes.*.is_new,true', 'nullable', 'string', 'max:255'],
+            'demandantes.*.tipo_documento'   => ['required_if:demandantes.*.is_new,true', 'nullable', 'string', 'max:255'],
+
             'demandados'              => ['nullable', 'array'],
-            // Las validaciones detalladas se manejarán en el controlador para permitir flexibilidad (IDs o Nuevos)
+            'demandados.*.id'         => ['nullable', 'integer', 'exists:personas,id'],
+            'demandados.*.is_new'     => ['nullable', 'boolean'],
+            'demandados.*.nombre_completo' => ['required_if:demandados.*.is_new,true', 'nullable', 'string', 'max:255'],
+            'demandados.*.numero_documento' => ['required_if:demandados.*.sin_info,false', 'required_if:demandados.*.is_new,true', 'nullable', 'string', 'max:255'],
+            'demandados.*.tipo_documento'   => ['required_if:demandados.*.is_new,true', 'nullable', 'string', 'max:255'],
+            'demandados.*.sin_info'         => ['nullable', 'boolean'],
         ];
     }
 

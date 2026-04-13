@@ -26,6 +26,24 @@ const props = defineProps({
 
 const emit = defineEmits(['save', 'edit', 'delete']);
 
+const quickTexts = [
+    'Se libra mandamiento de pago.',
+    'Se radica demanda ante el despacho.',
+    'Se solicita medidas cautelares.',
+    'Se contesta demanda.',
+    'Audiencia inicial celebrada.',
+    'Liquidación de crédito aprobada.',
+    'Sentencia favorable ejecutoriada.',
+];
+
+const appendQuickText = (text) => {
+    if (actuacionForm.nota) {
+        actuacionForm.nota += ' ' + text;
+    } else {
+        actuacionForm.nota = text;
+    }
+};
+
 const actuacionForm = useForm({ 
     nota: '', 
     fecha_actuacion: new Date().toISOString().slice(0, 10)
@@ -48,6 +66,11 @@ const handleSave = () => {
             </h3>
             <form @submit.prevent="handleSave" class="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div class="md:col-span-3 space-y-2">
+                    <div class="flex flex-wrap gap-1.5 mb-2">
+                        <button v-for="txt in quickTexts" :key="txt" type="button" @click="appendQuickText(txt)" class="text-[9px] font-bold bg-indigo-100/50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-1 rounded-md hover:bg-indigo-200 transition-colors border border-indigo-100 dark:border-indigo-800">
+                            + {{ txt.substring(0, 25) }}{{ txt.length > 25 ? '...' : '' }}
+                        </button>
+                    </div>
                     <InputLabel value="Descripción de la Actuación *" class="font-bold text-[10px] uppercase ml-1" />
                     <Textarea v-model="actuacionForm.nota" rows="2" class="w-full rounded-2xl border-gray-200 focus:ring-indigo-500 text-sm font-medium" placeholder="Describa el hito procesal..." required />
                 </div>

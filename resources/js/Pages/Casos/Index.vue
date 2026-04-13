@@ -7,8 +7,15 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import { ref, watch, reactive, computed, onMounted } from 'vue';
-import { TrashIcon, MagnifyingGlassIcon, InboxIcon, EyeIcon, ArrowDownTrayIcon, FunnelIcon, ArchiveBoxXMarkIcon, ChevronDownIcon, XMarkIcon, DocumentDuplicateIcon, CloudArrowUpIcon, BanknotesIcon, ExclamationCircleIcon, ArrowPathIcon, CheckCircleIcon, UserGroupIcon, ScaleIcon, PhoneIcon, EnvelopeIcon, BuildingOfficeIcon, ClockIcon, ExclamationTriangleIcon, UserIcon, ClipboardDocumentListIcon, LinkIcon } from '@heroicons/vue/24/outline'; 
+import { TrashIcon, MagnifyingGlassIcon, InboxIcon, EyeIcon, ArrowDownTrayIcon, FunnelIcon, ArchiveBoxXMarkIcon, ChevronDownIcon, XMarkIcon, DocumentDuplicateIcon, CloudArrowUpIcon, BanknotesIcon, ExclamationCircleIcon, ArrowPathIcon, CheckCircleIcon, UserGroupIcon, ScaleIcon, PhoneIcon, EnvelopeIcon, BuildingOfficeIcon, ClockIcon, ExclamationTriangleIcon, UserIcon, ClipboardDocumentListIcon, LinkIcon, MapPinIcon as PinIcon } from '@heroicons/vue/24/outline'; 
+
+const togglePin = (caso) => {
+    router.patch(route('casos.pin', caso.id), {}, {
+        preserveScroll: true,
+    });
+};
 import { debounce } from 'lodash';
+import Swal from 'sweetalert2';
 
 const props = defineProps({
     casos: Object,
@@ -16,6 +23,7 @@ const props = defineProps({
     filters: Object,
     abogados: Array,
     cooperativas: Array,
+    juzgados: Array,
     etapas_procesales: Array,
     stats: Object,
 });
@@ -25,6 +33,7 @@ const filterForm = reactive({
     search: props.filters?.search ?? '',
     abogado_id: props.filters?.abogado_id ?? '',
     cooperativa_id: props.filters?.cooperativa_id ?? '',
+    juzgado_id: props.filters?.juzgado_id ?? '',
     etapa_procesal: props.filters?.etapa_procesal ?? '',
     sin_radicado: props.filters?.sin_radicado === 'true' || props.filters?.sin_radicado === true,
 });
@@ -33,6 +42,7 @@ const isDirty = computed(() => {
     return filterForm.search !== '' || 
            filterForm.abogado_id !== '' || 
            filterForm.cooperativa_id !== '' || 
+           filterForm.juzgado_id !== '' || 
            filterForm.etapa_procesal !== '' ||
            filterForm.sin_radicado === true;
 });
@@ -41,6 +51,7 @@ const resetFilters = () => {
     filterForm.search = '';
     filterForm.abogado_id = '';
     filterForm.cooperativa_id = '';
+    filterForm.juzgado_id = '';
     filterForm.etapa_procesal = '';
     filterForm.sin_radicado = false;
 };
@@ -51,6 +62,7 @@ watch(filterForm, debounce(() => {
             search: filterForm.search, 
             abogado_id: filterForm.abogado_id,
             cooperativa_id: filterForm.cooperativa_id,
+            juzgado_id: filterForm.juzgado_id,
             etapa_procesal: filterForm.etapa_procesal,
             sin_radicado: filterForm.sin_radicado,
         }, 
@@ -77,6 +89,14 @@ const copyToClipboard = (text) => {
     if (!text) return;
     navigator.clipboard.writeText(text);
     // Podríamos añadir un toast aquí si existiera un sistema global
+};
+
+const getInactivityDays = (dateString) => {
+    if (!dateString) return 0;
+    const lastUpdate = new Date(dateString);
+    const now = new Date();
+    const diff = now - lastUpdate;
+    return Math.floor(diff / (1000 * 60 * 60 * 24));
 };
 
 // --- Ayudantes de Estilo Dinámicos ---
@@ -237,6 +257,43 @@ const caseStatus = computed(() => {
         isCompleted: !!c.radicado && !!c.juzgado && (c.users && c.users.length > 0)
     };
 });
+
+const copyLegalInfo = (caso) => {
+    const c = caso || selectedCaso.value;
+    if (!c) return;
+    
+    const radicado = c.radicado || 'SIN RADICADO';
+    const juzgado = c.juzgado?.nombre || 'POR DEFINIR';
+    const deudor = c.deudor?.nombre_completo || 'SIN DEUDOR';
+    const cooperativa = c.cooperativa?.nombre || 'N/A';
+    
+    let text = `EXPEDIENTE LEGAL\n`;
+    text += `-----------------\n`;
+    text += `Radicado: ${radicado}\n`;
+    text += `Juzgado: ${juzgado}\n`;
+    text += `Deudor: ${deudor}\n`;
+    text += `Cooperativa: ${cooperativa}\n`;
+    
+    if (c.codeudores?.length > 0) {
+        text += `Codeudores: ${c.codeudores.map(cd => cd.nombre_completo).join(', ')}\n`;
+    }
+    
+    navigator.clipboard.writeText(text).then(() => {
+        Swal.fire({
+            title: '¡Copiado!',
+            text: 'Datos listos para pegar.',
+            icon: 'success',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2500,
+            timerProgressBar: true,
+            background: '#EEF2FF',
+            iconColor: '#4F46E5',
+            color: '#312E81',
+        });
+    });
+};
 </script>
 
 <template>
@@ -328,7 +385,7 @@ const caseStatus = computed(() => {
 
                 <!-- Barra de Filtros Avanzada -->
                 <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                         <!-- Búsqueda -->
                         <div class="relative">
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Búsqueda rápida</label>
@@ -352,8 +409,20 @@ const caseStatus = computed(() => {
                                 v-model="filterForm.cooperativa_id"
                                 class="block w-full py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white"
                             >
-                                <option value="">Todas las cooperativas</option>
+                                <option value="">Todas</option>
                                 <option v-for="c in cooperativas" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+                            </select>
+                        </div>
+
+                        <!-- Juzgado -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Juzgado</label>
+                            <select 
+                                v-model="filterForm.juzgado_id"
+                                class="block w-full py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white"
+                            >
+                                <option value="">Todos los Despachos</option>
+                                <option v-for="j in juzgados" :key="j.id" :value="j.id">{{ j.nombre }}</option>
                             </select>
                         </div>
 
@@ -364,7 +433,7 @@ const caseStatus = computed(() => {
                                 v-model="filterForm.abogado_id"
                                 class="block w-full py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white"
                             >
-                                <option value="">Todos los abogados</option>
+                                <option value="">Todos</option>
                                 <option v-for="a in abogados" :key="a.id" :value="a.id">{{ a.name }}</option>
                             </select>
                         </div>
@@ -372,25 +441,23 @@ const caseStatus = computed(() => {
                         <!-- Etapa -->
                         <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Etapa Procesal</label>
-                            <select 
-                                v-model="filterForm.etapa_procesal"
-                                class="block w-full py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white"
-                            >
-                                <option value="">Todas las etapas</option>
-                                <option v-for="e in etapas_procesales" :key="e" :value="e">{{ e }}</option>
-                            </select>
-                        </div>
-
-                        <!-- Filtro Sin Radicado -->
-                        <div class="flex items-center gap-3 bg-gray-50 dark:bg-gray-700 p-2.5 rounded-lg border border-gray-100 dark:border-gray-600 h-[38px] mt-5 self-start">
-                            <label class="flex items-center gap-2 cursor-pointer w-full">
-                                <input 
-                                    v-model="filterForm.sin_radicado"
-                                    type="checkbox" 
-                                    class="rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 h-4 w-4"
-                                />
-                                <span class="text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-300">Sin Radicado</span>
-                            </label>
+                            <div class="flex items-center gap-2">
+                                <select 
+                                    v-model="filterForm.etapa_procesal"
+                                    class="block w-full py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white"
+                                >
+                                    <option value="">Todas</option>
+                                    <option v-for="e in etapas_procesales" :key="e" :value="e">{{ e }}</option>
+                                </select>
+                                <label class="flex items-center gap-1.5 cursor-pointer shrink-0 bg-gray-50 dark:bg-gray-700 px-2 py-2 rounded-lg border border-gray-100 dark:border-gray-600 h-[38px]">
+                                    <input 
+                                        v-model="filterForm.sin_radicado"
+                                        type="checkbox" 
+                                        class="rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 h-4 w-4"
+                                    />
+                                    <span class="text-[9px] font-black uppercase text-gray-500">Sin Rad.</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
 
@@ -453,11 +520,12 @@ const caseStatus = computed(() => {
                                     </td>
                                 </tr>
                                 
-                                <tr v-else v-for="caso in casos.data" :key="caso.id" class="hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10 transition-colors group cursor-pointer" @click="openQuickView(caso)">
+                                <tr v-else v-for="caso in casos.data" :key="caso.id" class="hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10 transition-colors group cursor-pointer" :class="{'bg-indigo-50/50 dark:bg-indigo-900/20': caso.is_pinned}" @click="openQuickView(caso)">
                                     <!-- Deudor / Expediente -->
-                                    <td class="px-6 py-4">
+                                    <td class="px-6 py-4 relative">
+                                        <div v-if="caso.is_pinned" class="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-r"></div>
                                         <div class="flex flex-col">
-                                            <Link :href="route('casos.show', caso.id)" class="text-sm font-black text-indigo-600 dark:text-indigo-400 hover:underline">
+                                            <Link @click.stop :href="route('casos.show', caso.id)" class="text-sm font-black text-indigo-600 dark:text-indigo-400 hover:underline">
                                                 {{ caso.deudor?.nombre_completo ?? 'Sin deudor' }}
                                             </Link>
                                             <div class="flex items-center gap-1.5 mt-1">
@@ -466,7 +534,7 @@ const caseStatus = computed(() => {
                                                 </span>
                                                 <span v-if="caso.radicado" class="text-[10px] text-gray-400 flex items-center gap-1 group/rad">
                                                     Rad: {{ caso.radicado }}
-                                                    <button @click="copyToClipboard(caso.radicado)" class="opacity-0 group-hover/rad:opacity-100 transition-opacity">
+                                                    <button @click.stop="copyToClipboard(caso.radicado)" class="opacity-0 group-hover/rad:opacity-100 transition-opacity">
                                                         <DocumentDuplicateIcon class="w-3 h-3 hover:text-indigo-500" />
                                                     </button>
                                                 </span>
@@ -502,6 +570,7 @@ const caseStatus = computed(() => {
                                                 <div 
                                                     v-for="u in caso.users" 
                                                     :key="u.id" 
+                                                    @click.stop
                                                     class="inline-flex items-center justify-center h-8 w-8 rounded-full ring-2 ring-white dark:ring-gray-800 bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 transition-transform hover:z-10 hover:scale-110 cursor-help"
                                                     :title="u.name"
                                                 >
@@ -519,12 +588,26 @@ const caseStatus = computed(() => {
                                         <div class="flex flex-col">
                                             <span class="text-xs font-bold text-gray-700 dark:text-gray-300">{{ formatDate(caso.updated_at) }}</span>
                                             <span class="text-[10px] text-gray-400 italic">hace {{ formatTimeAgo(caso.updated_at) }}</span>
+                                            
+                                            <div v-if="getInactivityDays(caso.updated_at) >= 30 && !caso.nota_cierre" class="mt-1">
+                                                <span class="px-1.5 py-0.5 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[8px] font-black uppercase rounded border border-red-100 dark:border-red-800 animate-pulse">
+                                                    ⚠️ Inactivo {{ getInactivityDays(caso.updated_at) }}d
+                                                </span>
+                                            </div>
                                         </div>
                                     </td>
 
                                     <!-- Acciones Sticky -->
-                                    <td class="sticky right-0 bg-white dark:bg-gray-800 group-hover:bg-indigo-50/50 dark:group-hover:bg-gray-700 px-6 py-4 whitespace-nowrap text-right z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] transition-colors" @click.stop>
+                                    <td class="sticky right-0 bg-white dark:bg-gray-800 group-hover:bg-indigo-50/50 dark:group-hover:bg-gray-700 px-6 py-4 whitespace-nowrap text-right z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] transition-colors" :class="{'!bg-indigo-50/50 dark:!bg-indigo-900/20': caso.is_pinned}" @click.stop>
                                         <div class="flex items-center justify-end gap-2">
+                                            <button 
+                                                @click.stop="togglePin(caso)"
+                                                class="p-2 rounded-lg transition-all shadow-sm"
+                                                :class="caso.is_pinned ? 'text-white bg-indigo-600 hover:bg-indigo-700' : 'text-gray-400 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600'"
+                                                :title="caso.is_pinned ? 'Desfijar' : 'Fijar al inicio'"
+                                            >
+                                                <PinIcon class="h-5 w-5" :class="{'rotate-45': !caso.is_pinned}" />
+                                            </button>
                                             <Link
                                                 :href="route('casos.show', caso.id)"
                                                 class="p-2 text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
@@ -565,43 +648,85 @@ const caseStatus = computed(() => {
                     </div>
                 </div>
 
+                <!-- Móvil: Cards Modernas -->
+                <div class="md:hidden space-y-4">
+                    <div v-for="caso in casos.data" :key="'mob-'+caso.id" @click="openQuickView(caso)" class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden cursor-pointer">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <Link @click.stop :href="route('casos.show', caso.id)" class="text-sm font-black text-indigo-600 dark:text-indigo-400 hover:underline">
+                                    {{ caso.deudor?.nombre_completo ?? 'Sin deudor' }}
+                                </Link>
+                                <div class="flex items-center gap-1.5 mt-1">
+                                    <span class="text-[10px] font-bold px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded">
+                                        ID #{{ caso.id }}
+                                    </span>
+                                </div>
+                            </div>
+                            <span class="px-2 py-1 text-[9px] font-black rounded-lg border uppercase tracking-tighter shadow-sm" :class="getEtapaColor(caso.etapa_procesal || caso.estado_proceso)">
+                                {{ caso.etapa_procesal || caso.estado_proceso || 'SIN ETAPA' }}
+                            </span>
+                        </div>
+
+                        <div class="space-y-3 mb-6">
+                            <div class="flex items-start gap-2">
+                                <span class="text-[9px] font-black text-blue-600 bg-blue-50 px-1 rounded border border-blue-100 mt-0.5">EMP</span>
+                                <p class="text-xs font-bold text-gray-700 dark:text-gray-300 leading-tight">{{ caso.cooperativa?.nombre ?? 'N/A' }}</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 pt-4 border-t border-gray-50 dark:border-gray-700">
+                            <Link @click.stop :href="route('casos.edit', caso.id)" class="flex items-center justify-center py-2 bg-gray-50 dark:bg-gray-700 text-[10px] font-black uppercase rounded-xl text-gray-500">Editar</Link>
+                            <Link @click.stop :href="route('casos.show', caso.id)" class="flex items-center justify-center py-2 bg-indigo-600 text-[10px] font-black uppercase rounded-xl text-white shadow-lg shadow-indigo-100">Ver Ficha</Link>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
 
         <Modal :show="confirmingCaseDeletion" @close="closeModal">
             <div class="p-6">
-                <div class="flex items-center gap-3 mb-4 text-red-600">
+                <div class="flex items-center gap-3 mb-4 text-amber-600">
                     <ExclamationTriangleIcon class="w-8 h-8" />
                     <h2 class="text-xl font-black uppercase tracking-tight">
-                        ¿Confirmar Eliminación?
+                        ¿Mover caso a Papelera?
                     </h2>
                 </div>
 
-                <p class="text-sm text-gray-600 dark:text-gray-400 font-medium leading-relaxed">
-                    ¿Estás seguro de que deseas eliminar este caso? Esta acción es irreversible y eliminará todos los registros asociados, incluyendo actuaciones, documentos y pagos.
-                </p>
+                <div class="p-4 bg-amber-50 border border-amber-100 rounded-xl mb-6">
+                    <p class="text-[11px] text-amber-700 font-black uppercase tracking-widest mb-2 italic underline">⚠️ Por favor lea con atención:</p>
+                    <ul class="text-[11px] text-amber-800 space-y-1.5 list-disc pl-5 font-bold leading-tight">
+                        <li>El caso dejará de aparecer en la lista de activos.</li>
+                        <li>Toda la información (actuaciones, documentos y pagos) <span class="text-indigo-600 underline">SE CONSERVA</span>.</li>
+                        <li>Podrás consultarlo y recuperarlo desde el filtro de "Estado: Cerrados/Papelera".</li>
+                        <li>Use esta opción para corregir errores de registro o casos archivados.</li>
+                    </ul>
+                </div>
 
                 <div v-if="caseToDelete" class="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
-                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Caso a eliminar:</p>
-                    <p class="text-sm font-bold text-gray-900 dark:text-white">
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Expediente Seleccionado:</p>
+                    <p class="text-sm font-black text-gray-900 dark:text-white uppercase truncate">
                         {{ caseToDelete.deudor?.nombre_completo || 'Sin nombre' }}
                     </p>
-                    <p class="text-xs text-gray-500">ID: #{{ caseToDelete.id }} | Radicado: {{ caseToDelete.radicado || 'Sin radicar' }}</p>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-[10px] font-black px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded uppercase">ID #{{ caseToDelete.id }}</span>
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Rad: {{ caseToDelete.radicado || 'Sin radicar' }}</span>
+                    </div>
                 </div>
 
                 <div class="mt-8 flex justify-end gap-3">
-                    <SecondaryButton @click="closeModal" class="uppercase text-[10px] font-black tracking-widest">
-                        Cancelar
+                    <SecondaryButton @click="closeModal" class="uppercase text-[10px] font-black tracking-widest px-6 py-3">
+                        No, cancelar
                     </SecondaryButton>
 
-                    <DangerButton
+                    <PrimaryButton
                         @click="deleteCase"
                         :class="{ 'opacity-25': deleteForm.processing }"
                         :disabled="deleteForm.processing"
-                        class="uppercase text-[10px] font-black tracking-widest"
+                        class="uppercase text-[10px] font-black tracking-widest px-6 py-3 bg-indigo-600"
                     >
-                        Eliminar Caso Permanentemente
-                    </DangerButton>
+                        Sí, mover a papelera
+                    </PrimaryButton>
                 </div>
             </div>
         </Modal>
@@ -621,14 +746,17 @@ const caseStatus = computed(() => {
                         </div>
                     </div>
                     <div class="flex items-center gap-2 sm:gap-4 shrink-0 ml-2">
+                        <button @click="copyLegalInfo()" class="hidden sm:flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all text-[10px] font-black uppercase tracking-widest border border-white/30 shadow-inner active:scale-95">
+                            <DocumentDuplicateIcon class="w-4 h-4" /> Copiar Info Legal
+                        </button>
                         <div class="flex bg-black/10 rounded-lg p-0.5">
-                            <button @click="prevCaso" :disabled="currentIndex === 0" class="p-1 sm:p-1.5 hover:bg-white/10 disabled:opacity-20 rounded-md transition-all active:scale-90" title="Anterior">
+                            <button @click="prevCaso" :disabled="currentIndex === 0" class="p-1.5 sm:p-1.5 hover:bg-white/10 disabled:opacity-20 rounded-md transition-all active:scale-90" title="Anterior">
                                 <ChevronDownIcon class="w-4 h-4 rotate-90" />
                             </button>
                             <div class="px-1.5 sm:px-3 flex items-center border-x border-white/5">
                                 <span class="text-[9px] sm:text-[10px] font-black tracking-widest">{{ currentIndex + 1 }}<span class="opacity-50 mx-0.5">/</span>{{ casos.data.length }}</span>
                             </div>
-                            <button @click="nextCaso" :disabled="currentIndex === casos.data.length - 1" class="p-1 sm:p-1.5 hover:bg-white/10 disabled:opacity-20 rounded-md transition-all active:scale-90" title="Siguiente">
+                            <button @click="nextCaso" :disabled="currentIndex === casos.data.length - 1" class="p-1.5 sm:p-1.5 hover:bg-white/10 disabled:opacity-20 rounded-md transition-all active:scale-90" title="Siguiente">
                                 <ChevronDownIcon class="w-4 h-4 -rotate-90" />
                             </button>
                         </div>
@@ -700,7 +828,7 @@ const caseStatus = computed(() => {
                                 <p class="text-[9px] font-bold text-gray-400 uppercase">Radicado Judicial</p>
                                 <p class="text-xs font-black text-gray-800 dark:text-gray-200 flex items-center gap-2 break-all">
                                     {{ selectedCaso.radicado || 'SIN CARGAR' }}
-                                    <button v-if="selectedCaso.radicado" @click="copyToClipboard(selectedCaso.radicado)" class="text-gray-400 hover:text-indigo-500 transition-colors shrink-0">
+                                    <button v-if="selectedCaso.radicado" @click.stop="copyToClipboard(selectedCaso.radicado)" class="text-gray-400 hover:text-indigo-500 transition-colors shrink-0">
                                         <DocumentDuplicateIcon class="w-3.5 h-3.5" />
                                     </button>
                                 </p>

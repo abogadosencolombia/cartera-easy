@@ -18,5 +18,4 @@ class Juzgado extends Model
     protected $guarded = []; 
 
     // Opcional: Si quieres asegurar que las fechas se manejen bien
-    protected $dates = ['deleted_at'];
 }

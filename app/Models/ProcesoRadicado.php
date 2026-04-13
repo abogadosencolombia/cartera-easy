@@ -15,9 +15,11 @@ use App\Models\Tarea;
 use App\Models\EtapaProcesal; 
 use App\Models\AuditoriaEvento;
 
+use Illuminate\Database\Eloquent\SoftDeletes;
+
 class ProcesoRadicado extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'proceso_radicados';
 
@@ -30,8 +32,27 @@ class ProcesoRadicado extends Model
         'abogado_id','responsable_revision_id','juzgado_id','tipo_proceso_id',
         'estado', 'nota_cierre', 'info_incompleta',
         'etapa_procesal_id', 
-        'fecha_cambio_etapa'
+        'fecha_cambio_etapa',
+        'is_pinned',
+        'checklist_seguimiento'
     ];
+
+    /**
+     * Mutator para normalizar el radicado.
+     * Si el radicado tiene 23 dígitos (o similar con ruido), limpiamos espacios y guiones.
+     */
+    protected function radicado(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
+            set: function ($value) {
+                if (empty($value)) return null;
+                $clean = preg_replace('/[^0-9]/', '', $value);
+                // Si al limpiar quedan 23 dígitos, usamos el limpio. 
+                // Si no, dejamos el original por si es un radicado antiguo/diferente.
+                return (strlen($clean) === 23) ? $clean : trim($value);
+            }
+        );
+    }
 
     protected $casts = [
         'fecha_radicado' => 'date',
@@ -39,6 +60,8 @@ class ProcesoRadicado extends Model
         'fecha_proxima_revision' => 'date',
         'fecha_cambio_etapa' => 'datetime',
         'info_incompleta' => 'boolean',
+        'is_pinned' => 'boolean',
+        'checklist_seguimiento' => 'array',
     ];
 
     /**
@@ -79,6 +102,14 @@ class ProcesoRadicado extends Model
 
     public function juzgado(): BelongsTo { return $this->belongsTo(Juzgado::class, 'juzgado_id'); }
     public function tipoProceso(): BelongsTo { return $this->belongsTo(TipoProceso::class, 'tipo_proceso_id'); }
+
+    public function personas(): BelongsToMany
+    {
+        return $this->belongsToMany(Persona::class, 'proceso_radicado_personas')
+                    ->withPivot('tipo')
+                    ->withTrashed()
+                    ->withTimestamps();
+    }
 
     public function demandantes(): BelongsToMany
     {

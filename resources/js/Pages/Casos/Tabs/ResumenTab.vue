@@ -8,6 +8,8 @@ import Textarea from '@/Components/Textarea.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import InputError from '@/Components/InputError.vue';
 import CumplimientoLegal from '@/Components/CumplimientoLegal.vue';
+import GuiaEtapa from '@/Components/GuiaEtapa.vue';
+import { addDaysToDate, addMonthsToDate } from '@/Utils/formatters';
 import { 
     ScaleIcon, 
     UserCircleIcon, 
@@ -180,6 +182,15 @@ const submitNotification = () => {
             <div class="bg-gray-50 dark:bg-gray-900/50 p-6 rounded-lg border border-gray-100 dark:border-gray-700">
                 <CumplimientoLegal :validaciones="caso.validaciones_legales" />
             </div>
+
+            <!-- GUÍA DE GESTIÓN POR ETAPA -->
+            <GuiaEtapa 
+                :etapa="caso.etapa_procesal" 
+                :tipo-proceso="caso.tipo_proceso" 
+                :checklist-completados="caso.checklist_seguimiento || []"
+                :model-id="caso.id"
+                model-type="caso"
+            />
         </div>
 
         <!-- COLUMNA DERECHA -->
@@ -197,6 +208,9 @@ const submitNotification = () => {
                             <div class="text-gray-600 dark:text-gray-300 font-bold">{{ caso.deudor ? caso.deudor.nombre_completo : 'N/A' }}</div>
                             <div v-if="caso.deudor?.celular_1" class="flex items-center text-xs text-gray-500 mt-1">
                                 <PhoneIcon class="h-3 w-3 mr-1 text-gray-400" /> {{ caso.deudor.celular_1 }}
+                                <a :href="'https://wa.me/57' + caso.deudor.celular_1.replace(/\s/g, '')" target="_blank" class="ml-2 p-1 bg-green-100 text-green-600 rounded-full hover:bg-green-600 hover:text-white transition-colors" title="Enviar WhatsApp">
+                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.438 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.397-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.808 2.876 2.056 3.223c.248.348 3.503 5.397 8.486 7.547 1.186.512 2.112.817 2.833 1.046 1.19.379 2.273.326 3.129.199.954-.141 2.031-.83 2.316-1.633.285-.804.285-1.493.199-1.633z"/></svg>
+                                </a>
                             </div>
                             <div v-if="caso.deudor?.correo_1" class="flex items-center text-xs text-gray-500">
                                 <EnvelopeIcon class="h-3 w-3 mr-1 text-gray-400" /> {{ caso.deudor.correo_1 }}
@@ -226,6 +240,9 @@ const submitNotification = () => {
                             <div v-if="codeudor.celular" class="flex items-center">
                                 <PhoneIcon class="h-3 w-3 mr-2 text-gray-400" />
                                 <span class="text-gray-700 dark:text-gray-300 text-xs">{{ codeudor.celular }}</span>
+                                <a :href="'https://wa.me/57' + codeudor.celular.replace(/\s/g, '')" target="_blank" class="ml-2 p-1 bg-green-100 text-green-600 rounded-full hover:bg-green-600 hover:text-white transition-colors" title="Enviar WhatsApp">
+                                    <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.438 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.397-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.808 2.876 2.056 3.223c.248.348 3.503 5.397 8.486 7.547 1.186.512 2.112.817 2.833 1.046 1.19.379 2.273.326 3.129.199.954-.141 2.031-.83 2.316-1.633.285-.804.285-1.493.199-1.633z"/></svg>
+                                </a>
                             </div>
                             <div v-if="codeudor.correo" class="flex items-center">
                                 <EnvelopeIcon class="h-3 w-3 mr-2 text-gray-400" />
@@ -276,6 +293,11 @@ const submitNotification = () => {
                             v-model="notifForm.fecha_programada" 
                             placeholder="Clic para agendar..."
                         />
+                        <div class="mt-1 flex gap-1">
+                            <button type="button" @click="notifForm.fecha_programada = addDaysToDate(notifForm.fecha_programada, 3)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+3d</button>
+                            <button type="button" @click="notifForm.fecha_programada = addDaysToDate(notifForm.fecha_programada, 5)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+5d</button>
+                            <button type="button" @click="notifForm.fecha_programada = addMonthsToDate(notifForm.fecha_programada, 1)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+1m</button>
+                        </div>
                         <InputError :message="notifForm.errors.fecha_programada" class="mt-1" />
                     </div>
                     

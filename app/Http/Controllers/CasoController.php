@@ -119,7 +119,7 @@ class CasoController extends Controller
             });
         }
 
-        $casos = $query->orderBy('updated_at', 'desc')->paginate(20)->withQueryString();
+        $casos = $query->orderBy('is_pinned', 'desc')->orderBy('updated_at', 'desc')->paginate(20)->withQueryString();
 
         $abogados = [];
         $cooperativas = [];
@@ -426,6 +426,21 @@ class CasoController extends Controller
         ]);
     }
 
+    public function togglePin(Caso $caso)
+    {
+        $this->authorize('update', $caso);
+        $caso->update(['is_pinned' => !$caso->is_pinned]);
+        
+        return back()->with('success', $caso->is_pinned ? 'Caso fijado correctamente.' : 'Caso desfijado.');
+    }
+
+    public function updateChecklist(Request $request, Caso $caso)
+    {
+        $this->authorize('update', $caso);
+        $caso->update(['checklist_seguimiento' => $request->input('checklist', [])]);
+        return back()->with('success', 'Checklist actualizado.');
+    }
+
     public function store(StoreCasoRequest $request): RedirectResponse
     {
         $this->authorize('create', Caso::class);
@@ -653,8 +668,23 @@ class CasoController extends Controller
     public function destroy(Caso $caso): RedirectResponse
     {
         if (Auth::user()->tipo_usuario !== 'admin') return back()->with('error', 'Solo administradores.');
+
+        $id = $caso->id;
+        $deudor = $caso->deudor?->nombre_completo ?? 'N/A';
+        
+        AuditoriaEvento::create([
+            'user_id' => Auth::id(),
+            'evento' => 'SUSPENDER_CASO',
+            'descripcion_breve' => "Caso #{$id} suspendido: Deudor {$deudor}",
+            'auditable_id' => $id,
+            'auditable_type' => Caso::class,
+            'criticidad' => 'alta',
+            'direccion_ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
         $caso->delete();
-        return to_route('casos.index')->with('success', '¡Caso eliminado exitosamente!');
+        return to_route('casos.index')->with('success', '¡Caso movido a la papelera!');
     }
 
     public function close(Request $request, Caso $caso): RedirectResponse

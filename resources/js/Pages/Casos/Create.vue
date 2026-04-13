@@ -26,6 +26,7 @@ import { Head, Link, useForm, useRemember } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
 import axios from 'axios';
 import { debounce } from 'lodash';
+import { formatRadicado, addDaysToDate, addMonthsToDate, toUpperCase, calculateDV } from '@/Utils/formatters';
 
 const props = defineProps({
     casoAClonar: { type: Object, default: null },
@@ -95,19 +96,34 @@ const initialData = {
     clonado_de_id: props.casoAClonar?.id || null,
 };
 
-const rememberedData = useRemember(initialData, 'CreateCasoData');
-const form = useForm(rememberedData.value);
+const form = useForm('CreateCasoData', initialData);
 
-// Sincronizar el form con el remember para que persista al escribir
-watch(() => form.data(), (val) => {
-    rememberedData.value = val;
-}, { deep: true });
+// --- AUTO-FORMATO ---
+watch(() => form.deudor.numero_documento, (newVal) => {
+    if (form.deudor.is_new && form.deudor.tipo_documento === 'NIT' && newVal) {
+        form.deudor.dv = calculateDV(newVal).toString();
+    }
+});
 
 // --- HELPERS DINÁMICOS ---
 const addCodeudor = () => form.codeudores.push({ nombre_completo: '', tipo_documento: 'CC', numero_documento: '', celular: '', correo: '', addresses: [], social_links: [] });
 const removeCodeudor = (index) => form.codeudores.splice(index, 1);
 const addAddress = (idx) => form.codeudores[idx].addresses.push({ label: 'Casa', address: '', city: '' });
 const removeAddress = (idx, addrIdx) => form.codeudores[idx].addresses.splice(addrIdx, 1);
+
+const handleRadicadoInput = (e) => {
+    const formatted = formatRadicado(e.target.value);
+    form.radicado = formatted;
+    e.target.value = formatted;
+};
+
+const addDays = (field, days) => {
+    form[field] = addDaysToDate(form[field], days);
+};
+
+const addMonths = (field, months) => {
+    form[field] = addMonthsToDate(form[field], months);
+};
 
 // --- CASCADA PROCESOS ---
 const formatLabel = (text) => text?.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) || '';
@@ -143,14 +159,20 @@ watch(() => form.subtipo_proceso, (newVal, oldVal) => {
     }
 }, { immediate: true });
 
-watch(form, debounce(() => {
+watch([() => form.radicado, () => form.referencia_credito, () => form.asunto], debounce(() => {
     const url = new URL(window.location);
     // Solo guardamos campos de texto simples para evitar URLs gigantes
     if (form.radicado) url.searchParams.set('radicado', form.radicado);
+    else url.searchParams.delete('radicado');
+    
     if (form.referencia_credito) url.searchParams.set('ref', form.referencia_credito);
+    else url.searchParams.delete('ref');
+    
     if (form.asunto) url.searchParams.set('asunto', form.asunto);
+    else url.searchParams.delete('asunto');
+    
     window.history.replaceState({}, '', url);
-}, 500), { deep: true });
+}, 500));
 
 // Mantener deudor_id sincronizado con la selección
 const casosExistentes = ref([]);
@@ -264,7 +286,7 @@ const submit = () => {
                                         <div v-else class="space-y-4 p-4 border dark:border-gray-700 rounded-lg bg-gray-50/30">
                                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                                 <div class="md:col-span-1">
-                                                    <TextInput v-model="form.deudor.nombre_completo" placeholder="Nombre Completo *" class="w-full" />
+                                                    <TextInput v-model="form.deudor.nombre_completo" @blur="form.deudor.nombre_completo = toUpperCase(form.deudor.nombre_completo)" placeholder="Nombre Completo *" class="w-full" />
                                                     <InputError :message="form.errors['deudor.nombre_completo']" />
                                                 </div>
                                                 <div>
@@ -317,7 +339,12 @@ const submit = () => {
                                     </div>
                                     <div>
                                         <InputLabel value="Número de Radicado" />
-                                        <TextInput v-model="form.radicado" class="mt-1 block w-full" />
+                                        <TextInput 
+                                            v-model="form.radicado" 
+                                            @input="handleRadicadoInput"
+                                            class="mt-1 block w-full font-mono" 
+                                            placeholder="XXXXX-XX-XX-XXX-XXXX-XXXXX-XX"
+                                        />
                                         <InputError :message="form.errors.radicado" />
                                     </div>
                                     <div>
@@ -348,11 +375,20 @@ const submit = () => {
                                     <div>
                                         <InputLabel value="Fecha de Demanda *" />
                                         <DatePicker v-model="form.fecha_apertura" class="mt-1 block w-full" />
+                                        <div class="mt-1 flex gap-1">
+                                            <button type="button" @click="addDays('fecha_apertura', 3)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+3d</button>
+                                            <button type="button" @click="addDays('fecha_apertura', 5)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+5d</button>
+                                            <button type="button" @click="addMonths('fecha_apertura', 1)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+1m</button>
+                                        </div>
                                         <InputError :message="form.errors.fecha_apertura" />
                                     </div>
                                     <div>
                                         <InputLabel value="Fecha de Vencimiento" />
                                         <DatePicker v-model="form.fecha_vencimiento" class="mt-1 block w-full" />
+                                        <div class="mt-1 flex gap-1">
+                                            <button type="button" @click="addMonths('fecha_vencimiento', 6)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+6m</button>
+                                            <button type="button" @click="addMonths('fecha_vencimiento', 12)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+1a</button>
+                                        </div>
                                         <InputError :message="form.errors.fecha_vencimiento" />
                                     </div>
                                     
@@ -493,7 +529,7 @@ const submit = () => {
                                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                             <div class="md:col-span-1">
                                                 <InputLabel :for="'co_nombre_' + index" value="Nombre Completo *" />
-                                                <TextInput :id="'co_nombre_' + index" v-model="codeudor.nombre_completo" class="mt-1 block w-full" placeholder="Nombre completo" required />
+                                                <TextInput :id="'co_nombre_' + index" v-model="codeudor.nombre_completo" @blur="codeudor.nombre_completo = toUpperCase(codeudor.nombre_completo)" class="mt-1 block w-full" placeholder="Nombre completo" required />
                                                 <InputError :message="form.errors[`codeudores.${index}.nombre_completo`]" />
                                             </div>
                                             <div>

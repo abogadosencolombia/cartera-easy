@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import { Head, Link, useForm, useRemember, router } from '@inertiajs/vue3';
 import { debounce } from 'lodash';
+import { formatRadicado, addDaysToDate, addMonthsToDate, toUpperCase, calculateDV } from '@/Utils/formatters';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
@@ -56,6 +57,20 @@ const steps = [
 
 const currentStep = computed(() => steps.find(s => s.id === step.value));
 
+const handleRadicadoInput = (e) => {
+    const formatted = formatRadicado(e.target.value);
+    form.radicado = formatted;
+    e.target.value = formatted;
+};
+
+const addDays = (field, days) => {
+    form[field] = addDaysToDate(form[field], days);
+};
+
+const addMonths = (field, months) => {
+    form[field] = addMonthsToDate(form[field], months);
+};
+
 // --- Form Data ---
 const form = useForm('CreateRadicado', {
   abogado_id: null,
@@ -84,13 +99,34 @@ const form = useForm('CreateRadicado', {
   observaciones: '',
 });
 
+// --- AUTO-FORMATO ---
+watch(() => form.demandantes, (newVal) => {
+    newVal.forEach(d => {
+        if (d.is_new && d.tipo_documento === 'NIT' && d.numero_documento) {
+            d.dv = calculateDV(d.numero_documento).toString();
+        }
+    });
+}, { deep: true });
+
+watch(() => form.demandados, (newVal) => {
+    newVal.forEach(d => {
+        if (d.is_new && d.tipo_documento === 'NIT' && d.numero_documento) {
+            d.dv = calculateDV(d.numero_documento).toString();
+        }
+    });
+}, { deep: true });
+
 // Sincronizar campos principales con la URL
-watch(form, debounce(() => {
+watch([() => form.radicado, () => form.asunto], debounce(() => {
     const url = new URL(window.location);
     if (form.radicado) url.searchParams.set('radicado', form.radicado);
+    else url.searchParams.delete('radicado');
+    
     if (form.asunto) url.searchParams.set('asunto', form.asunto);
+    else url.searchParams.delete('asunto');
+    
     window.history.replaceState({}, '', url);
-}, 500), { deep: true });
+}, 500));
 
 // --- Helpers para Listas Dinámicas ---
 const addDemandante = () => form.demandantes.push({ 
@@ -263,7 +299,12 @@ const submit = () => {
                         <InputLabel value="Número de Radicado (23 dígitos)" class="font-bold text-xs uppercase" />
                         <div class="relative">
                             <ScaleIcon class="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                            <TextInput v-model="form.radicado" class="pl-10 w-full rounded-xl border-gray-200" placeholder="Ej: 05001310300120230000100" />
+                            <TextInput 
+                                v-model="form.radicado" 
+                                @input="handleRadicadoInput"
+                                class="pl-10 w-full rounded-xl border-gray-200 font-mono" 
+                                placeholder="XXXXX-XX-XX-XXX-XXXX-XXXXX-XX" 
+                            />
                         </div>
                         <InputError :message="form.errors.radicado" />
                     </div>
@@ -335,6 +376,7 @@ const submit = () => {
                             <PlusIcon class="w-3.5 h-3.5 mr-1" /> Añadir
                         </button>
                     </div>
+                    <InputError :message="form.errors.demandantes" />
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div v-for="(item, index) in form.demandantes" :key="'dte-'+index" class="p-6 border border-gray-100 dark:border-gray-700 rounded-2xl bg-white dark:bg-gray-800 shadow-sm relative group animate-in zoom-in-95 duration-200">
@@ -351,7 +393,8 @@ const submit = () => {
                                 <AsyncSelect v-model="item.selected" :endpoint="route('personas.search')" placeholder="Buscar por nombre o CC..." label-key="nombre_completo" />
                             </div>
                             <div v-else class="space-y-4 animate-in slide-in-from-top-2 duration-300">
-                                <TextInput v-model="item.nombre_completo" placeholder="Nombre Completo *" class="text-sm w-full" />
+                                <TextInput v-model="item.nombre_completo" @blur="item.nombre_completo = toUpperCase(item.nombre_completo)" placeholder="Nombre Completo *" class="text-sm w-full" />
+                                <InputError :message="form.errors[`demandantes.${index}.nombre_completo`]" />
                                 <div class="grid grid-cols-3 gap-2">
                                     <select v-model="item.tipo_documento" class="text-sm rounded-xl border-gray-200 bg-gray-50">
                                         <option>CC</option><option>NIT</option>
@@ -361,6 +404,7 @@ const submit = () => {
                                         <TextInput v-if="item.tipo_documento === 'NIT'" v-model="item.dv" maxlength="1" placeholder="DV" class="w-10 text-center" />
                                     </div>
                                 </div>
+                                <InputError :message="form.errors[`demandantes.${index}.numero_documento`]" />
                                 <div class="space-y-2">
                                     <AsyncSelect v-model="item.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Vincular empresas * (Mín. 1)" multiple label-key="nombre" />
                                     <AsyncSelect v-model="item.abogados_ids" :endpoint="route('users.search')" placeholder="Vincular abogados..." multiple label-key="name" />
@@ -381,6 +425,7 @@ const submit = () => {
                             <PlusIcon class="w-3.5 h-3.5 mr-1" /> Añadir
                         </button>
                     </div>
+                    <InputError :message="form.errors.demandados" />
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div v-for="(item, index) in form.demandados" :key="'ddo-'+index" class="p-6 border border-gray-100 dark:border-gray-700 rounded-2xl bg-white dark:bg-gray-800 shadow-sm relative group animate-in zoom-in-95 duration-200">
@@ -401,7 +446,8 @@ const submit = () => {
                                     <input type="checkbox" v-model="item.sin_info" class="rounded border-amber-300 text-amber-600" />
                                     <span class="text-[9px] font-black text-amber-700 dark:text-amber-400 uppercase">Sin información (Demandado por identificar)</span>
                                 </label>
-                                <TextInput v-model="item.nombre_completo" placeholder="Nombre o Alias *" class="text-sm w-full" />
+                                <TextInput v-model="item.nombre_completo" @blur="item.nombre_completo = toUpperCase(item.nombre_completo)" placeholder="Nombre o Alias *" class="text-sm w-full" />
+                                <InputError :message="form.errors[`demandados.${index}.nombre_completo`]" />
                                 <div v-if="!item.sin_info" class="grid grid-cols-3 gap-2">
                                     <select v-model="item.tipo_documento" class="text-sm rounded-xl border-gray-200 bg-gray-50">
                                         <option>CC</option><option>NIT</option>
@@ -411,6 +457,7 @@ const submit = () => {
                                         <TextInput v-if="item.tipo_documento === 'NIT'" v-model="item.dv" maxlength="1" placeholder="DV" class="w-10 text-center" />
                                     </div>
                                 </div>
+                                <InputError :message="form.errors[`demandados.${index}.numero_documento`]" />
                                 <div class="space-y-2">
                                     <AsyncSelect v-model="item.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Vincular empresas * (Mín. 1)" multiple label-key="nombre" />
                                     <AsyncSelect v-model="item.abogados_ids" :endpoint="route('users.search')" placeholder="Vincular abogados..." multiple label-key="name" />
@@ -437,6 +484,12 @@ const submit = () => {
                         </div>
                         <InputLabel value="Fecha Próxima Revisión *" class="!text-white !font-black !text-[10px] !uppercase !tracking-widest" />
                         <DatePicker v-model="form.fecha_proxima_revision" class="mt-2 w-full !bg-white/10 !border-white/20 !text-white" required />
+                        <div class="mt-2 flex gap-1">
+                            <button type="button" @click="addDays('fecha_proxima_revision', 3)" class="text-[9px] bg-white/20 px-1.5 py-0.5 rounded font-bold hover:bg-white/40 text-white">+3d</button>
+                            <button type="button" @click="addDays('fecha_proxima_revision', 5)" class="text-[9px] bg-white/20 px-1.5 py-0.5 rounded font-bold hover:bg-white/40 text-white">+5d</button>
+                            <button type="button" @click="addDays('fecha_proxima_revision', 10)" class="text-[9px] bg-white/20 px-1.5 py-0.5 rounded font-bold hover:bg-white/40 text-white">+10d</button>
+                            <button type="button" @click="addMonths('fecha_proxima_revision', 1)" class="text-[9px] bg-white/20 px-1.5 py-0.5 rounded font-bold hover:bg-white/40 text-white">+1m</button>
+                        </div>
                         <p class="text-[10px] text-indigo-100 mt-3 font-bold uppercase tracking-tighter">Obligatorio: Define la fecha en que el sistema generará una alerta de revisión para este proceso.</p>
                         <InputError :message="form.errors.fecha_proxima_revision" class="!text-white font-bold" />
                     </div>
