@@ -25,9 +25,12 @@ class Kernel extends ConsoleKernel
                  ->name('calculate_late_fees');
 
         // --- TAREA DE NOTIFICACIONES ---
+        // Se cambia de dailyAt('08:00') a everyThirtyMinutes() para que procese los lotes (batch) de 20
+        // que quedan pendientes por el límite de ráfaga de Hostinger.
         $schedule->command('alertas:procesar-vencimientos')
-                  ->dailyAt('08:00')
-                  ->timezone('America/Bogota') // <--- LA SOLUCIÓN: Hora de Colombia
+                  ->everyThirtyMinutes()
+                  ->between('07:00', '22:00')
+                  ->timezone('America/Bogota')
                   ->name('generar_alertas_juridicas_financieras');
 
         // NUEVA GESTIÓN DIARIA: Procesar alertas cada 15 minutos

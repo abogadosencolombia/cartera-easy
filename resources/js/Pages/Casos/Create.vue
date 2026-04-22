@@ -8,6 +8,7 @@ import DatePicker from '@/Components/DatePicker.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import Textarea from '@/Components/Textarea.vue';
 import Dropdown from '@/Components/Dropdown.vue';
+import SelectInput from '@/Components/SelectInput.vue';
 import AsyncSelect from '@/Components/AsyncSelect.vue';
 import SearchableSelect from '@/Components/SearchableSelect.vue';
 import { 
@@ -20,7 +21,20 @@ import {
     CheckCircleIcon,
     ClockIcon,
     DocumentTextIcon,
-    ArrowPathIcon
+    ArrowPathIcon,
+    ArrowLeftIcon,
+    PlusIcon,
+    IdentificationIcon,
+    BanknotesIcon,
+    CreditCardIcon,
+    MapPinIcon,
+    AtSymbolIcon,
+    DevicePhoneMobileIcon,
+    ClipboardDocumentCheckIcon,
+    LinkIcon,
+    GlobeAltIcon,
+    HashtagIcon,
+    CalendarDaysIcon
 } from '@heroicons/vue/24/outline';
 import { Head, Link, useForm, useRemember } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
@@ -95,6 +109,11 @@ const initialData = {
     link_expediente: props.casoAClonar?.link_expediente || '',
     clonado_de_id: props.casoAClonar?.id || null,
 };
+
+const selectedJuzgado = ref(null);
+watch(selectedJuzgado, (val) => {
+    form.juzgado_id = val?.id || null;
+});
 
 const form = useForm('CreateCasoData', initialData);
 
@@ -220,411 +239,589 @@ const submit = () => {
     <Head :title="casoAClonar ? 'Clonando Caso' : 'Registrar Nuevo Caso'" />
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="font-semibold text-xl text-blue-500 leading-tight">
-                {{ casoAClonar ? `Clonando Caso #${casoAClonar.id}` : 'Registrar Nuevo Caso' }}
-            </h2>
+            <div class="flex items-center gap-4">
+                <Link :href="route('casos.index')" class="p-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 text-gray-400 hover:text-indigo-600 transition-all">
+                    <ArrowLeftIcon class="h-5 w-5" />
+                </Link>
+                <div>
+                    <h2 class="font-black text-2xl text-gray-900 dark:text-white leading-tight">
+                        {{ casoAClonar ? 'Clonando Expediente' : 'Registrar Nuevo Caso' }}
+                    </h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                        {{ casoAClonar ? `Creando una copia basada en el caso #${casoAClonar.id}` : 'Complete la información para la apertura del proceso jurídico.' }}
+                    </p>
+                </div>
+            </div>
         </template>
 
-        <div class="py-12">
+        <div class="py-8">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <div class="bg-white dark:bg-gray-800 overflow-visible shadow-sm sm:rounded-lg">
-                    <div class="p-6 md:p-8">
-                        <form @submit.prevent="submit" class="space-y-10">
+                <form @submit.prevent="submit" class="space-y-8">
 
-                            <!-- SECCIÓN 1: PARTES -->
-                            <section>
-                                <h3 class="text-lg font-bold border-b dark:border-gray-700 pb-2 mb-6">Partes Involucradas</h3>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <InputLabel value="Cooperativa / Empresa *" />
-                                        <AsyncSelect v-model="form.cooperativa_id" :endpoint="route('cooperativas.search')" placeholder="Seleccione empresa..." label-key="nombre" />
-                                        <InputError :message="form.errors.cooperativa_id" />
+                    <!-- SECCIÓN 1: PARTES -->
+                    <div class="bg-white dark:bg-gray-800 shadow-xl shadow-slate-200/50 dark:shadow-none rounded-3xl border border-gray-100 dark:border-gray-700 overflow-visible">
+                        <div class="p-6 bg-gray-50/50 dark:bg-gray-700/30 border-b border-gray-100 dark:border-gray-700 flex items-center">
+                            <div class="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm mr-3">
+                                <UsersIcon class="h-5 w-5 text-indigo-600" />
+                            </div>
+                            <h3 class="font-bold text-gray-900 dark:text-white uppercase tracking-widest text-xs">Partes Involucradas</h3>
+                        </div>
+                        
+                        <div class="p-8 space-y-8">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div>
+                                    <InputLabel value="Cooperativa / Empresa *" class="font-bold text-xs uppercase text-gray-400 mb-2" />
+                                    <AsyncSelect v-model="form.cooperativa_id" :endpoint="route('cooperativas.search')" placeholder="Seleccione empresa..." label-key="nombre" class="bg-gray-50/50 focus-within:bg-white transition-all rounded-xl" />
+                                    <InputError :message="form.errors.cooperativa_id" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel value="Abogado(s) a Cargo *" class="font-bold text-xs uppercase text-gray-400 mb-2" />
+                                    <AsyncSelect v-model="form.user_id" :endpoint="route('users.search')" multiple placeholder="Asignar responsables..." label-key="name" class="bg-gray-50/50 focus-within:bg-white transition-all rounded-xl" />
+                                    <InputError :message="form.errors.user_id" class="mt-2" />
+                                </div>
+                            </div>
+
+                            <div class="md:col-span-2 pt-6 border-t dark:border-gray-700 space-y-6">
+                                <div class="flex justify-between items-center">
+                                    <InputLabel value="Deudor Principal *" class="font-bold text-xs uppercase text-gray-400" />
+                                    <div class="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-xl">
+                                        <button type="button" @click="form.deudor.is_new = false" 
+                                            :class="!form.deudor.is_new ? 'bg-white dark:bg-gray-800 shadow-sm text-indigo-600 ring-1 ring-gray-200 dark:ring-gray-600' : 'text-gray-500 hover:text-gray-700'"
+                                            class="px-4 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all">
+                                            Buscar Existente
+                                        </button>
+                                        <button type="button" @click="form.deudor.is_new = true" 
+                                            :class="form.deudor.is_new ? 'bg-white dark:bg-gray-800 shadow-sm text-indigo-600 ring-1 ring-gray-200 dark:ring-gray-600' : 'text-gray-500 hover:text-gray-700'"
+                                            class="px-4 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all">
+                                            Registrar Nuevo
+                                        </button>
                                     </div>
-                                    <div>
-                                        <InputLabel value="Abogado(s) a Cargo *" />
-                                        <AsyncSelect v-model="form.user_id" :endpoint="route('users.search')" multiple placeholder="Asignar responsables..." label-key="name" />
-                                        <InputError :message="form.errors.user_id" />
+                                </div>
+
+                                <div v-if="!form.deudor.is_new" class="animate-in fade-in slide-in-from-top-2">
+                                    <AsyncSelect v-model="form.deudor.selected" :endpoint="route('personas.search')" placeholder="Buscar por nombre o documento..." label-key="nombre_completo" class="bg-gray-50/50 focus-within:bg-white transition-all rounded-xl" />
+                                    
+                                    <!-- Listado de Casos Existentes -->
+                                    <div v-if="buscandoCasos" class="mt-3 flex items-center gap-2 text-[10px] text-gray-400 font-bold uppercase tracking-widest italic pl-1">
+                                        <ArrowPathIcon class="w-3 h-3 animate-spin" /> Analizando antecedentes...
                                     </div>
-                                    <div class="md:col-span-2 space-y-4">
-                                        <div class="flex justify-between items-center">
-                                            <InputLabel value="Deudor Principal *" />
-                                            <button type="button" @click="form.deudor.is_new = !form.deudor.is_new" class="text-[10px] font-bold uppercase text-indigo-600">
-                                                {{ form.deudor.is_new ? '← Buscar existente' : '+ Registrar como nuevo' }}
-                                            </button>
-                                        </div>
-                                        <div v-if="!form.deudor.is_new">
-                                            <AsyncSelect v-model="form.deudor.selected" :endpoint="route('personas.search')" placeholder="Buscar por nombre o documento..." label-key="nombre_completo" />
-                                            
-                                            <!-- Listado de Casos Existentes -->
-                                            <div v-if="buscandoCasos" class="mt-2 flex items-center gap-2 text-xs text-gray-500 italic">
-                                                <ArrowPathIcon class="w-3 h-3 animate-spin" /> Buscando antecedentes...
+                                    
+                                    <div v-if="casosExistentes.length > 0" class="mt-6 p-6 bg-amber-50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-800/50 rounded-3xl animate-in zoom-in-95">
+                                        <div class="flex items-center gap-3 mb-4">
+                                            <div class="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                                                <ClockIcon class="w-5 h-5 text-amber-600" />
                                             </div>
-                                            
-                                            <div v-if="casosExistentes.length > 0" class="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl animate-in fade-in slide-in-from-top-2">
-                                                <div class="flex items-center gap-2 mb-3">
-                                                    <ClockIcon class="w-4 h-4 text-amber-600" />
-                                                    <h4 class="text-xs font-black text-amber-800 dark:text-amber-300 uppercase tracking-wider">Atención: Esta persona ya tiene casos registrados ({{ casosExistentes.length }})</h4>
-                                                </div>
-                                                <div class="space-y-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
-                                                    <div v-for="(item, idx) in casosExistentes" :key="idx" class="flex items-center justify-between bg-white dark:bg-gray-800 p-2.5 rounded-lg border border-amber-100 dark:border-amber-900 shadow-sm group">
-                                                        <div class="flex flex-col">
-                                                            <span class="text-[10px] font-black text-indigo-600 uppercase tracking-tighter">{{ item.tipo }} · ID #{{ item.id }}</span>
-                                                            <span class="text-xs font-bold text-gray-700 dark:text-gray-200">{{ item.radicado }}</span>
-                                                            <span class="text-[9px] text-gray-500 font-medium uppercase">{{ item.cooperativa }} · Registrado: {{ item.fecha }}</span>
-                                                        </div>
-                                                        <a :href="item.link" target="_blank" class="p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-indigo-600 hover:text-white">
-                                                            <DocumentTextIcon class="w-4 h-4" />
-                                                        </a>
+                                            <div>
+                                                <h4 class="text-xs font-black text-amber-800 dark:text-amber-300 uppercase tracking-widest">Alerta de Antecedentes</h4>
+                                                <p class="text-[10px] text-amber-600 dark:text-amber-500 font-bold uppercase tracking-tighter">Esta persona ya tiene {{ casosExistentes.length }} casos registrados en el sistema</p>
+                                            </div>
+                                        </div>
+                                        <div class="space-y-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                                            <div v-for="(item, idx) in casosExistentes" :key="idx" class="flex items-center justify-between bg-white/80 dark:bg-gray-800/80 p-4 rounded-2xl border border-amber-100/50 dark:border-amber-900/50 shadow-sm group hover:border-amber-400 transition-colors">
+                                                <div class="flex flex-col">
+                                                    <div class="flex items-center gap-2 mb-1">
+                                                        <span class="text-[10px] font-black text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded-md uppercase tracking-tighter">{{ item.tipo }}</span>
+                                                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">ID #{{ item.id }}</span>
+                                                    </div>
+                                                    <span class="text-sm font-black text-gray-700 dark:text-gray-200">{{ item.radicado }}</span>
+                                                    <div class="flex items-center gap-3 mt-1">
+                                                        <span class="flex items-center gap-1 text-[9px] text-gray-500 font-bold uppercase"><BuildingOfficeIcon class="w-3 h-3" /> {{ item.cooperativa }}</span>
+                                                        <span class="flex items-center gap-1 text-[9px] text-gray-500 font-bold uppercase"><CalendarDaysIcon class="w-3 h-3" /> {{ item.fecha }}</span>
                                                     </div>
                                                 </div>
-                                                <p class="mt-3 text-[10px] text-amber-700 dark:text-amber-400 italic">Haga clic en el icono para revisar el expediente en una pestaña nueva.</p>
+                                                <a :href="item.link" target="_blank" class="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-indigo-600 hover:text-white shadow-lg shadow-indigo-200 dark:shadow-none">
+                                                    <DocumentTextIcon class="w-5 h-5" />
+                                                </a>
                                             </div>
-
-                                            <InputError :message="form.errors.deudor_id" />
-                                            <InputError :message="form.errors['deudor.id']" />
                                         </div>
-                                        <div v-else class="space-y-4 p-4 border dark:border-gray-700 rounded-lg bg-gray-50/30">
-                                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                <div class="md:col-span-1">
-                                                    <TextInput v-model="form.deudor.nombre_completo" @blur="form.deudor.nombre_completo = toUpperCase(form.deudor.nombre_completo)" placeholder="Nombre Completo *" class="w-full" />
-                                                    <InputError :message="form.errors['deudor.nombre_completo']" />
+                                        <p class="mt-4 text-[10px] text-amber-700/60 dark:text-amber-500/60 font-medium italic text-center">Utilice el icono de documento para abrir el expediente en una pestaña nueva.</p>
+                                    </div>
+
+                                    <InputError :message="form.errors.deudor_id" class="mt-2" />
+                                    <InputError :message="form.errors['deudor.id']" class="mt-2" />
+                                </div>
+                                <div v-else class="animate-in fade-in slide-in-from-top-2 space-y-6 p-8 bg-gray-50/50 dark:bg-gray-900/30 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div class="md:col-span-2">
+                                            <InputLabel value="Nombre Completo *" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
+                                            <TextInput v-model="form.deudor.nombre_completo" @blur="form.deudor.nombre_completo = toUpperCase(form.deudor.nombre_completo)" placeholder="EJ: PEDRO PÉREZ" class="w-full bg-white transition-all" />
+                                            <InputError :message="form.errors['deudor.nombre_completo']" class="mt-2" />
+                                        </div>
+                                        <div>
+                                            <InputLabel value="Tipo Documento" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
+                                            <SelectInput v-model="form.deudor.tipo_documento">
+                                                <option>CC</option>
+                                                <option>NIT</option>
+                                                <option>CE</option>
+                                            </SelectInput>
+                                            <InputError :message="form.errors['deudor.tipo_documento']" class="mt-2" />
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div class="md:col-span-1">
+                                            <InputLabel value="Número Documento *" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
+                                            <div :class="form.deudor.tipo_documento === 'NIT' ? 'grid grid-cols-4 gap-2' : ''">
+                                                <div :class="form.deudor.tipo_documento === 'NIT' ? 'col-span-3' : ''">
+                                                    <TextInput v-model="form.deudor.numero_documento" placeholder="Número *" class="w-full bg-white transition-all" />
                                                 </div>
-                                                <div>
-                                                    <select v-model="form.deudor.tipo_documento" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900">
-                                                        <option>CC</option>
-                                                        <option>NIT</option>
-                                                        <option>CE</option>
-                                                    </select>
-                                                    <InputError :message="form.errors['deudor.tipo_documento']" />
-                                                </div>
-                                                <div>
-                                                    <InputLabel value="Número Documento *" />
-                                                    <div :class="form.deudor.tipo_documento === 'NIT' ? 'grid grid-cols-4 gap-2' : ''">
-                                                        <div :class="form.deudor.tipo_documento === 'NIT' ? 'col-span-3' : ''">
-                                                            <TextInput v-model="form.deudor.numero_documento" placeholder="Número *" class="w-full" />
-                                                        </div>
-                                                        <div v-if="form.deudor.tipo_documento === 'NIT'">
-                                                            <TextInput v-model="form.deudor.dv" maxlength="1" placeholder="DV" class="w-full text-center px-0" />
-                                                        </div>
-                                                    </div>
-                                                    <InputError :message="form.errors['deudor.numero_documento']" />
-                                                    <InputError :message="form.errors['deudor.dv']" />
-                                                </div>
-                                                <div>
-                                                    <TextInput v-model="form.deudor.celular_1" placeholder="Celular *" class="w-full" />
-                                                    <InputError :message="form.errors['deudor.celular_1']" />
-                                                </div>
-                                                <div class="md:col-span-2">
-                                                    <TextInput v-model="form.deudor.correo_1" type="email" placeholder="Correo Electrónico *" class="w-full" />
-                                                    <InputError :message="form.errors['deudor.correo_1']" />
+                                                <div v-if="form.deudor.tipo_documento === 'NIT'">
+                                                    <TextInput v-model="form.deudor.dv" maxlength="1" placeholder="DV" class="w-full text-center px-0 bg-white transition-all font-black" />
                                                 </div>
                                             </div>
-                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <AsyncSelect v-model="form.deudor.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Asignar cooperativas..." multiple label-key="nombre" />
-                                                <AsyncSelect v-model="form.deudor.abogados_ids" :endpoint="route('users.search')" placeholder="Asignar abogados..." multiple label-key="name" />
-                                            </div>
+                                            <InputError :message="form.errors['deudor.numero_documento']" class="mt-2" />
+                                            <InputError :message="form.errors['deudor.dv']" class="mt-2" />
+                                        </div>
+                                        <div>
+                                            <InputLabel value="Celular *" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
+                                            <TextInput v-model="form.deudor.celular_1" placeholder="300 000 0000" class="w-full bg-white transition-all" />
+                                            <InputError :message="form.errors['deudor.celular_1']" class="mt-2" />
+                                        </div>
+                                        <div>
+                                            <InputLabel value="Correo Electrónico *" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
+                                            <TextInput v-model="form.deudor.correo_1" type="email" placeholder="correo@ejemplo.com" class="w-full bg-white transition-all" />
+                                            <InputError :message="form.errors['deudor.correo_1']" class="mt-2" />
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <InputLabel value="Vincular a Cooperativas" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
+                                            <AsyncSelect v-model="form.deudor.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Asignar cooperativas..." multiple label-key="nombre" class="bg-white transition-all rounded-xl" />
+                                        </div>
+                                        <div>
+                                            <InputLabel value="Asignar Abogados" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
+                                            <AsyncSelect v-model="form.deudor.abogados_ids" :endpoint="route('users.search')" placeholder="Asignar abogados..." multiple label-key="name" class="bg-white transition-all rounded-xl" />
                                         </div>
                                     </div>
                                 </div>
-                            </section>
+                            </div>
+                        </div>
+                    </div>
 
-                            <!-- SECCIÓN 2: CRÉDITO Y PROCESO -->
-                            <section>
-                                <h3 class="text-lg font-bold border-b dark:border-gray-700 pb-2 mb-6">Información del Crédito y Proceso</h3>
-                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    <div>
-                                        <InputLabel value="Número De Pagaré" />
-                                        <TextInput v-model="form.referencia_credito" class="mt-1 block w-full" />
-                                        <InputError :message="form.errors.referencia_credito" />
+                    <!-- SECCIÓN 2: CRÉDITO Y PROCESO -->
+                    <div class="bg-white dark:bg-gray-800 shadow-xl shadow-slate-200/50 dark:shadow-none rounded-3xl border border-gray-100 dark:border-gray-700 overflow-visible">
+                        <div class="p-6 bg-gray-50/50 dark:bg-gray-700/30 border-b border-gray-100 dark:border-gray-700 flex items-center">
+                            <div class="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm mr-3">
+                                <ScaleIcon class="h-5 w-5 text-indigo-600" />
+                            </div>
+                            <h3 class="font-bold text-gray-900 dark:text-white uppercase tracking-widest text-xs">Información del Crédito y Proceso</h3>
+                        </div>
+                        
+                        <div class="p-8 space-y-10">
+                            <!-- Fila 1: Identificadores -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                <div>
+                                    <InputLabel value="Número De Pagaré" class="font-bold text-xs uppercase text-gray-400 mb-2" />
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <ClipboardDocumentCheckIcon class="h-4 w-4 text-gray-400" />
+                                        </div>
+                                        <TextInput v-model="form.referencia_credito" class="pl-10 block w-full bg-gray-50/50 focus:bg-white transition-all" />
                                     </div>
-                                    <div>
-                                        <InputLabel value="Número de Radicado" />
+                                    <InputError :message="form.errors.referencia_credito" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel value="Número de Radicado" class="font-bold text-xs uppercase text-gray-400 mb-2" />
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <HashtagIcon class="h-4 w-4 text-gray-400" />
+                                        </div>
                                         <TextInput 
                                             v-model="form.radicado" 
                                             @input="handleRadicadoInput"
-                                            class="mt-1 block w-full font-mono" 
+                                            class="pl-10 block w-full font-mono bg-gray-50/50 focus:bg-white transition-all" 
                                             placeholder="XXXXX-XX-XX-XXX-XXXX-XXXXX-XX"
                                         />
-                                        <InputError :message="form.errors.radicado" />
                                     </div>
-                                    <div>
-                                        <InputLabel value="Monto de Crédito *" />
-                                        <TextInput v-model="form.monto_total" type="number" step="0.01" class="mt-1 block w-full" />
-                                        <InputError :message="form.errors.monto_total" />
-                                    </div>
-                                    <div>
-                                        <InputLabel value="Monto Deuda Actual" />
-                                        <TextInput v-model="form.monto_deuda_actual" type="number" step="0.01" class="mt-1 block w-full" />
-                                        <InputError :message="form.errors.monto_deuda_actual" />
-                                    </div>
-                                    <div>
-                                        <InputLabel value="Total Pagado" />
-                                        <TextInput v-model="form.monto_total_pagado" type="number" step="0.01" class="mt-1 block w-full" />
-                                        <InputError :message="form.errors.monto_total_pagado" />
-                                    </div>
-                                    <div>
-                                        <InputLabel value="Tasa Interés Corriente *" />
-                                        <TextInput v-model="form.tasa_interes_corriente" type="number" step="0.01" class="mt-1 block w-full" />
-                                        <InputError :message="form.errors.tasa_interes_corriente" />
-                                    </div>
-                                    <div>
-                                        <InputLabel value="Fecha Inicio Crédito" />
-                                        <DatePicker v-model="form.fecha_inicio_credito" class="mt-1 block w-full" />
-                                        <InputError :message="form.errors.fecha_inicio_credito" />
-                                    </div>
-                                    <div>
-                                        <InputLabel value="Fecha de Demanda *" />
-                                        <DatePicker v-model="form.fecha_apertura" class="mt-1 block w-full" />
-                                        <div class="mt-1 flex gap-1">
-                                            <button type="button" @click="addDays('fecha_apertura', 3)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+3d</button>
-                                            <button type="button" @click="addDays('fecha_apertura', 5)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+5d</button>
-                                            <button type="button" @click="addMonths('fecha_apertura', 1)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+1m</button>
+                                    <InputError :message="form.errors.radicado" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel value="Tasa Interés Corriente *" class="font-bold text-xs uppercase text-gray-400 mb-2" />
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <span class="text-gray-400 font-black text-sm">%</span>
                                         </div>
-                                        <InputError :message="form.errors.fecha_apertura" />
+                                        <TextInput v-model="form.tasa_interes_corriente" type="number" step="0.01" class="pl-10 block w-full bg-gray-50/50 focus:bg-white transition-all" />
                                     </div>
-                                    <div>
-                                        <InputLabel value="Fecha de Vencimiento" />
-                                        <DatePicker v-model="form.fecha_vencimiento" class="mt-1 block w-full" />
-                                        <div class="mt-1 flex gap-1">
-                                            <button type="button" @click="addMonths('fecha_vencimiento', 6)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+6m</button>
-                                            <button type="button" @click="addMonths('fecha_vencimiento', 12)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+1a</button>
+                                    <InputError :message="form.errors.tasa_interes_corriente" class="mt-2" />
+                                </div>
+                            </div>
+
+                            <!-- Fila 2: Valores Financieros -->
+                            <div class="p-8 bg-indigo-50/30 dark:bg-indigo-900/10 rounded-3xl border border-indigo-100 dark:border-indigo-800/50 grid grid-cols-1 md:grid-cols-3 gap-8">
+                                <div>
+                                    <InputLabel value="Monto de Crédito *" class="font-bold text-[10px] uppercase text-indigo-400 mb-2" />
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <BanknotesIcon class="h-4 w-4 text-indigo-500" />
                                         </div>
-                                        <InputError :message="form.errors.fecha_vencimiento" />
+                                        <TextInput v-model="form.monto_total" type="number" step="0.01" class="pl-10 block w-full bg-white transition-all font-black text-indigo-700" />
                                     </div>
-                                    
-                                    <div>
-                                        <InputLabel value="Especialidad *" />
-                                        <SearchableSelect
-                                            v-model="form.especialidad_id"
-                                            :options="especialidades"
-                                            :featured-options="[8, 12, 10, 11]" 
-                                            value-key="id"
-                                            label-key="nombre"
-                                            :format-label="formatLabel"
-                                            placeholder="Seleccione especialidad..."
-                                        />
-                                        <InputError :message="form.errors.especialidad_id" />
+                                    <InputError :message="form.errors.monto_total" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel value="Monto Deuda Actual" class="font-bold text-[10px] uppercase text-indigo-400 mb-2" />
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <CreditCardIcon class="h-4 w-4 text-rose-400" />
+                                        </div>
+                                        <TextInput v-model="form.monto_deuda_actual" type="number" step="0.01" class="pl-10 block w-full bg-white transition-all font-black text-rose-600" />
+                                    </div>
+                                    <InputError :message="form.errors.monto_deuda_actual" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel value="Total Pagado" class="font-bold text-[10px] uppercase text-indigo-400 mb-2" />
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <CheckCircleIcon class="h-4 w-4 text-emerald-500" />
+                                        </div>
+                                        <TextInput v-model="form.monto_total_pagado" type="number" step="0.01" class="pl-10 block w-full bg-white transition-all font-black text-emerald-600" />
+                                    </div>
+                                    <InputError :message="form.errors.monto_total_pagado" class="mt-2" />
+                                </div>
+                            </div>
+
+                            <!-- Fila 3: Fechas -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                <div>
+                                    <InputLabel value="Fecha Inicio Crédito" class="font-bold text-xs uppercase text-gray-400 mb-2" />
+                                    <DatePicker v-model="form.fecha_inicio_credito" class="block w-full bg-gray-50/50 focus-within:bg-white transition-all" />
+                                    <InputError :message="form.errors.fecha_inicio_credito" class="mt-2" />
+                                </div>
+                                <div>
+                                    <div class="flex justify-between items-center mb-2">
+                                        <InputLabel value="Fecha de Demanda *" class="font-bold text-xs uppercase text-gray-400" />
+                                        <div class="flex gap-1">
+                                            <button type="button" @click="addDays('fecha_apertura', 3)" class="text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-black hover:bg-indigo-600 hover:text-white transition-colors">+3D</button>
+                                            <button type="button" @click="addMonths('fecha_apertura', 1)" class="text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-black hover:bg-indigo-600 hover:text-white transition-colors">+1M</button>
+                                        </div>
+                                    </div>
+                                    <DatePicker v-model="form.fecha_apertura" class="block w-full bg-gray-50/50 focus-within:bg-white transition-all" />
+                                    <InputError :message="form.errors.fecha_apertura" class="mt-2" />
+                                </div>
+                                <div>
+                                    <div class="flex justify-between items-center mb-2">
+                                        <InputLabel value="Fecha de Vencimiento" class="font-bold text-xs uppercase text-gray-400" />
+                                        <div class="flex gap-1">
+                                            <button type="button" @click="addMonths('fecha_vencimiento', 6)" class="text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-black hover:bg-indigo-600 hover:text-white transition-colors">+6M</button>
+                                            <button type="button" @click="addMonths('fecha_vencimiento', 12)" class="text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-black hover:bg-indigo-600 hover:text-white transition-colors">+1A</button>
+                                        </div>
+                                    </div>
+                                    <DatePicker v-model="form.fecha_vencimiento" class="block w-full bg-gray-50/50 focus-within:bg-white transition-all" />
+                                    <InputError :message="form.errors.fecha_vencimiento" class="mt-2" />
+                                </div>
+                            </div>
+
+                            <!-- Fila 4: Clasificación Procesal -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-6 border-t dark:border-gray-700">
+                                <div>
+                                    <InputLabel value="Especialidad *" class="font-bold text-xs uppercase text-gray-400 mb-2" />
+                                    <SearchableSelect
+                                        v-model="form.especialidad_id"
+                                        :options="especialidades"
+                                        :featured-options="[8, 12, 10, 11]" 
+                                        value-key="id"
+                                        label-key="nombre"
+                                        :format-label="formatLabel"
+                                        placeholder="Seleccione..."
+                                        class="bg-gray-50/50 rounded-xl"
+                                    />
+                                    <InputError :message="form.errors.especialidad_id" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel value="Tipo de Proceso *" class="font-bold text-xs uppercase text-gray-400 mb-2" />
+                                    <SearchableSelect
+                                        v-model="form.tipo_proceso"
+                                        :options="tiposDisponibles"
+                                        value-key="nombre"
+                                        label-key="nombre"
+                                        :format-label="formatLabel"
+                                        :disabled="!form.especialidad_id"
+                                        placeholder="Seleccione..."
+                                        class="bg-gray-50/50 rounded-xl"
+                                    />
+                                    <InputError :message="form.errors.tipo_proceso" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel value="Proceso *" class="font-bold text-xs uppercase text-gray-400 mb-2" />
+                                    <SearchableSelect
+                                        v-model="form.subtipo_proceso"
+                                        :options="subtiposDisponibles"
+                                        value-key="nombre"
+                                        label-key="nombre"
+                                        :format-label="formatLabel"
+                                        :disabled="!form.tipo_proceso"
+                                        placeholder="Seleccione..."
+                                        class="bg-gray-50/50 rounded-xl"
+                                    />
+                                    <InputError :message="form.errors.subtipo_proceso" class="mt-2" />
+                                </div>
+                                <div class="md:col-span-2">
+                                    <InputLabel value="Subproceso (Detalle)" class="font-bold text-xs uppercase text-gray-400 mb-2" />
+                                    <SearchableSelect
+                                        v-model="form.subproceso"
+                                        :options="subprocesosDisponibles"
+                                        value-key="nombre"
+                                        label-key="nombre"
+                                        :disabled="!form.subtipo_proceso"
+                                        placeholder="Especifique subproceso..."
+                                        class="bg-gray-50/50 rounded-xl"
+                                    />
+                                    <InputError :message="form.errors.subproceso" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel value="Etapa Procesal Actual" class="font-bold text-xs uppercase text-gray-400 mb-2" />
+                                    <SearchableSelect
+                                        v-model="form.etapa_procesal"
+                                        :options="etapas_procesales.map(e => ({ id: e, nombre: e }))"
+                                        :featured-options="[1220, 1233, 1281]"
+                                        value-key="id"
+                                        label-key="nombre"
+                                        :format-label="formatLabel"
+                                        placeholder="Definir etapa..."
+                                        class="bg-gray-50/50 rounded-xl"
+                                    />
+                                    <InputError :message="form.errors.etapa_procesal" class="mt-2" />
+                                </div>
+                            </div>
+
+                            <!-- Fila 5: Ubicación y Garantías -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                <div class="lg:col-span-3">
+                                    <InputLabel value="Juzgado / Despacho Judicial" class="font-bold text-xs uppercase text-gray-400 mb-2" />
+                                    <AsyncSelect v-model="selectedJuzgado" :endpoint="route('juzgados.search')" placeholder="Escriba el nombre del despacho..." label-key="nombre" class="bg-gray-50/50 focus-within:bg-white transition-all rounded-xl" />
+                                    <InputError :message="form.errors.juzgado_id" class="mt-2" />
+                                </div>
+
+                                <div>
+                                    <InputLabel value="Tipo de Garantía *" class="font-bold text-xs uppercase text-gray-400 mb-2" />
+                                    <SelectInput v-model="form.tipo_garantia_asociada">
+                                        <option value="codeudor">Codeudor</option>
+                                        <option value="hipotecaria">Hipotecaria</option>
+                                        <option value="prendaria">Prendaria</option>
+                                        <option value="sin garantía">Sin garantía</option>
+                                    </SelectInput>
+                                    <InputError :message="form.errors.tipo_garantia_asociada" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel value="Origen Documental *" class="font-bold text-xs uppercase text-gray-400 mb-2" />
+                                    <SelectInput v-model="form.origen_documental">
+                                        <option value="pagaré">Pagaré</option>
+                                        <option value="libranza">Libranza</option>
+                                        <option value="contrato">Contrato</option>
+                                        <option value="otro">Otro</option>
+                                    </SelectInput>
+                                    <InputError :message="form.errors.origen_documental" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel value="Canal de Notificación" class="font-bold text-xs uppercase text-gray-400 mb-2" />
+                                    <SelectInput v-model="form.medio_contacto">
+                                        <option :value="null">-- No especificado --</option>
+                                        <option value="email">Correo Electrónico</option>
+                                        <option value="whatsapp">WhatsApp Business</option>
+                                        <option value="telefono">Llamada Telefónica</option>
+                                    </SelectInput>
+                                    <InputError :message="form.errors.medio_contacto" class="mt-2" />
+                                </div>
+                            </div>
+
+                            <!-- Fila 6: Enlaces Digitales -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t dark:border-gray-700">
+                                <div>
+                                    <InputLabel value="URL Carpeta Drive (Repositorio)" class="font-bold text-xs uppercase text-gray-400 mb-2" />
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <LinkIcon class="h-4 w-4 text-indigo-400" />
+                                        </div>
+                                        <TextInput v-model="form.link_drive" type="url" class="pl-10 block w-full bg-gray-50/50 focus:bg-white transition-all text-xs" placeholder="https://drive.google.com/..." />
+                                    </div>
+                                    <InputError :message="form.errors.link_drive" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel value="URL Expediente Digital (Tyba/Samai)" class="font-bold text-xs uppercase text-gray-400 mb-2" />
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <GlobeAltIcon class="h-4 w-4 text-emerald-400" />
+                                        </div>
+                                        <TextInput v-model="form.link_expediente" type="url" class="pl-10 block w-full bg-gray-50/50 focus:bg-white transition-all text-xs" placeholder="https://procesos.ramajudicial.gov.co/..." />
+                                    </div>
+                                    <InputError :message="form.errors.link_expediente" class="mt-2" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN 3: CODEUDORES -->
+                    <div class="bg-white dark:bg-gray-800 shadow-xl shadow-slate-200/50 dark:shadow-none rounded-3xl border border-gray-100 dark:border-gray-700 overflow-visible">
+                        <div class="p-6 bg-gray-50/50 dark:bg-gray-700/30 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                            <div class="flex items-center">
+                                <div class="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm mr-3">
+                                    <BriefcaseIcon class="h-5 w-5 text-indigo-600" />
+                                </div>
+                                <h3 class="font-bold text-gray-900 dark:text-white uppercase tracking-widest text-xs">Codeudores Adicionales</h3>
+                            </div>
+                            <button type="button" @click="addCodeudor" class="text-[10px] font-black uppercase tracking-widest bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 dark:shadow-none flex items-center gap-2">
+                                <PlusIcon class="h-3 w-3" /> Añadir Codeudor
+                            </button>
+                        </div>
+
+                        <div class="p-8 space-y-8">
+                            <div v-if="form.codeudores.length === 0" class="py-16 border-2 border-dashed border-gray-100 dark:border-gray-700 rounded-3xl text-center">
+                                <div class="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-full w-fit mx-auto mb-4 text-gray-300">
+                                    <UsersIcon class="h-10 w-10" />
+                                </div>
+                                <p class="text-sm text-gray-400 font-bold uppercase tracking-widest px-8">No se han vinculado codeudores</p>
+                                <p class="text-xs text-gray-400/60 mt-1 italic">Haga clic en el botón superior para agregar un deudor solidario.</p>
+                            </div>
+
+                            <div v-for="(codeudor, index) in form.codeudores" :key="index" class="p-8 bg-gray-50/50 dark:bg-gray-900/40 rounded-3xl border border-gray-200 dark:border-gray-700 relative animate-in zoom-in-95 group/card">
+                                <button type="button" @click="removeCodeudor(index)" class="absolute -top-3 -right-3 bg-rose-500 text-white p-2 rounded-full shadow-lg hover:bg-rose-600 transition-transform hover:scale-110 opacity-0 group-hover/card:opacity-100">
+                                    <TrashIcon class="h-5 w-5" />
+                                </button>
+
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                    <div class="md:col-span-1">
+                                        <InputLabel :for="'co_nombre_' + index" value="Nombre Completo *" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
+                                        <TextInput :id="'co_nombre_' + index" v-model="codeudor.nombre_completo" @blur="codeudor.nombre_completo = toUpperCase(codeudor.nombre_completo)" class="mt-1 block w-full bg-white font-bold" placeholder="Nombre completo" required />
+                                        <InputError :message="form.errors[`codeudores.${index}.nombre_completo`]" class="mt-2" />
                                     </div>
                                     <div>
-                                        <InputLabel value="Tipo de Proceso *" />
-                                        <SearchableSelect
-                                            v-model="form.tipo_proceso"
-                                            :options="tiposDisponibles"
-                                            value-key="nombre"
-                                            label-key="nombre"
-                                            :format-label="formatLabel"
-                                            :disabled="!form.especialidad_id"
-                                            placeholder="Seleccione tipo..."
-                                        />
-                                        <InputError :message="form.errors.tipo_proceso" />
+                                        <InputLabel :for="'co_tipo_doc_' + index" value="Tipo Documento" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
+                                        <SelectInput :id="'co_tipo_doc_' + index" v-model="codeudor.tipo_documento">
+                                            <option value="CC">Cédula de Ciudadanía</option>
+                                            <option value="NIT">NIT</option>
+                                            <option value="CE">Cédula de Extranjería</option>
+                                        </SelectInput>
                                     </div>
                                     <div>
-                                        <InputLabel value="Proceso *" />
-                                        <SearchableSelect
-                                            v-model="form.subtipo_proceso"
-                                            :options="subtiposDisponibles"
-                                            value-key="nombre"
-                                            label-key="nombre"
-                                            :format-label="formatLabel"
-                                            :disabled="!form.tipo_proceso"
-                                            placeholder="Seleccione proceso..."
-                                        />
-                                        <InputError :message="form.errors.subtipo_proceso" />
+                                        <InputLabel :for="'co_doc_' + index" value="Número Documento *" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
+                                        <div :class="codeudor.tipo_documento === 'NIT' ? 'grid grid-cols-4 gap-2' : ''">
+                                            <div :class="codeudor.tipo_documento === 'NIT' ? 'col-span-3' : ''">
+                                                <TextInput :id="'co_doc_' + index" v-model="codeudor.numero_documento" class="mt-1 block w-full bg-white font-bold" placeholder="Documento" required />
+                                            </div>
+                                            <div v-if="codeudor.tipo_documento === 'NIT'">
+                                                <TextInput v-model="codeudor.dv" maxlength="1" placeholder="DV" class="mt-1 block w-full text-center px-0 bg-white font-black" />
+                                            </div>
+                                        </div>
+                                        <InputError :message="form.errors[`codeudores.${index}.numero_documento`]" class="mt-2" />
+                                        <InputError :message="form.errors[`codeudores.${index}.dv`]" class="mt-2" />
+                                    </div>
+                                    <div>
+                                        <InputLabel :for="'co_celular_' + index" value="Celular" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
+                                        <div class="relative">
+                                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <DevicePhoneMobileIcon class="h-4 w-4 text-gray-400" />
+                                            </div>
+                                            <TextInput :id="'co_celular_' + index" v-model="codeudor.celular" class="pl-10 mt-1 block w-full bg-white" placeholder="Ej: 3001234567" />
+                                        </div>
                                     </div>
                                     <div class="md:col-span-2">
-                                        <InputLabel value="Subproceso (Detalle)" />
-                                        <SearchableSelect
-                                            v-model="form.subproceso"
-                                            :options="subprocesosDisponibles"
-                                            value-key="nombre"
-                                            label-key="nombre"
-                                            :disabled="!form.subtipo_proceso"
-                                            placeholder="Seleccione subproceso..."
-                                        />
-                                        <InputError :message="form.errors.subproceso" />
-                                    </div>
-                                    
-                                    <div>
-                                        <InputLabel value="Etapa Procesal" />
-                                        <SearchableSelect
-                                            v-model="form.etapa_procesal"
-                                            :options="etapas_procesales.map(e => ({ id: e, nombre: e }))"
-                                            :featured-options="[1220, 1233, 1281]"
-                                            value-key="id"
-                                            label-key="nombre"
-                                            :format-label="formatLabel"
-                                            placeholder="Seleccione etapa..."
-                                        />
-                                        <InputError :message="form.errors.etapa_procesal" />
-                                    </div>
-
-                                    <div class="lg:col-span-3">
-                                        <InputLabel value="Juzgado" />
-                                        <AsyncSelect v-model="form.juzgado_id" :endpoint="route('juzgados.search')" placeholder="Buscar despacho..." label-key="nombre" />
-                                        <InputError :message="form.errors.juzgado_id" />
-                                    </div>
-
-                                    <div>
-                                        <InputLabel value="Tipo de Garantía *" />
-                                        <select v-model="form.tipo_garantia_asociada" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
-                                            <option value="codeudor">Codeudor</option>
-                                            <option value="hipotecaria">Hipotecaria</option>
-                                            <option value="prendaria">Prendaria</option>
-                                            <option value="sin garantía">Sin garantía</option>
-                                        </select>
-                                        <InputError :message="form.errors.tipo_garantia_asociada" />
-                                    </div>
-                                    <div>
-                                        <InputLabel value="Origen Documental *" />
-                                        <select v-model="form.origen_documental" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
-                                            <option value="pagaré">Pagaré</option>
-                                            <option value="libranza">Libranza</option>
-                                            <option value="contrato">Contrato</option>
-                                            <option value="otro">Otro</option>
-                                        </select>
-                                        <InputError :message="form.errors.origen_documental" />
-                                    </div>
-                                    <div>
-                                        <InputLabel value="Medio de Contacto" />
-                                        <select v-model="form.medio_contacto" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
-                                            <option :value="null">-- Seleccione --</option>
-                                            <option value="email">Email</option>
-                                            <option value="whatsapp">WhatsApp</option>
-                                            <option value="telefono">Teléfono</option>
-                                        </select>
-                                        <InputError :message="form.errors.medio_contacto" />
-                                    </div>
-                                    <div class="lg:col-span-2">
-                                        <InputLabel value="URL Carpeta Drive (Opcional)" />
-                                        <TextInput v-model="form.link_drive" type="url" class="mt-1 block w-full" placeholder="https://drive.google.com/..." />
-                                        <InputError :message="form.errors.link_drive" />
-                                    </div>
-                                    <div class="lg:col-span-1">
-                                        <InputLabel value="URL Expediente Digital (Opcional)" />
-                                        <TextInput v-model="form.link_expediente" type="url" class="mt-1 block w-full" placeholder="https://expediente.justicia.gov.co/..." />
-                                        <InputError :message="form.errors.link_expediente" />
-                                    </div>
-                                </div>
-                            </section>
-
-                            <!-- SECCIÓN 3: CODEUDORES -->
-                            <section>
-                                <div class="flex justify-between items-center border-b dark:border-gray-700 pb-2 mb-6">
-                                    <h3 class="text-lg font-bold">Codeudores (Opcional)</h3>
-                                    <SecondaryButton type="button" @click="addCodeudor" class="text-xs">
-                                        + Añadir Codeudor
-                                    </SecondaryButton>
-                                </div>
-
-                                <div v-if="form.codeudores.length === 0" class="text-center py-8 text-gray-500 bg-gray-50/30 rounded-lg border-2 border-dashed dark:border-gray-700">
-                                    No se han añadido codeudores a este caso.
-                                </div>
-
-                                <div class="space-y-6">
-                                    <div v-for="(codeudor, index) in form.codeudores" :key="index" class="p-6 border dark:border-gray-700 rounded-lg bg-gray-50/20 relative">
-                                        <button type="button" @click="removeCodeudor(index)" class="absolute top-4 right-4 text-red-500 hover:text-red-700">
-                                            <TrashIcon class="h-5 w-5" />
-                                        </button>
-
-                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                            <div class="md:col-span-1">
-                                                <InputLabel :for="'co_nombre_' + index" value="Nombre Completo *" />
-                                                <TextInput :id="'co_nombre_' + index" v-model="codeudor.nombre_completo" @blur="codeudor.nombre_completo = toUpperCase(codeudor.nombre_completo)" class="mt-1 block w-full" placeholder="Nombre completo" required />
-                                                <InputError :message="form.errors[`codeudores.${index}.nombre_completo`]" />
+                                        <InputLabel :for="'co_email_' + index" value="Correo Electrónico" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
+                                        <div class="relative">
+                                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <AtSymbolIcon class="h-4 w-4 text-gray-400" />
                                             </div>
-                                            <div>
-                                                <InputLabel :for="'co_tipo_doc_' + index" value="Tipo Documento" />
-                                                <select :id="'co_tipo_doc_' + index" v-model="codeudor.tipo_documento" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm">
-                                                    <option value="CC">Cédula de Ciudadanía</option>
-                                                    <option value="NIT">NIT</option>
-                                                    <option value="CE">Cédula de Extranjería</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <InputLabel :for="'co_doc_' + index" value="Número Documento *" />
-                                                <div :class="codeudor.tipo_documento === 'NIT' ? 'grid grid-cols-4 gap-2' : ''">
-                                                    <div :class="codeudor.tipo_documento === 'NIT' ? 'col-span-3' : ''">
-                                                        <TextInput :id="'co_doc_' + index" v-model="codeudor.numero_documento" class="mt-1 block w-full" placeholder="Documento" required />
-                                                    </div>
-                                                    <div v-if="codeudor.tipo_documento === 'NIT'">
-                                                        <TextInput v-model="codeudor.dv" maxlength="1" placeholder="DV" class="mt-1 block w-full text-center px-0" />
-                                                    </div>
+                                            <TextInput :id="'co_email_' + index" v-model="codeudor.correo" type="email" class="pl-10 mt-1 block w-full bg-white" placeholder="correo@ejemplo.com" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- --- DETALLE ADICIONAL: DIRECCIONES Y REDES --- -->
+                                <div class="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-10 pt-8 border-t border-gray-200/50 dark:border-gray-700/50">
+                                    <!-- Direcciones -->
+                                    <div class="space-y-4">
+                                        <div class="flex justify-between items-center bg-white/50 dark:bg-gray-800/50 p-2 pl-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                                            <h4 class="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+                                                <MapPinIcon class="h-4 w-4" /> Ubicaciones
+                                            </h4>
+                                            <button type="button" @click="addAddress(index)" class="text-[9px] font-black uppercase tracking-widest bg-white dark:bg-gray-700 text-indigo-600 px-3 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-900 shadow-sm hover:bg-indigo-600 hover:text-white transition-all">
+                                                + Nueva Dirección
+                                            </button>
+                                        </div>
+                                        <div class="grid grid-cols-1 gap-4">
+                                            <div v-for="(addr, aIdx) in codeudor.addresses" :key="aIdx" class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative group animate-in slide-in-from-left-2">
+                                                <div class="col-span-1">
+                                                    <InputLabel value="Referencia" class="!text-[9px] font-black text-gray-400" />
+                                                    <TextInput v-model="addr.label" placeholder="Ej: Oficina" class="!text-xs w-full bg-gray-50/50" />
                                                 </div>
-                                                <InputError :message="form.errors[`codeudores.${index}.numero_documento`]" />
-                                                <InputError :message="form.errors[`codeudores.${index}.dv`]" />
-                                            </div>
-                                            <div>
-                                                <InputLabel :for="'co_celular_' + index" value="Celular" />
-                                                <TextInput :id="'co_celular_' + index" v-model="codeudor.celular" class="mt-1 block w-full" placeholder="Ej: 3001234567" />
-                                            </div>
-                                            <div class="md:col-span-2">
-                                                <InputLabel :for="'co_email_' + index" value="Correo Electrónico" />
-                                                <TextInput :id="'co_email_' + index" v-model="codeudor.correo" type="email" class="mt-1 block w-full" placeholder="correo@ejemplo.com" />
+                                                <div class="col-span-2">
+                                                    <InputLabel value="Dirección y Ciudad" class="!text-[9px] font-black text-gray-400" />
+                                                    <TextInput v-model="addr.address" placeholder="Calle... Medellín" class="!text-xs w-full bg-gray-50/50" />
+                                                </div>
+                                                <button type="button" @click="removeAddress(index, aIdx)" class="absolute -top-2 -right-2 bg-rose-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition shadow-lg">
+                                                    <TrashIcon class="h-3 w-3" />
+                                                </button>
                                             </div>
                                         </div>
+                                    </div>
 
-                                        <!-- --- DETALLE ADICIONAL: DIRECCIONES Y REDES --- -->
-                                        <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-8 border-t dark:border-gray-700 pt-6">
-                                            <!-- Direcciones -->
-                                            <div class="space-y-4">
-                                                <div class="flex justify-between items-center">
-                                                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Direcciones</h4>
-                                                    <button type="button" @click="addAddress(index)" class="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded font-bold hover:bg-indigo-100 transition">
-                                                        + Añadir Dirección
-                                                    </button>
+                                    <!-- Redes Sociales -->
+                                    <div class="space-y-4">
+                                        <div class="flex justify-between items-center bg-white/50 dark:bg-gray-800/50 p-2 pl-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                                            <h4 class="text-[10px] font-black text-sky-400 uppercase tracking-widest flex items-center gap-2">
+                                                <AtSymbolIcon class="h-4 w-4" /> Presencia Digital
+                                            </h4>
+                                            <button type="button" @click="codeudor.social_links.push({ label: 'Facebook', url: '' })" class="text-[9px] font-black uppercase tracking-widest bg-white dark:bg-gray-700 text-sky-600 px-3 py-1.5 rounded-lg border border-sky-100 dark:border-sky-900 shadow-sm hover:bg-sky-600 hover:text-white transition-all">
+                                                + Nuevo Enlace
+                                            </button>
+                                        </div>
+                                        <div class="grid grid-cols-1 gap-4">
+                                            <div v-for="(link, sIdx) in codeudor.social_links" :key="sIdx" class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative group animate-in slide-in-from-right-2">
+                                                <div class="col-span-1">
+                                                    <InputLabel value="Red / Portal" class="!text-[9px] font-black text-gray-400" />
+                                                    <TextInput v-model="link.label" placeholder="EJ: LINKEDIN" class="!text-xs w-full bg-gray-50/50" />
                                                 </div>
-                                                <div v-for="(addr, aIdx) in codeudor.addresses" :key="aIdx" class="grid grid-cols-3 gap-2 items-end bg-white dark:bg-gray-800 p-2 rounded border dark:border-gray-700 shadow-sm relative group">
-                                                    <div class="col-span-1">
-                                                        <InputLabel value="Etiqueta" class="!text-[10px]" />
-                                                        <TextInput v-model="addr.label" placeholder="Ej: Oficina" class="!text-xs w-full" />
-                                                    </div>
-                                                    <div class="col-span-2">
-                                                        <InputLabel value="Dirección y Ciudad" class="!text-[10px]" />
-                                                        <TextInput v-model="addr.address" placeholder="Calle... Medellín" class="!text-xs w-full" />
-                                                    </div>
-                                                    <button type="button" @click="removeAddress(index, aIdx)" class="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition">
-                                                        <TrashIcon class="h-3 w-3" />
-                                                    </button>
+                                                <div class="col-span-2">
+                                                    <InputLabel value="Dirección URL" class="!text-[9px] font-black text-gray-400" />
+                                                    <TextInput v-model="link.url" type="url" placeholder="https://..." class="!text-xs w-full bg-gray-50/50" />
                                                 </div>
-                                            </div>
-
-                                            <!-- Redes Sociales -->
-                                            <div class="space-y-4">
-                                                <div class="flex justify-between items-center">
-                                                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Redes / Otros Enlaces</h4>
-                                                    <button type="button" @click="codeudor.social_links.push({ label: 'Facebook', url: '' })" class="text-[10px] bg-blue-50 text-blue-600 px-2 py-1 rounded font-bold hover:bg-blue-100 transition">
-                                                        + Añadir Enlace
-                                                    </button>
-                                                </div>
-                                                <div v-for="(link, sIdx) in codeudor.social_links" :key="sIdx" class="grid grid-cols-3 gap-2 items-end bg-white dark:bg-gray-800 p-2 rounded border dark:border-gray-700 shadow-sm relative group">
-                                                    <div class="col-span-1">
-                                                        <TextInput v-model="link.label" placeholder="Red" class="!text-xs w-full" />
-                                                    </div>
-                                                    <div class="col-span-2">
-                                                        <TextInput v-model="link.url" type="url" placeholder="https://..." class="!text-xs w-full" />
-                                                    </div>
-                                                    <button type="button" @click="codeudor.social_links.splice(sIdx, 1)" class="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition">
-                                                        <TrashIcon class="h-3 w-3" />
-                                                    </button>
-                                                </div>
+                                                <button type="button" @click="codeudor.social_links.splice(sIdx, 1)" class="absolute -top-2 -right-2 bg-rose-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition shadow-lg">
+                                                    <TrashIcon class="h-3 w-3" />
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            </section>
-
-                            <div class="flex items-center justify-end mt-8 border-t dark:border-gray-700 pt-6">
-                                <Link :href="route('casos.index')" class="text-sm text-gray-600 dark:text-gray-400 hover:underline mr-4">Cancelar</Link>
-                                <PrimaryButton class="bg-blue-500 hover:bg-blue-600" :disabled="form.processing">Guardar Nuevo Caso</PrimaryButton>
                             </div>
-                        </form>
+                        </div>
                     </div>
-                </div>
+
+                    <!-- BOTÓN FINAL -->
+                    <div class="flex flex-col md:flex-row items-center justify-between p-6 bg-indigo-950 rounded-[2.5rem] shadow-2xl shadow-indigo-300 dark:shadow-none animate-in fade-in slide-in-from-bottom-4">
+                        <div class="flex items-center gap-4 mb-4 md:mb-0 pl-4">
+                            <div class="p-3 bg-white/10 rounded-2xl">
+                                <CheckCircleIcon class="h-6 w-6 text-emerald-400" />
+                            </div>
+                            <div>
+                                <h4 class="text-white text-sm font-black uppercase tracking-widest">Listo para procesar</h4>
+                                <p class="text-indigo-300 text-[10px] font-bold uppercase">Verifique los datos financieros y el radicado antes de guardar.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-6 pr-2">
+                            <Link :href="route('casos.index')" class="text-xs font-black text-indigo-300 uppercase tracking-widest hover:text-white transition-colors">Cancelar Registro</Link>
+                            <PrimaryButton class="!bg-white !text-indigo-950 !rounded-3xl !px-10 !py-5 !text-xs !font-black !shadow-xl hover:!scale-105 active:!scale-95 transition-all !uppercase" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
+                                APERTURAR EXPEDIENTE
+                            </PrimaryButton>
+                        </div>
+                    </div>
+                </form>
             </div>
         </div>
     </AuthenticatedLayout>
 </template>
 
 <style>
-/* Estilos adicionales si fueran necesarios para esta página */
+/* Estilos adicionales para la barra de desplazamiento personalizada si es necesario */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 10px;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #334155;
+}
 </style>

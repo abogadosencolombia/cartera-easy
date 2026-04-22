@@ -131,12 +131,38 @@ class JuzgadoController extends Controller
     public function search(Request $request)
     {
         $term = $request->input('term', '');
-        if (empty($term)) return response()->json(Juzgado::limit(20)->get());
         
-        $juzgados = Juzgado::where('nombre', 'ILIKE', '%' . $term . '%')
-            ->limit(50)
+        $query = Juzgado::query();
+
+        if (!empty($term)) {
+            $words = explode(' ', $term);
+            foreach ($words as $word) {
+                if (empty(trim($word))) continue;
+                $normalized = $this->normalizeTerm(trim($word));
+                $query->where(function($q) use ($word, $normalized) {
+                    $q->where('nombre', 'ILIKE', '%' . $word . '%')
+                      ->orWhere('municipio', 'ILIKE', '%' . $word . '%')
+                      ->orWhere('departamento', 'ILIKE', '%' . $word . '%')
+                      ->orWhere('distrito', 'ILIKE', '%' . $word . '%')
+                      ->orWhereRaw("TRANSLATE(nombre, 'áéíóúüÁÉÍÓÚÜ', 'aeiouuAEIOUU') ILIKE ?", ["%{$normalized}%"])
+                      ->orWhereRaw("TRANSLATE(municipio, 'áéíóúüÁÉÍÓÚÜ', 'aeiouuAEIOUU') ILIKE ?", ["%{$normalized}%"]);
+                });
+            }
+        }
+        
+        $juzgados = $query->orderBy('nombre')
+            ->limit(100)
             ->get();
 
         return response()->json($juzgados);
+    }
+
+    private function normalizeTerm($term)
+    {
+        return str_replace(
+            ['á', 'é', 'í', 'ó', 'ú', 'ü', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ü'],
+            ['a', 'e', 'i', 'o', 'u', 'u', 'A', 'E', 'I', 'O', 'U', 'U'],
+            $term
+        );
     }
 }

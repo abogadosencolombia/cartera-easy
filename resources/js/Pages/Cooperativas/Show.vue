@@ -7,6 +7,7 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
+import SelectInput from '@/Components/SelectInput.vue';
 import { Head, Link, useForm, usePage, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import {
@@ -332,9 +333,9 @@ const getRandomColor = (id) => {
                 <form @submit.prevent="submitDocument" class="space-y-6">
                     <div>
                         <InputLabel value="Tipo de Documento *" class="font-bold text-xs uppercase" />
-                        <select v-model="docForm.tipo_documento" class="mt-1 block w-full rounded-xl border-gray-200 bg-gray-50 font-bold text-sm" required>
+                        <SelectInput v-model="docForm.tipo_documento" class="mt-1 block w-full rounded-xl border-gray-200 bg-gray-50 font-bold text-sm" required>
                             <option>Poder</option><option>Certificado Existencia</option><option>Carta Autorización</option><option>Protocolo Interno</option>
-                        </select>
+                        </SelectInput>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>

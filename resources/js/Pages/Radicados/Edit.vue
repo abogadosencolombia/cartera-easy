@@ -1,6 +1,6 @@
 <script setup>
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
@@ -10,6 +10,7 @@ import InputError from '@/Components/InputError.vue';
 import TextInput from '@/Components/TextInput.vue';
 import DatePicker from '@/Components/DatePicker.vue';
 import Textarea from '@/Components/Textarea.vue';
+import SelectInput from '@/Components/SelectInput.vue';
 import AsyncSelect from '@/Components/AsyncSelect.vue';
 import Modal from '@/Components/Modal.vue';
 import Dropdown from '@/Components/Dropdown.vue';
@@ -264,10 +265,10 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                                 <TextInput v-model="item.nombre_completo" @blur="item.nombre_completo = toUpperCase(item.nombre_completo)" placeholder="Nombre Completo *" class="text-sm w-full" />
                                 <InputError :message="form.errors[`demandantes.${index}.nombre_completo`]" />
                                 <div class="grid grid-cols-3 gap-2 items-end">
-                                    <select v-model="item.tipo_documento" class="text-sm rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm h-[42px]">
+                                    <SelectInput v-model="item.tipo_documento" class="text-sm rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm h-[42px]">
                                         <option>CC</option>
                                         <option>NIT</option>
-                                    </select>
+                                    </SelectInput>
                                     <div :class="item.tipo_documento === 'NIT' ? 'col-span-2 grid grid-cols-4 gap-2' : 'col-span-2'">
                                         <div :class="item.tipo_documento === 'NIT' ? 'col-span-3' : ''">
                                             <TextInput v-model="item.numero_documento" placeholder="Número *" class="text-sm w-full" />
@@ -317,10 +318,10 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                                 <TextInput v-model="item.nombre_completo" @blur="item.nombre_completo = toUpperCase(item.nombre_completo)" placeholder="Nombre Completo *" class="text-sm w-full" />
                                 <InputError :message="form.errors[`demandados.${index}.nombre_completo`]" />
                                 <div v-if="!item.sin_info" class="grid grid-cols-3 gap-2 items-end">
-                                    <select v-model="item.tipo_documento" class="text-sm rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm h-[42px]">
+                                    <SelectInput v-model="item.tipo_documento" class="text-sm rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm h-[42px]">
                                         <option>CC</option>
                                         <option>NIT</option>
-                                    </select>
+                                    </SelectInput>
                                     <div :class="item.tipo_documento === 'NIT' ? 'col-span-2 grid grid-cols-4 gap-2' : 'col-span-2'">
                                         <div :class="item.tipo_documento === 'NIT' ? 'col-span-3' : ''">
                                             <TextInput v-model="item.numero_documento" placeholder="Número *" class="text-sm w-full" />
@@ -414,7 +415,7 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
       </div>
     </div>
     
-    <Modal :show="showCloseModal" @close="showCloseModal = false">
+    <Modal :show="showCloseModal" @close="showCloseModal = false" centered>
        <div class="p-6 text-gray-900 dark:text-gray-100">
          <h2 class="text-lg font-medium">Cerrar Radicado</h2>
          <div class="mt-6"><InputLabel value="Nota de Cierre" /><Textarea v-model="closeForm.nota_cierre" class="w-full mt-1" rows="4" placeholder="Indica el motivo del cierre..." /></div>
@@ -423,7 +424,7 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
     </Modal>
 
     <!-- MODAL DE COMPROMISO DE REVISIÓN (OBLIGATORIO) -->
-    <Modal :show="showCommitmentModal" @close="showCommitmentModal = false" maxWidth="sm">
+    <Modal :show="showCommitmentModal" @close="showCommitmentModal = false" maxWidth="sm" centered>
         <div class="p-6">
             <div class="flex items-center gap-3 mb-4 text-indigo-600 dark:text-indigo-400">
                 <CalendarDaysIcon class="h-8 w-8" />

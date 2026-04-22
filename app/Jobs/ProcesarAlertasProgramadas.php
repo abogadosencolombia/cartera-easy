@@ -64,6 +64,21 @@ class ProcesarAlertasProgramadas implements ShouldQueue
                         $user->notify(new AlertaProgramadaNotification(
                             $a->caso_id, $a->mensaje, true, $a->prioridad ?? 'media', $a->proceso_id
                         ));
+                        
+                        // ===== AUTOMATIZACIÓN JURÍDICA =====
+                        // Si la prioridad es ALTA y se venció, creamos un incidente automático.
+                        if ($a->prioridad === 'alta' && $a->user_id) {
+                            \App\Models\IncidenteJuridico::create([
+                                'usuario_responsable_id' => $a->user_id,
+                                'origen' => 'auditoria',
+                                'asunto' => '⚠️ Alerta de Alta Prioridad Vencida',
+                                'descripcion' => "Se ha generado un incidente automático porque una alerta de prioridad ALTA se ha vencido sin ser completada.\n\nMensaje de la alerta: {$a->mensaje}\nCaso ID: #{$a->caso_id}",
+                                'estado' => 'pendiente',
+                                'fecha_registro' => now(),
+                            ]);
+                        }
+                        // ===================================
+
                         $a->forceFill([
                             'fecha_envio'  => $now,
                             'last_sent_at' => $now,

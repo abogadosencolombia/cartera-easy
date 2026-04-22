@@ -3,6 +3,7 @@ import { ref, watch, onMounted } from 'vue';
 import { usePage, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import SelectInput from '@/Components/SelectInput.vue';
 import { 
     XMarkIcon, 
     ClipboardDocumentCheckIcon,
@@ -324,12 +325,12 @@ onMounted(fetchNotas);
                         <div class="pt-4 border-t border-gray-100">
                             <label class="block text-[9px] font-black text-gray-500 uppercase mb-3 ml-1 tracking-widest opacity-60 italic">Vincular a Expediente (Opcional)</label>
                             <div class="grid grid-cols-2 gap-4">
-                                <select v-model="form.relacionable_type" class="text-[10px] font-black uppercase rounded-lg border-gray-200 bg-gray-50 focus:ring-blue-500">
+                                <SelectInput v-model="form.relacionable_type" class="text-[10px] font-black uppercase rounded-lg border-gray-200 bg-gray-50 focus:ring-blue-500">
                                     <option value="">REGISTRO LIBRE</option>
                                     <option value="App\Models\ProcesoRadicado">RADICADO / PROCESO</option>
                                     <option value="App\Models\Caso">CASO COOPERATIVA</option>
                                     <option value="App\Models\Contrato">CONTRATO HONORARIOS</option>
-                                </select>
+                                </SelectInput>
                                 <div v-if="form.relacionable_type" class="relative">
                                     <div class="relative">
                                         <input v-model="searchVinculacion" type="text" placeholder="BUSCAR POR NOMBRE, DOC O RADICADO..." 

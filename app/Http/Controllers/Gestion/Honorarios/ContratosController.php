@@ -119,14 +119,17 @@ class ContratosController extends Controller
         }
 
         if ($request->has('proceso_id')) {
-            $proceso = ProcesoRadicado::select('id', 'demandante_id', 'radicado')->find($request->input('proceso_id'));
+            $proceso = ProcesoRadicado::with('demandantes:id,nombre_completo')->find($request->input('proceso_id'));
         }
 
         if ($request->has('cliente_id')) {
             $clienteSeleccionado = Persona::select('id', 'nombre_completo')->find($request->input('cliente_id'));
         }
-        elseif ($proceso && $proceso->demandante_id && !$clienteSeleccionado) {
-            $clienteSeleccionado = Persona::select('id', 'nombre_completo')->find($proceso->demandante_id);
+        elseif ($proceso && !$clienteSeleccionado) {
+            // Intentar por ID directo (compatibilidad) o por relación pivot (nuevo sistema)
+            $clienteSeleccionado = $proceso->demandante_id 
+                ? Persona::select('id', 'nombre_completo')->find($proceso->demandante_id)
+                : $proceso->demandantes->first();
         }
 
         $personas = [];

@@ -80,6 +80,7 @@ class GenerarAlertasCron extends Command
 
                     if ($destinatarios->isNotEmpty()) {
                         // Evitar duplicados el mismo día para la misma alerta
+                        // Se usa LIKE porque la columna data en PostgreSQL es TEXT, no JSON
                         $yaNotificado = DB::table('notifications')
                             ->where('notifiable_type', 'App\Models\User')
                             ->whereIn('notifiable_id', $destinatarios->pluck('id'))
@@ -193,10 +194,6 @@ class GenerarAlertasCron extends Command
         } else {
             $this->warn("No se encontró el modelo ContratoCuota.");
         }
-
-        // --- NUEVO: También procesamos la Hoja de Ruta Diaria ---
-        $this->info("3. Analizando Hoja de Ruta Diaria...");
-        $this->call('gestion:procesar-alertas', [], $this->getOutput());
 
         $this->info('--> Ejecución finalizada exitosamente.');
     }

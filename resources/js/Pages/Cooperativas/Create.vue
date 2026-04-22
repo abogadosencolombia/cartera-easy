@@ -4,6 +4,7 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
+import SelectInput from '@/Components/SelectInput.vue';
 import Checkbox from '@/Components/Checkbox.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { 
@@ -128,9 +129,9 @@ const submit = () => {
                             </div>
                             <div class="space-y-2">
                                 <InputLabel value="Entidad de Vigilancia" class="font-bold text-xs uppercase" />
-                                <select v-model="form.tipo_vigilancia" class="w-full rounded-xl border-gray-200 bg-gray-50 font-bold text-sm">
+                                <SelectInput v-model="form.tipo_vigilancia" class="w-full rounded-xl border-gray-200 bg-gray-50 font-bold text-sm">
                                     <option>Supersolidaria</option><option>SFC</option><option>Otro</option>
-                                </select>
+                                </SelectInput>
                             </div>
                         </div>
                     </div>
@@ -183,12 +184,12 @@ const submit = () => {
                         <div class="p-8 md:p-10 grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div class="space-y-2">
                                 <InputLabel value="Tipo de Garantía Frecuente" class="font-bold text-xs uppercase" />
-                                <select v-model="form.tipo_garantia_frecuente" class="w-full rounded-xl border-gray-200 bg-gray-50 text-sm font-bold">
+                                <SelectInput v-model="form.tipo_garantia_frecuente" class="w-full rounded-xl border-gray-200 bg-gray-50 text-sm font-bold">
                                     <option value="codeudor">Codeudor</option>
                                     <option value="hipotecaria">Hipotecaria</option>
                                     <option value="prendaria">Prendaria</option>
                                     <option value="sin garantía">Sin garantía</option>
-                                </select>
+                                </SelectInput>
                             </div>
                             <div class="space-y-2">
                                 <InputLabel value="Tasa Máxima Moratoria (%) *" class="font-bold text-xs uppercase" />

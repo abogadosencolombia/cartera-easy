@@ -5,6 +5,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import Modal from '@/Components/Modal.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import SelectInput from '@/Components/SelectInput.vue';
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import { TrashIcon } from '@heroicons/vue/24/outline';
@@ -84,26 +85,26 @@ const closeModal = () => {
                         <form @submit.prevent="submit" class="mt-6 space-y-6">
                             <div>
                                 <InputLabel for="cooperativa_id" value="Aplicar a Cooperativa (Opcional)" />
-                                <select v-model="form.cooperativa_id" id="cooperativa_id" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
+                                <SelectInput v-model="form.cooperativa_id" id="cooperativa_id" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
                                     <option :value="null">Todas las Cooperativas</option>
                                     <option v-for="coop in cooperativas" :key="coop.id" :value="coop.id">{{ coop.nombre }}</option>
-                                </select>
+                                </SelectInput>
                             </div>
 
                             <div>
                                 <InputLabel for="tipo_proceso" value="Para el Tipo de Proceso" />
                                 <!-- === CAMBIO REALIZADO === -->
                                 <!-- El select ahora trabaja con el array de objetos de 'tipos_proceso' -->
-                                <select v-model="form.tipo_proceso_id" id="tipo_proceso" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
+                                <SelectInput v-model="form.tipo_proceso_id" id="tipo_proceso" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
                                     <option v-for="tipo in tipos_proceso" :key="tipo.id" :value="tipo.id">{{ tipo.nombre }}</option>
-                                </select>
+                                </SelectInput>
                             </div>
 
                             <div>
                                 <InputLabel for="tipo_documento_requerido" value="El Documento Requerido es" />
-                                <select v-model="form.tipo_documento_requerido" id="tipo_documento_requerido" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
+                                <SelectInput v-model="form.tipo_documento_requerido" id="tipo_documento_requerido" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
                                     <option v-for="tipo in tipos_documento" :key="tipo" :value="tipo">{{ tipo }}</option>
-                                </select>
+                                </SelectInput>
                             </div>
 
                             <div class="flex items-center justify-end">

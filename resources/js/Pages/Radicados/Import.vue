@@ -16,6 +16,7 @@ import {
 } from '@heroicons/vue/24/outline';
 import Swal from 'sweetalert2';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import SelectInput from '@/Components/SelectInput.vue';
 
 const props = defineProps({
     juzgados: Array,
@@ -167,12 +168,12 @@ const getRowStatusClass = (status) => {
                             <label class="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
                                 <UserIcon class="w-3 h-3" /> Abogado Responsable
                             </label>
-                            <select 
+                            <SelectInput 
                                 v-model="selectedAbogadoId"
                                 class="w-full text-xs font-bold border-none bg-transparent focus:ring-0 text-gray-700 dark:text-gray-300 p-0"
                             >
                                 <option v-for="a in abogados" :key="a.id" :value="a.id">{{ a.name }}</option>
-                            </select>
+                            </SelectInput>
                         </div>
 
                         <div class="flex-1 max-w-md bg-amber-50 dark:bg-amber-900/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-900/30">

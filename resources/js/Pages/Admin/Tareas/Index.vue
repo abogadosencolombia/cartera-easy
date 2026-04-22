@@ -9,6 +9,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import InputError from '@/Components/InputError.vue';
 import TextInput from '@/Components/TextInput.vue';
 import DatePicker from '@/Components/DatePicker.vue';
+import SelectInput from '@/Components/SelectInput.vue';
 import Textarea from '@/Components/Textarea.vue';
 import Pagination from '@/Components/Pagination.vue';
 import { debounce } from 'lodash';
@@ -176,11 +177,11 @@ const formatDateLocal = (dateString) => {
                             <!-- Usuario -->
                             <div class="md:col-span-4">
                                 <InputLabel for="user_id" value="¿Quién lo hace?" required />
-                                <select id="user_id" v-model="form.user_id"
+                                <SelectInput id="user_id" v-model="form.user_id"
                                     class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
                                     <option :value="null" disabled>Selecciona el Usuario...</option>
                                     <option v-for="user in usuarios" :key="user.id" :value="user.id">{{ user.name }}</option>
-                                </select>
+                                </SelectInput>
                                 <InputError :message="form.errors.user_id" class="mt-2" />
                             </div>
 
@@ -244,15 +245,15 @@ const formatDateLocal = (dateString) => {
                 <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                     <!-- Filtros -->
                     <div class="p-4 bg-gray-50 dark:bg-gray-800/50 flex gap-4">
-                        <select v-model="filtroEstado" class="rounded-md border-gray-300 dark:bg-gray-900">
+                        <SelectInput v-model="filtroEstado" class="rounded-md border-gray-300 dark:bg-gray-900">
                             <option value="todos">Todos los Estados</option>
                             <option value="pendiente">Pendientes</option>
                             <option value="completada">Completadas</option>
-                        </select>
-                        <select v-model="filtroUsuario" class="rounded-md border-gray-300 dark:bg-gray-900">
+                        </SelectInput>
+                        <SelectInput v-model="filtroUsuario" class="rounded-md border-gray-300 dark:bg-gray-900">
                             <option value="todos">Todos los Usuarios</option>
                             <option v-for="user in usuarios" :key="user.id" :value="user.id">{{ user.name }}</option>
-                        </select>
+                        </SelectInput>
                     </div>
 
                     <!-- Tabla -->

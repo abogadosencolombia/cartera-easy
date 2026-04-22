@@ -89,6 +89,11 @@ class User extends Authenticatable
         return $this->hasMany(Caso::class);
     }
 
+    public function procesos(): HasMany
+    {
+        return $this->hasMany(ProcesoRadicado::class, 'abogado_id');
+    }
+
     public function pagos(): HasManyThrough
     {
         return $this->hasManyThrough(PagoCaso::class, Caso::class);

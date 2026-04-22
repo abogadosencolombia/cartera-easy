@@ -5,7 +5,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { addDaysToDate, addMonthsToDate } from '@/Utils/formatters';
 import Swal from 'sweetalert2';
 
-// --- IMPORTAMOS LOS NUEVOS COMPONENTES DE PESTAÑA ---
+// --- IMPORTAMOS LOS COMPONENTES DE PESTAÑA ---
 import ResumenTab from './Tabs/ResumenTab.vue';
 import DocumentosTab from './Tabs/DocumentosTab.vue';
 import FinancieroTab from './Tabs/FinancieroTab.vue';
@@ -21,6 +21,14 @@ import {
     ClockIcon,
     LockOpenIcon,
     DocumentDuplicateIcon,
+    ArrowLeftIcon,
+    PencilSquareIcon,
+    UserCircleIcon,
+    CheckCircleIcon,
+    ExclamationTriangleIcon,
+    BanknotesIcon,
+    CalendarDaysIcon,
+    BriefcaseIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -45,7 +53,6 @@ const getInitialTab = () => {
 const activeTab = ref(getInitialTab());
 const user = usePage().props.auth.user;
 
-// --- SINCRONIZACIÓN CON URL ---
 const setActiveTab = (tab) => {
     activeTab.value = tab;
     const url = new URL(window.location);
@@ -53,25 +60,10 @@ const setActiveTab = (tab) => {
     window.history.replaceState({}, '', url);
 };
 
-// --- Lógica de formato ---
 const parseMoney = (input) => {
     let s = String(input ?? '').trim();
     if (!s) return 0;
-    s = s.replace(/\s/g, '');
-    const hasComma = s.includes(',');
-    const hasDot = s.includes('.');
-    if (hasComma && hasDot) {
-        const decimalSep = s.lastIndexOf(',') > s.lastIndexOf('.') ? ',' : '.';
-        const thousandSep = decimalSep === ',' ? '.' : ',';
-        s = s.replace(new RegExp('\\' + thousandSep, 'g'), '');
-        if (decimalSep === ',') s = s.replace(',', '.');
-    } else if (hasComma) {
-        s = s.replace(/\./g, '');
-        s = s.replace(',', '.');
-    } else {
-        s = s.replace(/,/g, '');
-    }
-    const n = Number(s);
+    const n = Number(s.replace(/[^0-9.-]+/g,""));
     return Number.isFinite(n) ? n : 0;
 };
 
@@ -79,41 +71,24 @@ const formatCurrency = (value) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })
     .format(parseMoney(value));
 
-const parseDate = (s) => {
-    if (!s) return null;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-        const [y, m, d] = s.split('-').map(Number);
-        return new Date(y, m - 1, d);
-    }
-    return new Date(String(s).replace(' ', 'T'));
+const formatDate = (s) => {
+    if (!s) return 'N/A';
+    const date = new Date(s);
+    return date.toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
 };
-
-const formatDate = (s) =>
-    parseDate(s)?.toLocaleDateString('es-CO', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        timeZone: 'UTC'
-    }) || 'No especificada';
 
 const formatLabel = (text) => {
     if (!text) return 'N/A';
-    if (text.indexOf('_') === -1) {
-        return text;
-    }
-    return text.replace(/_/g, ' ')
-            .toLowerCase()
-            .replace(/\b\w/g, char => char.toUpperCase());
+    return text.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
 };
 
 const statusProcessoClasses = {
-    'prejurídico': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-    'demandado': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-    'en ejecución': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300',
-    'sentencia': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
-    'cerrado': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
-    'default': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
-    'DEMANDA PRESENTADA': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+    'prejurídico': 'bg-amber-50 text-amber-700 ring-amber-600/20',
+    'demandado': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+    'en ejecución': 'bg-indigo-50 text-indigo-700 ring-indigo-600/20',
+    'sentencia': 'bg-purple-50 text-purple-700 ring-purple-600/20',
+    'cerrado': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+    'default': 'bg-gray-50 text-gray-600 ring-gray-500/10',
 };
 
 const puedeEditar = computed(() => {
@@ -122,350 +97,143 @@ const puedeEditar = computed(() => {
     return !props.caso.bloqueado;
 });
 
-const montoParaContrato = computed(() => {
-    return props.resumen_financiero.saldo_pendiente; 
-});
-
 const copyLegalInfo = () => {
-    const radicado = props.caso.radicado || 'SIN RADICADO';
-    const juzgado = props.caso.juzgado?.nombre || 'POR DEFINIR';
-    const deudor = props.caso.deudor?.nombre_completo || 'SIN DEUDOR';
-    const cooperativa = props.caso.cooperativa?.nombre || 'N/A';
-    
-    let text = `EXPEDIENTE LEGAL\n`;
-    text += `-----------------\n`;
-    text += `Radicado: ${radicado}\n`;
-    text += `Juzgado: ${juzgado}\n`;
-    text += `Deudor: ${deudor}\n`;
-    text += `Cooperativa: ${cooperativa}\n`;
-    
-    if (props.caso.codeudores?.length > 0) {
-        text += `Codeudores: ${props.caso.codeudores.map(c => c.nombre_completo).join(', ')}\n`;
-    }
-    
+    const text = `EXPEDIENTE: ${props.caso.radicado || 'N/A'}\nDEUDOR: ${props.caso.deudor?.nombre_completo || 'N/A'}\nJUZGADO: ${props.caso.juzgado?.nombre || 'N/A'}`;
     navigator.clipboard.writeText(text).then(() => {
-        Swal.fire({
-            title: '¡Copiado!',
-            text: 'Información legal lista para pegar.',
-            icon: 'success',
-            toast: true,
-            position: 'top-end',
-            showConfirmButton: false,
-            timer: 2500,
-            timerProgressBar: true,
-            background: '#EEF2FF',
-            iconColor: '#4F46E5',
-            color: '#312E81',
-        });
+        Swal.fire({ title: 'Copiado', icon: 'success', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
     });
 };
 
+const confirmUnlockCase = () => {
+    Swal.fire({
+        title: '¿Desbloquear?',
+        text: "Permitirá editar este proceso nuevamente.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, desbloquear'
+    }).then((res) => { if (res.isConfirmed) router.patch(route('casos.unlock', props.caso.id)); });
+};
 </script>
 
 <template>
-    <Head :title="'Ficha del Caso #' + caso.id" />
+    <Head :title="'Caso #' + caso.id" />
 
     <AuthenticatedLayout>
         <template #header>
-            <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                <div>
-                    <Link
-                        :href="route('casos.index')"
-                        class="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex items-center mb-1"
-                    >
-                        &larr; Volver a Gestión de Casos
+            <div class="flex flex-col md:flex-row justify-between md:items-center gap-4">
+                <div class="flex items-center gap-3">
+                    <Link :href="route('casos.index')" class="p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 text-gray-400 hover:text-indigo-600 transition-all">
+                        <ArrowLeftIcon class="h-4 w-4" />
                     </Link>
-                    <h2 class="font-semibold text-2xl text-gray-800 dark:text-gray-200 leading-tight">
-                        Ficha del Caso <span class="text-indigo-500">#{{ caso.id }}</span>
-                        <span
-                            v-if="caso.bloqueado"
-                            class="ml-2 px-2 py-0.5 text-xs rounded bg-red-100 text-red-700 align-middle"
-                        >Bloqueado</span>
-                        
-                        <button
-                            v-if="caso.bloqueado && user?.tipo_usuario === 'admin'" 
-                            @click="confirmUnlockCase"
-                            class="ml-2 inline-flex items-center px-2.5 py-1 border border-transparent rounded-md shadow-sm text-xs font-medium text-yellow-800 bg-yellow-100 hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 transition ease-in-out duration-150 align-middle"
-                            title="Desbloquear Caso"
-                        >
-                            <LockOpenIcon class="h-4 w-4 mr-1.5" />
-                            Desbloquear
-                        </button>
-                    </h2>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="font-bold text-xl text-gray-900 dark:text-white leading-tight">Expediente #{{ caso.id }}</h2>
+                            <span v-if="caso.bloqueado" class="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-rose-50 text-rose-600 ring-1 ring-rose-500/20">Bloqueado</span>
+                        </div>
+                        <p class="text-xs text-gray-500 font-medium">Gestión del deudor: {{ caso.deudor?.nombre_completo }}</p>
+                    </div>
                 </div>
-                <div class="flex items-center space-x-2 flex-shrink-0">
-                    <button
-                        @click="copyLegalInfo"
-                        class="inline-flex items-center px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-md font-bold text-xs text-indigo-700 dark:text-indigo-300 uppercase tracking-widest shadow-sm hover:bg-indigo-100 dark:hover:bg-indigo-900/50 focus:outline-none transition ease-in-out duration-150"
-                    >
-                        <DocumentDuplicateIcon class="h-4 w-4 mr-1.5" />
-                        Copiar Info Legal
+                
+                <div class="flex flex-wrap items-center gap-2">
+                    <button @click="copyLegalInfo" class="inline-flex items-center px-3 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg font-bold text-[10px] text-gray-600 dark:text-gray-300 uppercase tracking-wider hover:bg-white transition-all shadow-sm">
+                        <DocumentDuplicateIcon class="h-3.5 w-3.5 mr-1.5 text-gray-400" /> Copiar Datos
                     </button>
-                    <Link
-                        v-if="puedeEditar"
-                        :href="route('casos.clonar', caso.id)"
-                        class="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none disabled:opacity-25 transition ease-in-out duration-150"
-                    >
-                        Clonar
+                    <Link v-if="puedeEditar" :href="route('casos.edit', caso.id)" class="inline-flex items-center px-3 py-1.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg font-bold text-[10px] text-gray-700 dark:text-gray-300 uppercase tracking-wider hover:bg-gray-50 transition-all shadow-sm">
+                        <PencilSquareIcon class="h-3.5 w-3.5 mr-1.5 text-indigo-500" /> Editar
                     </Link>
-                    <Link
-                        v-if="puedeEditar"
-                        :href="route('casos.edit', caso.id)"
-                        class="inline-flex items-center px-4 py-2 bg-blue-500 dark:bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-white dark:text-gray-800 uppercase tracking-widest hover:bg-blue-600 dark:hover:bg-white focus:bg-gray-700 dark:focus:bg-white active:bg-gray-900 dark:active:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150"
-                    >
-                        Editar Caso
+                    <Link v-if="!caso.contrato && puedeEditar" :href="route('honorarios.contratos.create', { caso_id: caso.id, monto: resumen_financiero.saldo_pendiente })" class="inline-flex items-center px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-bold text-[10px] uppercase tracking-wider hover:bg-indigo-700 transition-all shadow-sm">
+                        <BriefcaseIcon class="h-3.5 w-3.5 mr-1.5" /> Generar Contrato
                     </Link>
-
-                    <Link
-                        v-if="!caso.contrato && puedeEditar"
-                        :href="route('honorarios.contratos.create', { caso_id: caso.id, monto: montoParaContrato })"
-                        class="inline-flex items-center px-4 py-2 bg-blue-500 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-600 focus:bg-blue-600 active:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150 shadow-sm"
-                    >
-                        Generar Contrato
+                    <Link v-else-if="caso.contrato" :href="route('honorarios.contratos.show', caso.contrato.id)" class="inline-flex items-center px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-bold text-[10px] uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-sm">
+                        <CheckCircleIcon class="h-3.5 w-3.5 mr-1.5" /> Contrato #{{ caso.contrato.id }}
                     </Link>
-                    
-
-                    <Link
-                        v-else-if="caso.contrato"
-                        :href="route('honorarios.contratos.show', caso.contrato.id)"
-                        class="inline-flex items-center px-4 py-2 bg-green-100 border border-green-300 rounded-md font-semibold text-xs text-green-800 uppercase tracking-widest hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:bg-green-900 dark:border-green-700 dark:text-green-200 dark:hover:bg-green-800 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150"
-                    >
-                        Ver Contrato
-                    </Link>
+                    <button v-if="caso.bloqueado && user?.tipo_usuario === 'admin'" @click="confirmUnlockCase" class="p-1.5 bg-amber-50 text-amber-600 border border-amber-200 rounded-lg hover:bg-amber-100 transition-all"><LockOpenIcon class="h-4 w-4" /></button>
                 </div>
             </div>
         </template>
 
-        <div class="py-12">
-            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <div
-                    v-if="page.props.flash.success"
-                    class="mb-6 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-lg shadow-md"
-                    role="status"
-                    aria-live="polite"
-                >
-                    <p class="font-bold">Éxito</p>
-                    <p>{{ page.props.flash.success }}</p>
-                </div>
-                <div
-                    v-if="page.props.flash.error"
-                    class="mb-6 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-md"
-                    role="alert"
-                >
-                    <p class="font-bold">Error</p>
-                    <p>{{ page.props.flash.error }}</p>
-                </div>
-
-                <!-- TARJETA DE RESUMEN PRINCIPAL -->
-                <div class="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 mb-8">
-                    <div class="flex flex-col md:flex-row justify-between md:items-center gap-4">
-                        <div class="flex-grow">
-                            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">
-                                Deudor Principal
-                            </p>
-                            <h1 class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
-                                {{ caso.deudor ? caso.deudor.nombre_completo : 'No Asignado' }}
-                            </h1>
-                            <p class="text-sm text-gray-600 dark:text-gray-300">
-                                {{ caso.cooperativa ? caso.cooperativa.nombre : 'N/A' }}
-                            </p>
+        <div class="py-6">
+            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+                
+                <!-- DASHBOARD COMPACTO -->
+                <div class="bg-white dark:bg-gray-800 shadow-sm rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-4">
+                        <!-- Info Resumida -->
+                        <div class="p-5 bg-gray-50/50 dark:bg-gray-700/30 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-700">
+                            <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Estado del Proceso</p>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="px-2.5 py-0.5 text-[10px] font-bold uppercase rounded-md ring-1" :class="statusProcessoClasses[caso.etapa_procesal || caso.estado_proceso] || statusProcessoClasses['default']">
+                                    {{ formatLabel(caso.etapa_procesal || caso.estado_proceso) }}
+                                </span>
+                            </div>
+                            <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Empresa / Cooperativa</p>
+                            <p class="text-xs font-bold text-gray-700 dark:text-gray-200 truncate">{{ caso.cooperativa ? caso.cooperativa.nombre : 'N/A' }}</p>
                         </div>
-                        <div class="flex items-center justify-end flex-wrap gap-4 mt-4 md:mt-0">
-                            
-                            <div class="text-right">
-                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Monto de Crédito (Inicial)</p>
-                                <p class="text-xl font-semibold text-gray-800 dark:text-gray-100">
-                                    <!-- CORRECCIÓN: Usamos el monto del resumen (que ya puede ser el del contrato) -->
-                                    {{ formatCurrency(resumen_financiero.monto_total) }}
-                                </p>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Deuda Actual (Calculada)</p>
-                                <p class="text-xl font-semibold text-gray-800 dark:text-gray-100">
-                                    {{ formatCurrency(resumen_financiero.saldo_pendiente) }}
-                                </p>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Pagado (Contrato)</p>
-                                <p class="text-xl font-semibold text-green-600 dark:text-green-400">
-                                    {{ formatCurrency(resumen_financiero.total_pagado) }}
-                                </p>
-                            </div>
 
-                            <!-- CORRECCIÓN: Usar la mora calculada por el backend -->
-                            <div
-                                v-if="resumen_financiero.dias_mora > 0"
-                                class="text-right bg-red-50 dark:bg-red-900/50 p-3 rounded-lg"
-                            >
-                                <p class="text-sm font-medium text-red-600 dark:text-red-300">Días en Mora</p>
-                                <p class="text-xl font-bold text-red-700 dark:text-red-200">
-                                    {{ Math.floor(resumen_financiero.dias_mora) }}
-                                </p>
+                        <!-- KPIs Financieros en una sola fila -->
+                        <div class="lg:col-span-3 p-5 grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="border-r border-gray-100 dark:border-gray-700 last:border-0 pr-4">
+                                <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1"><BanknotesIcon class="h-3 w-3" /> Capital</p>
+                                <p class="text-sm font-bold text-gray-900 dark:text-white">{{ formatCurrency(resumen_financiero.monto_total) }}</p>
                             </div>
-                            
-                            <div class="text-right" v-if="caso.etapa_procesal || caso.estado_proceso">
-                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Estado</p>
-                                <span
-                                    class="px-3 py-1.5 inline-flex text-sm leading-5 font-semibold rounded-full"
-                                    :class="statusProcessoClasses[caso.etapa_procesal || caso.estado_proceso] || statusProcessoClasses['default']"
-                                >{{ formatLabel(caso.etapa_procesal || caso.estado_proceso) }}</span>
+                            <div class="border-r border-gray-100 dark:border-gray-700 last:border-0 pr-4">
+                                <p class="text-[9px] font-bold text-rose-500 uppercase tracking-widest mb-1 flex items-center gap-1"><ExclamationTriangleIcon class="h-3 w-3" /> Saldo</p>
+                                <p class="text-sm font-bold text-rose-600 dark:text-rose-400">{{ formatCurrency(resumen_financiero.saldo_pendiente) }}</p>
                             </div>
-                            
+                            <div class="border-r border-gray-100 dark:border-gray-700 last:border-0 pr-4">
+                                <p class="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mb-1 flex items-center gap-1"><CheckCircleIcon class="h-3 w-3" /> Pagado</p>
+                                <p class="text-sm font-bold text-emerald-600 dark:text-emerald-400">{{ formatCurrency(resumen_financiero.total_pagado) }}</p>
+                            </div>
+                            <div>
+                                <template v-if="resumen_financiero.dias_mora > 0">
+                                    <p class="text-[9px] font-bold text-amber-500 uppercase tracking-widest mb-1 flex items-center gap-1"><ClockIcon class="h-3 w-3" /> Mora</p>
+                                    <p class="text-sm font-bold text-amber-600">{{ Math.floor(resumen_financiero.dias_mora) }} días</p>
+                                </template>
+                                <template v-else>
+                                    <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1"><CalendarDaysIcon class="h-3 w-3" /> Apertura</p>
+                                    <p class="text-sm font-bold text-gray-700 dark:text-gray-300">{{ formatDate(caso.fecha_apertura) }}</p>
+                                </template>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md">
-                    <div class="border-b border-gray-200 dark:border-gray-700">
-                        <nav class="-mb-px flex space-x-6 overflow-x-auto px-6" aria-label="Tabs">
+                <!-- NAVEGACIÓN Y CONTENIDO -->
+                <div class="bg-white dark:bg-gray-800 shadow-sm rounded-2xl border border-gray-200 dark:border-gray-700 overflow-visible">
+                    <div class="border-b border-gray-100 dark:border-gray-700 px-4">
+                        <nav class="-mb-px flex space-x-6 overflow-x-auto scrollbar-hide">
                             <button
-                                @click="setActiveTab('resumen')"
-                                :class="[
-                                    activeTab === 'resumen'
-                                        ? 'border-indigo-500 text-indigo-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:hover:text-gray-200 dark:hover:border-gray-500',
+                                v-for="tab in [
+                                    { id: 'resumen', label: 'Resumen', icon: InformationCircleIcon },
+                                    { id: 'documentos', label: 'Documentos', icon: FolderOpenIcon },
+                                    { id: 'financiero', label: 'Financiero', icon: CreditCardIcon },
+                                    { id: 'actuaciones', label: 'Actuaciones', icon: ClipboardDocumentListIcon },
+                                    { id: 'actividad', label: 'Historial', icon: ClockIcon },
                                 ]"
-                                class="flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
+                                :key="tab.id" @click="setActiveTab(tab.id)"
+                                :class="[ activeTab === tab.id ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300' ]"
+                                class="flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-bold text-[11px] uppercase tracking-wider transition-all group"
                             >
-                                <InformationCircleIcon class="h-5 w-5 mr-2" /> Resumen
-                            </button>
-                            <button
-                                @click="setActiveTab('documentos')"
-                                :class="[
-                                    activeTab === 'documentos'
-                                        ? 'border-indigo-500 text-indigo-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:hover:text-gray-200 dark:hover:border-gray-500',
-                                ]"
-                                class="flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
-                            >
-                                <FolderOpenIcon class="h-5 w-5 mr-2" /> Documentos
-                            </button>
-                            <button
-                                @click="setActiveTab('financiero')"
-                                :class="[
-                                    activeTab === 'financiero'
-                                        ? 'border-indigo-500 text-indigo-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:hover:text-gray-200 dark:hover:border-gray-500',
-                                ]"
-                                class="flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
-                            >
-                                <CreditCardIcon class="h-5 w-5 mr-2" /> Financiero
-                            </button>
-                            <button
-                                @click="setActiveTab('actuaciones')"
-                                :class="[
-                                    activeTab === 'actuaciones'
-                                        ? 'border-indigo-500 text-indigo-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:hover:text-gray-200 dark:hover:border-gray-500',
-                                ]"
-                                class="flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
-                            >
-                                <ClipboardDocumentListIcon class="h-5 w-5 mr-2" /> Actuaciones
-                            </button>
-                            <button
-                                @click="setActiveTab('actividad')"
-                                :class="[
-                                    activeTab === 'actividad'
-                                        ? 'border-indigo-500 text-indigo-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:hover:text-gray-200 dark:hover:border-gray-500',
-                                ]"
-                                class="flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
-                            >
-                                <ClockIcon class="h-5 w-5 mr-2" /> Actividad y Logs
+                                <component :is="tab.icon" :class="[activeTab === tab.id ? 'text-indigo-600' : 'text-gray-300 group-hover:text-gray-400']" class="h-4 w-4 mr-2 transition-colors" />
+                                {{ tab.label }}
                             </button>
                         </nav>
                     </div>
 
                     <div class="p-6">
-                        <ResumenTab 
-                            v-show="activeTab === 'resumen'"
-                            :caso="caso"
-                            :resumen_financiero="resumen_financiero"
-                            :formatCurrency="formatCurrency"
-                            :formatDate="formatDate"
-                            :formatLabel="formatLabel"
-                        />
-                        
-                        <DocumentosTab
-                            v-show="activeTab === 'documentos'"
-                            :caso="caso"
-                            :plantillas="plantillas"
-                            :puedeEditar="puedeEditar"
-                        />
-                        
-                        <FinancieroTab
-                            v-show="activeTab === 'financiero'"
-                            :caso="caso"
-                            :resumen_financiero="resumen_financiero"
-                            :contrato_id="caso.contrato?.id"
-                            :formatCurrency="formatCurrency"
-                        />
-                        
-                        <ActuacionesTab
-                            v-show="activeTab === 'actuaciones'"
-                            :caso="caso"
-                            :actuaciones="actuaciones"
-                            :is-form-disabled="!puedeEditar"
-                        />
-                        
-                        <ActividadTab
-                            v-show="activeTab === 'actividad'"
-                            :bitacoras="bitacoras"
-                            :auditoria="auditoria"
-                        />
+                        <ResumenTab v-show="activeTab === 'resumen'" :caso="caso" :resumen_financiero="resumen_financiero" :formatCurrency="formatCurrency" :formatDate="formatDate" :formatLabel="formatLabel" />
+                        <DocumentosTab v-show="activeTab === 'documentos'" :caso="caso" :plantillas="plantillas" :puedeEditar="puedeEditar" />
+                        <FinancieroTab v-show="activeTab === 'financiero'" :caso="caso" :resumen_financiero="resumen_financiero" :contrato_id="caso.contrato?.id" :formatCurrency="formatCurrency" />
+                        <ActuacionesTab v-show="activeTab === 'actuaciones'" :caso="caso" :actuaciones="actuaciones" :is-form-disabled="!puedeEditar" />
+                        <ActividadTab v-show="activeTab === 'actividad'" :bitacoras="bitacoras" :auditoria="auditoria" />
                     </div>
                 </div>
             </div>
         </div>
-
     </AuthenticatedLayout>
 </template>
 
 <style>
-.vue-select-style .vs__dropdown-toggle {
-    border-color: #d1d5db; 
-    background-color: white;
-    border-radius: 0.375rem; 
-    min-height: 42px;
-}
-.dark .vue-select-style .vs__dropdown-toggle {
-    border-color: #4b5563; 
-    background-color: #1f2937; 
-}
-.vue-select-style .vs__search, .vue-select-style .vs__selected {
-    color: #111827; 
-    margin-top: 0;
-    padding-left: 0.25rem;
-}
-.dark .vue-select-style .vs__search, .dark .vue-select-style .vs__selected {
-    color: #f3f4f6; 
-}
-.vue-select-style .vs__dropdown-menu {
-    background-color: white;
-    border-color: #d1d5db;
-    z-index: 50;
-}
-.dark .vue-select-style .vs__dropdown-menu {
-    background-color: #1f2937;
-    border-color: #4b5563;
-}
-.vue-select-style .vs__option {
-    color: #374151; 
-}
-.dark .vue-select-style .vs__option {
-    color: #d1d5db; 
-}
-.vue-select-style .vs__option--highlight {
-    background-color: #4f46e5; 
-    color: white;
-}
-.vue-select-style .vs__clear, .vue-select-style .vs__open-indicator {
-    fill: #6b7280; 
-}
-.dark .vue-select-style .vs__clear, .dark .vue-select-style .vs__open-indicator {
-    fill: #9ca3af; 
-}
-.vue-select-style .vs__selected-options {
-    padding-left: 0.25rem;
-}
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 </style>

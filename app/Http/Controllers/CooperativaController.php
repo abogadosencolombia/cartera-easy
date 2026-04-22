@@ -110,12 +110,32 @@ class CooperativaController extends Controller
             ? Cooperativa::query()
             : $user->cooperativas()->getQuery();
 
-        $cooperativas = $query->when($term, function($q) use ($term) {
-                $q->where('nombre', 'ilike', "%{$term}%");
-            })
-            ->limit(20)
+        if (!empty($term)) {
+            $words = explode(' ', $term);
+            foreach ($words as $word) {
+                if (empty(trim($word))) continue;
+                $normalized = $this->normalizeTerm(trim($word));
+                $query->where(function($q) use ($word, $normalized) {
+                    $q->where('nombre', 'ilike', "%{$word}%")
+                      ->orWhere('NIT', 'ilike', "%{$word}%")
+                      ->orWhereRaw("TRANSLATE(nombre, 'áéíóúüÁÉÍÓÚÜ', 'aeiouuAEIOUU') ILIKE ?", ["%{$normalized}%"]);
+                });
+            }
+        }
+
+        $cooperativas = $query->orderBy('nombre')
+            ->limit(100)
             ->get(['id', 'nombre']);
 
         return response()->json($cooperativas);
+    }
+
+    private function normalizeTerm($term)
+    {
+        return str_replace(
+            ['á', 'é', 'í', 'ó', 'ú', 'ü', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ü'],
+            ['a', 'e', 'i', 'o', 'u', 'u', 'A', 'E', 'I', 'O', 'U', 'U'],
+            $term
+        );
     }
 }

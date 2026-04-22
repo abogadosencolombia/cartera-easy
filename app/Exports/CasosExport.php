@@ -38,6 +38,11 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
         
         if (!empty($this->filtros['abogado_id'])) $query->where('user_id', $this->filtros['abogado_id']);
         if (!empty($this->filtros['cooperativa_id'])) $query->where('cooperativa_id', $this->filtros['cooperativa_id']);
+        if (!empty($this->filtros['juzgado_id'])) $query->where('juzgado_id', $this->filtros['juzgado_id']);
+        if (!empty($this->filtros['tipo_entidad'])) {
+            $tipo = $this->filtros['tipo_entidad'];
+            $query->whereHas('juzgado', fn($jq) => $jq->where('nombre', 'ilike', "%{$tipo}%"));
+        }
         if (!empty($this->filtros['etapa_procesal'])) $query->where('etapa_procesal', $this->filtros['etapa_procesal']);
         if (!empty($this->filtros['sin_radicado'])) {
             $query->where(function($q) { $q->whereNull('radicado')->orWhere('radicado', ''); });

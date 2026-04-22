@@ -7,6 +7,7 @@ import Modal from '@/Components/Modal.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import InputError from '@/Components/InputError.vue';
 import TextInput from '@/Components/TextInput.vue';
+import SelectInput from '@/Components/SelectInput.vue';
 import Checkbox from '@/Components/Checkbox.vue';
 import { Head, Link, useForm, usePage, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
@@ -185,7 +186,7 @@ const handleFileUpload = (event) => {
                         </div>
                         
                         <div class="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
-                            <select 
+                            <SelectInput 
                                 v-model="filtroForm.tipo" 
                                 @change="aplicarFiltros" 
                                 class="block w-full sm:w-48 text-sm border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
@@ -196,9 +197,9 @@ const handleFileUpload = (event) => {
                                 <option value="medida cautelar">Medida Cautelar</option>
                                 <option value="notificación">Notificación</option>
                                 <option value="otros">Otros</option>
-                            </select>
+                            </SelectInput>
 
-                            <select 
+                            <SelectInput 
                                 v-model="filtroForm.activa" 
                                 @change="aplicarFiltros" 
                                 class="block w-full sm:w-48 text-sm border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
@@ -206,7 +207,7 @@ const handleFileUpload = (event) => {
                                 <option value="">Todos los Estados</option>
                                 <option value="1">Solo Activas</option>
                                 <option value="0">Solo Inactivas</option>
-                            </select>
+                            </SelectInput>
 
                             <SecondaryButton @click="limpiarFiltros" class="justify-center" title="Limpiar filtros">
                                 <ArrowPathIcon class="w-5 h-5" />
@@ -316,23 +317,23 @@ const handleFileUpload = (event) => {
                         <!-- Cooperativa -->
                         <div>
                             <InputLabel for="cooperativa_id" value="Cooperativa (Opcional)" />
-                            <select v-model="form.cooperativa_id" id="cooperativa_id" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                            <SelectInput v-model="form.cooperativa_id" id="cooperativa_id" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
                                 <option :value="null">-- Plantilla Global --</option>
                                 <option v-for="coop in cooperativas" :key="coop.id" :value="coop.id">{{ coop.nombre }}</option>
-                            </select>
+                            </SelectInput>
                             <InputError :message="form.errors.cooperativa_id" class="mt-2" />
                         </div>
 
                         <!-- Tipo -->
                         <div>
                             <InputLabel for="tipo" value="Tipo de Documento" />
-                            <select v-model="form.tipo" id="tipo" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                            <SelectInput v-model="form.tipo" id="tipo" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
                                 <option value="demanda">Demanda</option>
                                 <option value="carta">Carta</option>
                                 <option value="medida cautelar">Medida Cautelar</option>
                                 <option value="notificación">Notificación</option>
                                 <option value="otros">Otros</option>
-                            </select>
+                            </SelectInput>
                             <InputError :message="form.errors.tipo" class="mt-2" />
                         </div>
                     </div>

@@ -8,6 +8,7 @@ import InputError from '@/Components/InputError.vue'
 import PrimaryButton from '@/Components/PrimaryButton.vue'
 import SecondaryButton from '@/Components/SecondaryButton.vue'
 import InputLabel from '@/Components/InputLabel.vue'
+import SelectInput from '@/Components/SelectInput.vue'
 import TextInput from '@/Components/TextInput.vue'
 import Textarea from '@/Components/Textarea.vue'
 import { onClickOutside } from '@vueuse/core'
@@ -1114,12 +1115,12 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
                         </div>
                         <div>
                             <InputLabel for="pago_cuota_metodo" value="Método" />
-                            <select id="pago_cuota_metodo" v-model="pagoCuotaForm.metodo" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-700">
+                            <SelectInput id="pago_cuota_metodo" v-model="pagoCuotaForm.metodo" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-700">
                                 <option>TRANSFERENCIA</option>
                                 <option>EFECTIVO</option>
                                 <option>TARJETA</option>
                                 <option>OTRO</option>
-                            </select>
+                            </SelectInput>
                         </div>
                     </div>
                     <div>
@@ -1182,12 +1183,12 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
                         </div>
                         <div>
                             <InputLabel for="pago_cargo_metodo" value="Método" />
-                            <select id="pago_cargo_metodo" v-model="pagoCargoForm.metodo" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-700">
+                            <SelectInput id="pago_cargo_metodo" v-model="pagoCargoForm.metodo" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-700">
                                 <option>TRANSFERENCIA</option>
                                 <option>EFECTIVO</option>
                                 <option>TARJETA</option>
                                 <option>OTRO</option>
-                            </select>
+                            </SelectInput>
                         </div>
                     </div>
                     <div>
@@ -1340,13 +1341,13 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <InputLabel for="modalidad_reestructurar" value="Modalidad del Contrato" />
-                            <select
+                            <SelectInput
                                 v-model="crearContratoForm.modalidad"
                                 id="modalidad_reestructurar"
                                 class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-700"
                             >
                                 <option v-for="mod in props.modalidades" :key="mod" :value="mod">{{ mod.replace('_',' ') }}</option>
-                            </select>
+                            </SelectInput>
                             <InputError class="mt-2" :message="crearContratoForm.errors.modalidad" />
                         </div>
                         <div>
@@ -1370,9 +1371,9 @@ const guardarNuevoContrato = () => { crearContratoForm.post(route('honorarios.co
                             <!-- NUEVO: SELECTOR DE FRECUENCIA EN REESTRUCTURAR -->
                             <div v-if="crearContratoForm.modalidad !== 'PAGO_UNICO'">
                                 <InputLabel for="frecuencia_reestructurar" value="Frecuencia de Pago" />
-                                <select v-model="crearContratoForm.frecuencia_pago" id="frecuencia_reestructurar" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-700">
+                                <SelectInput v-model="crearContratoForm.frecuencia_pago" id="frecuencia_reestructurar" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-700">
                                     <option v-for="freq in frecuencias" :key="freq.value" :value="freq.value">{{ freq.label }}</option>
-                                </select>
+                                </SelectInput>
                             </div>
                             <div>
                                 <InputLabel for="anticipo_reestructurar" value="Anticipo (Opcional)" />

@@ -32,13 +32,16 @@ class RegistrarIncidenteJuridico
 
     private function handleValidacionIncumplida(ValidacionLegalIncumplida $event): void
     {
+        $validacion = $event->validacionLegal;
+        $nombreRequisito = $validacion->requisito ? $validacion->requisito->nombre : (\App\Models\ValidacionLegal::TIPOS_VALIDACION[$validacion->tipo] ?? $validacion->tipo);
+        
         IncidenteJuridico::create([
-            'caso_id' => $event->validacionLegal->caso_id ?? null,
             'usuario_responsable_id' => $event->usuario->id,
             'origen' => 'validacion',
-            'asunto' => 'Incumplimiento de Validación Legal: ' . $event->validacionLegal->requisito->nombre,
-            'descripcion' => 'Se detectó un incumplimiento en la validación del requisito "' . $event->validacionLegal->requisito->nombre . '" para el caso #' . ($event->validacionLegal->caso_id ?? 'N/A') . '. El estado actual es "' . $event->validacionLegal->estado . '".',
+            'asunto' => '🔴 Incumplimiento Legal: ' . $nombreRequisito,
+            'descripcion' => "Se detectó una falla automática en el requisito \"{$nombreRequisito}\" para el caso #{$validacion->caso_id}. \n\nDetalles registrados: {$validacion->observacion}",
             'estado' => 'pendiente',
+            'fecha_registro' => now(),
         ]);
     }
 

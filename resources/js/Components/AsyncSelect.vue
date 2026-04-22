@@ -51,7 +51,10 @@ const displayLabel = (item) => {
 
 // Cargar datos iniciales
 onMounted(() => {
-    fetchResults('');
+    if (props.modelValue && !Array.isArray(props.modelValue)) {
+        // Si hay un valor inicial, podríamos cargar su label si fuera necesario, 
+        // pero displayLabel ya lo maneja si el objeto viene completo.
+    }
     document.addEventListener('click', handleClickOutside);
 });
 

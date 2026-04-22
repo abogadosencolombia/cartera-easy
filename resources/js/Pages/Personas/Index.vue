@@ -2,6 +2,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import SelectInput from '@/Components/SelectInput.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { reactive, watch, computed } from 'vue';
@@ -195,32 +196,32 @@ const copyToClipboard = (text) => {
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 xl:w-2/3">
                     <div>
                         <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1 ml-1">Estado</label>
-                        <select v-model="params.status" class="w-full rounded-xl border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs font-bold uppercase tracking-tight py-2.5">
+                        <SelectInput v-model="params.status" class="w-full py-2.5">
                             <option value="active">Activos</option>
                             <option value="suspended">Papelera</option>
-                        </select>
+                        </SelectInput>
                     </div>
                     <div>
                         <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1 ml-1">Rol</label>
-                        <select v-model="params.tipo_rol" class="w-full rounded-xl border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs font-bold uppercase tracking-tight py-2.5">
+                        <SelectInput v-model="params.tipo_rol" class="w-full py-2.5">
                             <option value="">Todos los Roles</option>
                             <option value="deudor">Deudores / Clientes</option>
                             <option value="demandado">Demandados</option>
-                        </select>
+                        </SelectInput>
                     </div>
                     <div>
                         <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1 ml-1">Empresa</label>
-                        <select v-model="params.cooperativa_id" class="w-full rounded-xl border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs font-bold uppercase tracking-tight py-2.5">
+                        <SelectInput v-model="params.cooperativa_id" class="w-full py-2.5">
                             <option value="">Todas</option>
                             <option v-for="c in cooperativas" :key="c.id" :value="c.id">{{ c.nombre }}</option>
-                        </select>
+                        </SelectInput>
                     </div>
                     <div>
                         <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1 ml-1">Orden</label>
-                        <select v-model="sortOption" class="w-full rounded-xl border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs font-bold uppercase tracking-tight py-2.5">
+                        <SelectInput v-model="sortOption" class="w-full py-2.5">
                             <option value="updated_at|desc">Más Recientes</option>
                             <option value="nombre_completo|asc">A - Z</option>
-                        </select>
+                        </SelectInput>
                     </div>
                 </div>
             </div>

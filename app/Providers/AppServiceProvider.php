@@ -23,8 +23,9 @@ use App\Models\Tarea;
 use App\Policies\TareaPolicy;
 // ===== FIN DE LA MODIFICACIÓN =====
 
-// --- 1. IMPORTAMOS EL OBSERVER ---
+// --- 1. IMPORTAMOS LOS OBSERVERS ---
 use App\Observers\CasoObserver;
+use App\Observers\AuditoriaObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -63,8 +64,11 @@ class AppServiceProvider extends ServiceProvider
             return $user->tipo_usuario === 'admin';
         });
 
-        // ===== 2. AQUÍ REGISTRAMOS NUESTRO OBSERVER PARA CASOS =====
+        // ===== 2. AQUÍ REGISTRAMOS NUESTROS OBSERVERS =====
         // Esta línea activa el motor que crea las validaciones automáticamente.
         Caso::observe(CasoObserver::class);
+        
+        // Esta línea activa el vigilante de seguridad de auditoría.
+        \App\Models\AuditoriaEvento::observe(AuditoriaObserver::class);
     }
 }

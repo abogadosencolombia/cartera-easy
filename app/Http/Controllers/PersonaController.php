@@ -324,16 +324,33 @@ class PersonaController extends Controller
             });
         }
 
-        $personas = $query->when($term, function($q) use ($term) {
-                $q->where(function($subq) use ($term) {
-                    $subq->where('nombre_completo', 'ilike', "%{$term}%")
-                         ->orWhere('numero_documento', 'ilike', "%{$term}%");
+        if (!empty($term)) {
+            $words = explode(' ', $term);
+            foreach ($words as $word) {
+                if (empty(trim($word))) continue;
+                $normalized = $this->normalizeTerm(trim($word));
+                $query->where(function($q) use ($word, $normalized) {
+                    $q->where('nombre_completo', 'ilike', "%{$word}%")
+                         ->orWhere('numero_documento', 'ilike', "%{$word}%")
+                         ->orWhereRaw("TRANSLATE(nombre_completo, 'áéíóúüÁÉÍÓÚÜ', 'aeiouuAEIOUU') ILIKE ?", ["%{$normalized}%"]);
                 });
-            })
-            ->limit(20)
+            }
+        }
+
+        $personas = $query->orderBy('nombre_completo')
+            ->limit(100)
             ->get(['id', 'nombre_completo', 'numero_documento']);
 
         return response()->json($personas);
+    }
+
+    private function normalizeTerm($term)
+    {
+        return str_replace(
+            ['á', 'é', 'í', 'ó', 'ú', 'ü', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ü'],
+            ['a', 'e', 'i', 'o', 'u', 'u', 'A', 'E', 'I', 'O', 'U', 'U'],
+            $term
+        );
     }
 
     /**

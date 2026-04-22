@@ -3,6 +3,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ref, watch, computed, onMounted } from 'vue';
 import { debounce, pickBy } from 'lodash';
+import SelectInput from '@/Components/SelectInput.vue';
 import { 
     UserGroupIcon, 
     BanknotesIcon, 
@@ -111,11 +112,11 @@ const roleBadgeClass = (role) => {
                          <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
                         <input v-model="q" type="text" class="w-full pl-10 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Buscar gestor...">
                     </div>
-                    <select v-model="sort" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    <SelectInput v-model="sort" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                         <option value="total_recovered">Mayor Recuperación</option>
                         <option value="casos_count">Más Casos</option>
                         <option value="name">Nombre (A-Z)</option>
-                    </select>
+                    </SelectInput>
                 </div>
             </div>
         </template>

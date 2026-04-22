@@ -4,6 +4,7 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
+import SelectInput from '@/Components/SelectInput.vue';
 import Checkbox from '@/Components/Checkbox.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { 
@@ -145,9 +146,9 @@ const getRandomColor = (id) => {
                             </div>
                             <div class="space-y-2">
                                 <InputLabel value="Entidad de Vigilancia" class="font-bold text-xs uppercase" />
-                                <select v-model="form.tipo_vigilancia" class="w-full rounded-xl border-gray-200 bg-gray-50 font-bold text-sm">
+                                <SelectInput v-model="form.tipo_vigilancia" class="w-full rounded-xl border-gray-200 bg-gray-50 font-bold text-sm">
                                     <option>Supersolidaria</option><option>SFC</option><option>Otro</option>
-                                </select>
+                                </SelectInput>
                             </div>
                         </div>
                     </div>

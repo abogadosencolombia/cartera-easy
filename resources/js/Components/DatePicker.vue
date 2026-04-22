@@ -7,7 +7,8 @@ import { isHoliday } from '@/Utils/holidays';
 
 const props = defineProps({
     modelValue: { type: [String, null], default: null },
-    placeholder: { type: String, default: 'Seleccionar fecha' }
+    placeholder: { type: String, default: 'Seleccionar fecha' },
+    yearRange: { type: Number, default: 100 }
 });
 
 const emit = defineEmits(['update:modelValue']);
@@ -64,8 +65,14 @@ const daysOfWeek = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
 const years = computed(() => {
     const cy = new Date().getFullYear();
     const arr = [];
-    for (let i = cy - 20; i <= cy + 10; i++) arr.push(i);
+    const startYear = cy - props.yearRange;
+    const endYear = cy + 20; // Un margen razonable a futuro
+    
+    for (let i = startYear; i <= endYear; i++) arr.push(i);
+    
+    // Asegurarse de que el año actual de vista esté incluido
     if (!arr.includes(currentYear.value)) arr.push(currentYear.value);
+    
     return arr.sort((a, b) => a - b);
 });
 

@@ -5,6 +5,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
+import SelectInput from '@/Components/SelectInput.vue';
 import DatePicker from '@/Components/DatePicker.vue';
 import Textarea from '@/Components/Textarea.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
@@ -130,9 +131,9 @@ const getRandomColor = (id) => {
                 </div>
                 <div class="space-y-2">
                     <InputLabel value="Tipo de Documento *" class="font-bold text-xs uppercase" />
-                    <select v-model="form.tipo_documento" class="w-full rounded-xl border-gray-200 bg-gray-50 font-bold text-sm">
+                    <SelectInput v-model="form.tipo_documento" class="w-full">
                         <option>CC</option><option>CE</option><option>NIT</option><option>Pasaporte</option>
-                    </select>
+                    </SelectInput>
                 </div>
                 <div class="space-y-2">
                     <InputLabel value="Número de Identificación *" class="font-bold text-xs uppercase" />

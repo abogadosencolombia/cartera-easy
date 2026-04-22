@@ -3,14 +3,18 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
-import SecondaryButton from '@/Components/SecondaryButton.vue'; // Importado para "Añadir"
+import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import Checkbox from '@/Components/Checkbox.vue';
-import SelectInput from '@/Components/SelectInput.vue';
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import Multiselect from 'vue-multiselect';
-import { TrashIcon, PlusIcon } from '@heroicons/vue/24/outline'; // Importar iconos
+import { 
+    TrashIcon, PlusIcon, UserIcon, LockClosedIcon, 
+    IdentificationIcon, MapPinIcon, ArrowLeftIcon, 
+    ShieldCheckIcon, BriefcaseIcon, BuildingOffice2Icon,
+    BellIcon, KeyIcon, PencilSquareIcon
+} from '@heroicons/vue/24/outline';
 
 // --- PROPS ---
 const props = defineProps({
@@ -37,7 +41,7 @@ const form = useForm({
     especialidades: props.user.especialidades.map(e => e.id),
     persona_id: props.user.persona_id,
     preferencias_notificacion: props.user.preferencias_notificacion || { 'email': true, 'in-app': true },
-    addresses: props.user.addresses || [], // --- AÑADIDO: Cargar direcciones existentes ---
+    addresses: props.user.addresses || [],
 });
 
 // --- LÓGICA DE DIRECCIONES ---
@@ -54,231 +58,241 @@ const submit = () => {
         preserveScroll: true,
     });
 };
+
+// --- ICONOS DE ROL ---
+const roleIcons = {
+    admin: ShieldCheckIcon,
+    abogado: BriefcaseIcon,
+    gestor: BuildingOffice2Icon,
+    cliente: UserIcon
+};
 </script>
 
-<!-- Estilos para Multiselect (sin cambios) -->
 <style src="vue-multiselect/dist/vue-multiselect.css"></style>
 <style>
-/* Personalización para que el multiselect se integre con el tema oscuro y los colores de la app */
-
-/* --- Contenedor principal y campo de texto --- */
 .multiselect__tags {
-    background-color: transparent !important;
-    border-color: #4b5563; /* Corresponde a border-gray-600 en tema oscuro */
+    border-radius: 0.75rem !important;
+    border-color: #e5e7eb !important;
+    padding-top: 8px !important;
 }
-.multiselect__input, .multiselect__single {
-    background-color: transparent !important;
-}
-
-/* --- Lista desplegable de opciones --- */
-.multiselect__content-wrapper {
-    background-color: #1f2937; /* Corresponde a bg-gray-800 */
-    color: #d1d5db; /* Corresponde a text-gray-300 */
-    border-color: #4b5563; /* Corresponde a border-gray-600 */
+.dark .multiselect__tags {
+    background-color: #111827 !important;
+    border-color: #374151 !important;
 }
 .multiselect__option--highlight {
-    background-color: #4f46e5; /* Corresponde a bg-indigo-600 */
+    background: #4f46e5 !important;
 }
-.multiselect__option--selected {
-    background-color: #3730a3; /* Corresponde a bg-indigo-800 */
-}
-.multiselect__option--selected.multiselect__option--highlight {
-    background-color: #4f46e5; /* Mantiene el color de hover incluso si está seleccionado */
-}
-
-/* --- Etiquetas de los elementos ya seleccionados --- */
 .multiselect__tag {
-    background-color: #4338ca; /* Corresponde a bg-indigo-700 */
-    color: #e0e7ff; /* Corresponde a text-indigo-100 */
-}
-.multiselect__tag-icon:focus,
-.multiselect__tag-icon:hover {
-    background-color: #312e81; /* Corresponde a bg-indigo-900 */
-}
-.multiselect__tag-icon::after {
-    color: #a5b4fc; /* Corresponde a text-indigo-300 */
+    background: #4f46e5 !important;
+    border-radius: 6px !important;
 }
 </style>
 
 <template>
-    <Head :title="'Editar Usuario: ' + user.name" />
+    <Head :title="'Editar: ' + user.name" />
 
     <AuthenticatedLayout>
-        <!-- Encabezado de la página -->
         <template #header>
-    <h2 class="font-semibold text-xl text-indigo-600 leading-tight">
-        Editando Usuario: 
-        <span class="text-gray-800">{{ user.name }}</span>
-    </h2>
-           
+            <div class="flex items-center gap-4">
+                <Link :href="route('admin.users.index')" class="p-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 text-gray-400 hover:text-indigo-600 transition-all">
+                    <ArrowLeftIcon class="h-5 w-5" />
+                </Link>
+                <div>
+                    <h2 class="font-black text-2xl text-gray-900 dark:text-white leading-tight">
+                        Editar Usuario
+                    </h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">Actualizando el perfil de: <span class="text-indigo-600 font-bold">{{ user.name }}</span></p>
+                </div>
+            </div>
         </template>
 
-        <div class="py-12">
-            <div class="max-w-2xl mx-auto sm:px-6 lg:px-8">
-                <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg">
-                    <div class="p-6 md:p-8">
-                        <div class="flex justify-between items-center mb-6">
-                            <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-gray-100">
-                                Actualice los datos del usuario
-                            </h3>
-                            <Link :href="route('admin.users.index')" class="text-sm text-gray-600 dark:text-gray-400 hover:underline">
-                                &larr; Volver al listado
-                            </Link>
+        <div class="py-8">
+            <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
+                <form @submit.prevent="submit" class="space-y-8">
+                    
+                    <!-- SECCIÓN 1: IDENTIDAD -->
+                    <div class="bg-white dark:bg-gray-800 shadow-xl shadow-slate-200/50 dark:shadow-none rounded-3xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                        <div class="p-6 bg-gray-50/50 dark:bg-gray-700/30 border-b border-gray-100 dark:border-gray-700 flex items-center rounded-t-3xl">
+                            <div class="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm mr-3 text-indigo-600">
+                                <IdentificationIcon class="h-5 w-5" />
+                            </div>
+                            <h3 class="font-bold text-gray-900 dark:text-white uppercase tracking-widest text-xs">Identidad Básica</h3>
                         </div>
                         
-                        <form @submit.prevent="submit" class="space-y-6">
-                            <!-- Nombre y Email -->
+                        <div class="p-8 space-y-6">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <InputLabel for="name" value="Nombre Completo" />
-                                    <TextInput id="name" type="text" class="mt-1 block w-full" v-model="form.name" required />
-                                    <InputError :message="form.errors.name" />
+                                    <InputLabel for="name" value="Nombre Completo" class="text-[10px] font-black uppercase text-gray-400" />
+                                    <TextInput id="name" type="text" class="mt-1 block w-full bg-gray-50 border-transparent focus:bg-white" v-model="form.name" required />
+                                    <InputError class="mt-2" :message="form.errors.name" />
                                 </div>
                                 <div>
-                                    <InputLabel for="email" value="Email" />
-                                    <TextInput id="email" type="email" class="mt-1 block w-full" v-model="form.email" required />
-                                    <InputError :message="form.errors.email" />
+                                    <InputLabel for="email" value="Correo Electrónico" class="text-[10px] font-black uppercase text-gray-400" />
+                                    <TextInput id="email" type="email" class="mt-1 block w-full bg-gray-50 border-transparent focus:bg-white" v-model="form.email" required />
+                                    <InputError class="mt-2" :message="form.errors.email" />
                                 </div>
                             </div>
-                            
-                            <!-- Selector de Rol -->
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN 2: ROL Y PERMISOS (CON Z-INDEX FIX) -->
+                    <div class="bg-white dark:bg-gray-800 shadow-xl shadow-slate-200/50 dark:shadow-none rounded-3xl border border-gray-100 dark:border-gray-700 overflow-visible relative z-30">
+                        <div class="p-6 bg-gray-50/50 dark:bg-gray-700/30 border-b border-gray-100 dark:border-gray-700 flex items-center rounded-t-3xl">
+                            <div class="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm mr-3 text-indigo-600">
+                                <ShieldCheckIcon class="h-5 w-5" />
+                            </div>
+                            <h3 class="font-bold text-gray-900 dark:text-white uppercase tracking-widest text-xs">Rol y Asignaciones</h3>
+                        </div>
+
+                        <div class="p-8 space-y-8 overflow-visible">
                             <div>
-                                <InputLabel for="tipo_usuario" value="Tipo de Usuario" />
-                                <SelectInput v-model="form.tipo_usuario" id="tipo_usuario" class="mt-1 block w-full" :disabled="isEditingSelf">
-                                    <option value="admin">Administrador</option>
-                                    <option value="abogado">Abogado</option>
-                                    <option value="gestor">Gestor</option>
-                                    <option value="cliente">Cliente</option>
-                                </SelectInput>
-                                <p v-if="isEditingSelf" class="text-xs text-gray-500 dark:text-gray-400 mt-1">No puedes cambiar tu propio rol.</p>
-                                <InputError :message="form.errors.tipo_usuario" />
+                                <InputLabel value="Tipo de Perfil" class="text-[10px] font-black uppercase text-gray-400 mb-3" />
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    <button v-for="role in ['admin', 'abogado', 'gestor', 'cliente']" :key="role" type="button" 
+                                        @click="!isEditingSelf ? form.tipo_usuario = role : null" 
+                                        :disabled="isEditingSelf"
+                                        :class="[
+                                            form.tipo_usuario === role ? 'border-indigo-600 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-500/20' : 'border-gray-200 bg-white text-gray-500 hover:border-indigo-300',
+                                            isEditingSelf && form.tipo_usuario !== role ? 'opacity-40 grayscale cursor-not-allowed' : ''
+                                        ]"
+                                        class="flex flex-col items-center p-4 border-2 rounded-2xl transition-all group">
+                                        <component :is="roleIcons[role]" class="h-6 w-6 mb-2" />
+                                        <span class="text-[10px] font-black uppercase tracking-tighter">{{ role }}</span>
+                                    </button>
+                                </div>
+                                <p v-if="isEditingSelf" class="text-[10px] text-amber-600 font-bold mt-2 italic">* No puedes cambiar tu propio rol para evitar bloqueos.</p>
+                                <InputError class="mt-2" :message="form.errors.tipo_usuario" />
                             </div>
 
-                            <!-- Especialidades (Visible solo para Abogado o Gestor) -->
-                            <div v-if="form.tipo_usuario === 'abogado' || form.tipo_usuario === 'gestor'">
-                                <InputLabel value="Especialidad(es)" />
+                            <div v-if="form.tipo_usuario === 'abogado' || form.tipo_usuario === 'gestor'" class="relative z-40">
+                                <InputLabel value="Especialidades" class="text-[10px] font-black uppercase text-gray-400 mb-2" />
                                 <Multiselect
                                     v-model="form.especialidades"
                                     :options="allEspecialidades.map(e => e.id)"
                                     :custom-label="opt => allEspecialidades.find(e => e.id === opt)?.nombre"
                                     :multiple="true"
-                                    placeholder="Seleccione una o más especialidades"
+                                    placeholder="Seleccionar..."
                                 />
-                                <InputError :message="form.errors.especialidades" />
+                                <InputError :message="form.errors.especialidades" class="mt-2" />
                             </div>
-                            
-                            <!-- Cooperativas (Visible para Abogado, Gestor y Cliente) -->
-                            <div v-if="form.tipo_usuario === 'abogado' || form.tipo_usuario === 'gestor' || form.tipo_usuario === 'cliente'">
-                                <InputLabel value="Cooperativas Asignadas" />
+
+                            <div v-if="form.tipo_usuario !== 'admin'" class="relative z-30">
+                                <InputLabel value="Cooperativas" class="text-[10px] font-black uppercase text-gray-400 mb-2" />
                                 <Multiselect
                                     v-model="form.cooperativas"
                                     :options="allCooperativas.map(c => c.id)"
                                     :custom-label="opt => allCooperativas.find(c => c.id === opt)?.nombre"
                                     :multiple="true"
-                                    placeholder="Seleccione una o más cooperativas"
+                                    placeholder="Seleccionar..."
                                 />
-                                <InputError :message="form.errors.cooperativas" />
+                                <InputError :message="form.errors.cooperativas" class="mt-2" />
                             </div>
+                        </div>
+                    </div>
 
-                            <!-- Selector de Persona Asociada (Visible solo para Cliente) -->
-                             <div v-if="form.tipo_usuario === 'cliente'">
-                                 <InputLabel for="persona_id" value="Persona Asociada a esta Cuenta"/>
-                                 <SelectInput v-model="form.persona_id" id="persona_id" class="mt-1 block w-full">
-                                      <option :value="null">Ninguna / Desvincular</option>
-                                      <option v-for="p in personas" :key="p.id" :value="p.id">{{ p.nombre_completo }} ({{ p.numero_documento }})</option>
-                                 </SelectInput>
-                                 <InputError :message="form.errors.persona_id" class="mt-2" />
-                             </div>
+                    <!-- SECCIÓN 3: CONTACTO -->
+                    <div class="bg-white dark:bg-gray-800 shadow-xl shadow-slate-200/50 dark:shadow-none rounded-3xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                        <div class="p-6 bg-gray-50/50 dark:bg-gray-700/30 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center rounded-t-3xl">
+                            <div class="flex items-center">
+                                <div class="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm mr-3 text-indigo-600">
+                                    <MapPinIcon class="h-5 w-5" />
+                                </div>
+                                <h3 class="font-bold text-gray-900 dark:text-white uppercase tracking-widest text-xs">Ubicaciones de Contacto</h3>
+                            </div>
+                            <button type="button" @click="addAddress" class="text-[10px] font-black uppercase tracking-widest bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition-all">
+                                + Añadir Otra
+                            </button>
+                        </div>
 
-                            <!-- --- INICIO: SECCIÓN DE DIRECCIONES --- -->
-                            <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
-                                <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Información de Contacto</h3>
-                                <InputError class="mt-2" :message="form.errors.addresses" />
-
-                                <div class="mt-4 space-y-4">
-                                    <div v-for="(address, index) in form.addresses" :key="index" class="p-4 border border-gray-200 dark:border-gray-700 rounded-lg space-y-4 relative">
-                                        <button 
-                                            type="button" 
-                                            @click="removeAddress(index)" 
-                                            class="absolute -top-3 -right-3 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-full"
-                                        >
-                                            <TrashIcon class="h-4 w-4" />
-                                        </button>
-                                        
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
-                                                <InputLabel :for="'address_' + index" value="Dirección" />
-                                                <TextInput :id="'address_' + index" type="text" class="mt-1 block w-full" v-model="address.address" placeholder="Ej: Calle 10 # 43A-20" />
-                                            </div>
-                                            <div>
-                                                <InputLabel :for="'city_' + index" value="Ciudad" />
-                                                <TextInput :id="'city_' + index" type="text" class="mt-1 block w-full" v-model="address.city" placeholder="Ej: Medellín" />
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <InputLabel :for="'details_' + index" value="Detalles Adicionales" />
-                                            <TextInput :id="'details_' + index" type="text" class="mt-1 block w-full" v-model="address.details" placeholder="Ej: Apto 501, Barrio El Poblado" />
-                                        </div>
+                        <div class="p-8 space-y-6">
+                            <div v-for="(address, index) in form.addresses" :key="index" class="p-6 bg-gray-50 dark:bg-gray-900/40 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700 relative animate-in zoom-in-95">
+                                <button type="button" @click="removeAddress(index)" class="absolute -top-3 -right-3 bg-rose-500 text-white p-1.5 rounded-full shadow-lg hover:scale-110 transition-transform">
+                                    <TrashIcon class="h-4 w-4" />
+                                </button>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <InputLabel value="Dirección Física" class="text-[10px] font-black text-gray-400" />
+                                        <TextInput type="text" class="mt-1 block w-full bg-white" v-model="address.address" />
                                     </div>
-
-                                    <SecondaryButton type="button" @click="addAddress" class="mt-2">
-                                        <PlusIcon class="h-4 w-4 mr-2" />
-                                        Añadir Dirección
-                                    </SecondaryButton>
+                                    <div>
+                                        <InputLabel value="Ciudad" class="text-[10px] font-black text-gray-400" />
+                                        <TextInput type="text" class="mt-1 block w-full bg-white" v-model="address.city" />
+                                    </div>
+                                </div>
+                                <div class="mt-4">
+                                    <InputLabel value="Detalles" class="text-[10px] font-black text-gray-400" />
+                                    <TextInput type="text" class="mt-1 block w-full bg-white" v-model="address.details" />
                                 </div>
                             </div>
-                            <!-- --- FIN: SECCIÓN DE DIRECCIONES --- -->
+                            <div v-if="form.addresses.length === 0" class="py-10 text-center border-2 border-dashed border-gray-100 dark:border-gray-700 rounded-[2rem] text-gray-400 text-xs italic">
+                                No hay direcciones registradas.
+                            </div>
+                        </div>
+                    </div>
 
-                            <!-- Preferencias de Notificación -->
-                            <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
-                                <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Preferencias de Notificación</h3>
-                                <InputError :message="form.errors.preferencias_notificacion" class="mt-2" />
-                                <div class="mt-4 space-y-3">
-                                    <label class="flex items-center">
-                                        <Checkbox v-model:checked="form.preferencias_notificacion['in-app']" />
-                                        <span class="ms-2 text-sm text-gray-600 dark:text-gray-300">Recibir notificaciones en la aplicación</span>
-                                    </label>
-                                    <label class="flex items-center">
-                                        <Checkbox v-model:checked="form.preferencias_notificacion.email" />
-                                        <span class="ms-2 text-sm text-gray-600 dark:text-gray-300">Recibir notificaciones por correo</span>
-                                    </label>
+                    <!-- SECCIÓN 4: PREFERENCIAS -->
+                    <div class="bg-white dark:bg-gray-800 shadow-xl shadow-slate-200/50 dark:shadow-none rounded-3xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                        <div class="p-6 bg-gray-50/50 dark:bg-gray-700/30 border-b border-gray-100 dark:border-gray-700 flex items-center rounded-t-3xl">
+                            <div class="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm mr-3 text-indigo-600">
+                                <BellIcon class="h-5 w-5" />
+                            </div>
+                            <h3 class="font-bold text-gray-900 dark:text-white uppercase tracking-widest text-xs">Notificaciones</h3>
+                        </div>
+                        <div class="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <label class="flex items-center p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl cursor-pointer hover:bg-indigo-50 transition-colors">
+                                <Checkbox v-model:checked="form.preferencias_notificacion['in-app']" class="rounded-lg h-5 w-5" />
+                                <span class="ml-3 text-sm font-bold text-gray-700 dark:text-gray-300">Alertas en la Aplicación</span>
+                            </label>
+                            <label class="flex items-center p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl cursor-pointer hover:bg-indigo-50 transition-colors">
+                                <Checkbox v-model:checked="form.preferencias_notificacion.email" class="rounded-lg h-5 w-5" />
+                                <span class="ml-3 text-sm font-bold text-gray-700 dark:text-gray-300">Alertas por Correo</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN 5: SEGURIDAD (ZONA CRÍTICA) -->
+                    <div class="bg-rose-50/50 dark:bg-rose-900/10 shadow-xl rounded-3xl border border-rose-100 dark:border-rose-900/30 overflow-hidden">
+                        <div class="p-6 bg-rose-100/50 dark:bg-rose-900/30 border-b border-rose-200 dark:border-rose-900/50 flex items-center">
+                            <div class="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm mr-3 text-rose-600">
+                                <KeyIcon class="h-5 w-5" />
+                            </div>
+                            <h3 class="font-bold text-rose-900 dark:text-rose-300 uppercase tracking-widest text-xs">Seguridad y Estado</h3>
+                        </div>
+                        <div class="p-8 space-y-8">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <InputLabel value="Cambiar Contraseña" class="text-[10px] font-black text-rose-400 uppercase" />
+                                    <TextInput type="password" class="mt-1 block w-full border-rose-100 focus:border-rose-500 focus:ring-rose-500" v-model="form.password" placeholder="Dejar en blanco para no cambiar" />
+                                    <InputError :message="form.errors.password" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel value="Confirmar Contraseña" class="text-[10px] font-black text-rose-400 uppercase" />
+                                    <TextInput type="password" class="mt-1 block w-full border-rose-100 focus:border-rose-500 focus:ring-rose-500" v-model="form.password_confirmation" />
                                 </div>
                             </div>
                             
-                            <!-- Contraseña y Estado -->
-                            <div class="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-6">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                     <div>
-                                         <InputLabel for="password" value="Nueva Contraseña (Opcional)" />
-                                         <TextInput id="password" type="password" class="mt-1 block w-full" v-model="form.password" />
-                                         <InputError :message="form.errors.password" />
-                                     </div>
-                                     <div>
-                                         <InputLabel for="password_confirmation" value="Confirmar Nueva Contraseña" />
-                                         <TextInput id="password_confirmation" type="password" class="mt-1 block w-full" v-model="form.password_confirmation" />
-                                     </div>
-                                </div>
-                                <div class="block">
-                                     <label class="flex items-center">
-                                         <Checkbox v-model:checked="form.estado_activo" :disabled="isEditingSelf" />
-                                         <span class="ms-2 text-sm text-gray-600 dark:text-gray-300">Usuario Activo</span>
-                                     </label>
-                                     <p v-if="isEditingSelf" class="text-xs text-gray-500 dark:text-gray-400 mt-1">No puedes desactivar tu propia cuenta.</p>
-                                </div>
+                            <div class="pt-6 border-t border-rose-100 dark:border-rose-900/30">
+                                <label class="flex items-center group">
+                                    <Checkbox v-model:checked="form.estado_activo" :disabled="isEditingSelf" class="h-6 w-6 text-rose-600 rounded-lg" />
+                                    <div class="ml-4">
+                                        <span class="text-sm font-black text-rose-900 dark:text-rose-300 uppercase">Cuenta Activa</span>
+                                        <p class="text-xs text-rose-500 dark:text-rose-400/60 leading-none mt-1">Desactive esta opción para suspender el acceso de inmediato.</p>
+                                    </div>
+                                </label>
                             </div>
-
-                            <!-- Botones de Acción -->
-                            <div class="flex items-center justify-end mt-4">
-                                <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                                    Actualizar Usuario
-                                </PrimaryButton>
-                            </div>
-                        </form>
+                        </div>
                     </div>
-                </div>
+
+                    <!-- ACCIÓN FINAL -->
+                    <div class="flex items-center justify-between p-4 bg-indigo-900 rounded-3xl shadow-2xl">
+                        <p class="text-indigo-100 text-[10px] font-black uppercase tracking-widest pl-4">Revisión Final: {{ form.name }}</p>
+                        <PrimaryButton class="!bg-white !text-indigo-900 !rounded-2xl !px-10 !py-4 !text-sm !font-black hover:!bg-indigo-50 transition-all" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
+                            ACTUALIZAR PERFIL
+                        </PrimaryButton>
+                    </div>
+                </form>
             </div>
         </div>
     </AuthenticatedLayout>
 </template>
-
-

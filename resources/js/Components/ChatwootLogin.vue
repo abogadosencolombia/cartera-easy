@@ -75,7 +75,7 @@ const toggleExpand = () => {
             <div class="flex-grow relative bg-gray-50">
                 <iframe
                     v-if="hasBooted"
-                    src="/app/login" 
+                    src="/app/" 
                     class="w-full h-full border-none"
                     allow="camera; microphone; clipboard-read; clipboard-write; display-capture"
                 ></iframe>

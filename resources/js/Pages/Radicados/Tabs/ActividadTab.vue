@@ -8,22 +8,24 @@ import {
     ArrowPathIcon,
     FingerPrintIcon,
     UserIcon,
-    DocumentMagnifyingGlassIcon
+    DocumentMagnifyingGlassIcon,
+    BookmarkIcon
 } from '@heroicons/vue/24/outline';
 import { ref, computed } from 'vue';
 
 const props = defineProps({
-    bitacoras: { type: Array, default: () => [] },
+    proceso: { type: Object, required: true },
     auditoria: { type: Array, default: () => [] },
 });
 
+// --- Paginación para Actuaciones (Bitácora) ---
 const itemsPerPage = 6;
 const currentPage = ref(1);
-const totalPages = computed(() => props.bitacoras ? Math.ceil(props.bitacoras.length / itemsPerPage) : 0);
-const paginatedBitacoras = computed(() => {
-    if (!props.bitacoras) return [];
+const totalPages = computed(() => props.proceso.actuaciones ? Math.ceil(props.proceso.actuaciones.length / itemsPerPage) : 0);
+const paginatedActuaciones = computed(() => {
+    if (!props.proceso.actuaciones) return [];
     const start = (currentPage.value - 1) * itemsPerPage;
-    return props.bitacoras.slice(start, start + itemsPerPage);
+    return props.proceso.actuaciones.slice(start, start + itemsPerPage);
 });
 
 const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++; };
@@ -39,36 +41,38 @@ const formatDateTime = (s) => {
 <template>
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in duration-500">
         
-        <!-- BITÁCORA COMPACTA -->
+        <!-- BITÁCORA DE ACTUACIONES (Equivalente a Bitácora Procesal en Casos) -->
         <div class="lg:col-span-7 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col h-[650px] overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 flex justify-between items-center shrink-0">
                 <div class="flex items-center gap-2">
                     <ClockIcon class="w-5 h-5 text-indigo-500" />
-                    <h3 class="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-tight">Bitácora Procesal</h3>
+                    <h3 class="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-tight">Hitos y Actuaciones</h3>
                 </div>
-                <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{{ bitacoras?.length || 0 }} Eventos</span>
+                <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{{ proceso.actuaciones?.length || 0 }} Eventos</span>
             </div>
 
             <div class="flex-grow overflow-y-auto p-6 custom-scrollbar relative">
-                <div v-if="!bitacoras.length" class="flex flex-col items-center justify-center h-full opacity-40">
+                <div v-if="!proceso.actuaciones?.length" class="flex flex-col items-center justify-center h-full opacity-40">
                     <DocumentMagnifyingGlassIcon class="w-12 h-12 mb-2 text-gray-300" />
-                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Sin registros</p>
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Sin hitos registrados</p>
                 </div>
                 
                 <div v-else class="space-y-6 relative before:absolute before:inset-0 before:ml-3 before:-translate-x-px before:h-full before:w-0.5 before:bg-gray-100 dark:before:bg-gray-700">
-                    <div v-for="item in paginatedBitacoras" :key="item.id" class="relative pl-8 group">
-                        <div class="absolute left-0 top-1 h-6 w-6 rounded-lg bg-white dark:bg-gray-800 border border-indigo-500 shadow-sm flex items-center justify-center z-10 group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                            <FingerPrintIcon class="w-3.5 h-3.5" />
+                    <div v-for="item in paginatedActuaciones" :key="item.id" class="relative pl-8 group">
+                        <div class="absolute left-0 top-1 h-6 w-6 rounded-lg bg-white dark:bg-gray-800 border border-indigo-50 shadow-sm flex items-center justify-center z-10 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                            <BookmarkIcon class="w-3.5 h-3.5" />
                         </div>
                         
                         <div class="bg-gray-50/50 dark:bg-gray-900/30 p-4 rounded-xl border border-gray-100 dark:border-gray-700 hover:border-indigo-100 transition-all">
                             <div class="flex justify-between items-start mb-2">
-                                <span class="text-[9px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">{{ item.accion }}</span>
-                                <span class="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">{{ formatDateTime(item.created_at) }}</span>
+                                <span class="text-[9px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Actuación Registrada</span>
+                                <span class="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">{{ formatDateTime(item.fecha_actuacion) }}</span>
                             </div>
-                            <p v-if="item.comentario" class="text-xs text-gray-600 dark:text-gray-400 leading-normal italic line-clamp-3">"{{ item.comentario }}"</p>
+                            <p class="text-xs text-gray-700 dark:text-gray-300 leading-normal font-medium line-clamp-3">{{ item.nota }}</p>
                             <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 flex items-center gap-2">
-                                <div class="w-5 h-5 bg-white dark:bg-gray-700 rounded-full flex items-center justify-center text-[8px] font-bold text-gray-400">{{ item.user?.name[0] }}</div>
+                                <div class="w-5 h-5 bg-white dark:bg-gray-700 rounded-full flex items-center justify-center text-[8px] font-bold text-gray-400 uppercase">
+                                    {{ (item.user?.name || 'S')[0] }}
+                                </div>
                                 <span class="text-[9px] font-bold text-gray-500 uppercase tracking-tighter">{{ item.user?.name || 'Sistema' }}</span>
                             </div>
                         </div>
@@ -95,9 +99,9 @@ const formatDateTime = (s) => {
                 </div>
                 
                 <div class="relative z-10 flex-grow overflow-y-auto custom-scrollbar-dark pr-2">
-                    <div v-if="!auditoria" class="flex flex-col items-center justify-center h-full opacity-40">
-                        <ArrowPathIcon class="w-8 h-8 mb-2 text-emerald-400 animate-spin" />
-                        <p class="text-[10px] font-bold uppercase tracking-widest text-emerald-500/50">Analizando...</p>
+                    <div v-if="!auditoria || auditoria.length === 0" class="flex flex-col items-center justify-center h-full opacity-40 py-20">
+                        <DocumentMagnifyingGlassIcon class="w-12 h-12 mb-2 text-gray-400" />
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Sin historial técnico</p>
                     </div>
                     <HistorialAuditoria v-else :eventos="auditoria" class="!text-[10px]" />
                 </div>

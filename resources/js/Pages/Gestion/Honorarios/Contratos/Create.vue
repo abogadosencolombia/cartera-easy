@@ -2,6 +2,7 @@
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { computed, ref, watch, onMounted } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import SelectInput from '@/Components/SelectInput.vue';
 import { onClickOutside } from '@vueuse/core';
 import { PlusIcon, TrashIcon, ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline';
 
@@ -480,9 +481,9 @@ onMounted(() => {
                             <!-- NUEVO: SELECTOR DE FRECUENCIA -->
                             <div v-if="form.modalidad === 'CUOTAS' || form.modalidad === 'CUOTA_MIXTA'">
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Frecuencia de Pago *</label>
-                                <select v-model="form.frecuencia_pago" class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                <SelectInput v-model="form.frecuencia_pago">
                                     <option v-for="freq in frecuencias" :key="freq.value" :value="freq.value">{{ freq.label }}</option>
-                                </select>
+                                </SelectInput>
                                 <p v-if="form.errors.frecuencia_pago" class="mt-1 text-sm text-red-600 font-bold">{{ form.errors.frecuencia_pago }}</p>
                             </div>
 

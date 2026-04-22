@@ -40,6 +40,30 @@ const eventoIconos = {
     'DEFAULT': EyeIcon
 };
 
+const formatKey = (key) => {
+    const maps = {
+        'user_id': 'Responsable',
+        'abogado_id': 'Abogado',
+        'deudor_id': 'Deudor',
+        'cooperativa_id': 'Empresa/Cooperativa',
+        'juzgado_id': 'Juzgado/Despacho',
+        'tipo_proceso_id': 'Tipo de Proceso',
+        'especialidad_id': 'Especialidad',
+        'radicado': 'N° Radicado',
+        'asunto': 'Asunto',
+        'monto_total': 'Cuantía/Monto',
+        'etapa_procesal_id': 'Etapa Actual',
+        'etapa_actual_id': 'Etapa Actual',
+        'responsable_revision_id': 'Supervisor de Revisión',
+        'fecha_proxima_revision': 'Próxima Revisión',
+        'fecha_radicado': 'Fecha Radicación',
+        'link_expediente': 'Link Expediente',
+        'ubicacion_drive': 'Carpeta Drive',
+        'correo_radicacion': 'Correo Radicación',
+    };
+    return maps[key] || key.replace(/_/g, ' ').toUpperCase();
+};
+
 const getIcon = (evento) => eventoIconos[evento] || eventoIconos['DEFAULT'];
 </script>
 
@@ -62,17 +86,17 @@ const getIcon = (evento) => eventoIconos[evento] || eventoIconos['DEFAULT'];
                         </div>
                         
                         <div v-if="evento.detalle_nuevo && Object.keys(evento.detalle_nuevo).length > 0" class="overflow-hidden rounded-xl border border-white/5 bg-black/20">
-                            <table class="w-full text-[9px] table-fixed">
+                            <table class="w-full text-[9px] table-auto">
                                 <thead class="bg-white/5 border-b border-white/5 text-gray-400">
                                     <tr>
-                                        <th class="px-2 py-1 text-left font-black uppercase tracking-tighter w-1/3">Campo</th>
+                                        <th class="px-2 py-1 text-left font-black uppercase tracking-tighter w-1/4">Campo</th>
                                         <th class="px-2 py-1 text-left font-black uppercase tracking-tighter">Cambios</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-white/5">
                                     <tr v-for="(val, key) in evento.detalle_nuevo" :key="key">
-                                        <td class="px-2 py-1.5 font-bold text-gray-500 uppercase truncate" :title="key.replace(/_/g, ' ')">{{ key.replace(/_/g, ' ') }}</td>
-                                        <td class="px-2 py-1.5 truncate text-white/80">
+                                        <td class="px-2 py-1.5 font-bold text-gray-500 uppercase" :title="formatKey(key)">{{ formatKey(key) }}</td>
+                                        <td class="px-2 py-1.5 text-white/80 whitespace-normal break-words">
                                             <span class="text-red-400/70 line-through mr-1">{{ evento.detalle_anterior ? (evento.detalle_anterior[key] ?? '—') : '—' }}</span>
                                             <span class="text-green-400 font-bold">→ {{ val ?? '—' }}</span>
                                         </td>
@@ -83,11 +107,11 @@ const getIcon = (evento) => eventoIconos[evento] || eventoIconos['DEFAULT'];
 
                         <div class="flex items-center justify-between gap-4 pt-1">
                             <div class="flex items-center gap-1.5">
-                                <div class="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center">
-                                    <UserIcon class="w-2.5 h-2.5 text-gray-400" />
+                                <div class="w-4 h-4 rounded-full bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+                                    <UserIcon class="w-2.5 h-2.5 text-indigo-400" />
                                 </div>
-                                <span class="text-[9px] font-bold text-gray-500 uppercase tracking-tighter">
-                                    {{ evento.usuario ? evento.usuario.name.split(' ')[0] : 'Sistema' }} • <span class="opacity-60">{{ evento.direccion_ip }}</span>
+                                <span class="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">
+                                    {{ evento.usuario ? evento.usuario.name : 'Sistema / Automático' }} • <span class="opacity-60">{{ evento.direccion_ip }}</span>
                                 </span>
                             </div>
                             <time class="text-[9px] font-black text-gray-600 uppercase tracking-widest">{{ formatDateTime(evento.created_at) }}</time>

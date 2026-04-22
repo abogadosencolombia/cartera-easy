@@ -11,6 +11,7 @@ import InputError from '@/Components/InputError.vue';
 import TextInput from '@/Components/TextInput.vue';
 import DatePicker from '@/Components/DatePicker.vue';
 import Textarea from '@/Components/Textarea.vue';
+import SelectInput from '@/Components/SelectInput.vue';
 import AsyncSelect from '@/Components/AsyncSelect.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import { 
@@ -396,9 +397,9 @@ const submit = () => {
                                 <TextInput v-model="item.nombre_completo" @blur="item.nombre_completo = toUpperCase(item.nombre_completo)" placeholder="Nombre Completo *" class="text-sm w-full" />
                                 <InputError :message="form.errors[`demandantes.${index}.nombre_completo`]" />
                                 <div class="grid grid-cols-3 gap-2">
-                                    <select v-model="item.tipo_documento" class="text-sm rounded-xl border-gray-200 bg-gray-50">
+                                    <SelectInput v-model="item.tipo_documento" class="text-sm rounded-xl border-gray-200 bg-gray-50">
                                         <option>CC</option><option>NIT</option>
-                                    </select>
+                                    </SelectInput>
                                     <div :class="item.tipo_documento === 'NIT' ? 'col-span-2 flex gap-1' : 'col-span-2'">
                                         <TextInput v-model="item.numero_documento" placeholder="Número *" class="text-sm flex-1" />
                                         <TextInput v-if="item.tipo_documento === 'NIT'" v-model="item.dv" maxlength="1" placeholder="DV" class="w-10 text-center" />
@@ -449,9 +450,9 @@ const submit = () => {
                                 <TextInput v-model="item.nombre_completo" @blur="item.nombre_completo = toUpperCase(item.nombre_completo)" placeholder="Nombre o Alias *" class="text-sm w-full" />
                                 <InputError :message="form.errors[`demandados.${index}.nombre_completo`]" />
                                 <div v-if="!item.sin_info" class="grid grid-cols-3 gap-2">
-                                    <select v-model="item.tipo_documento" class="text-sm rounded-xl border-gray-200 bg-gray-50">
+                                    <SelectInput v-model="item.tipo_documento" class="text-sm rounded-xl border-gray-200 bg-gray-50">
                                         <option>CC</option><option>NIT</option>
-                                    </select>
+                                    </SelectInput>
                                     <div :class="item.tipo_documento === 'NIT' ? 'col-span-2 flex gap-1' : 'col-span-2'">
                                         <TextInput v-model="item.numero_documento" placeholder="Número *" class="text-sm flex-1" />
                                         <TextInput v-if="item.tipo_documento === 'NIT'" v-model="item.dv" maxlength="1" placeholder="DV" class="w-10 text-center" />
@@ -478,7 +479,7 @@ const submit = () => {
                   </div>
 
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div class="p-6 bg-indigo-600 rounded-3xl text-white shadow-xl shadow-indigo-100 dark:shadow-none relative overflow-hidden group">
+                    <div class="p-6 bg-indigo-600 rounded-3xl text-white shadow-xl shadow-indigo-100 dark:shadow-none relative overflow-visible group">
                         <div class="absolute -right-6 -top-6 opacity-10 group-hover:scale-110 transition-transform">
                             <ClockIcon class="w-32 h-32" />
                         </div>

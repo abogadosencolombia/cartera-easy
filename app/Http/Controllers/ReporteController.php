@@ -140,9 +140,13 @@ class ReporteController extends Controller
                 'casos_activos' => (float)(clone $casosQuery)->count() + (float)(clone $radicadosQuery)->count(), 
                 'total_recuperado' => $totalRecuperado, 
                 'cartera_en_mora' => (float)$carteraEnMora,
-                'alertas_vencidas' => NotificacionCaso::whereIn('caso_id', $casosIds)->whereNull('atendida_en')->where('created_at', '<', now()->subDays(7))->count(),
-                'total_alertas_activas' => NotificacionCaso::whereIn('caso_id', $casosIds)->whereNull('atendida_en')->count(),
-                'casos_sin_pagare' => ($fuente === 'radicados') ? 0 : (clone $casosQuery)->whereDoesntHave('documentos', fn ($q) => $q->where('tipo_documento', 'ilike', 'pagaré'))->count(),
+                'alertas_vencidas' => NotificacionCaso::where(function($q) use ($casosIds, $radicadosIds) {
+                        $q->whereIn('caso_id', $casosIds)->orWhereIn('proceso_id', $radicadosIds);
+                    })->whereNull('atendida_en')->where('created_at', '<', now()->subDays(7))->count(),
+                'total_alertas_activas' => NotificacionCaso::where(function($q) use ($casosIds, $radicadosIds) {
+                        $q->whereIn('caso_id', $casosIds)->orWhereIn('proceso_id', $radicadosIds);
+                    })->whereNull('atendida_en')->count(),
+                'casos_sin_pagare' => ($fuente === 'radicados') ? 0 : (clone $casosQuery)->whereDoesntHave('documentos', fn ($q) => $q->where('tipo_documento', 'ilike', 'paga%'))->count(),
             ],
             'graficas' => [ 
                 'pagos_mensuales' => $pagosMensuales, 

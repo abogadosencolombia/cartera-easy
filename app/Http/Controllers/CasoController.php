@@ -20,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -113,6 +114,18 @@ class CasoController extends Controller
             });
         });
 
+        // --- 6. Filtro por Juzgado ---
+        $query->when($request->input('juzgado_id'), function ($q, $juzgadoId) {
+            $q->where('juzgado_id', $juzgadoId);
+        });
+
+        // --- 7. Filtro por Tipo de Entidad ---
+        $query->when($request->input('tipo_entidad'), function ($q, $tipo) {
+            $q->whereHas('juzgado', function($jq) use ($tipo) {
+                $jq->where('nombre', 'ilike', "%{$tipo}%");
+            });
+        });
+
         if ($request->boolean('sin_radicado')) {
             $query->where(function ($q) {
                 $q->whereNull('radicado')->orWhere('radicado', '');
@@ -126,6 +139,11 @@ class CasoController extends Controller
         if (in_array($user->tipo_usuario, ['admin', 'gestor', 'abogado'])) {
             $abogados = User::whereIn('tipo_usuario', ['abogado', 'gestor'])->select('id', 'name')->orderBy('name')->get();
             $cooperativas = Cooperativa::select('id', 'nombre')->orderBy('nombre')->get();
+        }
+
+        $selectedJuzgado = null;
+        if ($request->input('juzgado_id')) {
+            $selectedJuzgado = Juzgado::find($request->input('juzgado_id'), ['id', 'nombre']);
         }
 
         $etapas_procesales = DB::table('etapas_procesales')->orderBy('nombre')->pluck('nombre')->all();
@@ -145,8 +163,9 @@ class CasoController extends Controller
             'casos' => $casos,
             'abogados' => $abogados,
             'cooperativas' => $cooperativas,
+            'selectedJuzgado' => $selectedJuzgado,
             'etapas_procesales' => $etapas_procesales,
-            'filters' => $request->only(['search', 'abogado_id', 'cooperativa_id', 'etapa_procesal', 'sin_radicado']),
+            'filters' => $request->only(['search', 'abogado_id', 'cooperativa_id', 'juzgado_id', 'tipo_entidad', 'etapa_procesal', 'sin_radicado']),
             'stats' => $stats,
             'can' => ['delete_cases' => true],
         ]);
@@ -493,6 +512,36 @@ class CasoController extends Controller
                     'comentario' => 'Caso registrado con asignación múltiple.',
                 ]);
 
+                // --- HUMANIZAR DETALLE NUEVO ---
+                $detalleNuevo = $caso->getRawOriginal();
+                foreach ($detalleNuevo as $key => $val) {
+                    if (str_ends_with($key, '_id') && !empty($val)) {
+                        try {
+                            if ($key === 'user_id' || $key === 'abogado_id') {
+                                $detalleNuevo[$key] = \App\Models\User::find($val)?->name ?? $val;
+                            } elseif ($key === 'deudor_id') {
+                                $detalleNuevo[$key] = \App\Models\Persona::find($val)?->nombre_completo ?? $val;
+                            } elseif ($key === 'cooperativa_id') {
+                                $detalleNuevo[$key] = \App\Models\Cooperativa::find($val)?->nombre ?? $val;
+                            } elseif ($key === 'especialidad_id') {
+                                $detalleNuevo[$key] = DB::table('especialidades_juridicas')->where('id', $val)->value('nombre') ?? $val;
+                            } else {
+                                $table = str_replace('_id', '', $key);
+                                $tableName = match($table) {
+                                    'tipo_proceso' => 'tipos_proceso',
+                                    'subtipo_proceso' => 'subtipos_proceso',
+                                    'subproceso' => 'subprocesos',
+                                    'juzgado' => 'juzgados',
+                                    default => $table . 's'
+                                };
+                                if (Schema::hasTable($tableName)) {
+                                    $detalleNuevo[$key] = DB::table($tableName)->where('id', $val)->value('nombre') ?? $val;
+                                }
+                            }
+                        } catch (\Exception $e) {}
+                    }
+                }
+
                 AuditoriaEvento::create([
                     'user_id' => Auth::id(),
                     'evento' => 'CREAR_CASO',
@@ -500,7 +549,7 @@ class CasoController extends Controller
                     'criticidad' => 'media',
                     'auditable_id' => $caso->id,
                     'auditable_type' => Caso::class,
-                    'detalle_nuevo' => $caso->getRawOriginal(),
+                    'detalle_nuevo' => $detalleNuevo,
                     'direccion_ip' => request()->ip(),
                     'user_agent' => request()->userAgent(),
                 ]);
@@ -628,8 +677,46 @@ class CasoController extends Controller
                     $nuevo = [];
                     foreach ($changes as $key => $val) {
                         if (in_array($key, ['updated_at', 'ultima_actividad'])) continue;
-                        $anterior[$key] = $original[$key] ?? null;
-                        $nuevo[$key] = $val;
+                        
+                        $oldVal = $original[$key] ?? null;
+                        $newVal = $val;
+
+                        // --- TRADUCCIÓN DE IDS A NOMBRES LEGIBLES ---
+                        try {
+                            if ($key === 'user_id' || $key === 'abogado_id') {
+                                $oldVal = \App\Models\User::find($oldVal)?->name ?? $oldVal;
+                                $newVal = \App\Models\User::find($newVal)?->name ?? $newVal;
+                            } elseif ($key === 'deudor_id') {
+                                $oldVal = \App\Models\Persona::find($oldVal)?->nombre_completo ?? $oldVal;
+                                $newVal = \App\Models\Persona::find($newVal)?->nombre_completo ?? $newVal;
+                            } elseif ($key === 'cooperativa_id') {
+                                $oldVal = \App\Models\Cooperativa::find($oldVal)?->nombre ?? $oldVal;
+                                $newVal = \App\Models\Cooperativa::find($newVal)?->nombre ?? $newVal;
+                            } elseif ($key === 'especialidad_id') {
+                                $oldVal = DB::table('especialidades_juridicas')->where('id', $oldVal)->value('nombre') ?? $oldVal;
+                                $newVal = DB::table('especialidades_juridicas')->where('id', $newVal)->value('nombre') ?? $newVal;
+                            } elseif (str_ends_with($key, '_id')) {
+                                // Intento genérico para otros IDs (Tipo Proceso, Subproceso, etc.)
+                                $table = str_replace('_id', '', $key);
+                                // Pluralización básica o mapeo manual si es necesario
+                                $tableName = match($table) {
+                                    'tipo_proceso' => 'tipos_proceso',
+                                    'subtipo_proceso' => 'subtipos_proceso',
+                                    'subproceso' => 'subprocesos',
+                                    'juzgado' => 'juzgados',
+                                    default => $table . 's'
+                                };
+                                if (Schema::hasTable($tableName)) {
+                                    $oldVal = DB::table($tableName)->where('id', $oldVal)->value('nombre') ?? $oldVal;
+                                    $newVal = DB::table($tableName)->where('id', $newVal)->value('nombre') ?? $newVal;
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            // Si falla la traducción, dejamos el ID original
+                        }
+
+                        $anterior[$key] = $oldVal;
+                        $nuevo[$key] = $newVal;
                     }
 
                     if (!empty($nuevo)) {

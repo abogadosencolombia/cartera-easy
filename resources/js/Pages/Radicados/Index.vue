@@ -3,6 +3,8 @@ import { ref, watch, computed } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import TextInput from '@/Components/TextInput.vue';
+import SelectInput from '@/Components/SelectInput.vue';
+import AsyncSelect from '@/Components/AsyncSelect.vue';
 import Pagination from '@/Components/Pagination.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
@@ -52,6 +54,7 @@ const props = defineProps({
     procesos: { type: Object, required: true },
     filtros: { type: Object, default: () => ({}) },
     juzgados: { type: Array, default: () => [] },
+    selectedJuzgado: { type: Object, default: null },
     stats: { type: Object, default: () => ({}) },
 });
 
@@ -100,8 +103,13 @@ const tiposEntidad = [
 const search = ref(props.filtros.search || '');
 const estado = ref(props.filtros.estado || 'TODOS');
 const juzgadoId = ref(props.filtros.juzgado_id || '');
+const selectedJuzgado = ref(props.selectedJuzgado);
 const tipoEntidad = ref(props.filtros.tipo_entidad || '');
 const sinRadicado = ref(props.filtros.sin_radicado === 'true' || props.filtros.sin_radicado === true);
+
+watch(selectedJuzgado, (val) => {
+    juzgadoId.value = val?.id || '';
+});
 
 const isDirty = computed(() => {
     return search.value !== '' || estado.value !== 'TODOS' || juzgadoId.value !== '' || tipoEntidad.value !== '' || sinRadicado.value === true;
@@ -111,6 +119,7 @@ const resetFilters = () => {
     search.value = '';
     estado.value = 'TODOS';
     juzgadoId.value = '';
+    selectedJuzgado.value = null;
     tipoEntidad.value = '';
     sinRadicado.value = false;
 };
@@ -415,38 +424,38 @@ const copyLegalInfo = (proceso) => {
                         <!-- Tipo Entidad -->
                         <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Tipo de Entidad</label>
-                            <select 
+                            <SelectInput 
                                 v-model="tipoEntidad"
                                 class="block w-full py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white"
                             >
                                 <option value="">Todas las Entidades</option>
                                 <option v-for="tipo in tiposEntidad" :key="tipo" :value="tipo">{{ tipo }}s</option>
-                            </select>
+                            </SelectInput>
                         </div>
 
                         <!-- Juzgado -->
                         <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Juzgado Específico</label>
-                            <select 
-                                v-model="juzgadoId"
-                                class="block w-full py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white"
-                            >
-                                <option value="">Todos los Despachos</option>
-                                <option v-for="j in juzgados" :key="j.id" :value="j.id">{{ j.nombre }}</option>
-                            </select>
+                            <AsyncSelect 
+                                v-model="selectedJuzgado"
+                                :endpoint="route('juzgados.search')"
+                                placeholder="Buscar juzgado..."
+                                label-key="nombre"
+                                class="!min-h-[38px]"
+                            />
                         </div>
 
                         <!-- Estado -->
                         <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Estado</label>
-                            <select 
+                            <SelectInput 
                                 v-model="estado"
                                 class="block w-full py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white"
                             >
                                 <option value="TODOS">Todos los Estados</option>
                                 <option value="ACTIVO">Activos</option>
                                 <option value="CERRADO">Cerrados</option>
-                            </select>
+                            </SelectInput>
                         </div>
 
                         <!-- Filtro Sin Radicado -->
@@ -645,14 +654,14 @@ const copyLegalInfo = (proceso) => {
                                                     <DropdownLink :href="route('procesos.edit', proceso.id)">
                                                         <div class="flex items-center gap-2"><PencilSquareIcon class="w-4 h-4" /> Editar Información</div>
                                                     </DropdownLink>
-                                                    <button v-if="proceso.estado === 'ACTIVO' && $page.props.auth.user.tipo_usuario === 'admin'" @click="openCloseModal(proceso)" class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 font-bold border-t dark:border-gray-700 mt-1">
+                                                    <button v-if="proceso.estado === 'ACTIVO' && ['admin', 'abogado', 'gestor'].includes($page.props.auth.user.tipo_usuario)" @click="openCloseModal(proceso)" class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 font-bold border-t dark:border-gray-700 mt-1">
                                                         <div class="flex items-center gap-2"><ArchiveBoxXMarkIcon class="w-4 h-4" /> Finalizar Proceso</div>
                                                     </button>
                                                     <button v-if="proceso.estado === 'CERRADO' && $page.props.auth.user.tipo_usuario === 'admin'" @click="openReopenModal(proceso)" class="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 font-bold border-t dark:border-gray-700 mt-1">
                                                         <div class="flex items-center gap-2"><ArrowPathIcon class="w-4 h-4" /> Reactivar Caso</div>
                                                     </button>
-                                                    <button v-if="$page.props.auth.user.tipo_usuario === 'admin'" @click="deleteProceso(proceso)" class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 font-bold border-t dark:border-gray-700 mt-1">
-                                                        <div class="flex items-center gap-2"><TrashIcon class="w-4 h-4" /> Eliminar Registro</div>
+                                                    <button v-if="$page.props.auth.user.tipo_usuario === 'admin'" @click="deleteProceso(proceso)" class="block w-full text-left px-4 py-2 text-sm bg-red-600 text-white hover:bg-red-700 font-black uppercase tracking-widest border-t border-red-700 mt-2 py-3 shadow-inner">
+                                                        <div class="flex items-center justify-center gap-2"><TrashIcon class="w-4 h-4" /> ¡ELIMINAR REGISTRO!</div>
                                                     </button>
                                                 </template>
                                             </Dropdown>
@@ -703,7 +712,7 @@ const copyLegalInfo = (proceso) => {
         </div>
 
         <!-- MODALES REDISEÑADOS -->
-        <Modal :show="showCloseModal" @close="showCloseModal = false">
+        <Modal :show="showCloseModal" @close="showCloseModal = false" centered>
             <div class="p-8">
                 <div class="flex items-center gap-3 mb-6">
                     <div class="p-2 bg-red-50 rounded-lg">
@@ -723,7 +732,7 @@ const copyLegalInfo = (proceso) => {
             </div>
         </Modal>
 
-        <Modal :show="showReopenModal" @close="showReopenModal = false">
+        <Modal :show="showReopenModal" @close="showReopenModal = false" centered>
             <div class="p-8">
                 <div class="flex items-center gap-3 mb-6">
                     <div class="p-2 bg-green-50 rounded-lg">
@@ -740,7 +749,7 @@ const copyLegalInfo = (proceso) => {
         </Modal>
 
         <!-- MODAL DE VISTA RÁPIDA (V5: Ficha Judicial Optimizada) -->
-        <Modal :show="showQuickViewModal" @close="closeQuickView" max-width="3xl">
+        <Modal :show="showQuickViewModal" @close="closeQuickView" max-width="3xl" centered>
             <div v-if="selectedProceso" class="overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-2xl transition-all border border-gray-100 dark:border-gray-800 flex flex-col h-[85vh] sm:h-[90vh]">
                 <!-- Header -->
                 <div class="px-4 py-3 sm:px-8 sm:py-5 bg-indigo-600 dark:bg-indigo-700 text-white flex justify-between items-center shrink-0 shadow-lg relative z-10 w-full">

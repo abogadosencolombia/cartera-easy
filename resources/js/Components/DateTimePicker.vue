@@ -13,7 +13,8 @@ import { isHoliday } from '@/Utils/holidays';
 
 const props = defineProps({
     modelValue: { type: [String, null], default: null },
-    placeholder: { type: String, default: 'Seleccionar fecha y hora' }
+    placeholder: { type: String, default: 'Seleccionar fecha y hora' },
+    yearRange: { type: Number, default: 100 }
 });
 
 const emit = defineEmits(['update:modelValue']);
@@ -75,8 +76,13 @@ const emitValue = () => {
 const years = computed(() => {
     const cy = new Date().getFullYear();
     const arr = [];
-    for (let i = cy - 20; i <= cy + 10; i++) arr.push(i);
+    const startYear = cy - props.yearRange;
+    const endYear = cy + 20;
+    
+    for (let i = startYear; i <= endYear; i++) arr.push(i);
+    
     if (!arr.includes(currentYear.value)) arr.push(currentYear.value);
+    
     return arr.sort((a, b) => a - b);
 });
 

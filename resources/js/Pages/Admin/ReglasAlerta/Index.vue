@@ -7,6 +7,7 @@ import Modal from '@/Components/Modal.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import InputError from '@/Components/InputError.vue';
 import TextInput from '@/Components/TextInput.vue';
+import SelectInput from '@/Components/SelectInput.vue';
 import { Head, useForm, usePage } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 import { 
@@ -139,22 +140,22 @@ const getHumanDescription = (tipo, dias) => {
                                     <!-- Selección de Cooperativa -->
                                     <div>
                                         <InputLabel for="cooperativa_id" value="Cooperativa / Entidad" />
-                                        <select v-model="form.cooperativa_id" id="cooperativa_id" 
+                                        <SelectInput v-model="form.cooperativa_id" id="cooperativa_id" 
                                             class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
                                             <option v-for="coop in cooperativas" :key="coop.id" :value="coop.id">{{ coop.nombre }}</option>
-                                        </select>
+                                        </SelectInput>
                                         <InputError class="mt-2" :message="form.errors.cooperativa_id" />
                                     </div>
 
                                     <!-- Tipo de Alerta -->
                                     <div>
                                         <InputLabel for="tipo_alerta" value="¿Qué quieres vigilar?" />
-                                        <select v-model="form.tipo" id="tipo_alerta" 
+                                        <SelectInput v-model="form.tipo" id="tipo_alerta" 
                                             class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 rounded-lg shadow-sm capitalize focus:ring-indigo-500 focus:border-indigo-500">
                                             <option v-for="tipo in tipos_alerta" :key="tipo" :value="tipo">
                                                 {{ tipo.replace('_', ' ') }}
                                             </option>
-                                        </select>
+                                        </SelectInput>
                                         <InputError class="mt-2" :message="form.errors.tipo" />
                                     </div>
 

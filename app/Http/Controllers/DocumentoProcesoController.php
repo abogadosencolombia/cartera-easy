@@ -40,7 +40,7 @@ class DocumentoProcesoController extends Controller
             $proceso->update(['fecha_proxima_revision' => $data['fecha_proxima_revision']]);
 
             // ✅ AUDITORÍA GLOBAL
-            AuditoriaEvento::create([
+            $proceso->auditoria()->create([
                 'user_id' => Auth::id(),
                 'evento' => 'SUBIR_DOCUMENTO_PROCESO',
                 'descripcion_breve' => "Subido documento '{$data['nombre']}' al radicado {$proceso->radicado}. Próxima revisión: {$data['fecha_proxima_revision']}",
@@ -94,7 +94,7 @@ class DocumentoProcesoController extends Controller
         $documento->delete();
 
         // ✅ AUDITORÍA GLOBAL
-        AuditoriaEvento::create([
+        $proceso->auditoria()->create([
             'user_id' => Auth::id(),
             'evento' => 'ELIMINAR_DOCUMENTO_PROCESO',
             'descripcion_breve' => "Eliminado documento '{$nombreDoc}' del radicado {$proceso->radicado}",

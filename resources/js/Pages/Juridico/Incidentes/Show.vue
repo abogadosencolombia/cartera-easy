@@ -236,7 +236,7 @@ const etapaTicketClass = (etapa) => {
         </div>
 
         <Modal :show="creatingTicket" @close="closeCreateTicketModal">
-            <div class="p-6">
+            <div class="p-6 pb-48"> <!-- Aumentamos el espacio inferior drásticamente -->
                 <h2 class="text-lg font-medium text-gray-900">
                     Crear Nuevo Ticket Disciplinario
                 </h2>

@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class ProcesoRadicadoController extends Controller
@@ -44,6 +45,7 @@ class ProcesoRadicadoController extends Controller
 
         if ($request->boolean('sin_radicado')) { $query->where(function($q) { $q->whereNull('radicado')->orWhere('radicado', ''); }); }
         if ($request->filled('estado') && $request->estado !== 'TODOS') { $query->where('estado', $request->estado); }
+        if ($request->filled('juzgado_id')) { $query->where('juzgado_id', $request->juzgado_id); }
         if ($request->filled('tipo_entidad')) {
             $tipo = $request->input('tipo_entidad');
             $query->whereHas('juzgado', fn($q) => $q->where('nombre', 'ilike', "%{$tipo}%"));
@@ -61,7 +63,8 @@ class ProcesoRadicadoController extends Controller
         return Inertia::render('Radicados/Index', [
             'procesos' => $query->orderBy('is_pinned', 'desc')->latest('updated_at')->paginate(15)->withQueryString(),
             'filtros'  => $request->all(),
-            'juzgados' => Juzgado::select('id', 'nombre')->orderBy('nombre')->get(),
+            'selectedJuzgado' => $request->filled('juzgado_id') ? Juzgado::find($request->juzgado_id, ['id', 'nombre']) : null,
+            'juzgados' => [], // Enviamos vacío para evitar lentitud, el select ahora será asíncrono
             'stats'    => $stats,
         ]);
     }
@@ -335,6 +338,35 @@ class ProcesoRadicadoController extends Controller
             $proceso = ProcesoRadicado::create($data); 
             
             $this->syncPersonasFrontend($proceso, $request->input('demandantes', []), $request->input('demandados', []));
+
+            // Auditoría con detalles humanizados
+            $detalleNuevo = $proceso->getRawOriginal();
+            foreach ($detalleNuevo as $key => $val) {
+                if (str_ends_with($key, '_id') && !empty($val)) {
+                    try {
+                        if (in_array($key, ['abogado_id', 'responsable_revision_id', 'created_by'])) {
+                            $detalleNuevo[$key] = \App\Models\User::find($val)?->name ?? $val;
+                        } elseif ($key === 'juzgado_id') {
+                            $detalleNuevo[$key] = \App\Models\Juzgado::find($val)?->nombre ?? $val;
+                        } elseif ($key === 'tipo_proceso_id') {
+                            $detalleNuevo[$key] = \App\Models\TipoProceso::find($val)?->nombre ?? $val;
+                        } elseif ($key === 'etapa_procesal_id') {
+                            $detalleNuevo[$key] = \App\Models\EtapaProcesal::find($val)?->nombre ?? $val;
+                        }
+                    } catch (\Exception $e) {}
+                }
+            }
+
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'CREAR_RADICADO',
+                'descripcion_breve' => "Se creó el expediente judicial: " . ($proceso->radicado ?: "ID #{$proceso->id}"),
+                'auditable_id' => $proceso->id,
+                'auditable_type' => ProcesoRadicado::class,
+                'criticidad' => 'media',
+                'detalle_nuevo' => $detalleNuevo,
+                'direccion_ip' => request()->ip()
+            ]);
             
             return to_route('procesos.show', $proceso->id)->with('success', 'Radicado creado correctamente.'); 
         });
@@ -343,7 +375,7 @@ class ProcesoRadicadoController extends Controller
     public function show(ProcesoRadicado $proceso): Response 
     { 
         $this->authorize('view', $proceso); 
-        $proceso->load(['abogado', 'responsableRevision', 'juzgado', 'tipoProceso', 'demandantes', 'demandados', 'etapaActual', 'actuaciones.user', 'documentos']); 
+        $proceso->load(['abogado', 'responsableRevision', 'juzgado', 'tipoProceso', 'demandantes', 'demandados', 'etapaActual', 'actuaciones.user', 'documentos', 'contrato']); 
         
         return Inertia::render('Radicados/Show', [
             'proceso' => $proceso, 
@@ -358,12 +390,143 @@ class ProcesoRadicadoController extends Controller
         $this->authorize('update', $proceso); 
         
         return DB::transaction(function() use ($request, $proceso) {
+            $original = $proceso->getRawOriginal();
             $proceso->update($request->validated()); 
+            $changes = $proceso->getChanges();
             
             $this->syncPersonasFrontend($proceso, $request->input('demandantes', []), $request->input('demandados', []));
+
+            // Auditoría con detalles humanizados
+            $anterior = [];
+            $nuevo = [];
+            foreach ($changes as $key => $val) {
+                if (in_array($key, ['updated_at'])) continue;
+                
+                $oldVal = $original[$key] ?? null;
+                $newVal = $val;
+
+                if (str_ends_with($key, '_id') && !empty($val)) {
+                    try {
+                        if (in_array($key, ['abogado_id', 'responsable_revision_id', 'created_by'])) {
+                            $oldVal = \App\Models\User::find($oldVal)?->name ?? $oldVal;
+                            $newVal = \App\Models\User::find($newVal)?->name ?? $newVal;
+                        } elseif ($key === 'juzgado_id') {
+                            $oldVal = \App\Models\Juzgado::find($oldVal)?->nombre ?? $oldVal;
+                            $newVal = \App\Models\Juzgado::find($newVal)?->nombre ?? $newVal;
+                        } elseif ($key === 'tipo_proceso_id') {
+                            $oldVal = \App\Models\TipoProceso::find($oldVal)?->nombre ?? $oldVal;
+                            $newVal = \App\Models\TipoProceso::find($newVal)?->nombre ?? $newVal;
+                        } elseif ($key === 'etapa_procesal_id') {
+                            $oldVal = \App\Models\EtapaProcesal::find($oldVal)?->nombre ?? $oldVal;
+                            $newVal = \App\Models\EtapaProcesal::find($newVal)?->nombre ?? $newVal;
+                        }
+                    } catch (\Exception $e) {}
+                }
+                $anterior[$key] = $oldVal;
+                $nuevo[$key] = $newVal;
+            }
+
+            AuditoriaEvento::create([
+                'user_id' => Auth::id(),
+                'evento' => 'ACTUALIZAR_RADICADO',
+                'descripcion_breve' => "Se actualizaron los datos del expediente: " . ($proceso->radicado ?: "ID #{$proceso->id}"),
+                'auditable_id' => $proceso->id,
+                'auditable_type' => ProcesoRadicado::class,
+                'criticidad' => 'baja',
+                'detalle_anterior' => $anterior,
+                'detalle_nuevo' => $nuevo,
+                'direccion_ip' => request()->ip()
+            ]);
             
             return to_route('procesos.show', $proceso->id)->with('success', 'Radicado actualizado correctamente.'); 
         });
+    }
+
+    public function updateEtapa(Request $request, ProcesoRadicado $proceso)
+    {
+        $this->authorize('update', $proceso);
+        $request->validate([
+            'etapa_procesal_id' => 'required|exists:etapas_procesales,id',
+            'observacion' => 'nullable|string',
+            'fecha_proxima_revision' => 'required|date'
+        ]);
+
+        $etapaAnterior = $proceso->etapaActual?->nombre ?: 'Sin etapa';
+        $proceso->update([
+            'etapa_procesal_id' => $request->etapa_procesal_id,
+            'fecha_cambio_etapa' => now(),
+            'fecha_proxima_revision' => $request->fecha_proxima_revision
+        ]);
+        $etapaNueva = EtapaProcesal::find($request->etapa_procesal_id)->nombre;
+
+        // Registrar en Auditoría
+        $proceso->auditoria()->create([
+            'user_id' => Auth::id(),
+            'evento' => 'CAMBIO_ETAPA',
+            'descripcion_breve' => "Cambio de etapa: {$etapaAnterior} -> {$etapaNueva}",
+            'criticidad' => 'media',
+            'direccion_ip' => request()->ip(),
+            'detalle_nuevo' => ['observacion' => $request->observacion]
+        ]);
+
+        return back()->with('success', 'Etapa procesal actualizada.');
+    }
+
+    public function storeActuacion(Request $request, ProcesoRadicado $proceso)
+    {
+        $this->authorize('update', $proceso);
+        $validated = $request->validate([
+            'nota' => ['required', 'string'],
+            'fecha_actuacion' => ['required', 'date'],
+            'fecha_proxima_revision' => ['required', 'date']
+        ]);
+
+        $proceso->actuaciones()->create([
+            'nota' => $validated['nota'],
+            'fecha_actuacion' => $validated['fecha_actuacion'],
+            'user_id' => Auth::id()
+        ]);
+
+        // Actualizar fecha de revisión obligatoria
+        $proceso->update(['fecha_proxima_revision' => $validated['fecha_proxima_revision']]);
+
+        // Auditoría
+        $proceso->auditoria()->create([
+            'user_id' => Auth::id(),
+            'evento' => 'NUEVA_ACTUACION',
+            'descripcion_breve' => "Se registró una actuación en el proceso",
+            'criticidad' => 'baja',
+            'direccion_ip' => request()->ip()
+        ]);
+
+        return back()->with('success', 'Actuación registrada.');
+    }
+
+    public function updateActuacion(Request $request, Actuacion $actuacion)
+    {
+        // El permiso se verifica sobre el modelo que recibe la actuación
+        $proceso = $actuacion->actuable;
+        if (!$proceso || get_class($proceso) !== ProcesoRadicado::class) {
+            abort(403);
+        }
+        $this->authorize('update', $proceso);
+
+        $validated = $request->validate(['nota' => ['required', 'string'], 'fecha_actuacion' => ['required', 'date']]);
+        $actuacion->update($validated);
+
+        return back(303)->with('success', 'Actuación actualizada.');
+    }
+
+    public function destroyActuacion(Actuacion $actuacion) 
+    { 
+        $proceso = $actuacion->actuable;
+        if (!$proceso || get_class($proceso) !== ProcesoRadicado::class) {
+            abort(403);
+        }
+        $this->authorize('update', $proceso);
+
+        $actuacion->delete(); 
+        return back(303)->with('success', 'Actuación eliminada.'); 
     }
 
     /**
@@ -372,6 +535,8 @@ class ProcesoRadicadoController extends Controller
     private function syncPersonasFrontend(ProcesoRadicado $proceso, array $demandantes, array $demandados)
     {
         $syncData = [];
+        $firstDemandanteId = null;
+        $firstDemandadoId = null;
         
         // 1. Procesar Demandantes
         foreach ($demandantes as $d) {
@@ -394,7 +559,10 @@ class ProcesoRadicadoController extends Controller
                 $personaId = $persona->id;
             }
 
-            if ($personaId) $syncData[$personaId] = ['tipo' => 'DEMANDANTE'];
+            if ($personaId) {
+                $syncData[$personaId] = ['tipo' => 'DEMANDANTE'];
+                if (!$firstDemandanteId) $firstDemandanteId = $personaId;
+            }
         }
         
         // 2. Procesar Demandados
@@ -422,10 +590,19 @@ class ProcesoRadicadoController extends Controller
                 $personaId = $persona->id;
             }
 
-            if ($personaId) $syncData[$personaId] = ['tipo' => 'DEMANDADO'];
+            if ($personaId) {
+                $syncData[$personaId] = ['tipo' => 'DEMANDADO'];
+                if (!$firstDemandadoId) $firstDemandadoId = $personaId;
+            }
         }
         
         $proceso->personas()->sync($syncData);
+
+        // Actualizar columnas directas para compatibilidad
+        $proceso->update([
+            'demandante_id' => $firstDemandanteId,
+            'demandado_id' => $firstDemandadoId
+        ]);
     }
     
     public function destroy(ProcesoRadicado $proceso) 

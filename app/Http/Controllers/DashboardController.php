@@ -45,37 +45,37 @@ class DashboardController extends Controller
 
     private function getAdminDashboardData(User $user, Request $request): array
     {
-        $cfg = config('cartera', []);
+        $isAdmin = $user->tipo_usuario === 'admin';
         
-        $T_PAGOS_CASO = 'pagos_caso';
-        $Col_MONTO_CASO = 'monto_pagado';
-        $Col_FECHA_CASO = 'fecha_pago';
-        $Fk_CASO = 'caso_id';
-
-        $T_PAGOS_CONTRATO = 'contrato_pagos';
-        $Col_MONTO_CONTRATO = 'valor';
-        $Col_FECHA_CONTRATO = 'fecha';
-        
+        // Configuraciones de tablas (sin cambios)
         $dbConfig = [
-            'caso' => ['table' => $T_PAGOS_CASO, 'amount' => $Col_MONTO_CASO, 'date' => $Col_FECHA_CASO, 'fk' => $Fk_CASO],
-            'contrato' => ['table' => $T_PAGOS_CONTRATO, 'amount' => $Col_MONTO_CONTRATO, 'date' => $Col_FECHA_CONTRATO]
+            'caso' => ['table' => 'pagos_caso', 'amount' => 'monto_pagado', 'date' => 'fecha_pago', 'fk' => 'caso_id'],
+            'contrato' => ['table' => 'contrato_pagos', 'amount' => 'valor', 'date' => 'fecha']
         ];
 
         $currentPeriod = $this->getPeriodFromRequest($request, 'current');
         $previousPeriod = $this->getPeriodFromRequest($request, 'previous');
 
-        $currentStats = $this->calculateKpis($currentPeriod, $request->input('cooperativa_id'), $dbConfig);
-        $previousStats = $this->calculateKpis($previousPeriod, $request->input('cooperativa_id'), $dbConfig, true);
+        // --- FILTRO DE SEGURIDAD ---
+        // Si no es admin, solo calculamos KPIs para SU ID de usuario
+        $targetUserId = $isAdmin ? null : $user->id;
+
+        $currentStats = $this->calculateKpis($currentPeriod, $request->input('cooperativa_id'), $dbConfig, false, $targetUserId);
+        $previousStats = $this->calculateKpis($previousPeriod, $request->input('cooperativa_id'), $dbConfig, true, $targetUserId);
         
         $kpis = [
-            'saldo_total_activo' => $this->formatKpiWithTrend($currentStats['saldo_total_activo'], $previousStats['saldo_total_activo']),
+            'saldo_bajo_gestion' => $this->formatKpiWithTrend($currentStats['saldo_total_activo'], $previousStats['saldo_total_activo']),
             'tasa_recuperacion'  => $this->formatKpiWithTrend($currentStats['tasa_recuperacion'], $previousStats['tasa_recuperacion']),
-            'casos_activos'      => $this->formatKpiWithTrend($currentStats['casos_activos'], $previousStats['casos_activos']),
+            'casos_asignados'    => $this->formatKpiWithTrend($currentStats['casos_activos'], $previousStats['casos_activos']),
             'casos_cerrados'     => $this->formatKpiWithTrend($currentStats['casos_cerrados'], $previousStats['casos_cerrados']),
         ];
 
-        $chartData = $this->getUnifiedChartData($currentPeriod, $request->input('cooperativa_id'), $dbConfig);
-        $ranking = $this->getUnifiedRanking($currentPeriod, $request->input('cooperativa_id'), $dbConfig);
+        $chartData = $this->getUnifiedChartData($currentPeriod, $request->input('cooperativa_id'), $dbConfig, $targetUserId);
+        
+        // El ranking solo se muestra completo al Admin. El gestor solo ve su dato.
+        $ranking = $isAdmin 
+            ? $this->getUnifiedRanking($currentPeriod, $request->input('cooperativa_id'), $dbConfig)
+            : $this->getUnifiedRanking($currentPeriod, $request->input('cooperativa_id'), $dbConfig, $user->id);
 
         return [
             'kpis' => $kpis,
@@ -87,10 +87,11 @@ class DashboardController extends Controller
         ];
     }
 
-    private function calculateKpis(array $period, ?int $cooperativaId, array $config, bool $isHistorical = false): array
+    private function calculateKpis(array $period, ?int $cooperativaId, array $config, bool $isHistorical = false, ?int $userId = null): array
     {
         $baseQuery = Caso::query()
-            ->when($cooperativaId, fn($q) => $q->where('cooperativa_id', $cooperativaId));
+            ->when($cooperativaId, fn($q) => $q->where('cooperativa_id', $cooperativaId))
+            ->when($userId, fn($q) => $q->where('user_id', $userId));
 
         if ($isHistorical) {
             $baseQuery->where('fecha_apertura', '<=', $period['end']);
@@ -169,12 +170,13 @@ class DashboardController extends Controller
         ];
     }
 
-    private function getUnifiedChartData(array $period, ?int $cooperativaId, array $config): array
+    private function getUnifiedChartData(array $period, ?int $cooperativaId, array $config, ?int $userId = null): array
     {
         $baseQuery = Caso::query()
-            ->whereBetween('fecha_apertura', [$period['start'], $period['end']])
-            ->when($cooperativaId, fn($q) => $q->where('cooperativa_id', $cooperativaId));
+            ->when($cooperativaId, fn($q) => $q->where('cooperativa_id', $cooperativaId))
+            ->when($userId, fn($q) => $q->where('user_id', $userId));
 
+        // 1. Distribución por etapas
         $casosPorEstado = [];
         if (Schema::hasColumn('casos', 'etapa_procesal')) {
             $casosPorEstado = (clone $baseQuery)
@@ -183,38 +185,51 @@ class DashboardController extends Controller
                 ->groupBy('etapa_procesal')
                 ->orderByDesc('total')
                 ->get()
-                ->mapWithKeys(fn($item) => [$item->etapa_procesal ?: 'Sin Etapa' => $item->total]);
-        } else {
-            $casosPorEstado = ['Total' => (clone $baseQuery)->count()];
+                ->mapWithKeys(fn($item) => [($item->etapa_procesal ?: 'Sin Etapa') => $item->total]);
         }
 
-        $recuperacionCasos = collect([]);
-        $recuperacionContratos = collect([]);
+        // 2. Recuperación mensual (Lógica Blindada)
+        $isPgsql = DB::getDriverName() === 'pgsql';
+        $oneYearAgo = Carbon::now()->subMonths(11)->startOfMonth();
 
-        $cfgCaso = $config['caso'];
-        if (Schema::hasTable($cfgCaso['table'])) {
-            $recuperacionCasos = DB::table($cfgCaso['table'])
-                ->select(DB::raw("TO_CHAR({$cfgCaso['date']}, 'YYYY-MM') as mes"), DB::raw("SUM({$cfgCaso['amount']}) as total"))
-                ->where("{$cfgCaso['date']}", '>=', Carbon::now()->subYear())
-                ->groupBy(DB::raw("TO_CHAR({$cfgCaso['date']}, 'YYYY-MM')"))
-                ->orderBy(DB::raw("TO_CHAR({$cfgCaso['date']}, 'YYYY-MM')"))
-                ->get()->pluck('total', 'mes');
+        // Recuperación de Pagos de Casos
+        $qCasos = DB::table('pagos_caso')
+            ->select(
+                DB::raw($isPgsql ? "TO_CHAR(fecha_pago, 'YYYY-MM') as mes" : "DATE_FORMAT(fecha_pago, '%Y-%m') as mes"),
+                DB::raw("SUM(monto_pagado) as total")
+            )
+            ->where('fecha_pago', '>=', $oneYearAgo);
+
+        if ($userId || $cooperativaId) {
+            $qCasos->join('casos', 'pagos_caso.caso_id', '=', 'casos.id')
+                   ->when($userId, fn($q) => $q->where('casos.user_id', $userId))
+                   ->when($cooperativaId, fn($q) => $q->where('casos.cooperativa_id', $cooperativaId));
         }
+        $dataCasos = $qCasos->groupBy('mes')->pluck('total', 'mes');
 
-        $cfgContrato = $config['contrato'];
-        if (Schema::hasTable($cfgContrato['table']) && Schema::hasTable('contratos')) {
-             $recuperacionContratos = DB::table($cfgContrato['table'])
-                ->select(DB::raw("TO_CHAR({$cfgContrato['date']}, 'YYYY-MM') as mes"), DB::raw("SUM({$cfgContrato['amount']}) as total"))
-                ->where("{$cfgContrato['date']}", '>=', Carbon::now()->subYear())
-                ->groupBy(DB::raw("TO_CHAR({$cfgContrato['date']}, 'YYYY-MM')"))
-                ->orderBy(DB::raw("TO_CHAR({$cfgContrato['date']}, 'YYYY-MM')"))
-                ->get()->pluck('total', 'mes');
+        // Recuperación de Pagos de Contratos
+        $qContratos = DB::table('contrato_pagos')
+            ->select(
+                DB::raw($isPgsql ? "TO_CHAR(fecha, 'YYYY-MM') as mes" : "DATE_FORMAT(fecha, '%Y-%m') as mes"),
+                DB::raw("SUM(valor) as total")
+            )
+            ->where('fecha', '>=', $oneYearAgo);
+
+        if ($userId || $cooperativaId) {
+            $qContratos->join('contratos', 'contrato_pagos.contrato_id', '=', 'contratos.id')
+                       ->join('casos', 'contratos.caso_id', '=', 'casos.id')
+                       ->when($userId, fn($q) => $q->where('casos.user_id', $userId))
+                       ->when($cooperativaId, fn($q) => $q->where('casos.cooperativa_id', $cooperativaId));
         }
+        $dataContratos = $qContratos->groupBy('mes')->pluck('total', 'mes');
 
-        $todosLosMeses = $recuperacionCasos->keys()->merge($recuperacionContratos->keys())->unique()->sort();
-        $recuperacionTotal = $todosLosMeses->mapWithKeys(function($mes) use ($recuperacionCasos, $recuperacionContratos) {
-            return [$mes => $recuperacionCasos->get($mes, 0) + $recuperacionContratos->get($mes, 0)];
-        });
+        // Unificar resultados
+        $recuperacionTotal = [];
+        for ($i = 11; $i >= 0; $i--) {
+            $monthKey = Carbon::now()->subMonths($i)->format('Y-m');
+            $total = ($dataCasos[$monthKey] ?? 0) + ($dataContratos[$monthKey] ?? 0);
+            $recuperacionTotal[$monthKey] = (float)$total;
+        }
 
         return [
             'casosPorEstado' => $casosPorEstado,
@@ -222,7 +237,7 @@ class DashboardController extends Controller
         ];
     }
 
-    private function getUnifiedRanking(array $period, ?int $cooperativaId, array $config)
+    private function getUnifiedRanking(array $period, ?int $cooperativaId, array $config, ?int $userId = null)
     {
         $usersStats = [];
 
@@ -233,6 +248,7 @@ class DashboardController extends Controller
                 ->join($cfgCaso['table'], 'casos.id', '=', "{$cfgCaso['table']}.{$cfgCaso['fk']}")
                 ->select('users.id', 'users.name', DB::raw("SUM({$cfgCaso['table']}.{$cfgCaso['amount']}) as total"))
                 ->whereBetween("{$cfgCaso['table']}.{$cfgCaso['date']}", [$period['start'], $period['end']])
+                ->when($userId, fn($q) => $q->where('users.id', $userId))
                 ->when($cooperativaId, fn($q) => $q->where('casos.cooperativa_id', $cooperativaId))
                 ->groupBy('users.id', 'users.name')
                 ->get();
@@ -251,6 +267,7 @@ class DashboardController extends Controller
                 ->join($cfgContrato['table'], 'contratos.id', '=', "{$cfgContrato['table']}.contrato_id")
                 ->select('users.id', 'users.name', DB::raw("SUM({$cfgContrato['table']}.{$cfgContrato['amount']}) as total"))
                 ->whereBetween("{$cfgContrato['table']}.{$cfgContrato['date']}", [$period['start'], $period['end']])
+                ->when($userId, fn($q) => $q->where('users.id', $userId))
                 ->when($cooperativaId, fn($q) => $q->where('casos.cooperativa_id', $cooperativaId))
                 ->groupBy('users.id', 'users.name')
                 ->get();
@@ -264,7 +281,7 @@ class DashboardController extends Controller
         return collect($usersStats)
             ->where('total_recuperado', '>', 0)
             ->sortByDesc('total_recuperado')
-            ->take(3)
+            ->take($userId ? 1 : 3) // Si es un usuario específico, solo devolvemos su dato. Si es admin, el top 3.
             ->values()
             ->all();
     }

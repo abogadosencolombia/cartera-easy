@@ -4,6 +4,7 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
+import SelectInput from '@/Components/SelectInput.vue';
 import Textarea from '@/Components/Textarea.vue';
 import InputError from '@/Components/InputError.vue';
 import Dropdown from '@/Components/Dropdown.vue';
@@ -60,9 +61,9 @@ const submit = () => {
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <InputLabel for="user_id" value="Abogado / Gestor Responsable *" />
-                                    <select v-model="form.user_id" id="user_id" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
+                                    <SelectInput v-model="form.user_id" id="user_id">
                                         <option v-for="user in abogadosYGestores" :key="user.id" :value="user.id">{{ user.name }}</option>
-                                    </select>
+                                    </SelectInput>
                                     <InputError class="mt-2" :message="form.errors.user_id" />
                                 </div>
                                 <div>
@@ -72,10 +73,10 @@ const submit = () => {
                                 </div>
                                 <div>
                                     <InputLabel for="juzgado_id" value="Juzgado" />
-                                    <select v-model="form.juzgado_id" id="juzgado_id" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
+                                    <SelectInput v-model="form.juzgado_id" id="juzgado_id">
                                         <option :value="null">-- Sin especificar --</option>
                                         <option v-for="juzgado in juzgados" :key="juzgado.id" :value="juzgado.id">{{ juzgado.nombre }}</option>
-                                    </select>
+                                    </SelectInput>
                                     <InputError class="mt-2" :message="form.errors.juzgado_id" />
                                 </div>
                                 <div>
@@ -85,10 +86,10 @@ const submit = () => {
                                 </div>
                                 <div>
                                     <InputLabel for="subtipo_proceso" value="Subtipo de Proceso" />
-                                    <select v-model="form.subtipo_proceso" id="subtipo_proceso" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
+                                    <SelectInput v-model="form.subtipo_proceso" id="subtipo_proceso">
                                         <option value="">-- Sin especificar --</option>
                                         <option v-for="subtipo in subtipos_proceso" :key="subtipo" :value="subtipo">{{ subtipo }}</option>
-                                    </select>
+                                    </SelectInput>
                                     <InputError class="mt-2" :message="form.errors.subtipo_proceso" />
                                 </div>
                                 <div>
@@ -115,16 +116,16 @@ const submit = () => {
                                 </div>
                                 <div>
                                     <InputLabel for="demandante_id" value="Demandante *" />
-                                    <select v-model="form.demandante_id" id="demandante_id" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
+                                    <SelectInput v-model="form.demandante_id" id="demandante_id">
                                         <option v-for="persona in personas" :key="persona.id" :value="persona.id">{{ persona.nombre_completo }} ({{ persona.numero_documento }})</option>
-                                    </select>
+                                    </SelectInput>
                                     <InputError class="mt-2" :message="form.errors.demandante_id" />
                                 </div>
                                 <div>
                                     <InputLabel for="demandado_id" value="Demandado *" />
-                                    <select v-model="form.demandado_id" id="demandado_id" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
+                                    <SelectInput v-model="form.demandado_id" id="demandado_id">
                                         <option v-for="persona in personas" :key="persona.id" :value="persona.id">{{ persona.nombre_completo }} ({{ persona.numero_documento }})</option>
-                                    </select>
+                                    </SelectInput>
                                     <InputError class="mt-2" :message="form.errors.demandado_id" />
                                 </div>
                             </div>

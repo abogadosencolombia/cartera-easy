@@ -7,7 +7,7 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
-import { debounce, pickBy } from 'lodash'; // <-- Importamos pickBy
+import { debounce, pickBy } from 'lodash';
 import { ScaleIcon, PlusIcon, ArrowDownTrayIcon, ChevronDownIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -16,17 +16,12 @@ const props = defineProps({
     usuarios: Array,
 });
 
-// --- Lógica para los filtros ---
 const form = useForm({
     search: props.filters.search || '',
     estado: props.filters.estado || '',
     responsable_id: props.filters.responsable_id || '',
 });
 
-// ===== SOLUCIÓN DEFINITIVA AL BUCLE =====
-// Este es el método recomendado por Inertia.
-// Observa el formulario y, después de 300ms de inactividad,
-// envía solo los filtros que tienen un valor.
 watch(() => form.data(), debounce(function() {
     form.get(route('admin.incidentes-juridicos.index'), pickBy(form.data()), {
         preserveState: true,
@@ -34,8 +29,6 @@ watch(() => form.data(), debounce(function() {
     });
 }, 300), { deep: true });
 
-
-// --- Lógica para el modal de eliminación ---
 const confirmingIncidentDeletion = ref(false);
 const incidentToDelete = ref(null);
 const confirmIncidentDeletion = (incidente) => {
@@ -52,13 +45,11 @@ const deleteIncident = () => {
     });
 };
 
-// --- URL de exportación con Computed ---
 const exportUrl = computed(() => {
     const params = new URLSearchParams(pickBy(form.data())).toString();
     return route('admin.incidentes-juridicos.exportar') + '?' + params;
 });
 
-// --- Funciones de formato ---
 const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
@@ -97,13 +88,13 @@ const estadoClass = (estado) => {
                         </template>
 
                         <template #content>
-                            <a :href="`${exportUrl}&format=xlsx`" class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 transition duration-150 ease-in-out">
+                            <a :href="`${exportUrl}&format=xlsx`" class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 hover:bg-gray-100">
                                 <div class="flex items-center">
                                     <ArrowDownTrayIcon class="h-4 w-4 mr-2" />
                                     Exportar a Excel
                                 </div>
                             </a>
-                            <a :href="`${exportUrl}&format=pdf`" target="_blank" class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 transition duration-150 ease-in-out">
+                            <a :href="`${exportUrl}&format=pdf`" target="_blank" class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 hover:bg-gray-100">
                                 <div class="flex items-center">
                                     <ArrowDownTrayIcon class="h-4 w-4 mr-2" />
                                     Exportar a PDF
@@ -112,7 +103,7 @@ const estadoClass = (estado) => {
                         </template>
                     </Dropdown>
 
-                    <Link :href="route('admin.incidentes-juridicos.create')" class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                    <Link :href="route('admin.incidentes-juridicos.create')" class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 active:bg-gray-900 transition ease-in-out duration-150">
                         <PlusIcon class="h-4 w-4 mr-2"/>
                         Registrar Incidente
                     </Link>
@@ -122,46 +113,50 @@ const estadoClass = (estado) => {
 
         <div class="py-12">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-6 bg-white border-b border-gray-200">
-                        <div class="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label for="search" class="block text-sm font-medium text-gray-700">Buscar por Asunto</label>
-                                <input type="text" v-model="form.search" id="search" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Ej: derecho de petición...">
+                <div class="bg-white shadow-sm sm:rounded-lg overflow-visible">
+                    <div class="p-6 bg-white border-b border-gray-200 overflow-visible">
+                        
+                        <!-- Filtros con Z-index alto -->
+                        <div class="mb-8 grid grid-cols-1 md:grid-cols-3 gap-6 relative z-50">
+                            <div class="relative">
+                                <label for="search" class="block text-sm font-medium text-gray-700 mb-1">Buscar por Asunto</label>
+                                <input type="text" v-model="form.search" id="search" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Ej: derecho de petición...">
                             </div>
-                            <div>
+
+                            <div class="relative">
                                 <label for="estado" class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
                                 <Dropdown align="left" width="full">
                                     <template #trigger>
-                                        <button type="button" class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer">
+                                        <button type="button" class="flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm hover:border-indigo-500 transition-all">
                                             <span>{{ form.estado === '' ? 'Todos' : (form.estado === 'pendiente' ? 'Pendiente' : (form.estado === 'en_revision' ? 'En Revisión' : (form.estado === 'resuelto' ? 'Resuelto' : 'Archivado'))) }}</span>
                                             <ChevronDownIcon class="h-4 w-4 text-gray-400" />
                                         </button>
                                     </template>
                                     <template #content>
-                                        <div class="py-1 bg-white">
-                                            <button @click="form.estado = ''" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" :class="{ 'bg-indigo-50 text-indigo-700 font-bold': form.estado === '' }">Todos</button>
-                                            <button @click="form.estado = 'pendiente'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" :class="{ 'bg-indigo-50 text-indigo-700 font-bold': form.estado === 'pendiente' }">Pendiente</button>
-                                            <button @click="form.estado = 'en_revision'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" :class="{ 'bg-indigo-50 text-indigo-700 font-bold': form.estado === 'en_revision' }">En Revisión</button>
-                                            <button @click="form.estado = 'resuelto'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" :class="{ 'bg-indigo-50 text-indigo-700 font-bold': form.estado === 'resuelto' }">Resuelto</button>
-                                            <button @click="form.estado = 'archivado'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" :class="{ 'bg-indigo-50 text-indigo-700 font-bold': form.estado === 'archivado' }">Archivado</button>
+                                        <div class="py-1 bg-white shadow-2xl ring-1 ring-black ring-opacity-5 rounded-md border border-gray-100 mt-1">
+                                            <button @click="form.estado = ''" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Todos</button>
+                                            <button @click="form.estado = 'pendiente'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Pendiente</button>
+                                            <button @click="form.estado = 'en_revision'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">En Revisión</button>
+                                            <button @click="form.estado = 'resuelto'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Resuelto</button>
+                                            <button @click="form.estado = 'archivado'" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Archivado</button>
                                         </div>
                                     </template>
                                 </Dropdown>
                             </div>
-                            <div>
+
+                            <div class="relative">
                                 <label for="responsable_id" class="block text-sm font-medium text-gray-700 mb-1">Responsable</label>
                                 <Dropdown align="left" width="full">
                                     <template #trigger>
-                                        <button type="button" class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm hover:border-indigo-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer">
+                                        <button type="button" class="flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm hover:border-indigo-500 transition-all">
                                             <span class="truncate">{{ form.responsable_id ? usuarios.find(u => u.id === form.responsable_id)?.name : 'Todos' }}</span>
                                             <ChevronDownIcon class="h-4 w-4 text-gray-400" />
                                         </button>
                                     </template>
                                     <template #content>
-                                        <div class="py-1 bg-white max-h-60 overflow-y-auto">
-                                            <button @click="form.responsable_id = ''" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" :class="{ 'bg-indigo-50 text-indigo-700 font-bold': form.responsable_id === '' }">Todos</button>
-                                            <button v-for="usuario in usuarios" :key="usuario.id" @click="form.responsable_id = usuario.id" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" :class="{ 'bg-indigo-50 text-indigo-700 font-bold': form.responsable_id === usuario.id }">
+                                        <div class="py-1 bg-white shadow-2xl ring-1 ring-black ring-opacity-5 rounded-md border border-gray-100 mt-1 max-h-60 overflow-y-auto">
+                                            <button @click="form.responsable_id = ''" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Todos</button>
+                                            <button v-for="usuario in usuarios" :key="usuario.id" @click="form.responsable_id = usuario.id" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                                 {{ usuario.name }}
                                             </button>
                                         </div>
@@ -169,58 +164,52 @@ const estadoClass = (estado) => {
                                 </Dropdown>
                             </div>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asunto</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responsable</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Registro</th>
-                                        <th scope="col" class="relative px-6 py-3">
-                                            <span class="sr-only">Acciones</span>
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                                    <tr v-if="incidentes.data.length === 0">
-                                        <td colspan="5" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                                            No se encontraron incidentes con los filtros actuales.
-                                        </td>
-                                    </tr>
-                                    <tr v-for="incidente in incidentes.data" :key="incidente.id">
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm font-medium text-gray-900">{{ incidente.asunto }}</div>
-                                            <div class="text-sm text-gray-500 capitalize">{{ incidente.origen }}</div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {{ incidente.responsable ? incidente.responsable.name : 'No asignado' }}
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full" :class="estadoClass(incidente.estado)">
-                                                {{ incidente.estado ? incidente.estado.replace('_', ' ') : 'N/A' }}
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {{ formatDate(incidente.fecha_registro) }}
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <div class="flex justify-end items-center space-x-2">
-                                                <Link :href="route('admin.incidentes-juridicos.show', incidente.id)"
-                                                    class="inline-flex items-center px-3 py-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none disabled:opacity-25 transition ease-in-out duration-150">
-                                                    Ver
-                                                </Link>
-                                                
-                                                <DangerButton @click="confirmIncidentDeletion(incidente)" 
-                                                            class="!px-3 !py-1 !text-xs">
-                                                    Eliminar
-                                                </DangerButton>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+
+                        <!-- Tabla con scroll horizontal -->
+                        <div class="relative z-0">
+                            <div class="overflow-x-auto rounded-lg border border-gray-200">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asunto</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responsable</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                            <th class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        <tr v-if="incidentes.data.length === 0">
+                                            <td colspan="5" class="px-6 py-4 text-sm text-gray-500 text-center">No hay incidentes.</td>
+                                        </tr>
+                                        <tr v-for="incidente in incidentes.data" :key="incidente.id">
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm font-medium text-gray-900">{{ incidente.asunto }}</div>
+                                                <div class="text-xs text-gray-500 capitalize">{{ incidente.origen }}</div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {{ incidente.responsable ? incidente.responsable.name : 'N/A' }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <span class="px-2 py-1 text-xs font-semibold rounded-full" :class="estadoClass(incidente.estado)">
+                                                    {{ incidente.estado?.replace('_', ' ') }}
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {{ formatDate(incidente.fecha_registro) }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                <div class="flex justify-end space-x-2">
+                                                    <Link :href="route('admin.incidentes-juridicos.show', incidente.id)" class="text-indigo-600 hover:text-indigo-900">Ver</Link>
+                                                    <button @click="confirmIncidentDeletion(incidente)" class="text-red-600 hover:text-red-900">Eliminar</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
+
                         <div class="mt-4">
                             <Pagination :links="incidentes.links" />
                         </div>
@@ -231,17 +220,11 @@ const estadoClass = (estado) => {
 
         <Modal :show="confirmingIncidentDeletion" @close="closeModal">
             <div class="p-6">
-                <h2 class="text-lg font-medium text-gray-900">
-                    ¿Estás seguro de que deseas eliminar este incidente?
-                </h2>
-                <p class="mt-1 text-sm text-gray-600" v-if="incidentToDelete">
-                    Se eliminará permanentemente el incidente "<span class="font-medium">{{ incidentToDelete.asunto }}</span>" y todos sus tickets y archivos asociados. Esta acción no se puede deshacer.
-                </p>
+                <h2 class="text-lg font-medium text-gray-900">¿Estás seguro?</h2>
+                <p class="mt-1 text-sm text-gray-600">Esta acción no se puede deshacer.</p>
                 <div class="mt-6 flex justify-end">
-                    <SecondaryButton @click="closeModal"> Cancelar </SecondaryButton>
-                    <DangerButton class="ms-3" @click="deleteIncident">
-                        Sí, Eliminar Incidente
-                    </DangerButton>
+                    <SecondaryButton @click="closeModal">Cancelar</SecondaryButton>
+                    <DangerButton class="ms-3" @click="deleteIncident">Eliminar</DangerButton>
                 </div>
             </div>
         </Modal>

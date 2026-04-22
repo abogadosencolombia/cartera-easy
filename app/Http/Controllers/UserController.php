@@ -289,13 +289,32 @@ class UserController extends Controller
     {
         $term = $request->input('term', '');
 
-        $users = User::whereIn('tipo_usuario', ['abogado', 'gestor', 'admin'])
-            ->when($term, function($q) use ($term) {
-                $q->where('name', 'ilike', "%{$term}%");
-            })
-            ->limit(20)
+        $query = User::whereIn('tipo_usuario', ['abogado', 'gestor', 'admin']);
+
+        if (!empty($term)) {
+            $words = explode(' ', $term);
+            foreach ($words as $word) {
+                if (empty(trim($word))) continue;
+                $normalized = $this->normalizeTerm(trim($word));
+                $query->where(function($q) use ($word, $normalized) {
+                    $q->where('name', 'ilike', "%{$word}%")
+                      ->orWhereRaw("TRANSLATE(name, 'áéíóúüÁÉÍÓÚÜ', 'aeiouuAEIOUU') ILIKE ?", ["%{$normalized}%"]);
+                });
+            }
+        }
+
+        $users = $query->limit(50)
             ->get(['id', 'name']);
 
         return response()->json($users);
+    }
+
+    private function normalizeTerm($term)
+    {
+        return str_replace(
+            ['á', 'é', 'í', 'ó', 'ú', 'ü', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ü'],
+            ['a', 'e', 'i', 'o', 'u', 'u', 'A', 'E', 'I', 'O', 'U', 'U'],
+            $term
+        );
     }
 }

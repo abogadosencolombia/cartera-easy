@@ -11,6 +11,7 @@ import Textarea from '@/Components/Textarea.vue';
 import Checkbox from '@/Components/Checkbox.vue';
 import Modal from '@/Components/Modal.vue';
 import Dropdown from '@/Components/Dropdown.vue';
+import SelectInput from '@/Components/SelectInput.vue';
 import AsyncSelect from '@/Components/AsyncSelect.vue';
 import SearchableSelect from '@/Components/SearchableSelect.vue';
 import { Head, Link, useForm, usePage, useRemember, router } from '@inertiajs/vue3';
@@ -250,7 +251,7 @@ const submit = () => {
                                                 <InputError :message="form.errors['deudor.nombre_completo']" />
                                             </div>
                                             <div>
-                                                <select v-model="form.deudor.tipo_documento" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option>CC</option><option>NIT</option><option>CE</option></select>
+                                                <SelectInput v-model="form.deudor.tipo_documento"><option>CC</option><option>NIT</option><option>CE</option></SelectInput>
                                                 <InputError :message="form.errors['deudor.tipo_documento']" />
                                             </div>
                                             <div>
@@ -387,9 +388,9 @@ const submit = () => {
                                         />
                                         <InputError :message="form.errors.etapa_procesal" />
                                     </div>
-                                    <div><InputLabel value="Tipo de Garantía *" /><select v-model="form.tipo_garantia_asociada" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option value="codeudor">Codeudor</option><option value="hipotecaria">Hipotecaria</option><option value="prendaria">Prendaria</option><option value="sin garantía">Sin garantía</option></select><InputError :message="form.errors.tipo_garantia_asociada" /></div>
-                                    <div><InputLabel value="Origen Documental *" /><select v-model="form.origen_documental" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option value="pagaré">Pagaré</option><option value="libranza">Libranza</option><option value="contrato">Contrato</option><option value="otro">Otro</option></select><InputError :message="form.errors.origen_documental" /></div>
-                                    <div><InputLabel value="Medio de Contacto" /><select v-model="form.medio_contacto" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option :value="null">-- Seleccione --</option><option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="telefono">Teléfono</option></select><InputError :message="form.errors.medio_contacto" /></div>
+                                    <div><InputLabel value="Tipo de Garantía *" /><SelectInput v-model="form.tipo_garantia_asociada"><option value="codeudor">Codeudor</option><option value="hipotecaria">Hipotecaria</option><option value="prendaria">Prendaria</option><option value="sin garantía">Sin garantía</option></SelectInput><InputError :message="form.errors.tipo_garantia_asociada" /></div>
+                                    <div><InputLabel value="Origen Documental *" /><SelectInput v-model="form.origen_documental"><option value="pagaré">Pagaré</option><option value="libranza">Libranza</option><option value="contrato">Contrato</option><option value="otro">Otro</option></SelectInput><InputError :message="form.errors.origen_documental" /></div>
+                                    <div><InputLabel value="Medio de Contacto" /><SelectInput v-model="form.medio_contacto"><option :value="null">-- Seleccione --</option><option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="telefono">Teléfono</option></SelectInput><InputError :message="form.errors.medio_contacto" /></div>
                                     <div class="md:col-span-1"><InputLabel value="URL Carpeta Drive (Opcional)" /><TextInput v-model="form.link_drive" type="url" class="w-full" placeholder="https://drive.google.com/..." /><InputError :message="form.errors.link_drive" /></div>
                                     <div class="md:col-span-1"><InputLabel value="URL Expediente Digital (Opcional)" /><TextInput v-model="form.link_expediente" type="url" class="w-full" placeholder="https://expediente.justicia.gov.co/..." /><InputError :message="form.errors.link_expediente" /></div>
                                 </div>
@@ -402,7 +403,7 @@ const submit = () => {
                                     <button @click="removeCodeudor(i)" class="absolute top-4 right-4 text-red-500 hover:text-red-700"><TrashIcon class="h-5 w-5"/></button>
                                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div class="md:col-span-1"><InputLabel value="Nombre Completo *" /><TextInput v-model="c.nombre_completo" @blur="c.nombre_completo = toUpperCase(c.nombre_completo)" class="mt-1 block w-full" required/><InputError :message="form.errors[`codeudores.${i}.nombre_completo`]" /></div>
-                                        <div><InputLabel value="Tipo Documento" /><select v-model="c.tipo_documento" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm"><option value="CC">Cédula de Ciudadanía</option><option value="NIT">NIT</option><option value="CE">Cédula de Extranjería</option></select></div>
+                                        <div><InputLabel value="Tipo Documento" /><SelectInput v-model="c.tipo_documento"><option value="CC">Cédula de Ciudadanía</option><option value="NIT">NIT</option><option value="CE">Cédula de Extranjería</option></SelectInput></div>
                                         <div>
                                             <InputLabel value="Número Documento *" />
                                             <div :class="c.tipo_documento === 'NIT' ? 'grid grid-cols-4 gap-2' : ''">
@@ -439,7 +440,7 @@ const submit = () => {
             </div>
         </div>
 
-        <Modal :show="showCloseModal" @close="showCloseModal = false">
+        <Modal :show="showCloseModal" @close="showCloseModal = false" centered>
             <div class="p-6">
                 <h2 class="text-lg font-bold">Cierre del Caso</h2>
                 <div class="mt-4"><InputLabel value="Nota Final" /><Textarea v-model="closeForm.nota_cierre" class="w-full" rows="4" /></div>

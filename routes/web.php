@@ -48,6 +48,7 @@ use App\Http\Controllers\Api\JuzgadoSearchController;
 
 // --- ✅ NUEVO: CONTROLADOR DE JUZGADOS (IMPORTACIÓN) ---
 use App\Http\Controllers\JuzgadoController;
+use App\Http\Controllers\AnalyticsController;
 
 // --- NUEVOS CONTROLADORES: GESTIÓN > HONORARIOS ---
 use App\Http\Controllers\Gestion\Honorarios\ContratosController;
@@ -77,11 +78,11 @@ use Illuminate\Support\Facades\Broadcast;
 | 🛡️ CHATWOOT PROXY (MÁXIMA PRIORIDAD)
 |--------------------------------------------------------------------------
 */
-// Estas rutas deben ir ANTES que cualquier otra cosa para evitar el 404
-Route::any('app/{any?}', [ChatwootProxyController::class, 'proxy'])->where('any', '.*')->middleware('web');
-Route::any('api/v1/{any?}', [ChatwootProxyController::class, 'proxy'])->where('any', '.*')->middleware('web');
-Route::any('auth/{any?}', [ChatwootProxyController::class, 'proxy'])->where('any', '.*')->middleware('web');
-Route::any('rails/{any?}', [ChatwootProxyController::class, 'proxy'])->where('any', '.*')->middleware('web');
+// Quitamos el middleware web para que el proxy sea transparente y no interfiera con la sesión de Laravel
+Route::any('app/{any?}', [ChatwootProxyController::class, 'proxy'])->where('any', '.*');
+Route::any('api/v1/{any?}', [ChatwootProxyController::class, 'proxy'])->where('any', '.*');
+Route::any('auth/{any?}', [ChatwootProxyController::class, 'proxy'])->where('any', '.*');
+Route::any('rails/{any?}', [ChatwootProxyController::class, 'proxy'])->where('any', '.*');
 
 
 /*
@@ -106,7 +107,11 @@ Route::get('/', function () {
 // =================================================================
 // ===== GRUPO PRINCIPAL DE RUTAS PROTEGIDAS POR AUTENTICACIÓN =====
 // =================================================================
+use App\Http\Controllers\UrgencyController;
+
 Route::middleware(['auth', 'verified'])->group(function () {
+    // Alertas y Urgencias API
+    Route::get('/api/urgencias/list', [UrgencyController::class, 'getList'])->name('api.urgencias.list');
 
     // --- Push Notifications ---
     Route::post('/push/subscribe',   [WebPushController::class, 'subscribe'])->name('push.subscribe');
@@ -136,6 +141,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
 
     // --- NOTIFICACIONES ---
     Route::get('/notificaciones', [NotificacionController::class, 'index'])->name('notificaciones.index');

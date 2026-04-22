@@ -26,7 +26,7 @@ const asText = (v) => v ?? '—';
         <div class="lg:col-span-8 space-y-8">
             
             <!-- Bloque: Datos del Expediente -->
-            <div class="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden transition-all hover:shadow-md">
+            <div class="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-visible transition-all hover:shadow-md">
                 <div class="px-8 py-5 bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
                     <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs flex items-center gap-3">
                         <BuildingLibraryIcon class="w-5 h-5 text-indigo-500" /> 
@@ -54,9 +54,9 @@ const asText = (v) => v ?? '—';
                         </div>
 
                         <div class="flex flex-col gap-1.5">
-                            <span class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Naturaleza</span>
+                            <span class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Naturaleza / Clase</span>
                             <p class="text-sm font-bold text-gray-700 dark:text-gray-300">
-                                {{ asText(proceso.naturaleza) }}
+                                {{ asText(proceso.naturaleza) }} {{ proceso.clase_proceso ? ' / ' + proceso.clase_proceso : '' }}
                             </p>
                         </div>
 
@@ -68,6 +68,20 @@ const asText = (v) => v ?? '—';
                                     {{ formatDate(proceso.fecha_radicado) || 'No registrada' }}
                                 </p>
                             </div>
+                        </div>
+
+                        <div class="flex flex-col gap-1.5">
+                            <span class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Estado del Expediente</span>
+                            <p class="text-sm font-bold uppercase" :class="proceso.estado === 'ACTIVO' ? 'text-emerald-600' : 'text-rose-600'">
+                                {{ proceso.estado }}
+                            </p>
+                        </div>
+
+                        <div v-if="proceso.fecha_cambio_etapa" class="flex flex-col gap-1.5">
+                            <span class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Último Cambio de Etapa</span>
+                            <p class="text-sm font-bold text-gray-700 dark:text-gray-300">
+                                {{ formatDate(proceso.fecha_cambio_etapa) }}
+                            </p>
                         </div>
 
                         <div class="md:col-span-2 space-y-2">
@@ -92,16 +106,26 @@ const asText = (v) => v ?? '—';
                 </div>
             </div>
 
-            <!-- Bloque: Observaciones -->
-            <div class="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+            <!-- Bloque: Observaciones y Cierre -->
+            <div v-if="proceso.observaciones || proceso.nota_cierre" class="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-visible">
                 <div class="px-8 py-5 border-b border-gray-50 dark:border-gray-700 flex items-center gap-3">
                     <ChatBubbleBottomCenterTextIcon class="w-5 h-5 text-indigo-500" />
-                    <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Observaciones Internas</h3>
+                    <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Observaciones e Historial de Estado</h3>
                 </div>
-                <div class="p-8">
-                    <p class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed italic">
-                        {{ proceso.observaciones || 'No se han registrado observaciones adicionales para este expediente.' }}
-                    </p>
+                <div class="p-8 space-y-6">
+                    <div v-if="proceso.observaciones">
+                        <span class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 block">Notas Internas</span>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed italic">
+                            {{ proceso.observaciones }}
+                        </p>
+                    </div>
+
+                    <div v-if="proceso.nota_cierre" class="p-4 bg-rose-50 dark:bg-rose-900/20 border-l-4 border-rose-500 rounded-r-xl">
+                        <span class="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest block mb-1">Nota de Finalización / Cierre</span>
+                        <p class="text-sm text-rose-800 dark:text-rose-300 font-medium">
+                            {{ proceso.nota_cierre }}
+                        </p>
+                    </div>
                 </div>
             </div>
 
@@ -119,7 +143,7 @@ const asText = (v) => v ?? '—';
         <div class="lg:col-span-4 space-y-8">
             
             <!-- Tarjeta: Canales de Comunicación -->
-            <div class="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-xl overflow-hidden">
+            <div class="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-xl overflow-visible">
                 <div class="px-8 py-5 border-b border-gray-50 dark:border-gray-700 flex items-center gap-3">
                     <EnvelopeIcon class="w-5 h-5 text-indigo-500" />
                     <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-[10px]">Canales de Comunicación</h3>

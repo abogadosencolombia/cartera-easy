@@ -4,7 +4,15 @@ import Modal from '@/Components/Modal.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import SelectInput from '@/Components/SelectInput.vue';
+import AsyncSelect from '@/Components/AsyncSelect.vue';
 import Dropdown from '@/Components/Dropdown.vue';
+
+// --- TIPOS DE ENTIDAD ---
+const tiposEntidad = [
+    'Juzgado', 'Fiscalía', 'Secretaría', 'Despacho', 'Centro de Servicios',
+    'Corte', 'Tribunal', 'Notaría', 'Superintendencia'
+];
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import { ref, watch, reactive, computed, onMounted } from 'vue';
 import { TrashIcon, MagnifyingGlassIcon, InboxIcon, EyeIcon, ArrowDownTrayIcon, FunnelIcon, ArchiveBoxXMarkIcon, ChevronDownIcon, XMarkIcon, DocumentDuplicateIcon, CloudArrowUpIcon, BanknotesIcon, ExclamationCircleIcon, ArrowPathIcon, CheckCircleIcon, UserGroupIcon, ScaleIcon, PhoneIcon, EnvelopeIcon, BuildingOfficeIcon, ClockIcon, ExclamationTriangleIcon, UserIcon, ClipboardDocumentListIcon, LinkIcon, MapPinIcon as PinIcon } from '@heroicons/vue/24/outline'; 
@@ -24,18 +32,26 @@ const props = defineProps({
     abogados: Array,
     cooperativas: Array,
     juzgados: Array,
+    selectedJuzgado: Object,
     etapas_procesales: Array,
     stats: Object,
 });
 
 // --- Lógica de Búsqueda y Filtros Combinada ---
+const selectedJuzgado = ref(props.selectedJuzgado || null);
+
 const filterForm = reactive({
     search: props.filters?.search ?? '',
     abogado_id: props.filters?.abogado_id ?? '',
     cooperativa_id: props.filters?.cooperativa_id ?? '',
     juzgado_id: props.filters?.juzgado_id ?? '',
+    tipo_entidad: props.filters?.tipo_entidad ?? '',
     etapa_procesal: props.filters?.etapa_procesal ?? '',
     sin_radicado: props.filters?.sin_radicado === 'true' || props.filters?.sin_radicado === true,
+});
+
+watch(selectedJuzgado, (val) => {
+    filterForm.juzgado_id = val?.id || '';
 });
 
 const isDirty = computed(() => {
@@ -43,6 +59,7 @@ const isDirty = computed(() => {
            filterForm.abogado_id !== '' || 
            filterForm.cooperativa_id !== '' || 
            filterForm.juzgado_id !== '' || 
+           filterForm.tipo_entidad !== '' || 
            filterForm.etapa_procesal !== '' ||
            filterForm.sin_radicado === true;
 });
@@ -52,6 +69,8 @@ const resetFilters = () => {
     filterForm.abogado_id = '';
     filterForm.cooperativa_id = '';
     filterForm.juzgado_id = '';
+    filterForm.tipo_entidad = '';
+    selectedJuzgado.value = null;
     filterForm.etapa_procesal = '';
     filterForm.sin_radicado = false;
 };
@@ -63,6 +82,7 @@ watch(filterForm, debounce(() => {
             abogado_id: filterForm.abogado_id,
             cooperativa_id: filterForm.cooperativa_id,
             juzgado_id: filterForm.juzgado_id,
+            tipo_entidad: filterForm.tipo_entidad,
             etapa_procesal: filterForm.etapa_procesal,
             sin_radicado: filterForm.sin_radicado,
         }, 
@@ -79,6 +99,8 @@ const exportarExcel = () => {
         search: filterForm.search,
         abogado_id: filterForm.abogado_id,
         cooperativa_id: filterForm.cooperativa_id,
+        juzgado_id: filterForm.juzgado_id,
+        tipo_entidad: filterForm.tipo_entidad,
         etapa_procesal: filterForm.etapa_procesal,
         sin_radicado: filterForm.sin_radicado,
     });
@@ -385,7 +407,7 @@ const copyLegalInfo = (caso) => {
 
                 <!-- Barra de Filtros Avanzada -->
                 <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
                         <!-- Búsqueda -->
                         <div class="relative">
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Búsqueda rápida</label>
@@ -405,50 +427,50 @@ const copyLegalInfo = (caso) => {
                         <!-- Cooperativa -->
                         <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Cooperativa</label>
-                            <select 
-                                v-model="filterForm.cooperativa_id"
-                                class="block w-full py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white"
-                            >
+                            <SelectInput v-model="filterForm.cooperativa_id">
                                 <option value="">Todas</option>
                                 <option v-for="c in cooperativas" :key="c.id" :value="c.id">{{ c.nombre }}</option>
-                            </select>
+                            </SelectInput>
+                        </div>
+
+                        <!-- Tipo Entidad -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Tipo de Entidad</label>
+                            <SelectInput v-model="filterForm.tipo_entidad">
+                                <option value="">Todas las Entidades</option>
+                                <option v-for="tipo in tiposEntidad" :key="tipo" :value="tipo">{{ tipo }}s</option>
+                            </SelectInput>
                         </div>
 
                         <!-- Juzgado -->
                         <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Juzgado</label>
-                            <select 
-                                v-model="filterForm.juzgado_id"
-                                class="block w-full py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white"
-                            >
-                                <option value="">Todos los Despachos</option>
-                                <option v-for="j in juzgados" :key="j.id" :value="j.id">{{ j.nombre }}</option>
-                            </select>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Juzgado Específico</label>
+                            <AsyncSelect 
+                                v-model="selectedJuzgado"
+                                :endpoint="route('juzgados.search')"
+                                placeholder="Buscar juzgado..."
+                                label-key="nombre"
+                                class="!min-h-[38px]"
+                            />
                         </div>
 
                         <!-- Abogado -->
                         <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Responsable</label>
-                            <select 
-                                v-model="filterForm.abogado_id"
-                                class="block w-full py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white"
-                            >
+                            <SelectInput v-model="filterForm.abogado_id">
                                 <option value="">Todos</option>
                                 <option v-for="a in abogados" :key="a.id" :value="a.id">{{ a.name }}</option>
-                            </select>
+                            </SelectInput>
                         </div>
 
                         <!-- Etapa -->
                         <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Etapa Procesal</label>
                             <div class="flex items-center gap-2">
-                                <select 
-                                    v-model="filterForm.etapa_procesal"
-                                    class="block w-full py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white"
-                                >
+                                <SelectInput v-model="filterForm.etapa_procesal">
                                     <option value="">Todas</option>
                                     <option v-for="e in etapas_procesales" :key="e" :value="e">{{ e }}</option>
-                                </select>
+                                </SelectInput>
                                 <label class="flex items-center gap-1.5 cursor-pointer shrink-0 bg-gray-50 dark:bg-gray-700 px-2 py-2 rounded-lg border border-gray-100 dark:border-gray-600 h-[38px]">
                                     <input 
                                         v-model="filterForm.sin_radicado"

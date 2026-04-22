@@ -16,6 +16,7 @@ import ResponsiveNavLink from "@/Components/ResponsiveNavLink.vue";
 import ToastList from "@/Components/ToastList.vue";
 import GestionDiariaPanel from "@/Components/GestionDiariaPanel.vue";
 import WelcomeTour from "@/Components/WelcomeTour.vue";
+import AlertasUrgentesOverlay from "@/Components/AlertasUrgentesOverlay.vue";
 
 import {
     ChartBarIcon,
@@ -23,6 +24,7 @@ import {
     BellIcon,
     UsersIcon,
     ScaleIcon,
+    ArrowTrendingUpIcon,
     Cog6ToothIcon,
     DocumentTextIcon,
     ListBulletIcon,
@@ -42,6 +44,14 @@ const NAV_ITEMS = [
         href: route("dashboard"),
         active: "dashboard",
         icon: ChartBarIcon,
+        roles: ["admin", "gestor", "abogado"],
+    },
+    {
+        type: "link",
+        label: "Analítica",
+        href: route("analytics.index"),
+        active: "analytics.index",
+        icon: ArrowTrendingUpIcon,
         roles: ["admin", "gestor", "abogado"],
     },
     {
@@ -151,13 +161,19 @@ const NAV_ITEMS = [
             },
             { type: "divider", roles: ["admin"] },
             {
-                label: "Abogados/Gestores",
+                label: "Gestores del Sistema",
                 href: route("admin.gestores.index"),
                 active: "admin.gestores.*",
                 roles: ["admin"],
             },
             {
-                label: "Gestión de Tareas",
+                label: "Incidentes Jurídicos",
+                href: route("admin.incidentes-juridicos.index"),
+                active: "admin.incidentes-juridicos.*",
+                roles: ["admin", "abogado"],
+            },
+            {
+                label: "Tareas del Sistema",
                 href: route("admin.tareas.index"),
                 active: "admin.tareas.*",
                 roles: ["admin"],
@@ -348,13 +364,13 @@ onMounted(() => {
     </a>
 
     <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
-        <!-- NAVBAR PRINCIPAL -->
+        <!-- NAVBAR PRINCIPAL - Añadimos z-[100] para que los dropdowns floten sobre todo -->
         <nav
-            class="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700"
+            class="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 relative z-[100]"
         >
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between h-16">
-                    <div class="flex">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-visible">
+                <div class="flex justify-between h-16 overflow-visible">
+                    <div class="flex overflow-visible">
                         <div class="shrink-0 flex items-center">
                             <Link :href="route('dashboard')">
                                 <ApplicationLogo class="block h-9 w-auto" />
@@ -768,5 +784,7 @@ onMounted(() => {
         />
         <ToastList />
         <WelcomeTour />
+        <!-- Overlay de Alertas Urgentes al Iniciar Sesión -->
+        <AlertasUrgentesOverlay />
     </div>
 </template>
