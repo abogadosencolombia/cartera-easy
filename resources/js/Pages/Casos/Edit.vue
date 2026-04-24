@@ -17,11 +17,13 @@ import SearchableSelect from '@/Components/SearchableSelect.vue';
 import { Head, Link, useForm, usePage, useRemember, router } from '@inertiajs/vue3';
 import { ref, computed, watch, onMounted } from 'vue';
 import axios from 'axios';
+import { debounce } from 'lodash';
 import { formatRadicado, addDaysToDate, addMonthsToDate, toUpperCase, calculateDV } from '@/Utils/formatters';
 import { 
     TrashIcon, InformationCircleIcon, ScaleIcon, UsersIcon, LockClosedIcon, 
     PlusIcon, ChevronUpIcon, ChevronDownIcon, ArchiveBoxXMarkIcon, ArrowPathIcon,
-    BriefcaseIcon, BuildingOfficeIcon, CheckCircleIcon, ClockIcon, DocumentTextIcon
+    BriefcaseIcon, BuildingOfficeIcon, CheckCircleIcon, ClockIcon, DocumentTextIcon,
+    UserCircleIcon, CalendarDaysIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -65,7 +67,7 @@ const isFormDisabled = computed(() => (user.tipo_usuario !== 'admin' && props.ca
 const formatDateForInput = (d) => d ? new Date(d).toISOString().split('T')[0] : null;
 const safeJsonParse = (s) => { if (!s) return []; try { const p = JSON.parse(s); return Array.isArray(p) ? p : []; } catch (e) { return []; } };
 
-const form = useForm(`EditCaso:${props.caso.id}`, {
+const form = useForm({
     _method: 'PATCH',
     cooperativa_id: props.caso.cooperativa ? { id: props.caso.cooperativa.id, nombre: props.caso.cooperativa.nombre } : null,
     user_id: props.caso.users?.length > 0 
@@ -107,6 +109,82 @@ const form = useForm(`EditCaso:${props.caso.id}`, {
     link_drive: props.caso.link_drive || '',
     link_expediente: props.caso.link_expediente || '',
 });
+
+watch(() => props.caso.id, (newId) => {
+    if (newId) {
+        form.defaults({
+            cooperativa_id: props.caso.cooperativa ? { id: props.caso.cooperativa.id, nombre: props.caso.cooperativa.nombre } : null,
+            user_id: props.caso.users?.length > 0 
+                ? props.caso.users.map(u => ({ id: u.id, name: u.name })) 
+                : (props.caso.user ? [{ id: props.caso.user.id, name: props.caso.user.name }] : []),
+            deudor_id: props.caso.deudor_id,
+            deudor: {
+                id: props.caso.deudor_id,
+                selected: props.caso.deudor ? { id: props.caso.deudor.id, nombre_completo: props.caso.deudor.nombre_completo, numero_documento: props.caso.deudor.numero_documento } : null,
+                is_new: false,
+                nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '', celular_1: '', correo_1: '', cooperativas_ids: [], abogados_ids: []
+            },
+            codeudores: props.caso.codeudores?.map(c => ({
+                id: c.id, nombre_completo: c.nombre_completo || '', tipo_documento: c.tipo_documento || 'CC', numero_documento: c.numero_documento || '',
+                dv: c.dv || '',
+                celular: c.celular || '', correo: c.correo || '', addresses: safeJsonParse(c.addresses), social_links: safeJsonParse(c.social_links), showDetails: true
+            })) || [],
+            juzgado_id: props.caso.juzgado ? { id: props.caso.juzgado.id, nombre: props.caso.juzgado.nombre } : null,
+            referencia_credito: props.caso.referencia_credito,
+            especialidad_id: props.caso.especialidad_id,
+            tipo_proceso: props.caso.tipo_proceso,
+            subtipo_proceso: props.caso.subtipo_proceso,
+            subproceso: props.caso.subproceso,
+            etapa_procesal: props.caso.etapa_procesal,
+            radicado: props.caso.radicado ?? '',
+            tipo_garantia_asociada: props.caso.tipo_garantia_asociada,
+            origen_documental: props.caso.origen_documental,
+            medio_contacto: props.caso.medio_contacto,
+            fecha_apertura: formatDateForInput(props.caso.fecha_apertura),
+            fecha_vencimiento: formatDateForInput(props.caso.fecha_vencimiento),
+            fecha_inicio_credito: formatDateForInput(props.caso.fecha_inicio_credito),
+            monto_total: props.caso.monto_total,
+            monto_deuda_actual: props.caso.monto_deuda_actual,
+            monto_total_pagado: props.caso.monto_total_pagado,
+            tasa_interes_corriente: props.caso.tasa_interes_corriente,
+            bloqueado: !!props.caso.bloqueado,
+            motivo_bloqueo: props.caso.motivo_bloqueo ?? '',
+            notas_legales: props.caso.notas_legales,
+            link_drive: props.caso.link_drive || '',
+            link_expediente: props.caso.link_expediente || '',
+        });
+        form.reset();
+    }
+}, { immediate: true });
+
+// --- DUPLICADOS Y ALERTAS ---
+const casosExistentes = ref([]);
+const buscandoCasos = ref(false);
+const faltaIdentificacion = computed(() => !form.radicado && !form.referencia_credito);
+
+const checkDuplicados = debounce(() => {
+    if (!form.radicado && !form.referencia_credito) {
+        casosExistentes.value = [];
+        return;
+    }
+    
+    buscandoCasos.value = true;
+    axios.get(route('casos.verificar_duplicados'), {
+        params: {
+            radicado: form.radicado,
+            referencia_credito: form.referencia_credito,
+            ignore_id: props.caso.id
+        }
+    })
+    .then(res => {
+        casosExistentes.value = res.data;
+    })
+    .catch(err => console.error('Error buscando duplicados:', err))
+    .finally(() => buscandoCasos.value = false);
+}, 500);
+
+watch(() => form.radicado, checkDuplicados);
+watch(() => form.referencia_credito, checkDuplicados);
 
 // --- AUTO-FORMATO ---
 watch(() => form.deudor.numero_documento, (newVal) => {
@@ -231,6 +309,51 @@ const submit = () => {
                         </nav>
                     </div>
 
+                    <!-- Alertas de Duplicados o Identificación Incompleta -->
+                    <div class="px-8 pt-4">
+                        <div v-if="faltaIdentificacion" class="p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/50 rounded-2xl flex items-center gap-3 animate-pulse">
+                            <InformationCircleIcon class="w-5 h-5 text-blue-500" />
+                            <p class="text-[10px] font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest">
+                                El proceso no tiene Pagaré ni Radicado asignado actualmente.
+                            </p>
+                        </div>
+                        
+                        <div v-if="casosExistentes.length > 0" class="p-6 bg-amber-50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-800/50 rounded-3xl animate-in zoom-in-95 mt-4">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                                    <ClockIcon class="w-5 h-5 text-amber-600" />
+                                </div>
+                                <div>
+                                    <h4 class="text-xs font-black text-amber-800 dark:text-amber-300 uppercase tracking-widest">Alerta de Duplicados</h4>
+                                    <p class="text-[10px] text-amber-600 dark:text-amber-500 font-bold uppercase tracking-tighter">Se detectaron {{ casosExistentes.length }} coincidencias por Radicado o Pagaré</p>
+                                </div>
+                            </div>
+                            <div class="space-y-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                                <div v-for="(item, idx) in casosExistentes" :key="idx" class="flex items-center justify-between bg-white/80 dark:bg-gray-800/80 p-4 rounded-2xl border border-amber-100/50 dark:border-amber-900/50 shadow-sm group hover:border-amber-400 transition-colors">
+                                    <div class="flex flex-col">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <span class="text-[10px] font-black text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded-md uppercase tracking-tighter">{{ item.tipo }}</span>
+                                            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">ID #{{ item.id }}</span>
+                                            <span v-if="item.radicado === form.radicado && form.radicado" class="text-[9px] font-black text-red-600 bg-red-50 px-1.5 rounded uppercase">Mismo Radicado</span>
+                                            <span v-if="item.referencia_credito === form.referencia_credito && form.referencia_credito" class="text-[9px] font-black text-red-600 bg-red-50 px-1.5 rounded uppercase">Mismo Pagaré</span>
+                                        </div>
+                                        <span class="text-sm font-black text-gray-700 dark:text-gray-200">{{ item.radicado || 'SIN RADICADO' }}</span>
+                                        <div class="flex flex-col gap-0.5 mt-1">
+                                            <span class="flex items-center gap-1 text-[9px] text-gray-500 font-bold uppercase"><UserCircleIcon class="w-3 h-3" /> {{ item.deudor }}</span>
+                                            <div class="flex items-center gap-3">
+                                                <span class="flex items-center gap-1 text-[9px] text-gray-500 font-bold uppercase"><BuildingOfficeIcon class="w-3 h-3" /> {{ item.cooperativa }}</span>
+                                                <span class="flex items-center gap-1 text-[9px] text-gray-500 font-bold uppercase"><CalendarDaysIcon class="w-3 h-3" /> {{ item.fecha }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <a :href="item.link" target="_blank" class="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-indigo-600 hover:text-white shadow-lg shadow-indigo-200 dark:shadow-none">
+                                        <DocumentTextIcon class="w-5 h-5" />
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="p-8">
                         <fieldset :disabled="isFormDisabled">
                             <!-- TAB 1 -->
@@ -275,7 +398,10 @@ const submit = () => {
                                                 <InputError :message="form.errors['deudor.correo_1']" />
                                             </div>
                                             <div class="col-span-3 grid grid-cols-2 gap-4 mt-2">
-                                                <AsyncSelect v-model="form.deudor.cooperativas_ids" :endpoint="route('cooperativas.search')" multiple label-key="nombre" placeholder="Cooperativas..." />
+                                                <div>
+                                                    <AsyncSelect v-model="form.deudor.cooperativas_ids" :endpoint="route('cooperativas.search')" multiple label-key="nombre" placeholder="Cooperativas * (Mín. 1)" />
+                                                    <InputError :message="form.errors['deudor.cooperativas_ids']" class="mt-2" />
+                                                </div>
                                                 <AsyncSelect v-model="form.deudor.abogados_ids" :endpoint="route('users.search')" multiple label-key="name" placeholder="Abogados..." />
                                             </div>
                                         </div>

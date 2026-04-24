@@ -7,7 +7,8 @@ import {
     GlobeAltIcon,
     ArrowTopRightOnSquareIcon,
     ChatBubbleBottomCenterTextIcon,
-    ClipboardDocumentCheckIcon
+    ClipboardDocumentCheckIcon,
+    HandThumbUpIcon
 } from '@heroicons/vue/24/outline';
 import GuiaEtapa from '@/Components/GuiaEtapa.vue';
 
@@ -32,9 +33,14 @@ const asText = (v) => v ?? '—';
                         <BuildingLibraryIcon class="w-5 h-5 text-indigo-500" /> 
                         Detalle Técnico del Expediente
                     </h3>
-                    <span class="text-[10px] font-black text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1 rounded-full uppercase tracking-tighter border border-indigo-100 dark:border-indigo-800">
-                        {{ proceso.tipo_proceso?.nombre || 'General' }}
-                    </span>
+                    <div class="flex items-center gap-2">
+                        <span v-if="proceso.a_favor_de" class="text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter border" :class="proceso.a_favor_de === 'DEMANDANTE' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-red-50 text-red-600 border-red-100'">
+                            <HandThumbUpIcon class="w-3 h-3 inline mr-1" /> A favor del {{ proceso.a_favor_de }}
+                        </span>
+                        <span class="text-[10px] font-black text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1 rounded-full uppercase tracking-tighter border border-indigo-100 dark:border-indigo-800">
+                            {{ proceso.tipo_proceso?.nombre || 'General' }}
+                        </span>
+                    </div>
                 </div>
                 
                 <div class="p-8">

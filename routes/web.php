@@ -275,6 +275,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/personas/exportar-excel', [PersonaController::class, 'exportExcel'])->name('personas.export.excel');
         Route::get('/personas/{persona}/casos-existentes', [PersonaController::class, 'getCasos'])->name('personas.casos_existentes');
         Route::resource('personas', PersonaController::class);
+        Route::get('/casos/verificar/duplicados', [CasoController::class, 'verificarDuplicados'])->name('casos.verificar_duplicados');
+        Route::resource('casos', CasoController::class);
 
         Route::post('/personas/{persona}/documentos', [PersonaController::class, 'uploadDocument'])->name('personas.upload_document');
         Route::get('/personas/documentos/{documento}', [PersonaController::class, 'downloadDocument'])->name('personas.download_document');

@@ -115,7 +115,62 @@ watch(selectedJuzgado, (val) => {
     form.juzgado_id = val?.id || null;
 });
 
-const form = useForm('CreateCasoData', initialData);
+const form = useForm(initialData);
+
+watch(() => props.casoAClonar, (newCaso) => {
+    form.defaults({
+        cooperativa_id: newCaso?.cooperativa || null,
+        user_id: newCaso?.user ? [{ id: newCaso.user.id, name: newCaso.user.name }] : [],
+        deudor_id: newCaso?.deudor_id || null,
+        deudor: {
+            id: newCaso?.deudor_id || null,
+            selected: newCaso?.deudor ? { id: newCaso.deudor.id, nombre_completo: newCaso.deudor.nombre_completo, numero_documento: newCaso.deudor.numero_documento } : null,
+            is_new: false,
+            nombre_completo: '',
+            tipo_documento: 'CC',
+            numero_documento: '',
+            dv: '',
+            celular_1: '',
+            correo_1: '',
+            cooperativas_ids: [],
+            abogados_ids: []
+        },
+        codeudores: newCaso?.codeudores?.map(c => ({
+            ...c,
+            dv: c.dv || '',
+            addresses: safeParseJson(c.addresses), 
+            social_links: safeParseJson(c.social_links)
+        })) || [],
+        
+        radicado: newCaso?.radicado || '',
+        juzgado_id: newCaso?.juzgado || null,
+        referencia_credito: newCaso?.referencia_credito || '',
+        
+        especialidad_id: newCaso?.especialidad_id || null,
+        tipo_proceso: newCaso?.tipo_proceso || null,
+        subtipo_proceso: newCaso?.subtipo_proceso || null,
+        subproceso: newCaso?.subproceso || null,
+        
+        etapa_procesal: newCaso?.etapa_procesal || null,
+        tipo_garantia_asociada: newCaso?.tipo_garantia_asociada || 'codeudor',
+        
+        fecha_apertura: new Date().toISOString().slice(0, 10),
+        fecha_vencimiento: newCaso?.fecha_vencimiento || '',
+        fecha_inicio_credito: newCaso?.fecha_inicio_credito || '',
+        
+        monto_total: newCaso?.monto_total?.toString() || '0',
+        monto_deuda_actual: newCaso?.monto_deuda_actual?.toString() || '0',
+        monto_total_pagado: newCaso?.monto_total_pagado?.toString() || '0',
+        
+        tasa_interes_corriente: newCaso?.tasa_interes_corriente?.toString() || '0',
+        origen_documental: newCaso?.origen_documental || 'pagaré',
+        medio_contacto: newCaso?.medio_contacto || null,
+        link_drive: newCaso?.link_drive || '',
+        link_expediente: newCaso?.link_expediente || '',
+        clonado_de_id: newCaso?.id || null,
+    });
+    form.reset();
+}, { immediate: true });
 
 // --- AUTO-FORMATO ---
 watch(() => form.deudor.numero_documento, (newVal) => {
@@ -196,6 +251,38 @@ watch([() => form.radicado, () => form.referencia_credito, () => form.asunto], d
 // Mantener deudor_id sincronizado con la selección
 const casosExistentes = ref([]);
 const buscandoCasos = ref(false);
+
+const faltaIdentificacion = computed(() => !form.radicado && !form.referencia_credito);
+
+const checkDuplicados = debounce(() => {
+    // Si ambos están vacíos, no buscamos duplicados pero mostramos aviso de "incompleto"
+    if (!form.radicado && !form.referencia_credito) {
+        if (!form.deudor.selected) casosExistentes.value = [];
+        return;
+    }
+    
+    buscandoCasos.value = true;
+    axios.get(route('casos.verificar_duplicados'), {
+        params: {
+            radicado: form.radicado,
+            referencia_credito: form.referencia_credito
+        }
+    })
+    .then(res => {
+        // Combinamos con los del deudor si existen
+        const idsExistentes = new Set(casosExistentes.value.map(c => c.id));
+        res.data.forEach(caso => {
+            if (!idsExistentes.has(caso.id)) {
+                casosExistentes.value.push(caso);
+            }
+        });
+    })
+    .catch(err => console.error('Error buscando duplicados:', err))
+    .finally(() => buscandoCasos.value = false);
+}, 500);
+
+watch(() => form.radicado, checkDuplicados);
+watch(() => form.referencia_credito, checkDuplicados);
 
 watch(() => form.deudor.selected, (newVal) => {
     if (newVal && !form.deudor.is_new) {
@@ -312,8 +399,8 @@ const submit = () => {
                                                 <ClockIcon class="w-5 h-5 text-amber-600" />
                                             </div>
                                             <div>
-                                                <h4 class="text-xs font-black text-amber-800 dark:text-amber-300 uppercase tracking-widest">Alerta de Antecedentes</h4>
-                                                <p class="text-[10px] text-amber-600 dark:text-amber-500 font-bold uppercase tracking-tighter">Esta persona ya tiene {{ casosExistentes.length }} casos registrados en el sistema</p>
+                                                <h4 class="text-xs font-black text-amber-800 dark:text-amber-300 uppercase tracking-widest">Alerta de Duplicados o Antecedentes</h4>
+                                                <p class="text-[10px] text-amber-600 dark:text-amber-500 font-bold uppercase tracking-tighter">Se detectaron {{ casosExistentes.length }} coincidencias por Radicado, Pagaré o Persona</p>
                                             </div>
                                         </div>
                                         <div class="space-y-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
@@ -322,11 +409,16 @@ const submit = () => {
                                                     <div class="flex items-center gap-2 mb-1">
                                                         <span class="text-[10px] font-black text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded-md uppercase tracking-tighter">{{ item.tipo }}</span>
                                                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">ID #{{ item.id }}</span>
+                                                        <span v-if="item.radicado === form.radicado && form.radicado" class="text-[9px] font-black text-red-600 bg-red-50 px-1.5 rounded uppercase">Mismo Radicado</span>
+                                                        <span v-if="item.referencia_credito === form.referencia_credito && form.referencia_credito" class="text-[9px] font-black text-red-600 bg-red-50 px-1.5 rounded uppercase">Mismo Pagaré</span>
                                                     </div>
-                                                    <span class="text-sm font-black text-gray-700 dark:text-gray-200">{{ item.radicado }}</span>
-                                                    <div class="flex items-center gap-3 mt-1">
-                                                        <span class="flex items-center gap-1 text-[9px] text-gray-500 font-bold uppercase"><BuildingOfficeIcon class="w-3 h-3" /> {{ item.cooperativa }}</span>
-                                                        <span class="flex items-center gap-1 text-[9px] text-gray-500 font-bold uppercase"><CalendarDaysIcon class="w-3 h-3" /> {{ item.fecha }}</span>
+                                                    <span class="text-sm font-black text-gray-700 dark:text-gray-200">{{ item.radicado || 'SIN RADICADO' }}</span>
+                                                    <div class="flex flex-col gap-0.5 mt-1">
+                                                        <span class="flex items-center gap-1 text-[9px] text-gray-500 font-bold uppercase"><UserCircleIcon class="w-3 h-3" /> {{ item.deudor }}</span>
+                                                        <div class="flex items-center gap-3">
+                                                            <span class="flex items-center gap-1 text-[9px] text-gray-500 font-bold uppercase"><BuildingOfficeIcon class="w-3 h-3" /> {{ item.cooperativa }}</span>
+                                                            <span class="flex items-center gap-1 text-[9px] text-gray-500 font-bold uppercase"><CalendarDaysIcon class="w-3 h-3" /> {{ item.fecha }}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <a :href="item.link" target="_blank" class="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-indigo-600 hover:text-white shadow-lg shadow-indigo-200 dark:shadow-none">
@@ -340,7 +432,16 @@ const submit = () => {
                                     <InputError :message="form.errors.deudor_id" class="mt-2" />
                                     <InputError :message="form.errors['deudor.id']" class="mt-2" />
                                 </div>
-                                <div v-else class="animate-in fade-in slide-in-from-top-2 space-y-6 p-8 bg-gray-50/50 dark:bg-gray-900/30 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+
+                                <!-- Notificación de Falta de Identificación -->
+                                <div v-if="faltaIdentificacion" class="mt-4 p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/50 rounded-2xl flex items-center gap-3 animate-pulse">
+                                    <InformationCircleIcon class="w-5 h-5 text-blue-500" />
+                                    <p class="text-[10px] font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest">
+                                        Nota: El expediente se registrará sin Pagaré ni Radicado. Podrá asignarlos luego.
+                                    </p>
+                                </div>
+
+                                <div v-if="form.deudor.is_new" class="animate-in fade-in slide-in-from-top-2 space-y-6 p-8 bg-gray-50/50 dark:bg-gray-900/30 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
                                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div class="md:col-span-2">
                                             <InputLabel value="Nombre Completo *" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
@@ -384,8 +485,9 @@ const submit = () => {
                                     </div>
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div>
-                                            <InputLabel value="Vincular a Cooperativas" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
+                                            <InputLabel value="Vincular a Cooperativas *" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
                                             <AsyncSelect v-model="form.deudor.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Asignar cooperativas..." multiple label-key="nombre" class="bg-white transition-all rounded-xl" />
+                                            <InputError :message="form.errors['deudor.cooperativas_ids']" class="mt-2" />
                                         </div>
                                         <div>
                                             <InputLabel value="Asignar Abogados" class="text-[10px] font-black text-gray-400 uppercase mb-1" />

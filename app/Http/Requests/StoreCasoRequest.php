@@ -31,8 +31,18 @@ class StoreCasoRequest extends FormRequest
             ],
             'user_id' => ['required', 'array', 'min:1'],
             'user_id.*' => ['exists:users,id'],
-            'referencia_credito' => ['nullable', 'string', 'max:255'],
-            'radicado' => ['nullable', 'string', 'max:255'],
+            'referencia_credito' => [
+                'nullable', 
+                'string', 
+                'max:255', 
+                Rule::unique('casos', 'referencia_credito')->whereNull('deleted_at')
+            ],
+            'radicado' => [
+                'nullable', 
+                'string', 
+                'max:255', 
+                Rule::unique('casos', 'radicado')->whereNull('deleted_at')
+            ],
             'especialidad_id' => ['nullable', 'integer', 'exists:especialidades_juridicas,id'],
             'tipo_proceso' => [
                 'nullable', 

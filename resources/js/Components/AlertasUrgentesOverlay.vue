@@ -170,19 +170,20 @@ const open = () => {
             </div>
         </div>
 
-        <!-- BURBUJA MINIMIZADA -->
+        <!-- BURBUJA MINIMIZADA (Rediseñada) -->
         <button 
             v-else 
             @click="open" 
-            class="fixed bottom-4 left-4 md:bottom-8 md:left-8 z-[90] flex items-center gap-3 p-2 md:p-3 pr-4 md:pr-8 bg-red-600 text-white rounded-2xl md:rounded-3xl shadow-[0_20px_50px_rgba(220,38,38,0.4)] hover:scale-105 transition-all group animate-bounce hover:animate-none"
+            class="fixed bottom-24 right-5 z-[90] w-14 h-14 bg-red-600 text-white rounded-full shadow-[0_10px_30px_rgba(220,38,38,0.4)] hover:scale-110 active:scale-95 transition-all duration-300 flex items-center justify-center group"
         >
-            <div class="h-10 w-10 md:h-12 md:w-12 bg-white rounded-xl md:rounded-2xl flex items-center justify-center text-red-600 shadow-inner font-black text-lg md:text-xl">
-                {{ urgenciasCount.total }}
+            <div class="relative">
+                <BellAlertIcon class="w-7 h-7 group-hover:rotate-12 transition-transform" />
+                <div class="absolute -top-1.5 -right-1.5 bg-white text-red-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shadow-md ring-2 ring-red-600">
+                    {{ urgenciasCount.total }}
+                </div>
             </div>
-            <div class="flex flex-col items-start text-left">
-                <span class="text-[9px] md:text-[10px] font-black uppercase tracking-widest leading-none">Alertas</span>
-                <span class="text-[7px] md:text-[8px] font-bold text-red-100 uppercase tracking-tighter">Globales</span>
-            </div>
+            <!-- Efecto de pulso elegante -->
+            <span class="absolute inset-0 rounded-full bg-red-600 animate-ping opacity-25 pointer-events-none"></span>
         </button>
     </div>
 </template>

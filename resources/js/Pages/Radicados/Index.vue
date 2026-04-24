@@ -750,7 +750,7 @@ const copyLegalInfo = (proceso) => {
 
         <!-- MODAL DE VISTA RÁPIDA (V5: Ficha Judicial Optimizada) -->
         <Modal :show="showQuickViewModal" @close="closeQuickView" max-width="3xl" centered>
-            <div v-if="selectedProceso" class="overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-2xl transition-all border border-gray-100 dark:border-gray-800 flex flex-col h-[85vh] sm:h-[90vh]">
+            <div v-if="selectedProceso" class="overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-2xl transition-all border border-gray-100 dark:border-gray-800 flex flex-col h-[80vh] sm:h-[82vh]">
                 <!-- Header -->
                 <div class="px-4 py-3 sm:px-8 sm:py-5 bg-indigo-600 dark:bg-indigo-700 text-white flex justify-between items-center shrink-0 shadow-lg relative z-10 w-full">
                     <div class="flex items-center gap-3 sm:gap-4 overflow-hidden min-w-0">

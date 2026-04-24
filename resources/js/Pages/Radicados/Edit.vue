@@ -15,7 +15,7 @@ import AsyncSelect from '@/Components/AsyncSelect.vue';
 import Modal from '@/Components/Modal.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import { formatRadicado, addDaysToDate, addMonthsToDate, toUpperCase, calculateDV } from '@/Utils/formatters';
-import { PlusIcon, TrashIcon, ChevronDownIcon, CalendarDaysIcon } from '@heroicons/vue/24/outline';
+import { PlusIcon, TrashIcon, ChevronDownIcon, CalendarDaysIcon, HandThumbUpIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
   proceso: { type: Object, required: true },
@@ -84,7 +84,7 @@ const loadPersonasArray = (personas) => {
         id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', sin_info: false, cooperativas_ids: [], abogados_ids: []
     }];
     return personas.map(p => {
-        const isIncomplete = p.nombre_completo === 'DEMANDADO POR IDENTIFICAR' || p.nombre_completo === 'PERSONA INDETERMINADA';
+        const isIncomplete = p.nombre_completo === 'DEMANDADO POR IDENTIFICAR' || p.nombre_completo === 'DEMANDANTE POR IDENTIFICAR' || p.nombre_completo === 'PERSONA INDETERMINADA';
         return { 
             id: p.id, 
             selected: mapToSelectOption(p), 
@@ -107,6 +107,7 @@ const form = useForm(`EditRadicado:${props.proceso.id}`, {
   juzgado_id: mapToSelectOption(props.proceso.juzgado, 'nombre'),
   tipo_proceso_id: mapToSelectOption(props.proceso.tipo_proceso, 'nombre'),
   etapa_procesal_id: props.proceso.etapa_procesal_id || '', 
+  a_favor_de: props.proceso.a_favor_de || 'DEMANDANTE',
 
   demandantes: loadPersonasArray(props.proceso.demandantes),
   demandados: loadPersonasArray(props.proceso.demandados),
@@ -171,6 +172,7 @@ const submit = () => {
             tipo_documento: d.tipo_documento,
             numero_documento: d.numero_documento,
             dv: d.dv,
+            sin_info: d.sin_info,
             cooperativas_ids: Array.isArray(d.cooperativas_ids) ? d.cooperativas_ids.map(c => c.id || c) : [],
             abogados_ids: Array.isArray(d.abogados_ids) ? d.abogados_ids.map(a => a.id || a) : [],
             is_new: true
@@ -236,6 +238,31 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
             <fieldset :disabled="isClosed" :class="{ 'opacity-60': isClosed }">
               <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg p-6 border border-gray-200 dark:border-gray-700">
                 <h3 class="text-lg font-bold mb-4">Información del Proceso</h3>
+                
+                <!-- A Favor De Selection -->
+                <div class="mb-8 p-4 bg-indigo-50 dark:bg-indigo-900/10 rounded-2xl border border-indigo-100 dark:border-indigo-800">
+                    <InputLabel value="Representamos a Favor de:" class="text-xs font-bold text-indigo-700 dark:text-indigo-300 uppercase mb-3 ml-1" />
+                    <div class="flex bg-white dark:bg-gray-900 p-1 rounded-xl border border-indigo-100 dark:border-indigo-800 max-w-md">
+                        <button 
+                            type="button" 
+                            @click="form.a_favor_de = 'DEMANDANTE'"
+                            :class="form.a_favor_de === 'DEMANDANTE' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-500 hover:text-indigo-600'"
+                            class="flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all flex items-center justify-center gap-2"
+                        >
+                            <HandThumbUpIcon v-if="form.a_favor_de === 'DEMANDANTE'" class="w-3 h-3" /> Demandante
+                        </button>
+                        <button 
+                            type="button" 
+                            @click="form.a_favor_de = 'DEMANDADO'"
+                            :class="form.a_favor_de === 'DEMANDADO' ? 'bg-red-600 text-white shadow-md' : 'text-gray-500 hover:text-red-600'"
+                            class="flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all flex items-center justify-center gap-2"
+                        >
+                            <HandThumbUpIcon v-if="form.a_favor_de === 'DEMANDADO'" class="w-3 h-3" /> Demandado
+                        </button>
+                    </div>
+                    <InputError :message="form.errors.a_favor_de" class="mt-2" />
+                </div>
+
                 <div class="border-t border-gray-200 dark:border-gray-700 pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                   
                   <div class="md:col-span-2 space-y-4">
@@ -262,9 +289,13 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                                 <AsyncSelect v-model="item.selected" :endpoint="route('personas.search')" placeholder="Buscar persona..." label-key="nombre_completo" />
                             </div>
                             <div v-else class="space-y-3 animate-in fade-in slide-in-from-top-1">
+                                <label class="flex items-center gap-2 cursor-pointer mb-2">
+                                    <input type="checkbox" v-model="item.sin_info" class="rounded border-gray-300 text-indigo-600 shadow-sm" />
+                                    <span class="text-[10px] font-bold text-amber-600 uppercase">Sin info completa (Demandante por identificar)</span>
+                                </label>
                                 <TextInput v-model="item.nombre_completo" @blur="item.nombre_completo = toUpperCase(item.nombre_completo)" placeholder="Nombre Completo *" class="text-sm w-full" />
                                 <InputError :message="form.errors[`demandantes.${index}.nombre_completo`]" />
-                                <div class="grid grid-cols-3 gap-2 items-end">
+                                <div v-if="!item.sin_info" class="grid grid-cols-3 gap-2 items-end">
                                     <SelectInput v-model="item.tipo_documento" class="text-sm rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 shadow-sm h-[42px]">
                                         <option>CC</option>
                                         <option>NIT</option>
@@ -280,7 +311,9 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                                 </div>
                                 <InputError :message="form.errors[`demandantes.${index}.numero_documento`]" />
                                 <div class="space-y-2">
-                                    <AsyncSelect v-model="item.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Asignar empresas..." multiple label-key="nombre" />
+                                    <InputLabel value="Asignar empresas * (Mín. 1)" class="text-[10px] font-black uppercase text-gray-400" />
+                                    <AsyncSelect v-model="item.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Seleccione..." multiple label-key="nombre" />
+                                    <InputError :message="form.errors[`demandantes.${index}.cooperativas_ids`]" />
                                     <AsyncSelect v-model="item.abogados_ids" :endpoint="route('users.search')" placeholder="Asignar abogados..." multiple label-key="name" />
                                 </div>
                             </div>
@@ -333,7 +366,9 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                                 </div>
                                 <InputError :message="form.errors[`demandados.${index}.numero_documento`]" />
                                 <div class="space-y-2">
-                                    <AsyncSelect v-model="item.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Asignar empresas..." multiple label-key="nombre" />
+                                    <InputLabel value="Asignar empresas * (Mín. 1)" class="text-[10px] font-black uppercase text-gray-400" />
+                                    <AsyncSelect v-model="item.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Seleccione..." multiple label-key="nombre" />
+                                    <InputError :message="form.errors[`demandados.${index}.cooperativas_ids`]" />
                                     <AsyncSelect v-model="item.abogados_ids" :endpoint="route('users.search')" placeholder="Asignar abogados..." multiple label-key="name" />
                                 </div>
                             </div>

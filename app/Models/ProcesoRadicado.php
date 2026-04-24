@@ -34,7 +34,8 @@ class ProcesoRadicado extends Model
         'etapa_procesal_id', 
         'fecha_cambio_etapa',
         'is_pinned',
-        'checklist_seguimiento'
+        'checklist_seguimiento',
+        'a_favor_de'
     ];
 
     /**

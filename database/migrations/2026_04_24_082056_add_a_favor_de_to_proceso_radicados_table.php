@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('casos', function (Blueprint $table) {
-            $table->boolean('is_pinned')->default(false)->after('id');
+        Schema::table('proceso_radicados', function (Blueprint $table) {
+            $table->string('a_favor_de')->nullable()->comment('Indica si estamos a favor del DEMANDANTE o DEMANDADO');
         });
     }
 
@@ -21,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('casos', function (Blueprint $table) {
-            $table->dropColumn('is_pinned');
+        Schema::table('proceso_radicados', function (Blueprint $table) {
+            $table->dropColumn('a_favor_de');
         });
     }
 };

@@ -543,13 +543,18 @@ class ProcesoRadicadoController extends Controller
             $personaId = $d['id'] ?? ($d['selected']['id'] ?? null);
             
             if (!empty($d['is_new'])) {
+                $numDoc = $d['numero_documento'] ?? null;
+                if (!empty($d['sin_info']) && empty($numDoc)) {
+                    $numDoc = 'TEMP-' . substr(md5(uniqid()), 0, 12);
+                }
+
                 // Si es nuevo o estamos editando uno incompleto sin ID aún
                 $persona = Persona::withTrashed()->updateOrCreate(
                     ['id' => $personaId],
                     [
                         'nombre_completo' => $d['nombre_completo'],
                         'tipo_documento' => $d['tipo_documento'] ?? 'CC',
-                        'numero_documento' => $d['numero_documento'],
+                        'numero_documento' => $numDoc,
                         'dv' => $d['dv'] ?? null,
                         'deleted_at' => null
                     ]

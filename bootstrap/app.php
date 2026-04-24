@@ -6,6 +6,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\TrustProxies;
 // --- IMPORTACIONES AÑADIDAS PARA INERTIA ---
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Session\TokenMismatchException;
 use Inertia\Inertia;
 // ===== INICIO DE LA NUEVA CORRECCIÓN =====
 // Importamos la excepción de Conflicto (Error 409)
@@ -48,7 +49,15 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        // --- MANEJADOR DE SESIÓN EXPIRADA ---
+        // --- MANEJADOR DE SESIÓN EXPIRADA (419) ---
+        $exceptions->renderable(function (TokenMismatchException $e, $request) {
+            if ($request->header('X-Inertia')) {
+                return Inertia::location(route('login'));
+            }
+            return redirect()->guest(route('login'));
+        });
+
+        // --- MANEJADOR DE SESIÓN EXPIRADA (401) ---
         $exceptions->renderable(function (AuthenticationException $e, $request) {
             if ($request->header('X-Inertia')) {
                 return Inertia::location(route('login'));

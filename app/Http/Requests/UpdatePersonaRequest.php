@@ -61,7 +61,7 @@ class UpdatePersonaRequest extends FormRequest
             'social_links.*.url'    => ['nullable','url','max:2048'],
 
             // Relaciones
-            'cooperativas_ids'      => ['nullable', 'array'],
+            'cooperativas_ids'      => ['required', 'array', 'min:1'],
             'cooperativas_ids.*'    => ['integer', 'exists:cooperativas,id'],
             'abogados_ids'          => ['nullable', 'array'],
             'abogados_ids.*'        => ['integer', 'exists:users,id'],

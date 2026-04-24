@@ -258,11 +258,12 @@ const getRandomColor = (id) => {
                 <div class="px-8 py-5 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center">
                     <div class="flex items-center gap-3">
                         <BuildingOfficeIcon class="w-5 h-5 text-emerald-500" />
-                        <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-[10px]">Vincular Empresas</h3>
+                        <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-[10px]">Vincular Empresas *</h3>
                     </div>
                     <button type="button" @click="toggleCooperativas" class="text-[9px] font-black uppercase text-indigo-600 hover:underline">Alternar Todos</button>
                 </div>
                 <div class="p-8 max-h-64 overflow-y-auto custom-scrollbar">
+                    <InputError :message="form.errors.cooperativas_ids" class="mb-4" />
                     <div class="grid grid-cols-1 gap-2">
                         <label v-for="c in allCooperativas" :key="c.id" class="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-xl cursor-pointer hover:bg-emerald-50 transition-all border border-transparent hover:border-emerald-100 group">
                             <input type="checkbox" :value="c.id" v-model="form.cooperativas_ids" class="rounded-lg border-gray-300 text-emerald-600" />

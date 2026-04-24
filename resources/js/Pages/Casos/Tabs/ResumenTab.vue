@@ -73,7 +73,7 @@ const submitNotification = () => {
                     </div>
                     <div class="space-y-1">
                         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pagaré / Referencia</p>
-                        <p class="text-xs font-bold text-gray-700 dark:text-gray-200">{{ caso.referencia_credito || 'N/A' }}</p>
+                        <p class="text-xs font-bold text-gray-700 dark:text-gray-200">{{ caso.referencia_credito || 'SIN ASIGNAR' }}</p>
                     </div>
                     <div class="space-y-1">
                         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Especialidad</p>

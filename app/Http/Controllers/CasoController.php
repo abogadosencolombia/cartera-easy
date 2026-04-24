@@ -87,31 +87,46 @@ class CasoController extends Controller
             $q->where('etapa_procesal', $etapa);
         });
 
-        // --- 5. Filtro de Búsqueda General ---
+        // --- 5. Filtro de Búsqueda General (Multi-palabra inteligente) ---
         $query->when($request->input('search'), function ($q, $search) {
-            $q->where(function ($subq) use ($search) {
-                $subq->where('tipo_proceso', 'ilike', "%{$search}%")
-                    ->orWhere('etapa_actual', 'ilike', "%{$search}%")
-                    ->orWhere('referencia_credito', 'ilike', "%{$search}%")
-                    ->orWhere('radicado', 'ilike', "%{$search}%")
-                    ->orWhere('subtipo_proceso', 'ilike', "%{$search}%")
-                    ->orWhere('subproceso', 'ilike', "%{$search}%")
-                    ->orWhere('etapa_procesal', 'ilike', "%{$search}%")
-                    ->orWhereHas('deudor', function ($deudorQuery) use ($search) {
-                        $deudorQuery->where('nombre_completo', 'ilike', "%{$search}%")
-                            ->orWhere('numero_documento', 'ilike', "%{$search}%");
-                    })
-                    ->orWhereHas('codeudores', function ($codeudorQuery) use ($search) {
-                        $codeudorQuery->where('nombre_completo', 'ilike', "%{$search}%")
-                            ->orWhere('numero_documento', 'ilike', "%{$search}%");
-                    })
-                    ->orWhereHas('juzgado', function ($juzgadoQuery) use ($search) {
-                        $juzgadoQuery->where('nombre', 'ilike', "%{$search}%");
-                    })
-                    ->orWhereHas('cooperativa', function ($coopQuery) use ($search) {
-                        $coopQuery->where('nombre', 'ilike', "%{$search}%");
-                    });
-            });
+            $words = array_filter(explode(' ', trim($search)));
+
+            foreach ($words as $word) {
+                $cleanWord = preg_replace('/[^0-9]/', '', $word);
+                
+                $q->where(function ($subq) use ($word, $cleanWord) {
+                    $subq->where('tipo_proceso', 'ilike', "%{$word}%")
+                        ->orWhere('referencia_credito', 'ilike', "%{$word}%")
+                        ->orWhere('radicado', 'ilike', "%{$word}%")
+                        ->orWhere('subtipo_proceso', 'ilike', "%{$word}%")
+                        ->orWhere('subproceso', 'ilike', "%{$word}%")
+                        ->orWhere('etapa_procesal', 'ilike', "%{$word}%");
+                    
+                    if ($cleanWord) {
+                        $subq->orWhereRaw("regexp_replace(radicado, '[^0-9]', '', 'g') ILIKE ?", ["%{$cleanWord}%"])
+                             ->orWhere('referencia_credito', 'ilike', "%{$cleanWord}%");
+                    }
+
+                    $subq->orWhereHas('deudor', function ($deudorQuery) use ($word, $cleanWord) {
+                            $deudorQuery->where('nombre_completo', 'ilike', "%{$word}%");
+                            if ($cleanWord) {
+                                $deudorQuery->orWhere('numero_documento', 'ilike', "%{$cleanWord}%");
+                            }
+                        })
+                        ->orWhereHas('codeudores', function ($codeudorQuery) use ($word, $cleanWord) {
+                            $codeudorQuery->where('nombre_completo', 'ilike', "%{$word}%");
+                            if ($cleanWord) {
+                                $codeudorQuery->orWhere('numero_documento', 'ilike', "%{$cleanWord}%");
+                            }
+                        })
+                        ->orWhereHas('juzgado', function ($juzgadoQuery) use ($word) {
+                            $juzgadoQuery->where('nombre', 'ilike', "%{$word}%");
+                        })
+                        ->orWhereHas('cooperativa', function ($coopQuery) use ($word) {
+                            $coopQuery->where('nombre', 'ilike', "%{$word}%");
+                        });
+                });
+            }
         });
 
         // --- 6. Filtro por Juzgado ---
@@ -451,6 +466,55 @@ class CasoController extends Controller
         $caso->update(['is_pinned' => !$caso->is_pinned]);
         
         return back()->with('success', $caso->is_pinned ? 'Caso fijado correctamente.' : 'Caso desfijado.');
+    }
+
+    public function verificarDuplicados(Request $request)
+    {
+        $radicado = trim($request->input('radicado', ''));
+        $referencia = trim($request->input('referencia_credito', ''));
+        $ignoreId = $request->input('ignore_id');
+
+        if (empty($radicado) && empty($referencia)) {
+            return response()->json([]);
+        }
+
+        $query = Caso::query();
+
+        $query->where(function($q) use ($radicado, $referencia) {
+            if ($radicado) {
+                $cleanRad = preg_replace('/[^0-9]/', '', $radicado);
+                $q->where('radicado', 'ilike', "%{$radicado}%");
+                if ($cleanRad) {
+                    $q->orWhereRaw("regexp_replace(radicado, '[^0-9]', '', 'g') = ?", [$cleanRad]);
+                }
+            }
+
+            if ($referencia) {
+                $q->orWhere('referencia_credito', 'ilike', $referencia);
+            }
+        });
+
+        if ($ignoreId) {
+            $query->where('id', '!=', $ignoreId);
+        }
+
+        $duplicates = $query->with(['deudor:id,nombre_completo', 'cooperativa:id,nombre'])
+            ->limit(10)
+            ->get()
+            ->map(function ($caso) {
+                return [
+                    'id' => $caso->id,
+                    'radicado' => $caso->radicado,
+                    'referencia_credito' => $caso->referencia_credito,
+                    'tipo' => $caso->tipo_proceso,
+                    'fecha' => $caso->fecha_apertura ? $caso->fecha_apertura->format('Y-m-d') : null,
+                    'cooperativa' => $caso->cooperativa?->nombre,
+                    'deudor' => $caso->deudor?->nombre_completo,
+                    'link' => route('casos.show', $caso->id)
+                ];
+            });
+
+        return response()->json($duplicates);
     }
 
     public function updateChecklist(Request $request, Caso $caso)

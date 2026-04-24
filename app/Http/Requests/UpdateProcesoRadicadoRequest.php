@@ -31,13 +31,17 @@ class UpdateProcesoRadicadoRequest extends FormRequest
             'juzgado_id'              => ['nullable', 'exists:juzgados,id'],
             'tipo_proceso_id'         => ['required', 'exists:tipos_proceso,id'],
             'etapa_procesal_id'       => ['nullable', 'exists:etapas_procesales,id'],
+            'a_favor_de'              => ['required', 'string', 'in:DEMANDANTE,DEMANDADO'],
 
             'demandantes'             => ['required', 'array', 'min:1'],
             'demandantes.*.id'        => ['nullable', 'integer', 'exists:personas,id'],
             'demandantes.*.is_new'    => ['nullable', 'boolean'],
             'demandantes.*.nombre_completo' => ['required_if:demandantes.*.is_new,true', 'nullable', 'string', 'max:255'],
-            'demandantes.*.numero_documento' => ['required_if:demandantes.*.is_new,true', 'nullable', 'string', 'max:255'],
+            'demandantes.*.numero_documento' => ['required_if:demandantes.*.sin_info,false', 'required_if:demandantes.*.is_new,true', 'nullable', 'string', 'max:255'],
             'demandantes.*.tipo_documento'   => ['required_if:demandantes.*.is_new,true', 'nullable', 'string', 'max:255'],
+            'demandantes.*.sin_info'         => ['nullable', 'boolean'],
+            'demandantes.*.cooperativas_ids' => ['required_if:demandantes.*.is_new,true', 'nullable', 'array', 'min:1'],
+            'demandantes.*.abogados_ids'     => ['nullable', 'array'],
 
             'demandados'              => ['nullable', 'array'],
             'demandados.*.id'         => ['nullable', 'integer', 'exists:personas,id'],
@@ -46,6 +50,8 @@ class UpdateProcesoRadicadoRequest extends FormRequest
             'demandados.*.numero_documento' => ['required_if:demandados.*.sin_info,false', 'required_if:demandados.*.is_new,true', 'nullable', 'string', 'max:255'],
             'demandados.*.tipo_documento'   => ['required_if:demandados.*.is_new,true', 'nullable', 'string', 'max:255'],
             'demandados.*.sin_info'         => ['nullable', 'boolean'],
+            'demandados.*.cooperativas_ids' => ['required_if:demandados.*.is_new,true', 'nullable', 'array', 'min:1'],
+            'demandados.*.abogados_ids'     => ['nullable', 'array'],
         ];
     }
 }

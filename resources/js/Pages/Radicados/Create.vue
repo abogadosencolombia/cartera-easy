@@ -30,7 +30,8 @@ import {
     BriefcaseIcon,
     BuildingLibraryIcon,
     ClockIcon,
-    XMarkIcon
+    XMarkIcon,
+    HandThumbUpIcon
 } from '@heroicons/vue/24/outline';
 import Swal from 'sweetalert2';
 
@@ -52,7 +53,7 @@ const transitionName = useRemember('slide-next', 'CreateRadicadoTransition');
 
 const steps = [
   { id: 1, name: 'Información Técnica', icon: ScaleIcon, fields: ['radicado', 'asunto', 'juzgado_id', 'tipo_proceso_id'] },
-  { id: 2, name: 'Partes Procesales', icon: UserGroupIcon, fields: ['demandantes', 'demandados', 'abogado_id'] },
+  { id: 2, name: 'Partes Procesales', icon: UserGroupIcon, fields: ['demandantes', 'demandados', 'abogado_id', 'a_favor_de'] },
   { id: 3, name: 'Seguimiento y Control', icon: ClockIcon, fields: ['fecha_proxima_revision'] },
 ];
 
@@ -79,9 +80,10 @@ const form = useForm('CreateRadicado', {
   juzgado_id: null,
   tipo_proceso_id: null,
   etapa_procesal_id: '', 
+  a_favor_de: 'DEMANDANTE',
 
   demandantes: [{ 
-    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '', cooperativas_ids: [], abogados_ids: []
+    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '', sin_info: false, cooperativas_ids: [], abogados_ids: []
   }],
   demandados: [{ 
     id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '', sin_info: false, cooperativas_ids: [], abogados_ids: []
@@ -131,12 +133,12 @@ watch([() => form.radicado, () => form.asunto], debounce(() => {
 
 // --- Helpers para Listas Dinámicas ---
 const addDemandante = () => form.demandantes.push({ 
-    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', cooperativas_ids: [], abogados_ids: []
+    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '', sin_info: false, cooperativas_ids: [], abogados_ids: []
 });
 const removeDemandante = (index) => { if (form.demandantes.length > 1) form.demandantes.splice(index, 1); };
 
 const addDemandado = () => form.demandados.push({ 
-    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', sin_info: false, cooperativas_ids: [], abogados_ids: []
+    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '', sin_info: false, cooperativas_ids: [], abogados_ids: []
 });
 const removeDemandado = (index) => { if (form.demandados.length > 1) form.demandados.splice(index, 1); };
 
@@ -352,8 +354,8 @@ const submit = () => {
                 <!-- STEP 2: PARTES Y RESPONSABLES -->
                 <div v-else-if="step === 2" key="step2" class="space-y-10 animate-in fade-in duration-500">
                   
-                  <!-- Responsables -->
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-8 p-6 bg-indigo-50/30 dark:bg-indigo-900/10 rounded-3xl border border-indigo-100 dark:border-indigo-900/30">
+                  <!-- Responsables y A Favor De -->
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-8 p-6 bg-indigo-50/30 dark:bg-indigo-900/10 rounded-3xl border border-indigo-100 dark:border-indigo-900/30">
                       <div class="space-y-2">
                           <InputLabel value="Abogado / Gestor Principal *" class="font-bold text-xs uppercase" />
                           <AsyncSelect v-model="form.abogado_id" :endpoint="route('users.search')" placeholder="Quién lleva el caso..." label-key="name" />
@@ -363,6 +365,28 @@ const submit = () => {
                           <InputLabel value="Responsable de Revisión" class="font-bold text-xs uppercase" />
                           <AsyncSelect v-model="form.responsable_revision_id" :endpoint="route('users.search')" placeholder="Quién supervisa..." label-key="name" />
                           <InputError :message="form.errors.responsable_revision_id" />
+                      </div>
+                      <div class="space-y-2">
+                        <InputLabel value="Representamos a Favor de:" class="font-bold text-xs uppercase" />
+                        <div class="flex bg-white dark:bg-gray-900 p-1 rounded-xl border border-indigo-100 dark:border-indigo-800">
+                            <button 
+                                type="button" 
+                                @click="form.a_favor_de = 'DEMANDANTE'"
+                                :class="form.a_favor_de === 'DEMANDANTE' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-500 hover:text-indigo-600'"
+                                class="flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all flex items-center justify-center gap-2"
+                            >
+                                <HandThumbUpIcon v-if="form.a_favor_de === 'DEMANDANTE'" class="w-3 h-3" /> Demandante
+                            </button>
+                            <button 
+                                type="button" 
+                                @click="form.a_favor_de = 'DEMANDADO'"
+                                :class="form.a_favor_de === 'DEMANDADO' ? 'bg-red-600 text-white shadow-md' : 'text-gray-500 hover:text-red-600'"
+                                class="flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all flex items-center justify-center gap-2"
+                            >
+                                <HandThumbUpIcon v-if="form.a_favor_de === 'DEMANDADO'" class="w-3 h-3" /> Demandado
+                            </button>
+                        </div>
+                        <InputError :message="form.errors.a_favor_de" />
                       </div>
                   </div>
 
@@ -394,9 +418,13 @@ const submit = () => {
                                 <AsyncSelect v-model="item.selected" :endpoint="route('personas.search')" placeholder="Buscar por nombre o CC..." label-key="nombre_completo" />
                             </div>
                             <div v-else class="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                                <label class="flex items-center gap-2 cursor-pointer p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-100 dark:border-amber-800">
+                                    <input type="checkbox" v-model="item.sin_info" class="rounded border-amber-300 text-amber-600" />
+                                    <span class="text-[9px] font-black text-amber-700 dark:text-amber-400 uppercase">Sin información (Demandante por identificar)</span>
+                                </label>
                                 <TextInput v-model="item.nombre_completo" @blur="item.nombre_completo = toUpperCase(item.nombre_completo)" placeholder="Nombre Completo *" class="text-sm w-full" />
                                 <InputError :message="form.errors[`demandantes.${index}.nombre_completo`]" />
-                                <div class="grid grid-cols-3 gap-2">
+                                <div v-if="!item.sin_info" class="grid grid-cols-3 gap-2">
                                     <SelectInput v-model="item.tipo_documento" class="text-sm rounded-xl border-gray-200 bg-gray-50">
                                         <option>CC</option><option>NIT</option>
                                     </SelectInput>
@@ -407,7 +435,9 @@ const submit = () => {
                                 </div>
                                 <InputError :message="form.errors[`demandantes.${index}.numero_documento`]" />
                                 <div class="space-y-2">
-                                    <AsyncSelect v-model="item.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Vincular empresas * (Mín. 1)" multiple label-key="nombre" />
+                                    <InputLabel value="Vincular Empresas * (Mín. 1)" class="text-[10px] font-black uppercase text-gray-400" />
+                                    <AsyncSelect v-model="item.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Seleccione..." multiple label-key="nombre" />
+                                    <InputError :message="form.errors[`demandantes.${index}.cooperativas_ids`]" />
                                     <AsyncSelect v-model="item.abogados_ids" :endpoint="route('users.search')" placeholder="Vincular abogados..." multiple label-key="name" />
                                 </div>
                             </div>
@@ -460,7 +490,9 @@ const submit = () => {
                                 </div>
                                 <InputError :message="form.errors[`demandados.${index}.numero_documento`]" />
                                 <div class="space-y-2">
-                                    <AsyncSelect v-model="item.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Vincular empresas * (Mín. 1)" multiple label-key="nombre" />
+                                    <InputLabel value="Vincular Empresas * (Mín. 1)" class="text-[10px] font-black uppercase text-gray-400" />
+                                    <AsyncSelect v-model="item.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Seleccione..." multiple label-key="nombre" />
+                                    <InputError :message="form.errors[`demandados.${index}.cooperativas_ids`]" />
                                     <AsyncSelect v-model="item.abogados_ids" :endpoint="route('users.search')" placeholder="Vincular abogados..." multiple label-key="name" />
                                 </div>
                             </div>
