@@ -40,6 +40,7 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
         
         if (!empty($this->filtros['estado']) && $this->filtros['estado'] !== 'TODOS') $query->where('estado', $this->filtros['estado']);
         if (!empty($this->filtros['sin_radicado'])) $query->where(function($q) { $q->whereNull('radicado')->orWhere('radicado', ''); });
+        if (!empty($this->filtros['solo_vencidos'])) $query->where('fecha_proxima_revision', '<', now()->toDateString())->where('estado', 'ACTIVO');
 
         return $query->latest('updated_at');
     }

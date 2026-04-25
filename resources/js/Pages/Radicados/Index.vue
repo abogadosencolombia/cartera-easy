@@ -106,13 +106,14 @@ const juzgadoId = ref(props.filtros.juzgado_id || '');
 const selectedJuzgado = ref(props.selectedJuzgado);
 const tipoEntidad = ref(props.filtros.tipo_entidad || '');
 const sinRadicado = ref(props.filtros.sin_radicado === 'true' || props.filtros.sin_radicado === true);
+const soloVencidos = ref(props.filtros.solo_vencidos === 'true' || props.filtros.solo_vencidos === true);
 
 watch(selectedJuzgado, (val) => {
     juzgadoId.value = val?.id || '';
 });
 
 const isDirty = computed(() => {
-    return search.value !== '' || estado.value !== 'TODOS' || juzgadoId.value !== '' || tipoEntidad.value !== '' || sinRadicado.value === true;
+    return search.value !== '' || estado.value !== 'TODOS' || juzgadoId.value !== '' || tipoEntidad.value !== '' || sinRadicado.value === true || soloVencidos.value === true;
 });
 
 const resetFilters = () => {
@@ -122,6 +123,7 @@ const resetFilters = () => {
     selectedJuzgado.value = null;
     tipoEntidad.value = '';
     sinRadicado.value = false;
+    soloVencidos.value = false;
 };
 
 const applyFilters = debounce(() => {
@@ -130,11 +132,12 @@ const applyFilters = debounce(() => {
         estado: estado.value === 'TODOS' ? '' : estado.value,
         juzgado_id: juzgadoId.value,
         tipo_entidad: tipoEntidad.value,
-        sin_radicado: sinRadicado.value
+        sin_radicado: sinRadicado.value,
+        solo_vencidos: soloVencidos.value
     }, { preserveState: true, replace: true });
 }, 300);
 
-watch([search, estado, juzgadoId, tipoEntidad, sinRadicado], applyFilters);
+watch([search, estado, juzgadoId, tipoEntidad, sinRadicado, soloVencidos], applyFilters);
 
 // --- EXPORTAR ---
 const exportarExcel = () => {
@@ -142,7 +145,8 @@ const exportarExcel = () => {
         search: search.value,
         estado: estado.value === 'TODOS' ? '' : estado.value,
         tipo_entidad: tipoEntidad.value,
-        sin_radicado: sinRadicado.value
+        sin_radicado: sinRadicado.value,
+        solo_vencidos: soloVencidos.value
     });
     window.location.href = route('procesos.exportar') + '?' + params.toString();
 };
@@ -402,90 +406,93 @@ const copyLegalInfo = (proceso) => {
                     </div>
                 </div>
 
-                <!-- Barra de Filtros Avanzada -->
-                <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                        <!-- Búsqueda -->
-                        <div class="relative">
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Búsqueda rápida</label>
-                            <div class="relative">
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <MagnifyingGlassIcon class="h-4 w-4 text-gray-400" />
-                                </div>
-                                <input
-                                    v-model="search"
-                                    type="text"
-                                    class="block w-full pl-10 pr-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white"
-                                    placeholder="Radicado, nombres, documento..."
-                                />
-                            </div>
+        <!-- BARRA DE FILTROS AVANZADA -->
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-6">
+            <div class="flex flex-col xl:flex-row gap-6">
+                <!-- Búsqueda Principal -->
+                <div class="relative flex-grow">
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Búsqueda Maestra</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <MagnifyingGlassIcon class="h-4 w-4 text-gray-400" />
                         </div>
-
-                        <!-- Tipo Entidad -->
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Tipo de Entidad</label>
-                            <SelectInput 
-                                v-model="tipoEntidad"
-                                class="block w-full py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white"
-                            >
-                                <option value="">Todas las Entidades</option>
-                                <option v-for="tipo in tiposEntidad" :key="tipo" :value="tipo">{{ tipo }}s</option>
-                            </SelectInput>
-                        </div>
-
-                        <!-- Juzgado -->
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Juzgado Específico</label>
-                            <AsyncSelect 
-                                v-model="selectedJuzgado"
-                                :endpoint="route('juzgados.search')"
-                                placeholder="Buscar juzgado..."
-                                label-key="nombre"
-                                class="!min-h-[38px]"
-                            />
-                        </div>
-
-                        <!-- Estado -->
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Estado</label>
-                            <SelectInput 
-                                v-model="estado"
-                                class="block w-full py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white"
-                            >
-                                <option value="TODOS">Todos los Estados</option>
-                                <option value="ACTIVO">Activos</option>
-                                <option value="CERRADO">Cerrados</option>
-                            </SelectInput>
-                        </div>
-
-                        <!-- Filtro Sin Radicado -->
-                        <div class="flex items-center gap-3 bg-gray-50 dark:bg-gray-700 p-2.5 rounded-lg border border-gray-100 dark:border-gray-600 h-[38px] mt-5 self-start">
-                            <label class="flex items-center gap-2 cursor-pointer w-full">
-                                <input 
-                                    v-model="sinRadicado"
-                                    type="checkbox" 
-                                    class="rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 h-4 w-4"
-                                />
-                                <span class="text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-300">Sin Radicado</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- Botón Limpiar y Resultados -->
-                    <div class="flex justify-between items-center pt-2 border-t border-gray-50 dark:border-gray-700">
-                        <div class="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                            Mostrando <span class="text-indigo-600 dark:text-indigo-400 font-bold">{{ procesos.total }}</span> expedientes
-                        </div>
-                        <button 
-                            v-if="isDirty"
-                            @click="resetFilters"
-                            class="inline-flex items-center text-xs font-bold text-red-500 hover:text-red-700 transition-colors"
-                        >
-                            <XMarkIcon class="w-4 h-4 mr-1" />
-                            Limpiar Filtros
-                        </button>
+                        <input
+                            v-model="search"
+                            type="text"
+                            class="block w-full pl-10 pr-3 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white font-medium transition-all"
+                            placeholder="Radicado, nombres de las partes, asunto o documento..."
+                        />
                     </div>
                 </div>
+
+                <!-- Selectores de Filtro -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 xl:w-1/2">
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Tipo de Entidad</label>
+                        <SelectInput v-model="tipoEntidad" class="w-full py-3 rounded-xl">
+                            <option value="">Todas las Entidades</option>
+                            <option v-for="tipo in tiposEntidad" :key="tipo" :value="tipo">{{ tipo }}s</option>
+                        </SelectInput>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Estado</label>
+                        <SelectInput v-model="estado" class="w-full py-3 rounded-xl">
+                            <option value="TODOS">Todos los Estados</option>
+                            <option value="ACTIVO">Activos</option>
+                            <option value="CERRADO">Cerrados</option>
+                        </SelectInput>
+                    </div>
+                    <div class="sm:col-span-2 lg:col-span-1">
+                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Filtros Rápidos</label>
+                        <div class="flex items-center gap-2">
+                            <button 
+                                @click="sinRadicado = !sinRadicado"
+                                :class="sinRadicado ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-50 text-gray-500 border-gray-200'"
+                                class="flex-1 px-3 py-3 rounded-xl border text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-1.5"
+                            >
+                                <div :class="sinRadicado ? 'bg-white' : 'bg-gray-300'" class="w-1.5 h-1.5 rounded-full"></div>
+                                Sin Radicado
+                            </button>
+                            <button 
+                                @click="soloVencidos = !soloVencidos"
+                                :class="soloVencidos ? 'bg-red-600 text-white border-red-600' : 'bg-gray-50 text-gray-500 border-gray-200'"
+                                class="flex-1 px-3 py-3 rounded-xl border text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-1.5"
+                            >
+                                <div :class="soloVencidos ? 'bg-white' : 'bg-red-300'" class="w-1.5 h-1.5 rounded-full"></div>
+                                Vencidos
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fila Inferior: Juzgado y Botón Limpiar -->
+            <div class="flex flex-col lg:flex-row items-end gap-6 pt-6 border-t border-gray-50 dark:border-gray-700">
+                <div class="w-full lg:flex-grow">
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Filtrar por Despacho o Juzgado Específico</label>
+                    <AsyncSelect 
+                        v-model="selectedJuzgado"
+                        :endpoint="route('juzgados.search')"
+                        placeholder="Escriba para buscar el juzgado..."
+                        label-key="nombre"
+                        class="!min-h-[46px] !rounded-xl shadow-sm"
+                    />
+                </div>
+                <div class="flex items-center justify-between w-full lg:w-auto gap-8 pb-3">
+                    <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest whitespace-nowrap">
+                        Mostrando <span class="text-indigo-600 dark:text-indigo-400">{{ procesos.total }}</span> expedientes
+                    </div>
+                    <button 
+                        v-if="isDirty"
+                        @click="resetFilters"
+                        class="inline-flex items-center text-[10px] font-black text-red-500 hover:text-red-700 uppercase tracking-[0.2em] transition-colors whitespace-nowrap"
+                    >
+                        <XMarkIcon class="w-4 h-4 mr-1" />
+                        Limpiar Filtros
+                    </button>
+                </div>
+            </div>
+        </div>
 
                 <!-- Tabla de Datos (Desktop) -->
                 <div class="bg-white dark:bg-gray-800 shadow-xl rounded-xl border border-gray-100 dark:border-gray-700 overflow-visible hidden md:block">
@@ -758,7 +765,12 @@ const copyLegalInfo = (proceso) => {
                             <ScaleIcon class="w-6 h-6" />
                         </div>
                         <div class="truncate min-w-0">
-                            <p class="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-indigo-100/70 truncate">Expediente #{{ selectedProceso.id }}</p>
+                            <div class="flex items-center gap-2">
+                                <p class="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-indigo-100/70 truncate">Expediente #{{ selectedProceso.id }}</p>
+                                <span v-if="selectedProceso.a_favor_de" class="text-[8px] font-black px-1.5 py-0.5 rounded bg-white/20 text-white border border-white/10 uppercase tracking-tighter">
+                                    {{ selectedProceso.a_favor_de }}
+                                </span>
+                            </div>
                             <h2 class="text-base sm:text-lg font-black leading-tight truncate">{{ selectedProceso.radicado || 'SIN RADICADO' }}</h2>
                         </div>
                     </div>

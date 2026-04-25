@@ -23,8 +23,7 @@ class StorePersonaRequest extends FormRequest
                 'required',
                 'string',
                 'max:255',
-                // Eliminamos Rule::unique porque el PersonaController usa updateOrCreate(withTrashed())
-                // Si pusiéramos unique aquí, fallaría antes de llegar al controlador si la persona está en la papelera.
+                Rule::unique('personas', 'numero_documento')->whereNull('deleted_at'),
             ],
             'dv'                 => 'nullable|string|max:1',
 
@@ -37,6 +36,7 @@ class StorePersonaRequest extends FormRequest
             'celular_2'          => 'nullable|string|max:255',
             'correo_1'           => 'nullable|email|max:255',
             'correo_2'           => 'nullable|email|max:255',
+            'es_demandado'       => 'nullable|boolean',
             'empresa'            => 'nullable|string|max:255',
             'cargo'              => 'nullable|string|max:255',
             'observaciones'      => 'nullable|string',
@@ -61,6 +61,13 @@ class StorePersonaRequest extends FormRequest
             'cooperativas_ids.*'    => ['integer', 'exists:cooperativas,id'],
             'abogados_ids'          => ['nullable', 'array'],
             'abogados_ids.*'        => ['integer', 'exists:users,id'],
+        ];
+    }
+
+    public function attributes(): array
+    {
+        return [
+            'numero_documento' => 'Número de Identificación',
         ];
     }
 }

@@ -48,6 +48,7 @@ const filterForm = reactive({
     tipo_entidad: props.filters?.tipo_entidad ?? '',
     etapa_procesal: props.filters?.etapa_procesal ?? '',
     sin_radicado: props.filters?.sin_radicado === 'true' || props.filters?.sin_radicado === true,
+    inactivo_15_dias: props.filters?.inactivo_15_dias === 'true' || props.filters?.inactivo_15_dias === true,
 });
 
 watch(selectedJuzgado, (val) => {
@@ -61,7 +62,8 @@ const isDirty = computed(() => {
            filterForm.juzgado_id !== '' || 
            filterForm.tipo_entidad !== '' || 
            filterForm.etapa_procesal !== '' ||
-           filterForm.sin_radicado === true;
+           filterForm.sin_radicado === true ||
+           filterForm.inactivo_15_dias === true;
 });
 
 const resetFilters = () => {
@@ -73,6 +75,7 @@ const resetFilters = () => {
     selectedJuzgado.value = null;
     filterForm.etapa_procesal = '';
     filterForm.sin_radicado = false;
+    filterForm.inactivo_15_dias = false;
 };
 
 watch(filterForm, debounce(() => {
@@ -85,6 +88,7 @@ watch(filterForm, debounce(() => {
             tipo_entidad: filterForm.tipo_entidad,
             etapa_procesal: filterForm.etapa_procesal,
             sin_radicado: filterForm.sin_radicado,
+            inactivo_15_dias: filterForm.inactivo_15_dias,
         }, 
         {
             preserveState: true,
@@ -103,6 +107,7 @@ const exportarExcel = () => {
         tipo_entidad: filterForm.tipo_entidad,
         etapa_procesal: filterForm.etapa_procesal,
         sin_radicado: filterForm.sin_radicado,
+        inactivo_15_dias: filterForm.inactivo_15_dias,
     });
 };
 
@@ -405,12 +410,12 @@ const copyLegalInfo = (caso) => {
                     </div>
                 </div>
 
-                <!-- Barra de Filtros Avanzada -->
-                <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-                        <!-- Búsqueda -->
-                        <div class="relative">
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Búsqueda rápida</label>
+                <!-- BARRA DE FILTROS AVANZADA -->
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-6">
+                    <div class="flex flex-col xl:flex-row gap-6">
+                        <!-- Búsqueda Principal -->
+                        <div class="relative flex-grow">
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Búsqueda Maestra</label>
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <MagnifyingGlassIcon class="h-4 w-4 text-gray-400" />
@@ -418,84 +423,93 @@ const copyLegalInfo = (caso) => {
                                 <input
                                     v-model="filterForm.search"
                                     type="text"
-                                    class="block w-full pl-10 pr-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white"
-                                    placeholder="Nombre, cédula, radicado..."
+                                    class="block w-full pl-10 pr-3 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white font-medium transition-all"
+                                    placeholder="Nombre, cédula, radicado, cooperativa, juzgado..."
                                 />
                             </div>
                         </div>
 
-                        <!-- Cooperativa -->
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Cooperativa</label>
-                            <SelectInput v-model="filterForm.cooperativa_id">
-                                <option value="">Todas</option>
-                                <option v-for="c in cooperativas" :key="c.id" :value="c.id">{{ c.nombre }}</option>
-                            </SelectInput>
-                        </div>
-
-                        <!-- Tipo Entidad -->
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Tipo de Entidad</label>
-                            <SelectInput v-model="filterForm.tipo_entidad">
-                                <option value="">Todas las Entidades</option>
-                                <option v-for="tipo in tiposEntidad" :key="tipo" :value="tipo">{{ tipo }}s</option>
-                            </SelectInput>
-                        </div>
-
-                        <!-- Juzgado -->
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Juzgado Específico</label>
-                            <AsyncSelect 
-                                v-model="selectedJuzgado"
-                                :endpoint="route('juzgados.search')"
-                                placeholder="Buscar juzgado..."
-                                label-key="nombre"
-                                class="!min-h-[38px]"
-                            />
-                        </div>
-
-                        <!-- Abogado -->
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Responsable</label>
-                            <SelectInput v-model="filterForm.abogado_id">
-                                <option value="">Todos</option>
-                                <option v-for="a in abogados" :key="a.id" :value="a.id">{{ a.name }}</option>
-                            </SelectInput>
-                        </div>
-
-                        <!-- Etapa -->
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Etapa Procesal</label>
-                            <div class="flex items-center gap-2">
-                                <SelectInput v-model="filterForm.etapa_procesal">
+                        <!-- Selectores de Filtro (Grid Compacto) -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 xl:w-2/3">
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Cooperativa</label>
+                                <SelectInput v-model="filterForm.cooperativa_id" class="w-full py-3 rounded-xl">
+                                    <option value="">Todas</option>
+                                    <option v-for="c in cooperativas" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+                                </SelectInput>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Tipo de Entidad</label>
+                                <SelectInput v-model="filterForm.tipo_entidad" class="w-full py-3 rounded-xl">
+                                    <option value="">Todas</option>
+                                    <option v-for="tipo in tiposEntidad" :key="tipo" :value="tipo">{{ tipo }}s</option>
+                                </SelectInput>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Responsable</label>
+                                <SelectInput v-model="filterForm.abogado_id" class="w-full py-3 rounded-xl">
+                                    <option value="">Todos</option>
+                                    <option v-for="a in abogados" :key="a.id" :value="a.id">{{ a.name }}</option>
+                                </SelectInput>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Etapa Procesal</label>
+                                <SelectInput v-model="filterForm.etapa_procesal" class="w-full py-3 rounded-xl">
                                     <option value="">Todas</option>
                                     <option v-for="e in etapas_procesales" :key="e" :value="e">{{ e }}</option>
                                 </SelectInput>
-                                <label class="flex items-center gap-1.5 cursor-pointer shrink-0 bg-gray-50 dark:bg-gray-700 px-2 py-2 rounded-lg border border-gray-100 dark:border-gray-600 h-[38px]">
-                                    <input 
-                                        v-model="filterForm.sin_radicado"
-                                        type="checkbox" 
-                                        class="rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 h-4 w-4"
-                                    />
-                                    <span class="text-[9px] font-black uppercase text-gray-500">Sin Rad.</span>
-                                </label>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Botón Limpiar y Resultados -->
-                    <div class="flex justify-between items-center pt-2 border-t border-gray-50 dark:border-gray-700">
-                        <div class="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                            Mostrando <span class="text-indigo-600 dark:text-indigo-400 font-bold">{{ casos.total }}</span> resultados
+                    <!-- Fila de Filtros Rápidos y Juzgado -->
+                    <div class="flex flex-col lg:flex-row items-end gap-6 pt-6 border-t border-gray-50 dark:border-gray-700">
+                        <div class="w-full lg:flex-grow">
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Despacho o Juzgado Específico</label>
+                            <AsyncSelect 
+                                v-model="selectedJuzgado"
+                                :endpoint="route('juzgados.search')"
+                                placeholder="Escriba para buscar el juzgado..."
+                                label-key="nombre"
+                                class="!min-h-[46px] !rounded-xl shadow-sm"
+                            />
                         </div>
-                        <button 
-                            v-if="isDirty"
-                            @click="resetFilters"
-                            class="inline-flex items-center text-xs font-bold text-red-500 hover:text-red-700 transition-colors"
-                        >
-                            <XMarkIcon class="w-4 h-4 mr-1" />
-                            Limpiar Filtros
-                        </button>
+
+                        <div class="w-full lg:w-1/3">
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Filtros de Control</label>
+                            <div class="flex items-center gap-2">
+                                <button 
+                                    @click="filterForm.sin_radicado = !filterForm.sin_radicado"
+                                    :class="filterForm.sin_radicado ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-50 text-gray-500 border-gray-200'"
+                                    class="flex-1 px-3 py-3 rounded-xl border text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-1.5"
+                                >
+                                    <div :class="filterForm.sin_radicado ? 'bg-white' : 'bg-gray-300'" class="w-1.5 h-1.5 rounded-full"></div>
+                                    Sin Radicado
+                                </button>
+                                <button 
+                                    @click="filterForm.inactivo_15_dias = !filterForm.inactivo_15_dias"
+                                    :class="filterForm.inactivo_15_dias ? 'bg-amber-600 text-white border-amber-600' : 'bg-gray-50 text-gray-500 border-gray-200'"
+                                    class="flex-1 px-3 py-3 rounded-xl border text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-1.5"
+                                >
+                                    <div :class="filterForm.inactivo_15_dias ? 'bg-white' : 'bg-amber-300'" class="w-1.5 h-1.5 rounded-full"></div>
+                                    +15d Inactivo
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between w-full lg:w-auto gap-8 pb-3">
+                            <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest whitespace-nowrap">
+                                <span class="text-indigo-600 dark:text-indigo-400">{{ casos.total }}</span> resultados
+                            </div>
+                            <button 
+                                v-if="isDirty"
+                                @click="resetFilters"
+                                class="inline-flex items-center text-[10px] font-black text-red-500 hover:text-red-700 uppercase tracking-[0.2em] transition-colors whitespace-nowrap"
+                            >
+                                <XMarkIcon class="w-4 h-4 mr-1" />
+                                Limpiar
+                            </button>
+                        </div>
                     </div>
                 </div>
 

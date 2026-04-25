@@ -47,6 +47,10 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
         if (!empty($this->filtros['sin_radicado'])) {
             $query->where(function($q) { $q->whereNull('radicado')->orWhere('radicado', ''); });
         }
+        if (!empty($this->filtros['inactivo_15_dias'])) {
+            $query->where('updated_at', '<', now()->subDays(15))
+                  ->where('estado_proceso', '!=', 'cerrado');
+        }
 
         return $query->latest('updated_at');
     }

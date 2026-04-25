@@ -67,7 +67,7 @@ class PersonaPolicy
      */
     public function delete(User $user, Persona $persona): bool
     {
-        return false; // Solo admin (vía before)
+        return in_array($user->tipo_usuario, ['gestor', 'abogado']) && $this->sharesCooperativa($user, $persona);
     }
 
     /**
@@ -75,6 +75,6 @@ class PersonaPolicy
      */
     public function restore(User $user, Persona $persona): bool
     {
-        return false; // Solo admin
+        return in_array($user->tipo_usuario, ['gestor', 'abogado']) && $this->sharesCooperativa($user, $persona);
     }
 }

@@ -250,6 +250,9 @@ const statusClasses = {
               <span class="px-2 py-0.5 text-[9px] font-bold uppercase rounded ring-1" :class="statusClasses[proceso.estado] || statusClasses['ABIERTO']">
                 {{ proceso.estado }}
               </span>
+              <span v-if="proceso.a_favor_de" class="px-2 py-0.5 text-[9px] font-black uppercase rounded ring-1" :class="proceso.a_favor_de === 'DEMANDANTE' ? 'bg-blue-50 text-blue-700 ring-blue-600/20' : 'bg-red-50 text-red-700 ring-red-600/20'">
+                A FAVOR DEL {{ proceso.a_favor_de }}
+              </span>
             </div>
             <p class="text-xs text-gray-500 font-medium truncate" :title="proceso.asunto">{{ proceso.asunto || 'Sin descripción' }}</p>
           </div>

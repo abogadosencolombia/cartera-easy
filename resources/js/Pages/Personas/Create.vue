@@ -38,6 +38,7 @@ const form = useForm('CreatePersona', {
   observaciones: '',
   social_links: [],
   addresses: [],
+  es_demandado: false,
   cooperativas_ids: [],
   abogados_ids: [],
 });
@@ -128,6 +129,14 @@ const submit = () => {
                         <TextInput v-if="form.tipo_documento === 'NIT'" v-model="form.dv" maxlength="1" placeholder="DV" class="w-12 text-center rounded-xl border-gray-200 font-bold" />
                     </div>
                     <InputError :message="form.errors.numero_documento" />
+                </div>
+                <div class="space-y-2">
+                    <InputLabel value="Rol de la Persona *" class="font-bold text-xs uppercase" />
+                    <SelectInput v-model="form.es_demandado" class="w-full">
+                        <option :value="false">Deudor / Cliente</option>
+                        <option :value="true">Demandado</option>
+                    </SelectInput>
+                    <InputError :message="form.errors.es_demandado" />
                 </div>
                 <div class="space-y-2">
                     <InputLabel value="Fecha de Expedición" class="font-bold text-xs uppercase" />

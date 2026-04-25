@@ -43,6 +43,8 @@ class PersonaController extends Controller
         // --- 1. Filtro de Estado (Activos / Suspendidos) ---
         if ($request->input('status') === 'suspended') {
             $query->onlyTrashed();
+        } else {
+            $query->withoutTrashed();
         }
 
         // --- 2. Búsqueda General ---
@@ -122,10 +124,17 @@ class PersonaController extends Controller
 
         $validated = $request->validated();
 
-        $persona = Persona::withTrashed()->updateOrCreate(
-            ['numero_documento' => $validated['numero_documento']],
-            array_merge($validated, ['deleted_at' => null])
-        );
+        // Buscamos si ya existe (incluyendo borrados)
+        $persona = Persona::withTrashed()->where('numero_documento', $validated['numero_documento'])->first();
+
+        if ($persona) {
+            $persona->update($validated);
+            if ($persona->trashed()) {
+                $persona->restore();
+            }
+        } else {
+            $persona = Persona::create($validated);
+        }
         
         if ($request->has('cooperativas_ids')) $persona->cooperativas()->sync($request->input('cooperativas_ids'));
         if ($request->has('abogados_ids')) $persona->abogados()->sync($request->input('abogados_ids'));
@@ -238,7 +247,7 @@ class PersonaController extends Controller
             'descripcion_breve' => "Suspendida: {$nombre}",
             'criticidad' => 'alta', 'direccion_ip' => request()->ip(), 'user_agent' => request()->userAgent(),
         ]);
-        return redirect()->route('personas.index')->with('success', 'Persona suspendida.');
+        return back()->with('success', 'Persona suspendida.');
     }
 
     public function restore($id)
@@ -314,7 +323,7 @@ class PersonaController extends Controller
         $user = Auth::user();
         $term = $request->input('term', '');
 
-        $query = Persona::query();
+        $query = Persona::withoutTrashed();
 
         // Aplicamos el filtro de seguridad por cooperativa (mismo que en index)
         if ($user->tipo_usuario !== 'admin') {

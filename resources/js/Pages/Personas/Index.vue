@@ -4,7 +4,7 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SelectInput from '@/Components/SelectInput.vue';
 import Dropdown from '@/Components/Dropdown.vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { reactive, watch, computed } from 'vue';
 import { 
   MagnifyingGlassIcon, PlusIcon, ArrowDownTrayIcon, PencilSquareIcon, 
@@ -102,13 +102,18 @@ const deletePersona = (id) => {
     if (res.isConfirmed) {
         router.delete(route('personas.destroy', id), {
             preserveScroll: true,
-            onSuccess: () => Swal.fire({
-                title: 'Suspendido',
-                text: 'El registro se movió a la papelera correctamente.',
-                icon: 'success',
-                timer: 2000,
-                showConfirmButton: false
-            })
+            onSuccess: () => {
+                const flash = usePage().props.flash;
+                if (!flash.error) {
+                    Swal.fire({
+                        title: 'Suspendido',
+                        text: 'El registro se movió a la papelera correctamente.',
+                        icon: 'success',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                }
+            }
         });
     }
   });
@@ -116,7 +121,12 @@ const deletePersona = (id) => {
 
 const restorePersona = (id) => {
   router.post(route('personas.restore', id), {}, {
-      onSuccess: () => Swal.fire('Reactivada', 'La persona vuelve a estar activa.', 'success')
+      onSuccess: () => {
+          const flash = usePage().props.flash;
+          if (!flash.error) {
+              Swal.fire('Reactivada', 'La persona vuelve a estar activa.', 'success');
+          }
+      }
   });
 };
 

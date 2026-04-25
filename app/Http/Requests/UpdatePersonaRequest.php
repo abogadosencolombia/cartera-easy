@@ -41,6 +41,7 @@ class UpdatePersonaRequest extends FormRequest
             'celular_2'          => 'nullable|string|max:255',
             'correo_1'           => 'nullable|email|max:255',
             'correo_2'           => 'nullable|email|max:255',
+            'es_demandado'       => 'nullable|boolean',
             'empresa'            => 'nullable|string|max:255',
             'cargo'              => 'nullable|string|max:255',
             'observaciones'      => 'nullable|string',
@@ -65,6 +66,13 @@ class UpdatePersonaRequest extends FormRequest
             'cooperativas_ids.*'    => ['integer', 'exists:cooperativas,id'],
             'abogados_ids'          => ['nullable', 'array'],
             'abogados_ids.*'        => ['integer', 'exists:users,id'],
+        ];
+    }
+
+    public function attributes(): array
+    {
+        return [
+            'numero_documento' => 'Número de Identificación',
         ];
     }
 }

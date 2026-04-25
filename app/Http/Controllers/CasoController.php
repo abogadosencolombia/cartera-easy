@@ -147,6 +147,11 @@ class CasoController extends Controller
             });
         }
 
+        if ($request->boolean('inactivo_15_dias')) {
+            $query->where('updated_at', '<', now()->subDays(15))
+                  ->where('estado_proceso', '!=', 'cerrado');
+        }
+
         $casos = $query->orderBy('is_pinned', 'desc')->orderBy('updated_at', 'desc')->paginate(20)->withQueryString();
 
         $abogados = [];
@@ -346,17 +351,25 @@ class CasoController extends Controller
         DB::transaction(function () use ($data) {
             foreach ($data as $row) {
                 // 1. Upsert Persona (Deudor)
-                $deudor = Persona::withTrashed()->updateOrCreate(
-                    ['numero_documento' => trim($row['documento_deudor'])],
-                    [
-                        'nombre_completo' => trim($row['nombre_deudor']),
-                        'tipo_documento' => $row['tipo_documento'] ?? 'CC',
-                        'dv' => $row['dv'] ?? null,
-                        'celular_1' => $row['celular_deudor'] ?? null,
-                        'correo_1' => $row['correo_deudor'] ?? null,
-                        'deleted_at' => null,
-                    ]
-                );
+                    $deudor = Persona::withTrashed()->where('numero_documento', trim($row['documento_deudor']))->first();
+                    if ($deudor) {
+                        $deudor->update([
+                            'nombre_completo' => trim($row['nombre_deudor']),
+                            'tipo_documento' => $row['tipo_documento'] ?? 'CC',
+                            'dv' => $row['dv'] ?? null,
+                            'celular_1' => $row['celular_deudor'] ?? null,
+                            'correo_1' => $row['correo_deudor'] ?? null,
+                        ]);
+                    } else {
+                        $deudor = Persona::create([
+                            'nombre_completo' => trim($row['nombre_deudor']),
+                            'tipo_documento' => $row['tipo_documento'] ?? 'CC',
+                            'numero_documento' => trim($row['documento_deudor']),
+                            'dv' => $row['dv'] ?? null,
+                            'celular_1' => $row['celular_deudor'] ?? null,
+                            'correo_1' => $row['correo_deudor'] ?? null,
+                        ]);
+                    }
 
                 // 2. Vincular Deudor a Cooperativa (Si se indica)
                 if (!empty($row['cooperativa_id'])) {
@@ -543,17 +556,25 @@ class CasoController extends Controller
                     if (empty($datosDeudor['numero_documento'])) {
                         throw new \Exception("El número de documento es obligatorio para crear un nuevo deudor.");
                     }
-                    $deudor = Persona::withTrashed()->updateOrCreate(
-                        ['numero_documento' => trim($datosDeudor['numero_documento'])],
-                        [
+                    $deudor = Persona::withTrashed()->where('numero_documento', trim($datosDeudor['numero_documento']))->first();
+                    if ($deudor) {
+                        $deudor->update([
                             'nombre_completo' => trim($datosDeudor['nombre_completo']),
                             'tipo_documento' => $datosDeudor['tipo_documento'],
                             'dv' => $datosDeudor['dv'] ?? null,
                             'celular_1' => $datosDeudor['celular_1'] ?? null,
                             'correo_1' => $datosDeudor['correo_1'] ?? null,
-                            'deleted_at' => null,
-                        ]
-                    );
+                        ]);
+                    } else {
+                        $deudor = Persona::create([
+                            'nombre_completo' => trim($datosDeudor['nombre_completo']),
+                            'tipo_documento' => $datosDeudor['tipo_documento'],
+                            'numero_documento' => trim($datosDeudor['numero_documento']),
+                            'dv' => $datosDeudor['dv'] ?? null,
+                            'celular_1' => $datosDeudor['celular_1'] ?? null,
+                            'correo_1' => $datosDeudor['correo_1'] ?? null,
+                        ]);
+                    }
                     $validated['deudor_id'] = $deudor->id;
                 } elseif (!empty($datosDeudor['id'])) {
                     // Si no es nuevo, simplemente nos aseguramos de que el ID sea el correcto
@@ -715,17 +736,25 @@ class CasoController extends Controller
                     if (empty($datosDeudor['numero_documento'])) {
                         throw new \Exception("El número de documento es obligatorio para crear/actualizar el deudor.");
                     }
-                    $deudor = Persona::withTrashed()->updateOrCreate(
-                        ['numero_documento' => trim($datosDeudor['numero_documento'])],
-                        [
+                    $deudor = Persona::withTrashed()->where('numero_documento', trim($datosDeudor['numero_documento']))->first();
+                    if ($deudor) {
+                        $deudor->update([
                             'nombre_completo' => trim($datosDeudor['nombre_completo']),
                             'tipo_documento' => $datosDeudor['tipo_documento'],
                             'dv' => $datosDeudor['dv'] ?? null,
                             'celular_1' => $datosDeudor['celular_1'] ?? null,
                             'correo_1' => $datosDeudor['correo_1'] ?? null,
-                            'deleted_at' => null,
-                        ]
-                    );
+                        ]);
+                    } else {
+                        $deudor = Persona::create([
+                            'nombre_completo' => trim($datosDeudor['nombre_completo']),
+                            'tipo_documento' => $datosDeudor['tipo_documento'],
+                            'numero_documento' => trim($datosDeudor['numero_documento']),
+                            'dv' => $datosDeudor['dv'] ?? null,
+                            'celular_1' => $datosDeudor['celular_1'] ?? null,
+                            'correo_1' => $datosDeudor['correo_1'] ?? null,
+                        ]);
+                    }
                     $validated['deudor_id'] = $deudor->id;
                 } elseif (!empty($datosDeudor['id'])) {
                     $validated['deudor_id'] = $datosDeudor['id'];

@@ -44,6 +44,7 @@ class ProcesoRadicadoController extends Controller
         }
 
         if ($request->boolean('sin_radicado')) { $query->where(function($q) { $q->whereNull('radicado')->orWhere('radicado', ''); }); }
+        if ($request->boolean('solo_vencidos')) { $query->where('fecha_proxima_revision', '<', now()->toDateString())->where('estado', 'ACTIVO'); }
         if ($request->filled('estado') && $request->estado !== 'TODOS') { $query->where('estado', $request->estado); }
         if ($request->filled('juzgado_id')) { $query->where('juzgado_id', $request->juzgado_id); }
         if ($request->filled('tipo_entidad')) {
@@ -294,10 +295,12 @@ class ProcesoRadicadoController extends Controller
             }
             
             if ($doc) { 
-                $persona = Persona::withTrashed()->updateOrCreate(
-                    ['numero_documento' => $doc], 
-                    ['nombre_completo' => $nombre, 'tipo_documento' => $tipoDoc, 'deleted_at' => null]
-                ); 
+                $persona = Persona::withTrashed()->where('numero_documento', $doc)->first();
+                if ($persona) {
+                    $persona->update(['nombre_completo' => $nombre, 'tipo_documento' => $tipoDoc]);
+                } else {
+                    $persona = Persona::create(['numero_documento' => $doc, 'nombre_completo' => $nombre, 'tipo_documento' => $tipoDoc]);
+                }
             } else { 
                 // Si no hay documento, buscamos por nombre pero evitamos crear si falta el documento obligatorio
                 $persona = Persona::where('nombre_completo', $nombre)->first();
@@ -549,19 +552,28 @@ class ProcesoRadicadoController extends Controller
                 }
 
                 // Si es nuevo o estamos editando uno incompleto sin ID aún
-                $persona = Persona::withTrashed()->updateOrCreate(
-                    ['id' => $personaId],
-                    [
+                if ($personaId) {
+                    $persona = Persona::withTrashed()->find($personaId);
+                    if ($persona) {
+                        $persona->update([
+                            'nombre_completo' => $d['nombre_completo'],
+                            'tipo_documento' => $d['tipo_documento'] ?? 'CC',
+                            'numero_documento' => $numDoc,
+                            'dv' => $d['dv'] ?? null,
+                        ]);
+                    }
+                } else {
+                    $persona = Persona::create([
                         'nombre_completo' => $d['nombre_completo'],
                         'tipo_documento' => $d['tipo_documento'] ?? 'CC',
                         'numero_documento' => $numDoc,
                         'dv' => $d['dv'] ?? null,
-                        'deleted_at' => null
-                    ]
-                );
-                if (!empty($d['cooperativas_ids'])) $persona->cooperativas()->sync($d['cooperativas_ids']);
-                if (!empty($d['abogados_ids'])) $persona->abogados()->sync($d['abogados_ids']);
-                $personaId = $persona->id;
+                    ]);
+                }
+                
+                if ($persona && !empty($d['cooperativas_ids'])) $persona->cooperativas()->sync($d['cooperativas_ids']);
+                if ($persona && !empty($d['abogados_ids'])) $persona->abogados()->sync($d['abogados_ids']);
+                $personaId = $persona?->id;
             }
 
             if ($personaId) {
@@ -580,19 +592,28 @@ class ProcesoRadicadoController extends Controller
                     $numDoc = 'TEMP-' . substr(md5(uniqid()), 0, 12);
                 }
                 
-                $persona = Persona::withTrashed()->updateOrCreate(
-                    ['id' => $personaId],
-                    [
+                if ($personaId) {
+                    $persona = Persona::withTrashed()->find($personaId);
+                    if ($persona) {
+                        $persona->update([
+                            'nombre_completo' => $d['nombre_completo'],
+                            'tipo_documento' => $d['tipo_documento'] ?? 'CC',
+                            'numero_documento' => $numDoc,
+                            'dv' => $d['dv'] ?? null,
+                        ]);
+                    }
+                } else {
+                    $persona = Persona::create([
                         'nombre_completo' => $d['nombre_completo'],
                         'tipo_documento' => $d['tipo_documento'] ?? 'CC',
                         'numero_documento' => $numDoc,
                         'dv' => $d['dv'] ?? null,
-                        'deleted_at' => null
-                    ]
-                );
-                if (!empty($d['cooperativas_ids'])) $persona->cooperativas()->sync($d['cooperativas_ids']);
-                if (!empty($d['abogados_ids'])) $persona->abogados()->sync($d['abogados_ids']);
-                $personaId = $persona->id;
+                    ]);
+                }
+
+                if ($persona && !empty($d['cooperativas_ids'])) $persona->cooperativas()->sync($d['cooperativas_ids']);
+                if ($persona && !empty($d['abogados_ids'])) $persona->abogados()->sync($d['abogados_ids']);
+                $personaId = $persona?->id;
             }
 
             if ($personaId) {
