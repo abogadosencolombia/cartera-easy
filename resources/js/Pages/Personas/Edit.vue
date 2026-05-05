@@ -43,7 +43,7 @@ const form = useForm(`EditPersona:${props.persona.id}`, {
   es_demandado: !!props.persona.es_demandado,
   addresses: Array.isArray(props.persona.addresses) ? props.persona.addresses.map(a => ({ ...a })) : [],
   social_links: Array.isArray(props.persona.social_links) ? props.persona.social_links.map(l => ({ ...l })) : [],
-  cooperativas_ids: props.persona.cooperativas ? props.persona.cooperativas.map(c => c.id) : [],
+  cooperativas_ids: props.persona.cooperativas && props.persona.cooperativas.length > 0 ? props.persona.cooperativas.map(c => c.id) : [9],
   abogados_ids: props.persona.abogados ? props.persona.abogados.map(a => a.id) : [],
 });
 
@@ -63,6 +63,9 @@ const toggleAbogados = () => {
 };
 
 const submit = () => {
+    if (form.cooperativas_ids.length === 0) {
+        form.cooperativas_ids = [9];
+    }
     form.post(route('personas.update', props.persona.id), {
         preserveScroll: true,
         onSuccess: () => {

@@ -4,7 +4,7 @@
  * Layout principal corregido para mostrar notificaciones.
  */
 
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { Link, usePage, router } from "@inertiajs/vue3";
 import { initPush } from "@/push";
 
@@ -292,6 +292,19 @@ const userRole = computed(
 const unreadCount = computed(() =>
     Number(page.props.auth?.unreadNotifications ?? 0),
 );
+const idleTimeoutMs = computed(
+    () => Number(page.props.session?.idleTimeoutMinutes ?? 60) * 60 * 1000,
+);
+
+const activityEvents = [
+    "click",
+    "keydown",
+    "mousemove",
+    "scroll",
+    "touchstart",
+    "focus",
+];
+let idleLogoutTimer = null;
 
 // 4. LÓGICA COMPUTADA ---------------------------------------------------------
 const visibleMenu = computed(() => {
@@ -349,9 +362,50 @@ const isRouteActive = (patterns) => {
     return patterns.some((p) => route().current(p));
 };
 
+const clearIdleLogoutTimer = () => {
+    if (idleLogoutTimer) {
+        window.clearTimeout(idleLogoutTimer);
+        idleLogoutTimer = null;
+    }
+};
+
+const logoutForInactivity = () => {
+    router.post(
+        route("logout"),
+        {},
+        {
+            preserveScroll: true,
+            onError: () => {
+                window.location.href = route("login");
+            },
+        },
+    );
+};
+
+const resetIdleLogoutTimer = () => {
+    clearIdleLogoutTimer();
+    idleLogoutTimer = window.setTimeout(
+        logoutForInactivity,
+        idleTimeoutMs.value,
+    );
+};
+
 // 6. CICLO DE VIDA ------------------------------------------------------------
 onMounted(() => {
     initPush().catch(() => {});
+    activityEvents.forEach((eventName) => {
+        window.addEventListener(eventName, resetIdleLogoutTimer, {
+            passive: true,
+        });
+    });
+    resetIdleLogoutTimer();
+});
+
+onBeforeUnmount(() => {
+    clearIdleLogoutTimer();
+    activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, resetIdleLogoutTimer);
+    });
 });
 </script>
 

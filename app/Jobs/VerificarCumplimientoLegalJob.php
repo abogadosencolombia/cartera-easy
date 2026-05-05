@@ -30,7 +30,8 @@ class VerificarCumplimientoLegalJob implements ShouldQueue
     public function handle(): void
     {
         // Se cargan todas las relaciones necesarias para evitar múltiples consultas
-        $casos = Caso::whereIn('estado', ['activo', 'prejuridico'])
+        $casos = Caso::paraSeguimiento()
+            ->whereIn('estado', ['activo', 'prejuridico'])
             ->with(['cooperativa.configuracionLegal', 'documentos'])
             ->get();
 

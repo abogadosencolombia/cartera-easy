@@ -77,7 +77,7 @@ class EjecutarAlertasAutomaticas extends Command
                     $procesosInactivos = ProcesoRadicado::whereHas('demandantes.cooperativas', function($q) use ($regla) {
                             $q->where('cooperativas.id', $regla->cooperativa_id);
                         })
-                        ->where('estado', 'ACTIVO')
+                        ->paraSeguimiento()
                         ->where(function($q) use ($fechaLimite) {
                             // Sin actuaciones recientes O creado hace mucho sin actuaciones
                             $q->whereDoesntHave('actuaciones', function($sq) use ($fechaLimite) {
@@ -106,6 +106,7 @@ class EjecutarAlertasAutomaticas extends Command
                     $procesosPorVencer = ProcesoRadicado::whereHas('demandantes.cooperativas', function($q) use ($regla) {
                             $q->where('cooperativas.id', $regla->cooperativa_id);
                         })
+                        ->paraSeguimiento()
                         ->whereDate('fecha_proxima_revision', '=', $fechaObjetivo)
                         ->get();
 

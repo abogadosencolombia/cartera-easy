@@ -24,7 +24,8 @@ import {
     SparklesIcon,
     FolderPlusIcon,
     ClockIcon,
-    PlusIcon
+    PlusIcon,
+    XMarkIcon
 } from '@heroicons/vue/24/outline';
 import Swal from 'sweetalert2';
 
@@ -44,15 +45,57 @@ const docsGenerados = computed(() => [...(props.caso.documentos_generados || [])
 const adjuntos = computed(() => [...(props.caso.documentos || [])].sort((a, b) => new Date(b.fecha_carga) - new Date(a.fecha_carga)));
 
 const confirmingDocumentUpload = ref(false);
-const docForm = useForm({ tipo_documento: 'pagaré', fecha_carga: new Date().toISOString().slice(0, 10), archivo: null, asociado_a: props.caso.deudor ? `persona-${props.caso.deudor.id}` : null, nota: '' });
+const selectedFiles = ref([]); // Lista de { archivo, tipo_documento, fecha_carga, asociado_a, nota }
+const processing = ref(false);
+const fileInput = ref(null);
 
-const openUploadModal = () => { docForm.reset(); confirmingDocumentUpload.value = true; };
-const closeUploadModal = () => { confirmingDocumentUpload.value = false; docForm.reset(); };
+const openUploadModal = () => { 
+    selectedFiles.value = []; 
+    confirmingDocumentUpload.value = true; 
+};
+const closeUploadModal = () => { 
+    confirmingDocumentUpload.value = false; 
+    selectedFiles.value = []; 
+};
+
+const onPickFiles = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const defaultAsociado = props.caso.deudor ? `persona-${props.caso.deudor.id}` : null;
+
+    files.forEach(file => {
+        selectedFiles.value.push({
+            archivo: file,
+            tipo_documento: 'pagaré',
+            fecha_carga: today,
+            asociado_a: defaultAsociado,
+            nota: ''
+        });
+    });
+
+    if (fileInput.value) fileInput.value.value = null;
+};
+
+const removeSelectedFile = (index) => {
+    selectedFiles.value.splice(index, 1);
+};
 
 const submitDocument = () => {
-    docForm.post(route('casos.documentos.store', props.caso.id), {
+    if (selectedFiles.value.length === 0) return;
+
+    const form = useForm({
+        documentos: selectedFiles.value
+    });
+
+    form.post(route('casos.documentos.store', props.caso.id), {
+        forceFormData: true,
         preserveScroll: true,
-        onSuccess: () => { closeUploadModal(); Swal.fire({ title: '¡Subido!', icon: 'success', timer: 1500, showConfirmButton: false }); },
+        onSuccess: () => { 
+            closeUploadModal(); 
+            Swal.fire({ title: '¡Subidos!', text: 'Los documentos se han cargado correctamente.', icon: 'success', timer: 2000, showConfirmButton: false }); 
+        },
     });
 };
 
@@ -122,7 +165,7 @@ const submitGenerarDocumento = () => {
                     <h3 class="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-tight">Archivo de Soportes</h3>
                 </div>
                 <button v-if="puedeEditar" @click="openUploadModal" class="text-[10px] font-bold bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600 px-3 py-1.5 rounded-lg uppercase tracking-wider hover:bg-gray-50 transition-all shadow-sm">
-                    Subir
+                    Subida Masiva
                 </button>
             </div>
 
@@ -146,7 +189,7 @@ const submitGenerarDocumento = () => {
                             </div>
                         </div>
                         <p class="text-[9px] text-gray-400 font-bold uppercase mt-1 flex items-center gap-2">
-                            <span class="truncate">{{ doc.persona?.nombre_completo || 'Caso' }}</span> · <span>{{ formatDate(doc.fecha_carga) }}</span>
+                            <span class="truncate">{{ doc.persona?.nombre_completo || doc.codeudor?.nombre_completo || 'Caso' }}</span> · <span>{{ formatDate(doc.fecha_carga) }}</span>
                         </p>
                     </div>
                 </div>
@@ -180,60 +223,105 @@ const submitGenerarDocumento = () => {
             </div>
         </Modal>
 
-        <Modal :show="confirmingDocumentUpload" @close="closeUploadModal" max-width="lg" centered>
-            <div class="p-6">
-                <h2 class="text-base font-bold text-gray-900 uppercase mb-6 border-b pb-3">Cargar Archivo</h2>
-                <form @submit.prevent="submitDocument" class="space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <InputLabel value="Tipo *" class="text-[10px] uppercase font-bold text-gray-400" />
-                            <SelectInput v-model="docForm.tipo_documento" required>
-                                <option value="pagaré">Pagaré</option>
-                                <option value="carta instrucciones">Carta Instrucciones</option>
-                                <option value="certificación saldo">Certificación Saldo</option>
-                                <option value="libranza">Libranza</option>
-                                <option value="demanda">Demanda</option>
-                                <option value="autos">Autos</option>
-                                <option value="memorial">Memorial</option>
-                                <option value="cédula deudor">Cédula Deudor</option>
-                                <option value="cédula codeudor">Cédula Codeudor</option>
-                                <option value="otros">Otros</option>
-                            </SelectInput>
-                        </div>
-                        <div>
-                            <InputLabel value="Fecha *" class="text-[10px] uppercase font-bold text-gray-400" />
-                            <TextInput v-model="docForm.fecha_carga" type="date" class="w-full h-10 text-xs" required />
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <InputLabel value="Asociado a (Sujeto Procesal)" class="text-[10px] uppercase font-bold text-gray-400" />
-                        <SelectInput v-model="docForm.asociado_a">
-                            <option :value="null">-- General (Sin vincular) --</option>
-                            <option v-if="caso.deudor" :value="'persona-' + caso.deudor.id">DEUDOR: {{ caso.deudor.nombre_completo }}</option>
-                            <option v-for="c in caso.codeudores" :key="c.id" :value="'codeudor-' + c.id">CODEUDOR: {{ c.nombre_completo }}</option>
-                        </SelectInput>
-                        <InputError :message="docForm.errors.asociado_a" />
-                    </div>
-
-                    <div>
-                        <InputLabel value="Nota / Observación" class="text-[10px] uppercase font-bold text-gray-400" />
-                        <Textarea v-model="docForm.nota" rows="2" class="w-full rounded-lg border-gray-200 bg-gray-50 text-xs" placeholder="Opcional: Detalles adicionales del documento..." />
-                        <InputError :message="docForm.errors.nota" />
-                    </div>
-
-                    <label class="block w-full cursor-pointer p-6 border-2 border-dashed border-gray-200 bg-gray-50 rounded-xl text-center hover:border-indigo-300 transition-all">
-                        <input type="file" @input="docForm.archivo = $event.target.files[0]" class="hidden" />
-                        <CloudArrowUpIcon class="w-6 h-6 text-indigo-400 mx-auto mb-1" />
-                        <p class="text-[10px] font-bold text-indigo-600 uppercase">{{ docForm.archivo ? docForm.archivo.name : 'Seleccionar Archivo' }}</p>
+        <Modal :show="confirmingDocumentUpload" @close="closeUploadModal" max-width="2xl" centered>
+            <div class="p-6 overflow-visible">
+                <h2 class="text-base font-bold text-gray-900 uppercase mb-6 border-b pb-3">Cargar Archivos</h2>
+                
+                <div class="space-y-6">
+                    <label class="block w-full cursor-pointer p-8 border-2 border-dashed border-gray-200 bg-gray-50 rounded-xl text-center hover:border-indigo-300 transition-all group">
+                        <input ref="fileInput" type="file" @change="onPickFiles" class="hidden" multiple />
+                        <PlusIcon class="w-10 h-10 text-indigo-400 mx-auto mb-2 group-hover:scale-110 transition-transform" />
+                        <p class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">
+                            {{ selectedFiles.length > 0 ? 'Añadir más archivos' : 'Seleccionar o arrastrar archivos' }}
+                        </p>
                     </label>
-                    <div class="flex justify-end gap-3 pt-4">
-                        <SecondaryButton @click="closeUploadModal" class="!rounded-lg !text-[10px]">Cancelar</SecondaryButton>
-                        <PrimaryButton class="!bg-indigo-600 !rounded-lg !text-[10px]" :disabled="docForm.processing">Subir</PrimaryButton>
+
+                    <div v-if="selectedFiles.length > 0" class="max-h-[50vh] overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+                        <div v-for="(item, idx) in selectedFiles" :key="idx" class="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700 relative group/item">
+                            <button @click="removeSelectedFile(idx)" class="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-500 transition-colors">
+                                <XMarkIcon class="w-4 h-4" />
+                            </button>
+
+                            <div class="flex items-center gap-2 mb-3">
+                                <DocumentTextIcon class="w-4 h-4 text-gray-400" />
+                                <span class="text-[10px] font-bold text-gray-500 truncate max-w-[80%]">{{ item.archivo.name }}</span>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <InputLabel value="Tipo *" class="text-[9px] uppercase font-bold text-gray-400" />
+                                    <SelectInput v-model="item.tipo_documento" class="w-full h-9 text-[11px]" required>
+                                        <option value="pagaré">Pagaré</option>
+                                        <option value="carta instrucciones">Carta Instrucciones</option>
+                                        <option value="certificación saldo">Certificación Saldo</option>
+                                        <option value="libranza">Libranza</option>
+                                        <option value="demanda">Demanda</option>
+                                        <option value="autos">Autos</option>
+                                        <option value="memorial">Memorial</option>
+                                        <option value="cédula deudor">Cédula Deudor</option>
+                                        <option value="cédula codeudor">Cédula Codeudor</option>
+                                        <option value="otros">Otros</option>
+                                    </SelectInput>
+                                </div>
+                                <div>
+                                    <InputLabel value="Asociado a" class="text-[9px] uppercase font-bold text-gray-400" />
+                                    <SelectInput v-model="item.asociado_a" class="w-full h-9 text-[11px]">
+                                        <option :value="null">-- General --</option>
+                                        <option v-if="caso.deudor" :value="'persona-' + caso.deudor.id">DEUDOR: {{ caso.deudor.nombre_completo }}</option>
+                                        <option v-for="c in caso.codeudores" :key="c.id" :value="'codeudor-' + c.id">CODEUDOR: {{ c.nombre_completo }}</option>
+                                    </SelectInput>
+                                </div>
+                                <div>
+                                    <InputLabel value="Fecha" class="text-[9px] uppercase font-bold text-gray-400" />
+                                    <TextInput v-model="item.fecha_carga" type="date" class="w-full h-9 text-[11px]" required />
+                                </div>
+                                <div>
+                                    <InputLabel value="Nota / Observación" class="text-[9px] uppercase font-bold text-gray-400" />
+                                    <TextInput v-model="item.nota" class="w-full h-9 text-[11px]" placeholder="Opcional..." />
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </form>
+
+                    <div class="flex justify-end gap-3 pt-4 border-t">
+                        <SecondaryButton @click="closeUploadModal" class="!rounded-lg !text-[10px]">Cancelar</SecondaryButton>
+                        <PrimaryButton 
+                            @click="submitDocument" 
+                            class="!bg-indigo-600 !rounded-lg !text-[10px] shadow-lg shadow-indigo-100" 
+                            :disabled="selectedFiles.length === 0 || processing"
+                        >
+                            <ArrowPathIcon v-if="processing" class="w-4 h-4 animate-spin mr-2" />
+                            Subir {{ selectedFiles.length }} Documento{{ selectedFiles.length !== 1 ? 's' : '' }}
+                        </PrimaryButton>
+                    </div>
+                </div>
+            </div>
+        </Modal>
+
+        <!-- MODAL ELIMINACIÓN -->
+        <Modal :show="confirmingDocumentDeletion" @close="confirmingDocumentDeletion = false" centered>
+            <div class="p-6">
+                <h2 class="text-lg font-bold text-gray-900 uppercase mb-4">¿Eliminar Documento?</h2>
+                <p class="text-sm text-gray-500 mb-6">Esta acción no se puede deshacer. El archivo se borrará permanentemente del servidor.</p>
+                <div class="flex justify-end gap-3">
+                    <SecondaryButton @click="confirmingDocumentDeletion = false">Cancelar</SecondaryButton>
+                    <DangerButton @click="deleteDocument">Eliminar Permanentemente</DangerButton>
+                </div>
             </div>
         </Modal>
 
     </div>
 </template>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(79, 70, 229, 0.1);
+    border-radius: 10px;
+}
+</style>

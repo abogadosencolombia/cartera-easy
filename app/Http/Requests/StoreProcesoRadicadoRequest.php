@@ -15,7 +15,7 @@ class StoreProcesoRadicadoRequest extends FormRequest
     {
         return [
             // --- CAMPOS DE TEXTO Y FECHA ---
-            'radicado'             => ['nullable', 'string', 'max:255', 'unique:proceso_radicados,radicado'],
+            'radicado'             => ['nullable', 'string', 'max:23', 'regex:/^[0-9]{14,23}$/', 'unique:proceso_radicados,radicado'],
             'fecha_radicado'       => ['nullable', 'date'],
             'naturaleza'           => ['nullable', 'string', 'max:255'],
             'asunto'               => ['nullable', 'string', 'max:500'],
@@ -26,6 +26,7 @@ class StoreProcesoRadicadoRequest extends FormRequest
             'ubicacion_drive'      => ['nullable', 'string', 'max:1024'],
             'correos_juzgado'      => ['nullable', 'string'],
             'observaciones'        => ['nullable', 'string'],
+            'es_spoa_nunc'         => ['nullable', 'boolean'],
 
             // --- CAMPOS DE RELACIÓN ---
             'abogado_id'              => ['required', 'exists:users,id'],

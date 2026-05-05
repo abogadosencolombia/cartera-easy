@@ -1,17 +1,7 @@
 export const formatRadicado = (val) => {
     let value = String(val || '').replace(/\D/g, '');
     if (value.length > 23) value = value.slice(0, 23);
-    
-    let formatted = '';
-    if (value.length > 0) formatted += value.substring(0, 5);
-    if (value.length > 5) formatted += '-' + value.substring(5, 7);
-    if (value.length > 7) formatted += '-' + value.substring(7, 9);
-    if (value.length > 9) formatted += '-' + value.substring(9, 12);
-    if (value.length > 12) formatted += '-' + value.substring(12, 16);
-    if (value.length > 16) formatted += '-' + value.substring(16, 21);
-    if (value.length > 21) formatted += '-' + value.substring(21, 23);
-    
-    return formatted;
+    return value;
 };
 
 export const addDaysToDate = (dateStr, days) => {

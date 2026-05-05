@@ -34,13 +34,43 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
             $query->where(function ($q) use ($search) {
                 $q->where('radicado', 'ilike', "%{$search}%")
                     ->orWhere('asunto', 'ilike', "%{$search}%")
-                    ->orWhereHas('demandantes', fn($sq) => $sq->where('nombre_completo', 'ilike', "%{$search}%"));
+                    ->orWhereHas('demandantes', fn($sq) => $sq->where('nombre_completo', 'ilike', "%{$search}%"))
+                    ->orWhereHas('demandados', fn($sq) => $sq->where('nombre_completo', 'ilike', "%{$search}%"));
             });
         }
         
-        if (!empty($this->filtros['estado']) && $this->filtros['estado'] !== 'TODOS') $query->where('estado', $this->filtros['estado']);
-        if (!empty($this->filtros['sin_radicado'])) $query->where(function($q) { $q->whereNull('radicado')->orWhere('radicado', ''); });
-        if (!empty($this->filtros['solo_vencidos'])) $query->where('fecha_proxima_revision', '<', now()->toDateString())->where('estado', 'ACTIVO');
+        if (!empty($this->filtros['estado']) && $this->filtros['estado'] !== 'TODOS') {
+            $query->where('estado', $this->filtros['estado']);
+        }
+
+        if (!empty($this->filtros['juzgado_id'])) {
+            $query->where('juzgado_id', $this->filtros['juzgado_id']);
+        }
+
+        if (!empty($this->filtros['tipo_entidad'])) {
+            $tipo = $this->filtros['tipo_entidad'];
+            $query->whereHas('juzgado', fn($q) => $q->where('nombre', 'ilike', "%{$tipo}%"));
+        }
+
+        $sinRadicado = filter_var($this->filtros['sin_radicado'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        if ($sinRadicado) {
+            $query->where(function($q) { $q->whereNull('radicado')->orWhere('radicado', ''); });
+        }
+
+        $soloVencidos = filter_var($this->filtros['solo_vencidos'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        if ($soloVencidos) {
+            $query->where('fecha_proxima_revision', '<', now()->toDateString())->paraSeguimiento();
+        }
+
+        $cerrados = filter_var($this->filtros['cerrados'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        if ($cerrados) {
+            $query->cerrados();
+        }
+
+        $actualizadosHoy = filter_var($this->filtros['actualizados_hoy'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        if ($actualizadosHoy) {
+            $query->whereBetween('updated_at', [now()->startOfDay(), now()->endOfDay()]);
+        }
 
         return $query->latest('updated_at');
     }
@@ -52,11 +82,13 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
             'Radicado',
             'Fecha Radicacion',
             'Naturaleza',
+            'A Favor De',
             'Asunto',
             'Tipo de Proceso',
             'Etapa Procesal',
             'Fecha Cambio Etapa',
             'Estado',
+            'Viabilidad',
             'Informacion Incompleta',
             'Demandantes',
             'Demandados',
@@ -89,13 +121,16 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
         return [
             $proceso->id,
             $proceso->radicado,
+            $proceso->es_spoa_nunc ? 'SI' : 'NO',
             $proceso->fecha_radicado ? $proceso->fecha_radicado->format('Y-m-d') : '',
             $proceso->naturaleza,
+            $proceso->a_favor_de,
             $proceso->asunto,
             $proceso->tipoProceso?->nombre,
             $proceso->etapaActual?->nombre,
             $proceso->fecha_cambio_etapa ? $proceso->fecha_cambio_etapa->format('Y-m-d') : '',
             $proceso->estado,
+            strtoupper($proceso->viabilidad_estado ?? 'PENDIENTE'),
             $proceso->info_incompleta ? 'SI' : 'NO',
             $formatoPartes($proceso->demandantes),
             $formatoPartes($proceso->demandados),
@@ -121,6 +156,66 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
         return [
             AfterSheet::class => function(AfterSheet $event) {
                 $sheet = $event->sheet->getDelegate();
+                $lastRow = $sheet->getHighestRow();
+                $lastCol = $sheet->getHighestColumn();
+                $fullRange = "A1:{$lastCol}{$lastRow}";
+
+                // 1. Estilo General y Alineación
+                $sheet->getStyle($fullRange)->getAlignment()->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_TOP);
+                
+                // 2. Encabezados Premium
+                $headerRange = "A1:{$lastCol}1";
+                $sheet->getStyle($headerRange)->getFont()->setBold(true)->setSize(11);
+                $sheet->getStyle($headerRange)->getFill()
+                    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                    ->getStartColor()->setARGB('4F46E5');
+                $sheet->getStyle($headerRange)->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+                $sheet->getStyle($headerRange)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+
+                // 3. Bordes Finos para toda la tabla
+                $sheet->getStyle($fullRange)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+                $sheet->getStyle($fullRange)->getBorders()->getAllBorders()->getColor()->setARGB('E2E8F0');
+
+                // 4. Ajuste de Anchos y Text Wrapping para campos largos
+                $longTextFields = [
+                    'D' => 20, // Naturaleza
+                    'E' => 25, // A Favor De
+                    'F' => 45, // Asunto
+                    'K' => 15, // Viabilidad
+                    'M' => 35, // Demandantes
+                    'N' => 35, // Demandados
+                    'R' => 30, // Correos Juzgado
+                    'U' => 50, // Ultima Actuacion
+                    'V' => 45, // Observaciones
+                    'W' => 40, // Link
+                    'X' => 30, // Drive
+                ];
+
+                foreach ($longTextFields as $col => $width) {
+                    $sheet->getColumnDimension($col)->setAutoSize(false);
+                    $sheet->getColumnDimension($col)->setWidth($width);
+                    $sheet->getStyle("{$col}2:{$col}{$lastRow}")->getAlignment()->setWrapText(true);
+                }
+
+                // Auto-size para el resto de columnas
+                foreach(range('A','Z') as $col) {
+                    if (!isset($longTextFields[$col])) {
+                        $sheet->getColumnDimension($col)->setAutoSize(true);
+                    }
+                }
+                $sheet->getColumnDimension('AA')->setAutoSize(true);
+                $sheet->getColumnDimension('AB')->setAutoSize(true);
+
+                // 5. Cebra / Rayado de filas para lectura fácil
+                for ($row = 2; $row <= $lastRow; $row++) {
+                    if ($row % 2 == 0) {
+                        $sheet->getStyle("A{$row}:{$lastCol}{$row}")->getFill()
+                            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                            ->getStartColor()->setARGB('F8FAFC');
+                    }
+                }
+
+                // 6. Validaciones de Datos (Hoja Oculta)
                 $spreadsheet = $sheet->getParent();
                 $dataSheet = $spreadsheet->createSheet();
                 $dataSheet->setTitle('DATA_SISTEMA');
@@ -134,14 +229,9 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
                 $this->fillColumn($dataSheet, 'B', $tipos);
                 $this->fillColumn($dataSheet, 'C', $etapas);
 
-                $this->applyValidation($sheet, 'F2:F5000', 'DATA_SISTEMA!$B$1:$B$' . count($tipos));
-                $this->applyValidation($sheet, 'G2:G5000', 'DATA_SISTEMA!$C$1:$C$' . count($etapas));
-                $this->applyValidation($sheet, 'O2:O5000', 'DATA_SISTEMA!$A$1:$A$' . count($juzgados));
-
-                $sheet->getStyle('A1:Z1')->getFont()->setBold(true);
-                $sheet->getStyle('A1:Z1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('4F46E5');
-                $sheet->getStyle('A1:Z1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
-                foreach(range('A','Z') as $col) { $sheet->getColumnDimension($col)->setAutoSize(true); }
+                $this->applyValidation($sheet, "G2:G{$lastRow}", 'DATA_SISTEMA!$B$1:$B$' . count($tipos));
+                $this->applyValidation($sheet, "H2:H{$lastRow}", 'DATA_SISTEMA!$C$1:$C$' . count($etapas));
+                $this->applyValidation($sheet, "Q2:Q{$lastRow}", 'DATA_SISTEMA!$A$1:$A$' . count($juzgados));
             },
         ];
     }

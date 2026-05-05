@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { 
@@ -15,6 +15,7 @@ import {
 
 const page = usePage();
 const urgenciasCount = computed(() => page.props.auth.urgencias);
+const totalUrgencias = computed(() => urgenciasCount.value?.total ?? 0);
 
 const isExpanded = ref(false);
 const paginatedData = ref(null);
@@ -36,11 +37,25 @@ const fetchUrgencias = (url = '/api/urgencias/list') => {
 
 onMounted(() => {
     const dismissed = sessionStorage.getItem('urgencia_alert_dismissed');
-    if (urgenciasCount.value?.total > 0 && !dismissed) {
+    if (totalUrgencias.value > 0 && !dismissed) {
         isExpanded.value = true;
         fetchUrgencias();
     }
 });
+
+watch(urgenciasCount, () => {
+    paginatedData.value = null;
+
+    if (totalUrgencias.value <= 0) {
+        isExpanded.value = false;
+        sessionStorage.removeItem('urgencia_alert_dismissed');
+        return;
+    }
+
+    if (isExpanded.value) {
+        fetchUrgencias();
+    }
+}, { deep: true });
 
 const minimize = () => {
     isExpanded.value = false;
@@ -49,12 +64,12 @@ const minimize = () => {
 
 const open = () => {
     isExpanded.value = true;
-    if (!paginatedData.value) fetchUrgencias();
+    fetchUrgencias();
 };
 </script>
 
 <template>
-    <div v-if="urgenciasCount?.total > 0">
+    <div v-if="totalUrgencias > 0">
         <!-- MODAL PANTALLA COMPLETA 100% RESPONSIVO -->
         <div v-if="isExpanded" class="fixed inset-0 z-[100] flex items-center justify-center p-2 md:p-8 bg-slate-950/95 backdrop-blur-xl animate-in fade-in duration-500">
             
@@ -87,7 +102,7 @@ const open = () => {
                     <div class="flex-1 p-5 md:p-10 overflow-y-auto custom-scrollbar space-y-6">
                         
                         <p class="text-base md:text-lg text-gray-600 dark:text-gray-300 font-medium leading-tight">
-                            Hay <span class="font-black text-red-600 underline decoration-2 underline-offset-4">{{ urgenciasCount.total }}</span> expedientes pendientes.
+                            Hay <span class="font-black text-red-600 underline decoration-2 underline-offset-4">{{ totalUrgencias }}</span> expedientes pendientes.
                         </p>
 
                         <!-- Módulos Compactos -->
@@ -179,7 +194,7 @@ const open = () => {
             <div class="relative">
                 <BellAlertIcon class="w-7 h-7 group-hover:rotate-12 transition-transform" />
                 <div class="absolute -top-1.5 -right-1.5 bg-white text-red-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shadow-md ring-2 ring-red-600">
-                    {{ urgenciasCount.total }}
+                    {{ totalUrgencias }}
                 </div>
             </div>
             <!-- Efecto de pulso elegante -->

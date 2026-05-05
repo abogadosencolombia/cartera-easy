@@ -6,6 +6,7 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
 import InputError from '@/Components/InputError.vue';
+import { useFormDraft } from '@/composables/useFormDraft';
 import { 
     BuildingOffice2Icon, 
     ArrowLeftIcon,
@@ -25,8 +26,12 @@ const form = useForm({
     distrito: '',
 });
 
+const { clearDraft } = useFormDraft(form, 'draft:create:juzgados');
+
 const submit = () => {
-    form.post(route('juzgados.store'));
+    form.post(route('juzgados.store'), {
+        onSuccess: clearDraft,
+    });
 };
 </script>
 

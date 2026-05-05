@@ -23,6 +23,7 @@ import {
     DocumentTextIcon
 } from '@heroicons/vue/24/outline';
 import Swal from 'sweetalert2';
+import { useFormDraft } from '@/composables/useFormDraft';
 
 const form = useForm({
     nombre: '',
@@ -44,10 +45,13 @@ const form = useForm({
     ciudad_principal_operacion: '',
 });
 
+const { clearDraft } = useFormDraft(form, 'draft:create:cooperativas');
+
 const submit = () => {
     form.post(route('cooperativas.store'), {
         preserveScroll: true,
         onSuccess: () => {
+            clearDraft();
             Swal.fire({
                 title: '¡Registrada!',
                 text: 'La cooperativa ha sido creada exitosamente.',

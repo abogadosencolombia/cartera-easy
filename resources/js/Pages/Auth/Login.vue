@@ -1,5 +1,4 @@
 <script setup>
-import Checkbox from '@/Components/Checkbox.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
@@ -14,7 +13,6 @@ defineProps({
 const form = useForm({
     email: '',
     password: '',
-    remember: false,
 });
 
 const submit = () => {
@@ -71,11 +69,7 @@ const submit = () => {
                         <InputError class="mt-2" :message="form.errors.password" />
                     </div>
                     
-                    <div class="flex items-center justify-between">
-                        <label class="flex items-center">
-                            <Checkbox name="remember" class="text-[#0052CC] focus:ring-[#0052CC]" v-model:checked="form.remember" />
-                            <span class="ml-2 text-sm text-slate-600 dark:text-slate-400">Recordarme</span>
-                        </label>
+                    <div class="flex items-center justify-end">
                         <Link v-if="canResetPassword" :href="route('password.request')" class="text-sm font-medium text-[#0052CC] hover:text-[#0041A3] dark:hover:text-blue-400 transition-colors duration-300">
                             ¿Olvidaste tu contraseña?
                         </Link>

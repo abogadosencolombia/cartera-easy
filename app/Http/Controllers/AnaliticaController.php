@@ -48,7 +48,8 @@ class AnaliticaController extends Controller
         $validacionesQuery = ValidacionLegal::whereIn('caso_id', $casosDeCooperativaIds);
         
         $kpisCasos = (clone $queryCasos)->select('estado_proceso', DB::raw('count(*) as total'))->groupBy('estado_proceso')->pluck('total', 'estado_proceso');
-        $moraTotal = (clone $queryCasos)->where('estado_proceso', '!=', 'cerrado')->sum('monto_total');
+        $casosActivosQuery = (clone $queryCasos)->paraSeguimiento();
+        $moraTotal = (clone $casosActivosQuery)->sum('monto_total');
         
         $totalValidaciones = (clone $validacionesQuery)->count();
         $validacionesIncumplidas = (clone $validacionesQuery)->where('estado', 'incumple')->count();
@@ -87,7 +88,7 @@ class AnaliticaController extends Controller
 
         return Inertia::render('Dashboard/Index', [
             'kpis' => [
-                'casos_activos' => $kpisCasos->except('cerrado')->sum(),
+                'casos_activos' => (clone $casosActivosQuery)->count(),
                 'casos_demandados' => $kpisCasos->get('demandado', 0),
                 'mora_total' => number_format($moraTotal, 0, ',', '.'),
                 'cumplimiento_legal' => $porcentajeCumplimiento,

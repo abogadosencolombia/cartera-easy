@@ -31,7 +31,7 @@ class GenerarAlertasCron extends Command
         // 1. REVISIÓN DE PROCESOS JUDICIALES
         // ------------------------------------------
         $this->info("1. Analizando Procesos Judiciales...");
-        $procesos = ProcesoRadicado::where('estado', '!=', 'CERRADO') 
+        $procesos = ProcesoRadicado::paraSeguimiento()
             ->where(function($q) {
                 $q->whereNotNull('fecha_proxima_revision')
                   ->orWhereNotNull('etapa_procesal_id');

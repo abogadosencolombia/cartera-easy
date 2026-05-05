@@ -44,6 +44,7 @@ import PartesTab from './Tabs/PartesTab.vue';
 import DocumentosTab from './Tabs/DocumentosTab.vue';
 import ActuacionesTab from './Tabs/ActuacionesTab.vue';
 import ActividadTab from './Tabs/ActividadTab.vue';
+import ViabilidadTab from '../Casos/Tabs/ViabilidadTab.vue';
 
 const props = defineProps({
     proceso: { type: Object, required: true },
@@ -54,7 +55,7 @@ const props = defineProps({
 const page = usePage();
 const user = computed(() => page.props.auth.user);
 
-const validTabs = ['resumen', 'partes', 'documentos', 'actuaciones', 'actividad'];
+const validTabs = ['resumen', 'viabilidad', 'partes', 'documentos', 'actuaciones', 'actividad'];
 const getInitialTab = () => {
     if (typeof window === 'undefined') return 'resumen';
     const params = new URLSearchParams(window.location.search);
@@ -141,6 +142,23 @@ const openEtapaModal = () => {
     showEtapaModal.value = true;
 };
 
+// --- AUTOMATIZACIÓN: Sugerir fecha de revisión según la etapa seleccionada ---
+watch(() => etapaForm.etapa_procesal_id, (newId) => {
+    if (!newId) return;
+    const etapa = props.etapas.find(e => e.id === newId);
+    if (!etapa) return;
+
+    let dias = 15; // Por defecto
+    if (etapa.nombre.includes('DEMANDA')) dias = 10;
+    if (etapa.nombre.includes('MANDAMIENTO')) dias = 30;
+    if (etapa.nombre.includes('AUDIENCIA')) dias = 45;
+    if (etapa.nombre.includes('SENTENCIA')) dias = 60;
+
+    const fechaSugerida = new Date();
+    fechaSugerida.setDate(fechaSugerida.getDate() + dias);
+    etapaForm.fecha_proxima_revision = fechaSugerida.toISOString().split('T')[0];
+});
+
 const submitEtapa = () => {
     openCommitmentModal((date) => {
         etapaForm.fecha_proxima_revision = date;
@@ -169,11 +187,22 @@ const askDelete = () => (confirmingDeletion.value = true);
 const doDelete = () => deleteForm.delete(route('procesos.destroy', props.proceso.id), { onSuccess: () => confirmingDeletion.value = false });
 
 // --- Documentos ---
+const documentosTabRef = ref(null);
 const handleUpload = (data) => {
     openCommitmentModal((date) => {
-        const form = useForm({ ...data, fecha_proxima_revision: date });
+        const form = useForm({ 
+            documentos: data.documentos,
+            fecha_proxima_revision: date 
+        });
         form.post(route('procesos.documentos.store', props.proceso.id), {
-            forceFormData: true, preserveScroll: true, onSuccess: () => router.reload({ only: ['proceso'], preserveState: true }),
+            forceFormData: true, 
+            preserveScroll: true, 
+            onSuccess: () => {
+                router.reload({ only: ['proceso'], preserveState: true });
+                if (documentosTabRef.value) {
+                    documentosTabRef.value.clearSelectedFiles();
+                }
+            },
         });
     });
 };
@@ -296,6 +325,30 @@ const statusClasses = {
 
     <div class="py-6">
       <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+
+        <!-- BANNER DE SEGURIDAD JURÍDICA (AUTOMÁTICO) -->
+        <div v-if="proceso.viabilidad_estado && proceso.viabilidad_estado !== 'pendiente'" 
+            class="rounded-2xl p-4 flex items-center justify-between border-2 animate-in slide-in-from-top-4"
+            :class="{
+                'bg-emerald-50 border-emerald-200 text-emerald-800': proceso.viabilidad_estado === 'verde',
+                'bg-amber-50 border-amber-200 text-amber-800': proceso.viabilidad_estado === 'amarillo',
+                'bg-rose-50 border-rose-200 text-rose-800': proceso.viabilidad_estado === 'rojo',
+            }">
+            <div class="flex items-center gap-4">
+                <div class="p-3 rounded-xl bg-white shadow-sm">
+                    <ShieldCheckIcon v-if="proceso.viabilidad_estado === 'verde'" class="w-6 h-6 text-emerald-600" />
+                    <ExclamationTriangleIcon v-if="proceso.viabilidad_estado === 'amarillo'" class="w-6 h-6 text-amber-600" />
+                    <XCircleIcon v-if="proceso.viabilidad_estado === 'rojo'" class="w-6 h-6 text-rose-600" />
+                </div>
+                <div>
+                    <h4 class="text-sm font-black uppercase tracking-tight">
+                        {{ proceso.viabilidad_estado === 'verde' ? 'EXPEDIENTE JURÍDICAMENTE APTO' : (proceso.viabilidad_estado === 'amarillo' ? 'REVISIÓN REQUERIDA' : 'RADICACIÓN BLOQUEADA') }}
+                    </h4>
+                    <p class="text-[10px] font-bold uppercase opacity-70">DICTAMEN DE VIABILIDAD: {{ proceso.viabilidad_estado }}</p>
+                </div>
+            </div>
+            <button @click="setActiveTab('viabilidad')" class="px-4 py-2 bg-white rounded-xl text-[10px] font-black uppercase shadow-sm hover:shadow-md transition-all">Revisar Dictamen</button>
+        </div>
         
         <!-- DASHBOARD COMPACTO -->
         <div class="bg-white dark:bg-gray-800 shadow-sm rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -351,6 +404,7 @@ const statusClasses = {
                 <nav class="-mb-px flex space-x-6 overflow-x-auto scrollbar-hide">
                     <button v-for="tab in [
                         { id: 'resumen', label: 'General', icon: InformationCircleIcon },
+                        { id: 'viabilidad', label: 'Viabilidad', icon: ShieldCheckIcon },
                         { id: 'partes', label: 'Partes', icon: UsersIcon },
                         { id: 'documentos', label: 'Soportes', icon: FolderOpenIcon },
                         { id: 'actuaciones', label: 'Actuaciones', icon: ClipboardDocumentListIcon },
@@ -385,11 +439,14 @@ const statusClasses = {
                     </template>
                 </ResumenTab>
 
+                <!-- TAB: VIABILIDAD -->
+                <ViabilidadTab v-show="activeTab === 'viabilidad'" :entity="proceso" type="proceso" />
+
                 <!-- TAB: PARTES -->
                 <PartesTab v-show="activeTab === 'partes'" :proceso="proceso" />
 
                 <!-- TAB: DOCUMENTOS -->
-                <DocumentosTab v-show="activeTab === 'documentos'" :proceso="proceso" :files="files" :isClosed="isClosed" :formatDate="formatDate" @upload="handleUpload" @delete="askDeleteDoc" />
+                <DocumentosTab v-show="activeTab === 'documentos'" ref="documentosTabRef" :proceso="proceso" :files="files" :isClosed="isClosed" :formatDate="formatDate" @upload="handleUpload" @delete="askDeleteDoc" />
 
                 <!-- TAB: ACTUACIONES -->
                 <ActuacionesTab v-show="activeTab === 'actuaciones'" :proceso="proceso" :actuaciones="actuaciones" :isClosed="isClosed" :fmtDateTime="fmtDateTime" :fmtDateSimple="fmtDateSimple" @save="handleSaveActuacion" @edit="abrirModalEditar" @delete="eliminarActuacion" />
@@ -477,10 +534,10 @@ const statusClasses = {
 
     <!-- MODAL CAMBIO DE ETAPA -->
     <Modal :show="showEtapaModal" @close="showEtapaModal = false" centered>
-        <div class="p-8">
+        <div class="p-8 overflow-visible">
             <h2 class="text-xl font-black uppercase tracking-tight text-gray-900 mb-6">Avanzar Etapa</h2>
-            <div class="space-y-6">
-                <div>
+            <div class="space-y-6 overflow-visible">
+                <div class="relative z-50">
                     <InputLabel for="nueva_etapa" value="Nueva Etapa Procesal *" class="text-[10px] font-black uppercase text-gray-400" />
                     <Dropdown align="left" width="full">
                         <template #trigger>

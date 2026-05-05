@@ -20,6 +20,43 @@ test('users can authenticate using the login screen', function () {
     $response->assertRedirect(route('dashboard', absolute: false));
 });
 
+test('login does not create persistent remember sessions', function () {
+    $user = User::factory()->create([
+        'remember_token' => 'old-token',
+    ]);
+
+    $this->post('/login', [
+        'email' => $user->email,
+        'password' => 'password',
+        'remember' => true,
+    ]);
+
+    $user->refresh();
+
+    $this->assertAuthenticated();
+    expect($user->remember_token)->not->toBe('old-token');
+});
+
+test('stale sessions are closed when the same user logs in elsewhere', function () {
+    config(['session.single_active' => true]);
+
+    $user = User::factory()->create([
+        'active_session_id' => 'session-from-another-device',
+    ]);
+
+    $response = $this
+        ->withSession(['active_session_token' => 'current-browser-session'])
+        ->actingAs($user)
+        ->get('/profile');
+
+    $this->assertGuest();
+    $response->assertRedirect(route('login', absolute: false));
+    $response->assertSessionHas(
+        'status',
+        'Tu sesión se cerró porque esta cuenta inició sesión en otro equipo.'
+    );
+});
+
 test('users can not authenticate with invalid password', function () {
     $user = User::factory()->create();
 

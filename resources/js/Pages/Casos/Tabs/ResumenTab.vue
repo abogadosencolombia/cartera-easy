@@ -69,7 +69,10 @@ const submitNotification = () => {
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="space-y-1">
                         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Radicado</p>
-                        <p class="text-xs font-bold text-gray-700 dark:text-gray-200 font-mono">{{ caso.radicado || 'SIN ASIGNAR' }}</p>
+                        <div class="flex items-center gap-1.5">
+                            <p class="text-xs font-bold text-gray-700 dark:text-gray-200 font-mono">{{ caso.radicado || 'SIN ASIGNAR' }}</p>
+                            <span v-if="caso.es_spoa_nunc" class="text-[8px] font-black bg-indigo-100 text-indigo-700 px-1 rounded border border-indigo-200 uppercase tracking-tighter">SPOA/NUNC</span>
+                        </div>
                     </div>
                     <div class="space-y-1">
                         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pagaré / Referencia</p>
@@ -210,7 +213,7 @@ const submitNotification = () => {
                 <h3 class="font-bold text-gray-900 dark:text-white uppercase tracking-tight text-sm mb-6 flex items-center gap-2">
                     <CalendarIcon class="h-5 w-5 text-amber-500" /> Guía de Gestión Procesal
                 </h3>
-                <GuiaEtapa :etapa="caso.etapa_procesal" :tipo-proceso="caso.tipo_proceso" :checklist-completados="caso.checklist_seguimiento || []" :model-id="caso.id" model-type="caso" />
+                <GuiaEtapa :etapa="caso.etapa_procesal" :tipo-proceso="caso.tipo_proceso" :checklist-completados="caso.checklist_seguimiento || []" :model-id="caso.id" model-type="caso" :entity="caso" />
             </div>
         </div>
 

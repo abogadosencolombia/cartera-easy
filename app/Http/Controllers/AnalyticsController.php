@@ -23,28 +23,70 @@ class AnalyticsController extends Controller
         // 1. OBTENER RADAR DE ACCIÓN (INTELIGENCIA)
         $radarAcciones = $impulsoService->obtenerRadarDeAccion(6);
 
-        // 2. SALUD DEL DESPACHO... (resto del código) ...
+        // 2. SALUD DEL DESPACHO GLOBAL (UNIFICADA)
         $hoy = Carbon::today();
-        $salud = [
-            'al_dia' => ProcesoRadicado::where('estado', 'ACTIVO')
+        $cincoDias = $hoy->copy()->subDays(5);
+        $veinteDias = $hoy->copy()->subDays(20);
+
+        // Radicados: Basado en fecha_proxima_revision
+        $radAlDia = ProcesoRadicado::paraSeguimiento()
                         ->where('fecha_proxima_revision', '>', $hoy->copy()->addDays(2))
-                        ->count(),
-            'en_riesgo' => ProcesoRadicado::where('estado', 'ACTIVO')
+                        ->count();
+        $radEnRiesgo = ProcesoRadicado::paraSeguimiento()
                         ->whereBetween('fecha_proxima_revision', [$hoy, $hoy->copy()->addDays(2)])
-                        ->count(),
-            'vencidos' => ProcesoRadicado::where('estado', 'ACTIVO')
+                        ->count();
+        $radVencidos = ProcesoRadicado::paraSeguimiento()
                         ->where('fecha_proxima_revision', '<', $hoy)
-                        ->count(),
+                        ->count();
+
+        // Casos: Basado en updated_at (Inactividad)
+        $casosAlDia = Caso::paraSeguimiento()
+                        ->where('updated_at', '>', $cincoDias)
+                        ->count();
+        $casosEnRiesgo = Caso::paraSeguimiento()
+                        ->whereBetween('updated_at', [$veinteDias, $cincoDias])
+                        ->count();
+        $casosVencidos = Caso::paraSeguimiento()
+                        ->where('updated_at', '<', $veinteDias)
+                        ->count();
+
+        $salud = [
+            'al_dia' => $radAlDia + $casosAlDia,
+            'en_riesgo' => $radEnRiesgo + $casosEnRiesgo,
+            'vencidos' => $radVencidos + $casosVencidos,
         ];
 
-        // 2. CARGA DE TRABAJO POR ABOGADO (UNIFICADA)
+        // 2b. VIABILIDAD JURÍDICA GLOBAL (NUEVO)
+        $viabilidadProcesos = ProcesoRadicado::paraSeguimiento()
+            ->select('viabilidad_estado', DB::raw('count(*) as total'))
+            ->groupBy('viabilidad_estado')
+            ->get();
+
+        $viabilidadCasos = Caso::paraSeguimiento()
+            ->select('viabilidad_estado', DB::raw('count(*) as total'))
+            ->groupBy('viabilidad_estado')
+            ->get();
+
+        $viabilidadMerged = collect($viabilidadProcesos)
+            ->concat($viabilidadCasos)
+            ->groupBy(fn($item) => $item->viabilidad_estado ?: 'pendiente')
+            ->map(fn($group) => $group->sum('total'));
+
+        $chartViabilidad = [
+            'verde' => $viabilidadMerged->get('verde', 0),
+            'amarillo' => $viabilidadMerged->get('amarillo', 0),
+            'rojo' => $viabilidadMerged->get('rojo', 0),
+            'pendiente' => $viabilidadMerged->get('pendiente', 0),
+        ];
+
+        // 2c. CARGA DE TRABAJO POR ABOGADO (UNIFICADA)
         $cargaAbogados = User::where('estado_activo', true)
             ->whereIn('tipo_usuario', ['admin', 'abogado', 'gestor'])
             ->withCount(['procesos' => function($query) {
-                $query->where('estado', 'ACTIVO');
+                $query->paraSeguimiento();
             }])
             ->withCount(['casos' => function($query) {
-                $query->where('estado_proceso', '!=', 'cerrado');
+                $query->paraSeguimiento();
             }])
             ->get(['id', 'name', 'procesos_count', 'casos_count'])
             ->map(function($user) {
@@ -167,8 +209,8 @@ class AnalyticsController extends Controller
 
         return Inertia::render('Dashboard/Analytics', [
             'stats' => [
-                'total_activos' => ProcesoRadicado::whereNotIn('estado', $estadosCierreRad)->count() + 
-                                   Caso::whereNotIn('estado_proceso', $estadosCierreCasos)->count(),
+                'total_activos' => ProcesoRadicado::paraSeguimiento()->count() + 
+                                   Caso::paraSeguimiento()->count(),
                 'total_cerrados' => ProcesoRadicado::whereIn('estado', $estadosCierreRad)->count() + 
                                     Caso::whereIn('estado_proceso', $estadosCierreCasos)->count(),
                 'tasa_cierre' => $creados30 > 0 ? round(($cerrados30 / $creados30) * 100, 1) : 0,

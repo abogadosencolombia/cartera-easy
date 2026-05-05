@@ -77,7 +77,7 @@ class GenerarAlertasDiarias extends Command
     {
         $fechaMora = Carbon::today()->subDays($regla->dias)->toDateString();
         $casosAfectados = Caso::where('cooperativa_id', $regla->cooperativa_id)
-            ->where('estado_proceso', '!=', 'cerrado')
+            ->paraSeguimiento()
             ->whereDate('fecha_vencimiento', $fechaMora)
             ->get();
 
@@ -92,7 +92,7 @@ class GenerarAlertasDiarias extends Command
     {
         $fechaVencimiento = Carbon::today()->addDays($regla->dias)->toDateString();
         $casosAfectados = Caso::where('cooperativa_id', $regla->cooperativa_id)
-            ->where('estado_proceso', '!=', 'cerrado')
+            ->paraSeguimiento()
             ->whereDate('fecha_vencimiento', $fechaVencimiento)
             ->get();
 
@@ -107,7 +107,7 @@ class GenerarAlertasDiarias extends Command
     {
         $fechaInactividad = Carbon::today()->subDays($regla->dias);
         $casosAfectados = Caso::where('cooperativa_id', $regla->cooperativa_id)
-            ->where('estado_proceso', '!=', 'cerrado')
+            ->paraSeguimiento()
             ->where('updated_at', '<=', $fechaInactividad)
             ->get();
 
@@ -122,7 +122,7 @@ class GenerarAlertasDiarias extends Command
     {
         // Esta lógica puede ser compleja, asumimos que está correcta como la tenías.
         $casosAfectados = Caso::where('cooperativa_id', $regla->cooperativa_id)
-            ->where('estado_proceso', '!=', 'cerrado')
+            ->paraSeguimiento()
             // ... (tu lógica para encontrar documentos faltantes)
             ->get();
 

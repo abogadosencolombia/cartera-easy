@@ -36,8 +36,8 @@ class RevisionDiariaController extends Controller
         $applyFilters = $this->getApplyFiltersClosure();
 
         // --- INICIO: Construir Consultas Base ---
-        $casosQuery = Caso::query()->with(['deudor', 'cooperativa']);
-        $radicadosQuery = ProcesoRadicado::query()->with(['demandantes', 'demandados']);
+        $casosQuery = Caso::paraSeguimiento()->with(['deudor', 'cooperativa']);
+        $radicadosQuery = ProcesoRadicado::paraSeguimiento()->with(['demandantes', 'demandados']);
         // Quitamos el filtro fijo de 'ACTIVO' para que aparezcan todos los contratos que el usuario necesite revisar
         $contratosQuery = Contrato::query()->with(['cliente']);
         // --- FIN: Construir Consultas Base ---
@@ -134,7 +134,7 @@ class RevisionDiariaController extends Controller
                     'deudor', 'cooperativa', 'user',
                     'revisionesDiarias' => fn($q) => $q->where('user_id', $user->id)->latest('fecha_revision')
                 ];
-                $baseQuery = Caso::query()->with($relationsToLoad);
+                $baseQuery = Caso::paraSeguimiento()->with($relationsToLoad);
                 $revisadosHoyIds = RevisionDiaria::where('user_id', $user->id)->where('fecha_revision', $hoy)->where('revisable_type', Caso::class)->pluck('revisable_id');
                 $modelClass = Caso::class; $idColumn = 'casos.id'; break;
             case 'radicados':
@@ -143,7 +143,7 @@ class RevisionDiariaController extends Controller
                     'abogado', 
                     'revisionesDiarias' => fn($q) => $q->where('user_id', $user->id)->latest('fecha_revision')
                 ];
-                $baseQuery = ProcesoRadicado::query()->with($relationsToLoad);
+                $baseQuery = ProcesoRadicado::paraSeguimiento()->with($relationsToLoad);
                 $revisadosHoyIds = RevisionDiaria::where('user_id', $user->id)->where('fecha_revision', $hoy)->where('revisable_type', ProcesoRadicado::class)->pluck('revisable_id');
                 $modelClass = ProcesoRadicado::class; $idColumn = 'proceso_radicados.id'; break;
             case 'contratos':

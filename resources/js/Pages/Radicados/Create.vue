@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue';
 import { Head, Link, useForm, useRemember, router } from '@inertiajs/vue3';
 import { debounce } from 'lodash';
 import { formatRadicado, addDaysToDate, addMonthsToDate, toUpperCase, calculateDV } from '@/Utils/formatters';
+import { useFormDraft } from '@/composables/useFormDraft';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
@@ -90,6 +91,7 @@ const form = useForm('CreateRadicado', {
   }],
   
   radicado: '',
+  es_spoa_nunc: false,
   fecha_radicado: new Date().toISOString().slice(0, 10),
   naturaleza: '',
   asunto: '',
@@ -101,6 +103,8 @@ const form = useForm('CreateRadicado', {
   correos_juzgado: '',
   observaciones: '',
 });
+
+const { clearDraft } = useFormDraft(form, 'draft:create:radicados');
 
 // --- AUTO-FORMATO ---
 watch(() => form.demandantes, (newVal) => {
@@ -185,6 +189,7 @@ const submit = () => {
   })).post(route('procesos.store'), {
     preserveScroll: true,
     onSuccess: () => {
+      clearDraft();
       Swal.fire({
           title: '¡Éxito!',
           text: 'El radicado ha sido registrado correctamente.',
@@ -299,14 +304,20 @@ const submit = () => {
                         <InputError :message="form.errors.asunto" />
                     </div>
                     <div class="space-y-2">
-                        <InputLabel value="Número de Radicado (23 dígitos)" class="font-bold text-xs uppercase" />
+                        <div class="flex justify-between items-center mb-1">
+                            <InputLabel value="Número de Radicado (23 dígitos)" class="font-bold text-xs uppercase" />
+                            <label class="flex items-center gap-1.5 cursor-pointer group">
+                                <input type="checkbox" v-model="form.es_spoa_nunc" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3 h-3" />
+                                <span class="text-[9px] font-black uppercase text-gray-400 group-hover:text-indigo-600 transition-colors">¿Es SPOA/NUNC?</span>
+                            </label>
+                        </div>
                         <div class="relative">
-                            <ScaleIcon class="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                            <ScaleIcon class="absolute left-3 top-3 w-4 h-4" :class="form.es_spoa_nunc ? 'text-indigo-500' : 'text-gray-400'" />
                             <TextInput 
                                 v-model="form.radicado" 
                                 @input="handleRadicadoInput"
                                 class="pl-10 w-full rounded-xl border-gray-200 font-mono" 
-                                placeholder="XXXXX-XX-XX-XXX-XXXX-XXXXX-XX" 
+                                :placeholder="form.es_spoa_nunc ? '21 dígitos (Sistema Penal)' : '14 a 23 dígitos (Sin caracteres especiales)'" 
                             />
                         </div>
                         <InputError :message="form.errors.radicado" />

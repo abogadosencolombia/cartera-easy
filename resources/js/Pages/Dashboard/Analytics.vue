@@ -254,7 +254,7 @@ const horizontalBarOptions = {
                                         </div>
                                         <div class="flex items-center gap-3">
                                             <div class="w-2 h-2 rounded-full bg-gray-300"></div>
-                                            <p class="text-xs font-bold text-gray-500 uppercase tracking-widest">Inactividad: <span class="text-red-600 font-black">{{ item.dias_inactivo }} Días</span></p>
+                                            <p class="text-xs font-bold text-gray-500 uppercase tracking-widest">Inactividad: <span class="text-red-600 font-black">{{ Math.round(item.dias_inactivo) }} Días</span></p>
                                         </div>
                                     </div>
 

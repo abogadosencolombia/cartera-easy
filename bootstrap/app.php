@@ -8,6 +8,7 @@ use App\Http\Middleware\TrustProxies;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Session\TokenMismatchException;
 use Inertia\Inertia;
+use App\Http\Middleware\EnsureSingleActiveSession;
 // ===== INICIO DE LA NUEVA CORRECCIÓN =====
 // Importamos la excepción de Conflicto (Error 409)
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -26,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             TrustProxies::class,  // PRIMERO TrustProxies
             \App\Http\Middleware\HandleInertiaRequests::class,  // DESPUÉS Inertia
+            EnsureSingleActiveSession::class,
         ]);
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckUserRole::class,

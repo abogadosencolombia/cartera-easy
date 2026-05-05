@@ -11,6 +11,7 @@ import DocumentosTab from './Tabs/DocumentosTab.vue';
 import FinancieroTab from './Tabs/FinancieroTab.vue';
 import ActuacionesTab from './Tabs/ActuacionesTab.vue';
 import ActividadTab from './Tabs/ActividadTab.vue';
+import ViabilidadTab from './Tabs/ViabilidadTab.vue';
 
 // Iconos
 import {
@@ -24,11 +25,13 @@ import {
     ArrowLeftIcon,
     PencilSquareIcon,
     UserCircleIcon,
+    UsersIcon,
     CheckCircleIcon,
     ExclamationTriangleIcon,
     BanknotesIcon,
     CalendarDaysIcon,
-    BriefcaseIcon
+    BriefcaseIcon,
+    ShieldCheckIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -42,7 +45,7 @@ const props = defineProps({
 });
 
 const page = usePage();
-const validTabs = ['resumen', 'documentos', 'financiero', 'actuaciones', 'actividad'];
+const validTabs = ['resumen', 'viabilidad', 'documentos', 'financiero', 'actuaciones', 'actividad'];
 const getInitialTab = () => {
     if (typeof window === 'undefined') return 'resumen';
     const params = new URLSearchParams(window.location.search);
@@ -52,6 +55,7 @@ const getInitialTab = () => {
 
 const activeTab = ref(getInitialTab());
 const user = usePage().props.auth.user;
+const isMinimized = ref(false);
 
 const setActiveTab = (tab) => {
     activeTab.value = tab;
@@ -155,6 +159,52 @@ const confirmUnlockCase = () => {
         <div class="py-6">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
                 
+                <!-- Alerta Crítica: Sin Codeudores -->
+                <div v-if="caso.codeudores.length === 0 && !caso.sin_codeudores && !isMinimized" 
+                    class="rounded-3xl p-6 bg-rose-50 dark:bg-rose-900/20 border-2 border-rose-200 dark:border-rose-800 flex flex-col md:flex-row items-center justify-between gap-6 animate-in slide-in-from-top-4">
+                    <div class="flex items-center gap-5 text-center md:text-left">
+                        <div class="p-4 bg-rose-100 dark:bg-rose-900/50 rounded-2xl shadow-sm shrink-0">
+                            <UsersIcon class="w-10 h-10 text-rose-600" />
+                        </div>
+                        <div>
+                            <h3 class="text-base font-black text-rose-900 dark:text-rose-100 uppercase tracking-tight">Expediente sin codeudores vinculados</h3>
+                            <p class="text-xs font-bold text-rose-600 dark:text-rose-400 mt-1 max-w-lg">Este proceso jurídico se encuentra incompleto. Se requiere la vinculación de co-obligados o la confirmación oficial de que el título no posee garantías adicionales.</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-center gap-3 shrink-0">
+                        <Link :href="route('casos.edit', caso.id) + '?tab=codeudores'" class="px-6 py-3 bg-rose-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-xl shadow-rose-200 dark:shadow-none active:scale-95">
+                            Agregar Ahora
+                        </Link>
+                        <button @click="isMinimized = true" class="px-5 py-3 text-[11px] font-black text-rose-400 uppercase tracking-widest hover:text-rose-600 transition-colors">
+                            Más tarde
+                        </button>
+                    </div>
+                </div>
+
+                <!-- BANNER DE SEGURIDAD JURÍDICA (AUTOMÁTICO) -->
+                <div v-if="caso.viabilidad_estado && caso.viabilidad_estado !== 'pendiente'" 
+                    class="rounded-2xl p-4 flex items-center justify-between border-2 animate-in slide-in-from-top-4"
+                    :class="{
+                        'bg-emerald-50 border-emerald-200 text-emerald-800': caso.viabilidad_estado === 'verde',
+                        'bg-amber-50 border-amber-200 text-amber-800': caso.viabilidad_estado === 'amarillo',
+                        'bg-rose-50 border-rose-200 text-rose-800': caso.viabilidad_estado === 'rojo',
+                    }">
+                    <div class="flex items-center gap-4">
+                        <div class="p-3 rounded-xl bg-white shadow-sm">
+                            <ShieldCheckIcon v-if="caso.viabilidad_estado === 'verde'" class="w-6 h-6 text-emerald-600" />
+                            <ExclamationTriangleIcon v-if="caso.viabilidad_estado === 'amarillo'" class="w-6 h-6 text-amber-600" />
+                            <XCircleIcon v-if="caso.viabilidad_estado === 'rojo'" class="w-6 h-6 text-rose-600" />
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-black uppercase tracking-tight">
+                                {{ caso.viabilidad_estado === 'verde' ? 'EXPEDIENTE BLINDADO' : (caso.viabilidad_estado === 'amarillo' ? 'REVISIÓN REQUERIDA' : 'DEMANDA BLOQUEADA') }}
+                            </h4>
+                            <p class="text-[10px] font-bold uppercase opacity-70">DICTAMEN DEL DIRECTOR JURÍDICO: {{ caso.viabilidad_estado }}</p>
+                        </div>
+                    </div>
+                    <button @click="setActiveTab('viabilidad')" class="px-4 py-2 bg-white rounded-xl text-[10px] font-black uppercase shadow-sm hover:shadow-md transition-all">Ver Ficha Técnica</button>
+                </div>
+                
                 <!-- DASHBOARD COMPACTO -->
                 <div class="bg-white dark:bg-gray-800 shadow-sm rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                     <div class="grid grid-cols-1 lg:grid-cols-4">
@@ -205,6 +255,7 @@ const confirmUnlockCase = () => {
                             <button
                                 v-for="tab in [
                                     { id: 'resumen', label: 'Resumen', icon: InformationCircleIcon },
+                                    { id: 'viabilidad', label: 'Viabilidad', icon: ShieldCheckIcon },
                                     { id: 'documentos', label: 'Documentos', icon: FolderOpenIcon },
                                     { id: 'financiero', label: 'Financiero', icon: CreditCardIcon },
                                     { id: 'actuaciones', label: 'Actuaciones', icon: ClipboardDocumentListIcon },
@@ -222,6 +273,7 @@ const confirmUnlockCase = () => {
 
                     <div class="p-6">
                         <ResumenTab v-show="activeTab === 'resumen'" :caso="caso" :resumen_financiero="resumen_financiero" :formatCurrency="formatCurrency" :formatDate="formatDate" :formatLabel="formatLabel" />
+                        <ViabilidadTab v-show="activeTab === 'viabilidad'" :entity="caso" type="caso" />
                         <DocumentosTab v-show="activeTab === 'documentos'" :caso="caso" :plantillas="plantillas" :puedeEditar="puedeEditar" />
                         <FinancieroTab v-show="activeTab === 'financiero'" :caso="caso" :resumen_financiero="resumen_financiero" :contrato_id="caso.contrato?.id" :formatCurrency="formatCurrency" />
                         <ActuacionesTab v-show="activeTab === 'actuaciones'" :caso="caso" :actuaciones="actuaciones" :is-form-disabled="!puedeEditar" />

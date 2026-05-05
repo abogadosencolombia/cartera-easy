@@ -39,8 +39,18 @@ class UpdateCasoRequest extends FormRequest
             'radicado' => [
                 'nullable', 
                 'string', 
-                'max:255', 
-                Rule::unique('casos', 'radicado')->ignore($this->route('caso'))->whereNull('deleted_at')
+                'max:23',
+                'regex:/^[0-9]+$/',
+                Rule::unique('casos', 'radicado')->ignore($this->route('caso'))->whereNull('deleted_at'),
+                function ($attribute, $value, $fail) {
+                    if (!empty($value) && strlen($value) < 14) {
+                        $caso = $this->route('caso');
+                        $currentRadicado = $caso instanceof \App\Models\Caso ? $caso->radicado : \App\Models\Caso::find($caso)?->radicado;
+                        if ($value !== $currentRadicado) {
+                            $fail('El número de radicado debe tener entre 14 y 23 dígitos (solo números).');
+                        }
+                    }
+                }
             ],
             'especialidad_id' => ['nullable', 'integer', 'exists:especialidades_juridicas,id'],
             'tipo_proceso' => ['nullable', 'string'],
@@ -86,6 +96,8 @@ class UpdateCasoRequest extends FormRequest
             'codeudores.*.addresses' => ['nullable', 'array'],
             'codeudores.*.social_links' => ['nullable', 'array'],
             'juzgado_id' => ['nullable', 'integer', 'exists:juzgados,id'],
+            'sin_codeudores' => ['nullable', 'boolean'],
+            'es_spoa_nunc' => ['nullable', 'boolean'],
         ];
     }
 

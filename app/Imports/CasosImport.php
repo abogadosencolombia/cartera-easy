@@ -26,6 +26,7 @@ class CasosImport implements ToCollection, WithHeadingRow
                 'messages' => [],
                 'id_sistema' => $idSistema,
                 'radicado' => preg_replace('/[^0-9]/', '', trim((string)($row['radicado_23_digitos'] ?? ''))),
+                'es_spoa_nunc' => strtoupper(trim($row['es_spoa_nunc_sino'] ?? 'NO')) === 'SI',
                 'referencia_credito' => trim((string)($row['referencia_credito_pagare'] ?? '')),
                 'nombre_deudor' => $nombreDeudor,
                 'documento_deudor' => $docDeudor,

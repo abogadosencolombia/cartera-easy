@@ -45,7 +45,11 @@ class HandleInertiaRequests extends Middleware
         if ($user) {
             // 1. Notificaciones estándar...
             if (method_exists($user, 'notificaciones')) {
-                $countCasos = $user->notificaciones()->where('leido', false)->where('fecha_envio', '<=', now())->count();
+                $countCasos = $user->notificaciones()
+                    ->deExpedientesEnSeguimiento()
+                    ->where('leido', false)
+                    ->where('fecha_envio', '<=', now())
+                    ->count();
             }
             if (method_exists($user, 'unreadNotifications')) {
                 $countTareas = $user->unreadNotifications()->count();
@@ -58,15 +62,15 @@ class HandleInertiaRequests extends Middleware
                 $riesgoDate = $hoy->copy()->addDays(2);
 
                 // --- RADICADOS (ABOGADOS COLOMBIA) - CONTEO GLOBAL ---
-                $queryRad = \App\Models\ProcesoRadicado::where('estado', 'ACTIVO');
+                $queryRad = \App\Models\ProcesoRadicado::paraSeguimiento();
                 
                 $urgencias['radicados_vencidos'] = (clone $queryRad)->where('fecha_proxima_revision', '<', $hoy)->count();
                 $urgencias['radicados_riesgo'] = (clone $queryRad)->whereBetween('fecha_proxima_revision', [$hoy, $riesgoDate])->count();
 
                 // --- CASOS (COOPERATIVAS) - CONTEO GLOBAL ---
-                $queryCasos = \App\Models\Caso::where('estado_proceso', '!=', 'cerrado');
+                $queryCasos = \App\Models\Caso::paraSeguimiento();
 
-                $urgencias['casos_vencidos'] = (clone $queryCasos)->where('updated_at', '<', now()->subDays(10))->count();
+                $urgencias['casos_vencidos'] = (clone $queryCasos)->where('updated_at', '<', now()->subDays(20))->count();
 
                 $urgencias['total'] = $urgencias['radicados_vencidos'] + $urgencias['radicados_riesgo'] + $urgencias['casos_vencidos'];
             }
@@ -78,6 +82,9 @@ class HandleInertiaRequests extends Middleware
                 'unreadNotifications' => $countCasos + $countTareas,
                 'pendingGestionDiaria' => $countGestionDiaria,
                 'urgencias' => $urgencias,
+            ],
+            'session' => [
+                'idleTimeoutMinutes' => (int) config('session.lifetime', 60),
             ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, onMounted } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import TextInput from '@/Components/TextInput.vue';
@@ -74,6 +74,18 @@ const closeQuickView = () => {
     setTimeout(() => { selectedProceso.value = null; }, 300);
 };
 
+watch(() => props.procesos.data, (procesos) => {
+    if (!selectedProceso.value) return;
+
+    const refreshed = procesos.find(p => p.id === selectedProceso.value.id);
+    if (refreshed) {
+        selectedProceso.value = refreshed;
+        return;
+    }
+
+    closeQuickView();
+});
+
 const currentIndex = computed(() => {
     if (!selectedProceso.value) return -1;
     return props.procesos.data.findIndex(p => p.id === selectedProceso.value.id);
@@ -100,23 +112,135 @@ const tiposEntidad = [
 ];
 
 // --- FILTROS ---
-const search = ref(props.filtros.search || '');
-const estado = ref(props.filtros.estado || 'TODOS');
-const juzgadoId = ref(props.filtros.juzgado_id || '');
+const filterStorageKey = 'radicados.index.filters';
+const filterKeys = ['search', 'estado', 'juzgado_id', 'tipo_entidad', 'sin_radicado', 'solo_vencidos', 'cerrados', 'actualizados_hoy'];
+const booleanFilterKeys = ['sin_radicado', 'solo_vencidos', 'cerrados', 'actualizados_hoy'];
+
+const parseBooleanFilter = (value) => value === true || value === 'true' || value === 1 || value === '1';
+
+const readStoredFilters = () => {
+    if (typeof window === 'undefined') return {};
+
+    try {
+        return JSON.parse(sessionStorage.getItem(filterStorageKey) || '{}') || {};
+    } catch {
+        return {};
+    }
+};
+
+const storedFilters = readStoredFilters();
+
+const initialFilterValue = (key, fallback = '') => props.filtros?.[key] ?? storedFilters[key] ?? fallback;
+
+const hasUsefulFilterValue = (filters) => filterKeys.some((key) => {
+    if (key === 'estado') {
+        return String(filters[key] ?? '').trim() !== '' && filters[key] !== 'TODOS';
+    }
+
+    if (booleanFilterKeys.includes(key)) {
+        return parseBooleanFilter(filters[key]);
+    }
+
+    return String(filters[key] ?? '').trim() !== '';
+});
+
+const hasUsefulUrlFilter = () => {
+    if (typeof window === 'undefined') return false;
+
+    const params = new URLSearchParams(window.location.search);
+    return filterKeys.some((key) => {
+        if (!params.has(key)) return false;
+        if (key === 'estado') {
+            const value = params.get(key);
+            return value !== '' && value !== 'TODOS';
+        }
+        if (booleanFilterKeys.includes(key)) {
+            return parseBooleanFilter(params.get(key));
+        }
+
+        return String(params.get(key) ?? '').trim() !== '';
+    });
+};
+
+const search = ref(initialFilterValue('search'));
+const estado = ref(initialFilterValue('estado') || 'TODOS');
+const juzgadoId = ref(initialFilterValue('juzgado_id'));
 const selectedJuzgado = ref(props.selectedJuzgado);
-const tipoEntidad = ref(props.filtros.tipo_entidad || '');
-const sinRadicado = ref(props.filtros.sin_radicado === 'true' || props.filtros.sin_radicado === true);
-const soloVencidos = ref(props.filtros.solo_vencidos === 'true' || props.filtros.solo_vencidos === true);
+const tipoEntidad = ref(initialFilterValue('tipo_entidad'));
+const sinRadicado = ref(parseBooleanFilter(initialFilterValue('sin_radicado', false)));
+const soloVencidos = ref(parseBooleanFilter(initialFilterValue('solo_vencidos', false)));
+const cerrados = ref(parseBooleanFilter(initialFilterValue('cerrados', false)));
+const actualizadosHoy = ref(parseBooleanFilter(initialFilterValue('actualizados_hoy', false)));
+
+const currentFilterPayload = () => ({
+    search: search.value,
+    estado: estado.value === 'TODOS' ? '' : estado.value,
+    juzgado_id: juzgadoId.value,
+    tipo_entidad: tipoEntidad.value,
+    sin_radicado: sinRadicado.value,
+    solo_vencidos: soloVencidos.value,
+    cerrados: cerrados.value,
+    actualizados_hoy: actualizadosHoy.value,
+});
+
+const persistFilters = (filters) => {
+    if (typeof window === 'undefined') return;
+
+    if (hasUsefulFilterValue(filters)) {
+        sessionStorage.setItem(filterStorageKey, JSON.stringify(filters));
+    } else {
+        sessionStorage.removeItem(filterStorageKey);
+    }
+};
+
+const reapplyStoredFiltersIfNeeded = () => {
+    if (!hasUsefulUrlFilter() && hasUsefulFilterValue(storedFilters)) {
+        router.get(route('procesos.index'), storedFilters, {
+            replace: true,
+            preserveState: false,
+        });
+        return true;
+    }
+
+    return false;
+};
 
 watch(selectedJuzgado, (val) => {
     juzgadoId.value = val?.id || '';
 });
 
+const clearControlFilters = () => {
+    estado.value = 'TODOS';
+    sinRadicado.value = false;
+    soloVencidos.value = false;
+    cerrados.value = false;
+    actualizadosHoy.value = false;
+};
+
+const applyControlFilter = (filterKey) => {
+    const filterRefs = {
+        sin_radicado: sinRadicado,
+        solo_vencidos: soloVencidos,
+        cerrados,
+        actualizados_hoy: actualizadosHoy,
+    };
+    const target = filterRefs[filterKey];
+    if (!target) return;
+
+    const nextValue = !target.value;
+    clearControlFilters();
+    target.value = nextValue;
+};
+
 const isDirty = computed(() => {
-    return search.value !== '' || estado.value !== 'TODOS' || juzgadoId.value !== '' || tipoEntidad.value !== '' || sinRadicado.value === true || soloVencidos.value === true;
+    return search.value !== '' || estado.value !== 'TODOS' || juzgadoId.value !== '' || tipoEntidad.value !== '' || sinRadicado.value === true || soloVencidos.value === true || cerrados.value === true || actualizadosHoy.value === true;
 });
 
 const resetFilters = () => {
+    if (typeof window !== 'undefined') {
+        sessionStorage.removeItem(filterStorageKey);
+    }
+
     search.value = '';
     estado.value = 'TODOS';
     juzgadoId.value = '';
@@ -124,30 +248,26 @@ const resetFilters = () => {
     tipoEntidad.value = '';
     sinRadicado.value = false;
     soloVencidos.value = false;
+    cerrados.value = false;
+    actualizadosHoy.value = false;
 };
 
 const applyFilters = debounce(() => {
-    router.get(route('procesos.index'), { 
-        search: search.value, 
-        estado: estado.value === 'TODOS' ? '' : estado.value,
-        juzgado_id: juzgadoId.value,
-        tipo_entidad: tipoEntidad.value,
-        sin_radicado: sinRadicado.value,
-        solo_vencidos: soloVencidos.value
-    }, { preserveState: true, replace: true });
+    const filters = currentFilterPayload();
+    persistFilters(filters);
+
+    router.get(route('procesos.index'), filters, { preserveState: true, replace: true });
 }, 300);
 
-watch([search, estado, juzgadoId, tipoEntidad, sinRadicado, soloVencidos], applyFilters);
+watch([search, estado, juzgadoId, tipoEntidad, sinRadicado, soloVencidos, cerrados, actualizadosHoy], applyFilters);
+
+onMounted(() => {
+    reapplyStoredFiltersIfNeeded();
+});
 
 // --- EXPORTAR ---
 const exportarExcel = () => {
-    const params = new URLSearchParams({
-        search: search.value,
-        estado: estado.value === 'TODOS' ? '' : estado.value,
-        tipo_entidad: tipoEntidad.value,
-        sin_radicado: sinRadicado.value,
-        solo_vencidos: soloVencidos.value
-    });
+    const params = new URLSearchParams(currentFilterPayload());
     window.location.href = route('procesos.exportar') + '?' + params.toString();
 };
 
@@ -368,7 +488,7 @@ const copyLegalInfo = (proceso) => {
             <div class="max-w-8xl mx-auto sm:px-6 lg:px-8 space-y-4">
                 
                 <!-- STATS / KPI CARDS -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                     <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md">
                         <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-indigo-600">
                             <ScaleIcon class="w-16 h-16" />
@@ -378,23 +498,61 @@ const copyLegalInfo = (proceso) => {
                         <p class="text-[9px] text-gray-500 font-bold mt-1 uppercase tracking-tighter">En gestión interna</p>
                     </div>
 
-                    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md">
+                    <button
+                        type="button"
+                        @click="applyControlFilter('sin_radicado')"
+                        :class="sinRadicado ? 'ring-2 ring-amber-400 border-amber-200 dark:border-amber-500/70' : ''"
+                        class="text-left w-full bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    >
                         <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-amber-600">
                             <ArchiveBoxXMarkIcon class="w-16 h-16" />
                         </div>
-                        <p class="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Incompletos</p>
+                        <p class="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Sin Radicado</p>
                         <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.sin_radicado }}</p>
                         <p class="text-[9px] text-amber-500 font-bold mt-1 uppercase tracking-tighter">Pendientes de radicado</p>
-                    </div>
+                    </button>
 
-                    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md">
+                    <button
+                        type="button"
+                        @click="applyControlFilter('cerrados')"
+                        :class="cerrados ? 'ring-2 ring-red-400 border-red-200 dark:border-red-500/70' : ''"
+                        class="text-left w-full bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                    >
+                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-red-600">
+                            <CheckCircleIcon class="w-16 h-16" />
+                        </div>
+                        <p class="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1">Cerrados</p>
+                        <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.cerrados }}</p>
+                        <p class="text-[9px] text-red-500 font-bold mt-1 uppercase tracking-tighter">Expedientes finalizados</p>
+                    </button>
+
+                    <button
+                        type="button"
+                        @click="applyControlFilter('actualizados_hoy')"
+                        :class="actualizadosHoy ? 'ring-2 ring-indigo-400 border-indigo-200 dark:border-indigo-500/70' : ''"
+                        class="text-left w-full bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    >
+                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-indigo-600">
+                            <ArrowPathIcon class="w-16 h-16" />
+                        </div>
+                        <p class="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Actualizados Hoy</p>
+                        <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.actualizados_hoy }}</p>
+                        <p class="text-[9px] text-indigo-500 font-bold mt-1 uppercase tracking-tighter">Cambios del día</p>
+                    </button>
+
+                    <button
+                        type="button"
+                        @click="applyControlFilter('solo_vencidos')"
+                        :class="soloVencidos ? 'ring-2 ring-red-400 border-red-200 dark:border-red-500/70' : ''"
+                        class="text-left w-full bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                    >
                         <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-red-600">
                             <ExclamationTriangleIcon class="w-16 h-16" />
                         </div>
                         <p class="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1">Revisiones Vencidas</p>
                         <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.vencidos }}</p>
                         <p class="text-[9px] text-red-500 font-bold mt-1 uppercase tracking-tighter">Acción requerida urgente</p>
-                    </div>
+                    </button>
 
                     <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md">
                         <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-emerald-600">
@@ -411,7 +569,7 @@ const copyLegalInfo = (proceso) => {
             <div class="flex flex-col xl:flex-row gap-6">
                 <!-- Búsqueda Principal -->
                 <div class="relative flex-grow">
-                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Búsqueda Maestra</label>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Búsqueda General</label>
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <MagnifyingGlassIcon class="h-4 w-4 text-gray-400" />
@@ -446,7 +604,7 @@ const copyLegalInfo = (proceso) => {
                         <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Filtros Rápidos</label>
                         <div class="flex items-center gap-2">
                             <button 
-                                @click="sinRadicado = !sinRadicado"
+                                @click="applyControlFilter('sin_radicado')"
                                 :class="sinRadicado ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-50 text-gray-500 border-gray-200'"
                                 class="flex-1 px-3 py-3 rounded-xl border text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-1.5"
                             >
@@ -454,7 +612,7 @@ const copyLegalInfo = (proceso) => {
                                 Sin Radicado
                             </button>
                             <button 
-                                @click="soloVencidos = !soloVencidos"
+                                @click="applyControlFilter('solo_vencidos')"
                                 :class="soloVencidos ? 'bg-red-600 text-white border-red-600' : 'bg-gray-50 text-gray-500 border-gray-200'"
                                 class="flex-1 px-3 py-3 rounded-xl border text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-1.5"
                             >
@@ -543,9 +701,20 @@ const copyLegalInfo = (proceso) => {
                                         <div v-if="proceso.is_pinned" class="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-r"></div>
                                         <div class="flex flex-col">
                                             <div class="flex items-center gap-2">
+                                                <div 
+                                                     class="w-2.5 h-2.5 rounded-full shrink-0"
+                                                     :class="{
+                                                         'bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]': proceso.viabilidad_estado === 'verde',
+                                                         'bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.6)]': proceso.viabilidad_estado === 'amarillo',
+                                                         'bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]': proceso.viabilidad_estado === 'rojo',
+                                                         'bg-gray-300 dark:bg-gray-600': !proceso.viabilidad_estado || proceso.viabilidad_estado === 'pendiente'
+                                                     }"
+                                                     :title="'Estado de Viabilidad: ' + (proceso.viabilidad_estado || 'pendiente').toUpperCase()">
+                                                </div>
                                                 <Link @click.stop :href="route('procesos.show', proceso.id)" class="text-sm font-black text-indigo-600 dark:text-indigo-400 hover:underline">
                                                     {{ proceso.radicado || 'SIN RADICADO' }}
                                                 </Link>
+                                                <span v-if="proceso.es_spoa_nunc" class="text-[7px] font-black bg-indigo-100 text-indigo-700 px-1 rounded uppercase tracking-tighter">SPOA/NUNC</span>
                                                 <button v-if="proceso.radicado" @click.stop="copyToClipboard(proceso.radicado)" class="text-gray-300 hover:text-indigo-500 transition-colors">
                                                     <DocumentDuplicateIcon class="w-3.5 h-3.5" />
                                                 </button>
@@ -651,7 +820,7 @@ const copyLegalInfo = (proceso) => {
                                                 <EyeIcon class="w-5 h-5" />
                                             </Link>
                                             
-                                            <Dropdown align="right" width="48">
+                                            <Dropdown align="right" width="48" teleport>
                                                 <template #trigger>
                                                     <button class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">
                                                         <EllipsisVerticalIcon class="w-5 h-5" />
@@ -770,6 +939,7 @@ const copyLegalInfo = (proceso) => {
                                 <span v-if="selectedProceso.a_favor_de" class="text-[8px] font-black px-1.5 py-0.5 rounded bg-white/20 text-white border border-white/10 uppercase tracking-tighter">
                                     {{ selectedProceso.a_favor_de }}
                                 </span>
+                                <span v-if="selectedProceso.es_spoa_nunc" class="text-[8px] font-black px-1.5 py-0.5 rounded bg-white/20 text-white border border-white/10 uppercase tracking-tighter">SPOA/NUNC</span>
                             </div>
                             <h2 class="text-base sm:text-lg font-black leading-tight truncate">{{ selectedProceso.radicado || 'SIN RADICADO' }}</h2>
                         </div>

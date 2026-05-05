@@ -21,6 +21,21 @@ class ProcesoRadicado extends Model
 {
     use HasFactory, SoftDeletes;
 
+    public const ESTADOS_CIERRE = [
+        'CERRADO',
+        'ARCHIVADO',
+        'FINALIZADO',
+        'TERMINADO',
+        'Cerrado',
+        'Archivado',
+        'Finalizado',
+        'Terminado',
+        'cerrado',
+        'archivado',
+        'finalizado',
+        'terminado',
+    ];
+
     protected $table = 'proceso_radicados';
 
     protected $appends = ['demandante', 'demandado'];
@@ -35,7 +50,10 @@ class ProcesoRadicado extends Model
         'fecha_cambio_etapa',
         'is_pinned',
         'checklist_seguimiento',
-        'a_favor_de'
+        'a_favor_de',
+        'viabilidad_juridica',
+        'viabilidad_estado',
+        'es_spoa_nunc'
     ];
 
     /**
@@ -63,6 +81,8 @@ class ProcesoRadicado extends Model
         'info_incompleta' => 'boolean',
         'is_pinned' => 'boolean',
         'checklist_seguimiento' => 'array',
+        'viabilidad_juridica' => 'array',
+        'es_spoa_nunc' => 'boolean',
     ];
 
     /**
@@ -87,6 +107,30 @@ class ProcesoRadicado extends Model
     public function touchRevision()
     {
         $this->update(['fecha_revision' => now()]);
+    }
+
+    public function scopeParaSeguimiento($query)
+    {
+        return $query
+            ->whereNull('nota_cierre')
+            ->where(function ($query) {
+                $query->whereNull('estado')
+                    ->orWhereNotIn('estado', self::ESTADOS_CIERRE);
+            });
+    }
+
+    public function scopeCerrados($query)
+    {
+        return $query->where(function ($query) {
+            $query->whereNotNull('nota_cierre')
+                ->orWhereIn('estado', self::ESTADOS_CIERRE);
+        });
+    }
+
+    public function estaEnSeguimiento(): bool
+    {
+        return empty($this->nota_cierre)
+            && !in_array($this->estado, self::ESTADOS_CIERRE, true);
     }
 
     // --- RELACIONES ---
@@ -189,6 +233,6 @@ class ProcesoRadicado extends Model
             return null; 
         }
         $fechaLimite = $this->fecha_cambio_etapa->copy()->addWeekdays($this->etapaActual->sla_dias);
-        return now()->diffInDays($fechaLimite, false);
+        return (int) now()->diffInDays($fechaLimite, false);
     }
 }

@@ -17,7 +17,8 @@ import {
     PlusIcon,
     ClockIcon,
     BookmarkIcon,
-    PencilSquareIcon
+    PencilSquareIcon,
+    SparklesIcon
 } from '@heroicons/vue/24/outline';
 import Swal from 'sweetalert2';
 
@@ -47,6 +48,32 @@ const appendQuickText = (text) => {
 };
 
 const actuacionForm = useForm({ nota: '', fecha_actuacion: new Date().toISOString().slice(0, 10) });
+
+const generarNotaInteligente = () => {
+    const c = props.caso;
+    const etapa = c.etapa_procesal || 'Cobro';
+    let texto = `En seguimiento al expediente administrativo, se verifica el estado actual en ${etapa}. `;
+    
+    if (etapa.includes('PREJUR')) {
+        texto += "Se intensifican gestiones de cobro persuasivo mediante llamadas y correos electrónicos. El deudor manifiesta voluntad de pago pero no concreta acuerdo.";
+    } else if (etapa.includes('DEMANDA')) {
+        texto += "Se prepara el paquete documental para remitir al equipo jurídico y proceder con la radicación formal de la demanda ejecutiva.";
+    } else {
+        texto += "Se actualiza el saldo de la deuda y se verifica la vigencia de los datos de contacto de los deudores y codeudores.";
+    }
+
+    actuacionForm.nota = texto;
+    
+    Swal.fire({
+        title: 'Nota Generada',
+        text: 'He redactado una nota para este caso. Puedes ajustarla.',
+        icon: 'success',
+        toast: true,
+        position: 'top-end',
+        timer: 3000
+    });
+};
+
 const guardarActuacion = () => {
     actuacionForm.post(route('casos.actuaciones.store', props.caso.id), {
         preserveScroll: true,
@@ -84,8 +111,11 @@ const eliminarActuacion = (id) => {
         
         <!-- REGISTRO RÁPIDO COMPACTO -->
         <div v-if="!isFormDisabled" class="bg-gray-50/50 dark:bg-gray-900/20 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
-            <h3 class="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2">
-                <PencilSquareIcon class="w-4 h-4 text-indigo-500" /> Nueva Actuación Procesal
+            <h3 class="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-4 flex items-center justify-between">
+                <div class="flex items-center gap-2"><PencilSquareIcon class="w-4 h-4 text-indigo-500" /> Nueva Actuación Procesal</div>
+                <button type="button" @click="generarNotaInteligente" class="text-[8px] bg-indigo-600 text-white px-2 py-1 rounded flex items-center gap-1 hover:bg-indigo-700 transition-all">
+                    <SparklesIcon class="w-3 h-3" /> Autocompletar
+                </button>
             </h3>
 
             <form @submit.prevent="guardarActuacion" class="grid grid-cols-1 lg:grid-cols-4 gap-4">

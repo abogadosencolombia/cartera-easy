@@ -186,6 +186,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('procesos/{proceso}/edit', [ProcesoRadicadoController::class, 'edit'])->name('procesos.edit');
     Route::patch('procesos/{proceso}', [ProcesoRadicadoController::class, 'update'])->name('procesos.update');
     Route::patch('procesos/{proceso}/pin', [ProcesoRadicadoController::class, 'togglePin'])->name('procesos.pin');
+    Route::patch('procesos/{proceso}/viabilidad', [ProcesoRadicadoController::class, 'updateViabilidad'])->name('procesos.viabilidad.update');
     Route::patch('procesos/{proceso}/quick-review', [ProcesoRadicadoController::class, 'quickReview'])->name('procesos.quick_review');
     Route::patch('procesos/{proceso}/checklist', [ProcesoRadicadoController::class, 'updateChecklist'])->name('procesos.checklist.update');
     Route::delete('procesos/{proceso}', [ProcesoRadicadoController::class, 'destroy'])->name('procesos.destroy');
@@ -261,6 +262,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::resource('casos', CasoController::class);
         Route::patch('/casos/{caso}/pin', [CasoController::class, 'togglePin'])->name('casos.pin');
+        Route::patch('/casos/{caso}/viabilidad', [CasoController::class, 'updateViabilidad'])->name('casos.viabilidad.update');
         Route::patch('/casos/{caso}/checklist', [CasoController::class, 'updateChecklist'])->name('casos.checklist.update');
         Route::patch('/casos/{caso}/unlock', [CasoController::class, 'unlock'])->name('casos.unlock');
         Route::patch('/casos/{caso}/reopen', [CasoController::class, 'reopen'])->name('casos.reopen');

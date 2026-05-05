@@ -64,6 +64,8 @@ const submitReopen = () => {
 
 const isFormDisabled = computed(() => (user.tipo_usuario !== 'admin' && props.caso.bloqueado));
 
+const isMinimized = ref(false);
+
 const formatDateForInput = (d) => d ? new Date(d).toISOString().split('T')[0] : null;
 const safeJsonParse = (s) => { if (!s) return []; try { const p = JSON.parse(s); return Array.isArray(p) ? p : []; } catch (e) { return []; } };
 
@@ -108,6 +110,8 @@ const form = useForm({
     notas_legales: props.caso.notas_legales,
     link_drive: props.caso.link_drive || '',
     link_expediente: props.caso.link_expediente || '',
+    sin_codeudores: !!props.caso.sin_codeudores,
+    es_spoa_nunc: !!props.caso.es_spoa_nunc,
 });
 
 watch(() => props.caso.id, (newId) => {
@@ -152,6 +156,8 @@ watch(() => props.caso.id, (newId) => {
             notas_legales: props.caso.notas_legales,
             link_drive: props.caso.link_drive || '',
             link_expediente: props.caso.link_expediente || '',
+            sin_codeudores: !!props.caso.sin_codeudores,
+            es_spoa_nunc: !!props.caso.es_spoa_nunc,
         });
         form.reset();
     }
@@ -193,7 +199,11 @@ watch(() => form.deudor.numero_documento, (newVal) => {
     }
 });
 
-const addCodeudor = () => { form.codeudores.push({ id: null, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', celular: '', correo: '', addresses: [], social_links: [], showDetails: true }); activeTab.value = 'codeudores'; };
+const addCodeudor = () => { 
+    form.sin_codeudores = false;
+    form.codeudores.push({ id: null, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', celular: '', correo: '', addresses: [], social_links: [], showDetails: true }); 
+    activeTab.value = 'codeudores'; 
+};
 const removeCodeudor = (idx) => form.codeudores.splice(idx, 1);
 const addAddress = (idx) => form.codeudores[idx].addresses.push({ label: 'Casa', address: '', city: '' });
 const removeAddress = (idx, addrIdx) => form.codeudores[idx].addresses.splice(addrIdx, 1);
@@ -310,7 +320,46 @@ const submit = () => {
                     </div>
 
                     <!-- Alertas de Duplicados o Identificación Incompleta -->
-                    <div class="px-8 pt-4">
+                    <div class="px-8 pt-4 space-y-4">
+                        <!-- Alerta Crítica: Sin Codeudores -->
+                        <div v-if="form.codeudores.length === 0 && !form.sin_codeudores && !isMinimized" 
+                            class="p-5 bg-rose-50 dark:bg-rose-900/20 border-2 border-rose-200 dark:border-rose-800 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 animate-in slide-in-from-top-4">
+                            <div class="flex items-center gap-4 text-center md:text-left">
+                                <div class="p-3 bg-rose-100 dark:bg-rose-900/50 rounded-2xl shadow-sm shrink-0">
+                                    <UsersIcon class="w-8 h-8 text-rose-600" />
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-black text-rose-800 dark:text-rose-300 uppercase tracking-widest">¡Atención! Proceso sin codeudores</h3>
+                                    <p class="text-xs font-bold text-rose-600 dark:text-rose-400 mt-1">Este expediente no registra garantías de terceros. ¿Desea agregarlos ahora o confirmar que no tiene?</p>
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap items-center justify-center gap-3 shrink-0">
+                                <button type="button" @click="setActiveTab('codeudores')" class="px-5 py-2.5 bg-rose-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-lg shadow-rose-200 dark:shadow-none">
+                                    Agregar Ahora
+                                </button>
+                                <button type="button" @click="form.sin_codeudores = true" class="px-5 py-2.5 bg-white dark:bg-gray-800 border border-rose-200 dark:border-gray-700 text-rose-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 transition-all">
+                                    Marcar sin codeudores
+                                </button>
+                                <button type="button" @click="isMinimized = true" class="px-4 py-2 text-[10px] font-bold text-rose-400 uppercase hover:text-rose-600 transition-colors">
+                                    Más tarde
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Estado: Confirmado sin codeudores -->
+                        <div v-if="form.sin_codeudores" class="p-4 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-800/50 rounded-2xl flex items-center justify-between gap-4 animate-in zoom-in-95">
+                            <div class="flex items-center gap-3">
+                                <div class="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+                                    <CheckCircleIcon class="w-5 h-5 text-emerald-600" />
+                                </div>
+                                <div>
+                                    <h4 class="text-[10px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-widest">Estado verificado: Sin Codeudores</h4>
+                                    <p class="text-[9px] text-emerald-600 dark:text-emerald-500 font-bold uppercase tracking-tighter">Este proceso se maneja sin garantías adicionales.</p>
+                                </div>
+                            </div>
+                            <button type="button" @click="form.sin_codeudores = false" class="text-[9px] font-black text-emerald-600 uppercase hover:underline">Cambiar Estado</button>
+                        </div>
+
                         <div v-if="faltaIdentificacion" class="p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/50 rounded-2xl flex items-center gap-3 animate-pulse">
                             <InformationCircleIcon class="w-5 h-5 text-blue-500" />
                             <p class="text-[10px] font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest">
@@ -440,12 +489,18 @@ const submit = () => {
                             <section v-show="activeTab === 'proceso-judicial'" class="space-y-8">
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
-                                        <InputLabel value="Radicado" />
+                                        <div class="flex justify-between items-center mb-1">
+                                            <InputLabel value="Radicado" />
+                                            <label class="flex items-center gap-1.5 cursor-pointer group">
+                                                <input type="checkbox" v-model="form.es_spoa_nunc" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3 h-3" />
+                                                <span class="text-[9px] font-black uppercase text-gray-400 group-hover:text-indigo-600 transition-colors">¿Es SPOA/NUNC?</span>
+                                            </label>
+                                        </div>
                                         <TextInput 
                                             v-model="form.radicado" 
                                             @input="handleRadicadoInput"
                                             class="w-full font-mono" 
-                                            placeholder="XXXXX-XX-XX-XXX-XXXX-XXXXX-XX"
+                                            :placeholder="form.es_spoa_nunc ? '21 dígitos (Sistema Penal)' : '23 dígitos numéricos (Sin puntos ni guiones)'"
                                         />
                                         <InputError :message="form.errors.radicado" />
                                     </div>

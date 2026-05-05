@@ -12,6 +12,7 @@ import {
     IdentificationIcon, MapPinIcon, ArrowLeftIcon, 
     ShieldCheckIcon, BriefcaseIcon, BuildingOffice2Icon 
 } from '@heroicons/vue/24/outline';
+import { useFormDraft } from '@/composables/useFormDraft';
 
 // --- PROPS ---
 defineProps({
@@ -33,6 +34,8 @@ const form = useForm({
     addresses: [],
 });
 
+const { clearDraft } = useFormDraft(form, 'draft:create:users');
+
 // --- LÓGICA DE DIRECCIONES ---
 function addAddress() {
     form.addresses.push({ address: '', city: '', details: '' });
@@ -44,6 +47,7 @@ function removeAddress(index) {
 // --- SUBMIT ---
 const submit = () => {
     form.post(route('admin.users.store'), {
+        onSuccess: clearDraft,
         onFinish: () => form.reset('password', 'password_confirmation'),
     });
 };

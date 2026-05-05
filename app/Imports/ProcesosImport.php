@@ -24,6 +24,7 @@ class ProcesosImport implements ToCollection, WithHeadingRow
             $this->processedRows[] = [
                 'id_interno'           => $idInterno,
                 'radicado'             => $radicado,
+                'es_spoa_nunc'         => strtoupper(trim($row['es_spoa_nunc_sino'] ?? 'NO')) === 'SI',
                 'fecha_radicado'       => $this->transformDate($row['fecha_radicacion'] ?? null),
                 'naturaleza'           => $row['naturaleza'] ?? null, // Ya no forzamos CIVIL
                 'asunto'               => $row['asunto'] ?? null,

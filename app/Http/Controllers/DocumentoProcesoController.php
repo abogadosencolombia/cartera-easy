@@ -18,39 +18,52 @@ class DocumentoProcesoController extends Controller
     public function store(Request $request, ProcesoRadicado $proceso)
     {
         $data = $request->validate([
-            'archivo' => ['required', 'file', 'max:102400'], // 100MB
-            'nombre'  => ['required', 'string', 'max:255'],
-            'nota'    => ['nullable', 'string', 'max:2000'],
+            'documentos' => ['required', 'array', 'min:1'],
+            'documentos.*.archivo' => ['required', 'file', 'max:102400'], // 100MB
+            'documentos.*.nombre'  => ['required', 'string', 'max:255'],
+            'documentos.*.nota'    => ['nullable', 'string', 'max:2000'],
             'fecha_proxima_revision' => ['required', 'date', 'after_or_equal:today'],
         ]);
 
-        $file = $request->file('archivo');
-        $dir  = "procesos/{$proceso->id}";
-        $path = $file->store($dir, 'public');
+        \DB::transaction(function () use ($proceso, $data, $request) {
+            foreach ($data['documentos'] as $docData) {
+                $file = $docData['archivo'];
+                $dir  = "procesos/{$proceso->id}";
+                $path = $file->store($dir, 'public');
 
-        \DB::transaction(function () use ($proceso, $data, $path, $request) {
-            DocumentoProceso::create([
-                'proceso_radicado_id' => $proceso->id,
-                'user_id'             => $request->user()->id ?? null,
-                'descripcion'         => $data['nota'] ?? null,
-                'file_name'           => $data['nombre'],
-                'file_path'           => $path,
-            ]);
+                DocumentoProceso::create([
+                    'proceso_radicado_id' => $proceso->id,
+                    'user_id'             => $request->user()->id ?? null,
+                    'descripcion'         => $docData['nota'] ?? null,
+                    'file_name'           => $docData['nombre'],
+                    'file_path'           => $path,
+                ]);
+
+                // ✅ AUDITORÍA POR CADA DOCUMENTO
+                $proceso->auditoria()->create([
+                    'user_id' => Auth::id(),
+                    'evento' => 'SUBIR_DOCUMENTO_PROCESO',
+                    'descripcion_breve' => "Subido documento '{$docData['nombre']}' al radicado {$proceso->radicado}",
+                    'criticidad' => 'media',
+                    'direccion_ip' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                ]);
+            }
 
             $proceso->update(['fecha_proxima_revision' => $data['fecha_proxima_revision']]);
-
-            // ✅ AUDITORÍA GLOBAL
+            
+            // Auditoría del cambio de fecha
             $proceso->auditoria()->create([
                 'user_id' => Auth::id(),
-                'evento' => 'SUBIR_DOCUMENTO_PROCESO',
-                'descripcion_breve' => "Subido documento '{$data['nombre']}' al radicado {$proceso->radicado}. Próxima revisión: {$data['fecha_proxima_revision']}",
-                'criticidad' => 'media',
-                'direccion_ip' => request()->ip(),
-                'user_agent' => request()->userAgent(),
+                'evento' => 'ACTUALIZAR_REVISION_PROCESO',
+                'descripcion_breve' => "Actualizada próxima revisión a {$data['fecha_proxima_revision']} tras subida masiva de documentos",
+                'criticidad' => 'baja',
+                'direccion_ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
             ]);
         });
 
-        return back()->with('success', 'Documento cargado y próxima revisión actualizada.');
+        return back()->with('success', 'Documentos cargados y próxima revisión actualizada.');
     }
 
     public function view(DocumentoProceso $documento)

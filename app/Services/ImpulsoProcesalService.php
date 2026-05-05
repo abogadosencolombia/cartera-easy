@@ -17,14 +17,14 @@ class ImpulsoProcesalService
         $hoy = Carbon::now();
 
         // 1. ANALIZAR RADICADOS (ABOGADOS COLOMBIA)
-        $radicados = ProcesoRadicado::where('estado', 'ACTIVO')
+        $radicados = ProcesoRadicado::paraSeguimiento()
             ->with(['etapaActual'])
             ->orderBy('updated_at', 'asc') // Los más "olvidados" primero
             ->take($limit * 2)
             ->get();
 
         foreach ($radicados as $r) {
-            $diasInactivo = $r->updated_at->diffInDays($hoy);
+            $diasInactivo = (int) $r->updated_at->diffInDays($hoy);
             $etapa = $r->etapaActual?->nombre ?? 'Sin Etapa';
             
             $sugerencia = $this->calcularSugerenciaRadicado($r, $diasInactivo, $etapa);
@@ -45,15 +45,15 @@ class ImpulsoProcesalService
         }
 
         // 2. ANALIZAR CASOS (COOPERATIVAS)
-        $casos = Caso::where('estado_proceso', '!=', 'cerrado')
+        $casos = Caso::paraSeguimiento()
             ->orderBy('updated_at', 'asc')
             ->take($limit * 2)
             ->get();
 
         foreach ($casos as $c) {
-            $diasInactivo = $c->updated_at->diffInDays($hoy);
+            $diasInactivo = (int) $c->updated_at->diffInDays($hoy);
             
-            if ($diasInactivo >= 10) {
+            if ($diasInactivo >= 20) {
                 $acciones->push([
                     'id' => $c->id,
                     'tipo' => 'CASO',

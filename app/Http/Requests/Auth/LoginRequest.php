@@ -56,7 +56,7 @@ class LoginRequest extends FormRequest
         }
 
         // 3. Si el usuario está activo (o no existe), intentamos la autenticación normal.
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        if (! Auth::attempt($this->only('email', 'password'), false)) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([

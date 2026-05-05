@@ -14,7 +14,21 @@ class UpdateProcesoRadicadoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'radicado'             => ['nullable', 'string', 'max:255'],
+            'radicado'             => [
+                'nullable', 
+                'string', 
+                'max:23',
+                'regex:/^[0-9]+$/',
+                function ($attribute, $value, $fail) {
+                    if (!empty($value) && strlen($value) < 14) {
+                        $proceso = $this->route('proceso');
+                        $currentRadicado = $proceso instanceof \App\Models\ProcesoRadicado ? $proceso->radicado : \App\Models\ProcesoRadicado::find($proceso)?->radicado;
+                        if ($value !== $currentRadicado) {
+                            $fail('El número de radicado debe tener entre 14 y 23 dígitos (solo números).');
+                        }
+                    }
+                }
+            ],
             'fecha_radicado'       => ['nullable', 'date'],
             'naturaleza'           => ['nullable', 'string', 'max:255'],
             'asunto'               => ['nullable', 'string', 'max:500'],
@@ -25,6 +39,7 @@ class UpdateProcesoRadicadoRequest extends FormRequest
             'ubicacion_drive'      => ['nullable', 'string', 'max:1024'],
             'correos_juzgado'      => ['nullable', 'string'],
             'observaciones'        => ['nullable', 'string'],
+            'es_spoa_nunc'         => ['nullable', 'boolean'],
 
             'abogado_id'              => ['required', 'exists:users,id'],
             'responsable_revision_id' => ['nullable', 'exists:users,id'],

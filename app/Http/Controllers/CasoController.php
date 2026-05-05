@@ -141,15 +141,30 @@ class CasoController extends Controller
             });
         });
 
+        $inicioHoy = now()->startOfDay();
+        $finHoy = now()->endOfDay();
+        $aplicarActualizadosHoy = fn ($q) => $q->whereBetween('updated_at', [$inicioHoy, $finHoy]);
+
+        // Las tarjetas deben contar sobre los filtros base, antes de aplicar el KPI seleccionado.
+        $statsQuery = clone $query;
+
         if ($request->boolean('sin_radicado')) {
             $query->where(function ($q) {
                 $q->whereNull('radicado')->orWhere('radicado', '');
             });
         }
 
-        if ($request->boolean('inactivo_15_dias')) {
-            $query->where('updated_at', '<', now()->subDays(15))
-                  ->where('estado_proceso', '!=', 'cerrado');
+        if ($request->boolean('cerrados')) {
+            $query->cerrados();
+        }
+
+        if ($request->boolean('actualizados_hoy')) {
+            $aplicarActualizadosHoy($query);
+        }
+
+        if ($request->boolean('inactivo_20_dias')) {
+            $query->where('updated_at', '<', now()->subDays(20))
+                  ->paraSeguimiento();
         }
 
         $casos = $query->orderBy('is_pinned', 'desc')->orderBy('updated_at', 'desc')->paginate(20)->withQueryString();
@@ -168,16 +183,13 @@ class CasoController extends Controller
 
         $etapas_procesales = DB::table('etapas_procesales')->orderBy('nombre')->pluck('nombre')->all();
 
-        // --- Estadísticas para los KPI Cards (SQL puro para máxima velocidad y alcance global) ---
-        $statsQuery = (clone $query)->reorder(); // <--- Eliminamos cualquier ORDER BY heredado
-        $stats = Inertia::defer(function() use ($statsQuery) {
-            return [
-                'total' => (clone $statsQuery)->count(),
-                'sin_radicado' => (clone $statsQuery)->where(fn($q) => $q->whereNull('radicado')->orWhere('radicado', ''))->count(),
-                'saldo_total' => (clone $statsQuery)->selectRaw('SUM(COALESCE(monto_total, 0) - COALESCE(monto_total_pagado, 0)) as total')->value('total') ?? 0,
-                'actualizados_hoy' => (clone $statsQuery)->whereDate('updated_at', Carbon::today())->count(),
-            ];
-        });
+        $stats = [
+            'total' => (clone $statsQuery)->count(),
+            'sin_radicado' => (clone $statsQuery)->where(fn($q) => $q->whereNull('radicado')->orWhere('radicado', ''))->count(),
+            'cerrados' => (clone $statsQuery)->cerrados()->count(),
+            'saldo_total' => (clone $statsQuery)->selectRaw('SUM(COALESCE(monto_total, 0) - COALESCE(monto_total_pagado, 0)) as total')->value('total') ?? 0,
+            'actualizados_hoy' => $aplicarActualizadosHoy(clone $statsQuery)->count(),
+        ];
 
         return Inertia::render('Casos/Index', [
             'casos' => $casos,
@@ -185,7 +197,7 @@ class CasoController extends Controller
             'cooperativas' => $cooperativas,
             'selectedJuzgado' => $selectedJuzgado,
             'etapas_procesales' => $etapas_procesales,
-            'filters' => $request->only(['search', 'abogado_id', 'cooperativa_id', 'juzgado_id', 'tipo_entidad', 'etapa_procesal', 'sin_radicado']),
+            'filters' => $request->only(['search', 'abogado_id', 'cooperativa_id', 'juzgado_id', 'tipo_entidad', 'etapa_procesal', 'sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy']),
             'stats' => $stats,
             'can' => ['delete_cases' => true],
         ]);
@@ -350,6 +362,10 @@ class CasoController extends Controller
 
         DB::transaction(function () use ($data) {
             foreach ($data as $row) {
+                if (($row['status'] ?? 'success') === 'error') {
+                    continue;
+                }
+
                 // 1. Upsert Persona (Deudor)
                     $deudor = Persona::withTrashed()->where('numero_documento', trim($row['documento_deudor']))->first();
                     if ($deudor) {
@@ -390,6 +406,7 @@ class CasoController extends Controller
                     'subproceso' => $row['subproceso'],
                     'etapa_procesal' => !empty($row['etapa_procesal']) ? $row['etapa_procesal'] : 'INICIAL',
                     'radicado' => $row['radicado'],
+                    'es_spoa_nunc' => $row['es_spoa_nunc'] ?? false,
                     'referencia_credito' => $row['referencia_credito'],
                     'monto_total' => $row['monto_total'] ?? 0,
                     'monto_deuda_actual' => $row['monto_deuda_actual'] ?? 0,
@@ -420,17 +437,44 @@ class CasoController extends Controller
                     if ($uid) $casoData['user_id'] = $uid;
                 }
 
+                $preservarCamposVacios = function (Caso $caso) use (&$casoData) {
+                    foreach (['link_drive', 'link_expediente', 'notas_legales', 'nota_cierre'] as $campo) {
+                        if (($casoData[$campo] ?? null) === null || trim((string) $casoData[$campo]) === '') {
+                            $casoData[$campo] = $caso->{$campo};
+                        }
+                    }
+                };
+
                 $caso = null;
                 if (!empty($row['id_sistema'])) {
-                    $caso = Caso::updateOrCreate(['id' => $row['id_sistema']], $casoData);
-                } elseif (!empty($row['radicado']) && strlen($row['radicado']) === 23) {
-                    $caso = Caso::updateOrCreate(['radicado' => $row['radicado']], $casoData);
-                } else {
+                    $caso = Caso::find($row['id_sistema']);
+                    if ($caso) {
+                        $preservarCamposVacios($caso);
+                        $caso->update($casoData);
+                    } else {
+                        $caso = Caso::create($casoData);
+                    }
+                } elseif (!empty($row['radicado']) && strlen($row['radicado']) >= 14 && strlen($row['radicado']) <= 23) {
+                    $caso = Caso::where('radicado', $row['radicado'])->first();
+                    if ($caso) {
+                        $preservarCamposVacios($caso);
+                        $caso->update($casoData);
+                    } else {
+                        $caso = Caso::create($casoData);
+                    }
+                } elseif (!empty($row['referencia_credito'])) {
                     // Si no hay radicado ni ID, buscar por deudor y referencia para evitar duplicados
-                    $caso = Caso::updateOrCreate(
-                        ['deudor_id' => $deudor->id, 'referencia_credito' => $row['referencia_credito']],
-                        $casoData
-                    );
+                    $caso = Caso::where('deudor_id', $deudor->id)
+                        ->where('referencia_credito', $row['referencia_credito'])
+                        ->first();
+                    if ($caso) {
+                        $preservarCamposVacios($caso);
+                        $caso->update($casoData);
+                    } else {
+                        $caso = Caso::create($casoData);
+                    }
+                } else {
+                    $caso = Caso::create($casoData);
                 }
 
                 // 4. Sincronizar Abogados desde el Excel (si se proporcionan nombres)
@@ -528,6 +572,36 @@ class CasoController extends Controller
             });
 
         return response()->json($duplicates);
+    }
+
+    public function updateViabilidad(Request $request, Caso $caso): RedirectResponse
+    {
+        $this->authorize('update', $caso);
+
+        $validated = $request->validate([
+            'viabilidad_juridica' => 'required|array',
+            'viabilidad_estado' => 'required|string|in:verde,amarillo,rojo,pendiente',
+        ]);
+
+        $caso->update($validated);
+
+        // --- AUTOMATIZACIÓN: Registrar en la bitácora del caso para que el historial esté al día ---
+        $caso->bitacoras()->create([
+            'user_id' => Auth::id(),
+            'accion' => 'DICTAMEN JURÍDICO',
+            'comentario' => "Se ha actualizado el dictamen de viabilidad a estado: " . strtoupper($validated['viabilidad_estado']) . ". Análisis técnico: " . ($validated['viabilidad_juridica']['analisis_tecnico'] ?? 'No especificado'),
+        ]);
+
+        AuditoriaEvento::create([
+            'user_id' => Auth::id(),
+            'evento' => 'ACTUALIZAR_VIABILIDAD',
+            'descripcion_breve' => "Actualización de ficha de viabilidad jurídica",
+            'auditable_id' => $caso->id,
+            'auditable_type' => Caso::class,
+            'direccion_ip' => $request->ip(),
+        ]);
+
+        return back()->with('success', 'Ficha de viabilidad actualizada correctamente.');
     }
 
     public function updateChecklist(Request $request, Caso $caso)

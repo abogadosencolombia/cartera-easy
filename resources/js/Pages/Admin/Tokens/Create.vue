@@ -5,6 +5,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
 import InputError from '@/Components/InputError.vue';
+import { useFormDraft } from '@/composables/useFormDraft';
 
 const form = useForm({
     proveedor: '',
@@ -14,8 +15,12 @@ const form = useForm({
     activo: true,
 });
 
+const { clearDraft } = useFormDraft(form, 'draft:create:admin.tokens');
+
 const submit = () => {
-    form.post(route('admin.tokens.store'));
+    form.post(route('admin.tokens.store'), {
+        onSuccess: clearDraft,
+    });
 };
 </script>
 

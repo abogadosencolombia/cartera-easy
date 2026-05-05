@@ -40,7 +40,8 @@ class StoreCasoRequest extends FormRequest
             'radicado' => [
                 'nullable', 
                 'string', 
-                'max:255', 
+                'max:23', 
+                'regex:/^[0-9]{14,23}$/',
                 Rule::unique('casos', 'radicado')->whereNull('deleted_at')
             ],
             'especialidad_id' => ['nullable', 'integer', 'exists:especialidades_juridicas,id'],
@@ -100,6 +101,8 @@ class StoreCasoRequest extends FormRequest
             'subproceso' => ['nullable', 'string', 'max:255'],
             'etapa_procesal' => ['nullable', 'string'],
             'juzgado_id' => ['nullable', 'integer', 'exists:juzgados,id'],
+            'sin_codeudores' => ['nullable', 'boolean'],
+            'es_spoa_nunc' => ['nullable', 'boolean'],
         ];
     }
 

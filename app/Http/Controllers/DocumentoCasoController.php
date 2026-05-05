@@ -28,88 +28,84 @@ class DocumentoCasoController extends Controller
     {
         $this->authorize('update', $caso);
 
-        // 1. Validaciones
-        $validated = $request->validate([
-            'tipo_documento' => [
+        $request->validate([
+            'documentos' => ['required', 'array', 'min:1'],
+            'documentos.*.tipo_documento' => [
                 'required', 
                 'string', 
                 'max:255',
                 Rule::in(['pagaré', 'carta instrucciones', 'certificación saldo', 'libranza', 'demanda', 'autos', 'memorial', 'cédula deudor', 'cédula codeudor', 'otros'])
             ],
-            'fecha_carga' => 'required|date',
-            'archivo' => 'required|file|mimes:pdf,jpg,png,jpeg,doc,docx,xls,xlsx,csv|max:131072', // 128MB
-            'nota' => 'nullable|string|max:5000',
-            'asociado_a' => ['nullable', 'string'],
+            'documentos.*.fecha_carga' => 'required|date',
+            'documentos.*.archivo' => 'required|file|mimes:pdf,jpg,png,jpeg,doc,docx,xls,xlsx,csv|max:131072', // 128MB
+            'documentos.*.nota' => 'nullable|string|max:5000',
+            'documentos.*.asociado_a' => ['nullable', 'string'],
         ]);
-        
-        $personaId = null;
-        $codeudorId = null;
-        $comentarioBitacora = 'Se subió el documento: ' . $validated['tipo_documento'];
 
-        // 2. Procesar la asociación polimórfica
-        if (!empty($validated['asociado_a'])) {
-            $parts = explode('-', $validated['asociado_a']);
-            
-            if (count($parts) !== 2) {
-                throw ValidationException::withMessages(['asociado_a' => 'El formato de asociación no es válido.']);
-            }
+        \DB::transaction(function () use ($caso, $request) {
+            foreach ($request->input('documentos') as $index => $docData) {
+                $personaId = null;
+                $codeudorId = null;
+                $comentarioBitacora = 'Se subió el documento: ' . $docData['tipo_documento'];
 
-            $tipo = $parts[0];
-            $id = $parts[1];
+                // Procesar la asociación polimórfica
+                if (!empty($docData['asociado_a'])) {
+                    $parts = explode('-', $docData['asociado_a']);
+                    if (count($parts) === 2) {
+                        $tipo = $parts[0];
+                        $id = $parts[1];
 
-            if ($tipo === 'persona') {
-                if ($caso->deudor_id == $id && Persona::where('id', $id)->exists()) {
-                    $personaId = $id;
-                    $comentarioBitacora .= ' (Asociado al Deudor Principal)';
-                } else {
-                    throw ValidationException::withMessages(['asociado_a' => 'El deudor seleccionado no coincide con el deudor del caso.']);
+                        if ($tipo === 'persona') {
+                            if ($caso->deudor_id == $id) {
+                                $personaId = $id;
+                                $comentarioBitacora .= ' (Asociado al Deudor Principal)';
+                            }
+                        } elseif ($tipo === 'codeudor') {
+                            if ($caso->codeudores()->where('codeudores.id', $id)->exists()) {
+                                $codeudorId = $id;
+                                $comentarioBitacora .= ' (Asociado a un Codeudor)';
+                            }
+                        }
+                    }
                 }
-            } elseif ($tipo === 'codeudor') {
-                if ($caso->codeudores()->where('codeudores.id', $id)->exists()) {
-                    $codeudorId = $id;
-                    $comentarioBitacora .= ' (Asociado a un Codeudor)';
-                } else {
-                    throw ValidationException::withMessages(['asociado_a' => 'El codeudor seleccionado no pertenece a este caso.']);
-                }
-            } else {
-                throw ValidationException::withMessages(['asociado_a' => 'El tipo de asociación no es válido.']);
+
+                // Guardar el archivo
+                $file = $request->file("documentos.{$index}.archivo");
+                $path = $file->store('casos_documentos', 'local');
+
+                // Crear el registro en la BD
+                $caso->documentos()->create([
+                    'tipo_documento' => $docData['tipo_documento'],
+                    'fecha_carga' => $docData['fecha_carga'],
+                    'archivo' => $path,
+                    'nota' => $docData['nota'] ?? null,
+                    'persona_id' => $personaId,
+                    'codeudor_id' => $codeudorId,
+                ]);
+
+                // Bitácora Local (Caso)
+                $caso->bitacoras()->create([
+                    'user_id' => auth()->id(),
+                    'accion' => 'Documento Adjuntado',
+                    'comentario' => $comentarioBitacora,
+                ]);
+
+                // AUDITORÍA GLOBAL
+                AuditoriaEvento::create([
+                    'user_id' => Auth::id(),
+                    'evento' => 'SUBIR_DOCUMENTO',
+                    'descripcion_breve' => "Se subió '{$docData['tipo_documento']}' al caso #{$caso->id}",
+                    'criticidad' => 'media',
+                    'direccion_ip' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
+                ]);
             }
-        }
-        
-        // 3. Guardar el archivo
-        $path = $request->file('archivo')->store('casos_documentos', 'local');
+        });
 
-        // 4. Crear el registro en la BD
-        $caso->documentos()->create([
-            'tipo_documento' => $validated['tipo_documento'],
-            'fecha_carga' => $validated['fecha_carga'],
-            'archivo' => $path,
-            'nota' => $validated['nota'],
-            'persona_id' => $personaId,
-            'codeudor_id' => $codeudorId,
-        ]);
-
-        // 5. Bitácora Local (Caso)
-        $caso->bitacoras()->create([
-            'user_id' => auth()->id(),
-            'accion' => 'Documento Adjuntado',
-            'comentario' => $comentarioBitacora,
-        ]);
-
-        // ✅ 6. AUDITORÍA GLOBAL (NUEVO)
-        AuditoriaEvento::create([
-            'user_id' => Auth::id(),
-            'evento' => 'SUBIR_DOCUMENTO',
-            'descripcion_breve' => "Se subió '{$validated['tipo_documento']}' al caso #{$caso->id}",
-            'criticidad' => 'media',
-            'direccion_ip' => request()->ip(),
-            'user_agent' => request()->userAgent(),
-        ]);
-
-        // ✅ Registro de revisión diaria por acción
+        // Registro de revisión diaria por acción
         $this->registrarRevisionAutomatica($caso);
 
-        return back()->with('success', '¡Documento subido exitosamente!');
+        return back()->with('success', '¡Documentos subidos exitosamente!');
     }
 
     /**

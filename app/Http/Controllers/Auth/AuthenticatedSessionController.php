@@ -8,7 +8,10 @@ use App\Http\Requests\Auth\LoginRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use App\Events\UserLoggedIn;
@@ -35,8 +38,26 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        $user = $request->user();
+        $sessionId = $request->session()->getId();
+        $sessionToken = Str::random(64);
+        $loginAttributes = [
+            'remember_token' => Str::random(60),
+        ];
+
+        if ($this->shouldEnforceSingleActiveSession($user)) {
+            $request->session()->put('active_session_token', $sessionToken);
+            $loginAttributes['active_session_id'] = $sessionToken;
+        }
+
+        $user->forceFill($loginAttributes)->save();
+
+        if (config('session.single_active', false)) {
+            $this->deleteOtherDatabaseSessions((int) $user->id, $sessionId);
+        }
+
         // Disparamos el evento de auditoría
-        UserLoggedIn::dispatch($request->user(), $request);
+        UserLoggedIn::dispatch($user, $request);
 
         // =================================================================
         // ===== CAMBIO CLAVE: Redirigimos directamente al dashboard =====
@@ -50,6 +71,25 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        $user = $request->user();
+        $sessionToken = $request->session()->get('active_session_token');
+
+        if ($user) {
+            $logoutAttributes = [
+                'remember_token' => Str::random(60),
+            ];
+
+            if (
+                $this->shouldEnforceSingleActiveSession($user)
+                && $sessionToken
+                && hash_equals((string) $user->active_session_id, (string) $sessionToken)
+            ) {
+                $logoutAttributes['active_session_id'] = null;
+            }
+
+            $user->forceFill($logoutAttributes)->save();
+        }
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();
@@ -66,5 +106,27 @@ class AuthenticatedSessionController extends Controller
         // ===== FIN DE LA CORRECCIÓN ====================================
         // =================================================================
     }
-}
 
+    private function deleteOtherDatabaseSessions(int $userId, string $currentSessionId): void
+    {
+        if (config('session.driver') !== 'database') {
+            return;
+        }
+
+        DB::table(config('session.table', 'sessions'))
+            ->where('user_id', $userId)
+            ->where('id', '!=', $currentSessionId)
+            ->delete();
+    }
+
+    private function usersHaveActiveSessionColumn($user): bool
+    {
+        return Schema::hasColumn($user->getTable(), 'active_session_id');
+    }
+
+    private function shouldEnforceSingleActiveSession($user): bool
+    {
+        return config('session.single_active', false)
+            && $this->usersHaveActiveSessionColumn($user);
+    }
+}

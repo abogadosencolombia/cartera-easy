@@ -27,7 +27,7 @@ class NotificacionController extends Controller
         $user = Auth::user();
 
         // 1. OBTENER NOTIFICACIONES DE CASOS (Tabla Personalizada)
-        $queryCasos = NotificacionCaso::with(['caso', 'proceso']);
+        $queryCasos = NotificacionCaso::deExpedientesEnSeguimiento()->with(['caso', 'proceso']);
 
         if ($user->tipo_usuario !== 'admin') {
             $queryCasos->where('user_id', $user->id);
@@ -212,6 +212,10 @@ class NotificacionController extends Controller
 
     public function storeManual(Request $request, Caso $caso): RedirectResponse
     {
+         if (!$caso->estaEnSeguimiento()) {
+             return back()->with('error', 'No se pueden programar alertas para casos cerrados o finalizados.');
+         }
+
          $validated = $request->validate([
             'mensaje' => 'required|string|max:1000',
             'prioridad' => 'nullable|in:baja,media,alta',
@@ -262,6 +266,10 @@ class NotificacionController extends Controller
 
     public function storeManualProceso(Request $request, ProcesoRadicado $proceso): RedirectResponse
     {
+         if (!$proceso->estaEnSeguimiento()) {
+             return back()->with('error', 'No se pueden programar alertas para radicados cerrados o finalizados.');
+         }
+
          $validated = $request->validate([
             'mensaje' => 'required|string|max:1000',
             'prioridad' => 'nullable|in:baja,media,alta',

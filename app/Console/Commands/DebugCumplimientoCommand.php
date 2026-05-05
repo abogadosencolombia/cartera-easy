@@ -43,7 +43,7 @@ class DebugCumplimientoCommand extends Command
         $this->info('*** INICIANDO DEPURACIÓN DE CUMPLIMIENTO LEGAL ***');
 
         $casoId = $this->argument('caso_id');
-        $query = Caso::whereIn('estado', ['activo', 'prejuridico']);
+        $query = Caso::paraSeguimiento()->whereIn('estado', ['activo', 'prejuridico']);
 
         if ($casoId) {
             $this->line("-> Buscando caso específico con ID: {$casoId}");

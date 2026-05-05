@@ -5,6 +5,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import SelectInput from '@/Components/SelectInput.vue';
 import { onClickOutside } from '@vueuse/core';
 import { PlusIcon, TrashIcon, ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline';
+import { useFormDraft } from '@/composables/useFormDraft';
 
 const props = defineProps({
     clientes: { type: Array, default: () => [] },
@@ -277,6 +278,7 @@ const submit = () => {
     form.manual_cuotas = manualCuotas.value;
     form.post(route('honorarios.contratos.store'), {
         preserveScroll: true,
+        onSuccess: clearDraft,
         onError: (errors) => {
             console.error("Errores al guardar contrato:", errors);
         }
@@ -337,6 +339,38 @@ onMounted(() => {
         form.reset();
         selectClient(props.clienteSeleccionado);
     }
+});
+
+const contractDraftKey = props.plantilla
+    ? `draft:create:honorarios.contratos:plantilla:${props.plantilla.id}`
+    : props.datosCaso
+        ? `draft:create:honorarios.contratos:caso:${props.datosCaso.id}`
+        : props.proceso
+            ? `draft:create:honorarios.contratos:proceso:${props.proceso.id}`
+            : 'draft:create:honorarios.contratos:nuevo';
+
+const { clearDraft } = useFormDraft(form, contractDraftKey, {
+    extra: () => ({
+        manualCuotas: manualCuotas.value,
+        isManualMode: isManualMode.value,
+        clienteSearch: clienteSearch.value,
+        selectedClientName: selectedClientName.value,
+    }),
+    restoreExtra: (draft) => {
+        if (Array.isArray(draft.manualCuotas)) {
+            manualCuotas.value = draft.manualCuotas;
+        }
+        if (typeof draft.isManualMode === 'boolean') {
+            isManualMode.value = draft.isManualMode;
+        }
+        if (typeof draft.clienteSearch === 'string') {
+            clienteSearch.value = draft.clienteSearch;
+        }
+        if (typeof draft.selectedClientName === 'string') {
+            selectedClientName.value = draft.selectedClientName;
+        }
+    },
+    restoreExtraAfterTick: true,
 });
 </script>
 

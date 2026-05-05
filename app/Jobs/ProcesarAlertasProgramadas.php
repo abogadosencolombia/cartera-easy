@@ -31,6 +31,7 @@ class ProcesarAlertasProgramadas implements ShouldQueue
         NotificacionCaso::query()
             ->where('tipo', 'alerta_manual')
             ->where('completed', false)
+            ->deExpedientesEnSeguimiento()
             ->with('user')
             ->orderBy('id')
             ->chunkById(50, function ($lote) use ($now, $tz) {

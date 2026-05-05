@@ -7,6 +7,9 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SelectInput from '@/Components/SelectInput.vue';
 import AsyncSelect from '@/Components/AsyncSelect.vue';
 import Dropdown from '@/Components/Dropdown.vue';
+import DropdownLink from '@/Components/DropdownLink.vue';
+import Textarea from '@/Components/Textarea.vue';
+import InputLabel from '@/Components/InputLabel.vue';
 
 // --- TIPOS DE ENTIDAD ---
 const tiposEntidad = [
@@ -15,7 +18,7 @@ const tiposEntidad = [
 ];
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import { ref, watch, reactive, computed, onMounted } from 'vue';
-import { TrashIcon, MagnifyingGlassIcon, InboxIcon, EyeIcon, ArrowDownTrayIcon, FunnelIcon, ArchiveBoxXMarkIcon, ChevronDownIcon, XMarkIcon, DocumentDuplicateIcon, CloudArrowUpIcon, BanknotesIcon, ExclamationCircleIcon, ArrowPathIcon, CheckCircleIcon, UserGroupIcon, ScaleIcon, PhoneIcon, EnvelopeIcon, BuildingOfficeIcon, ClockIcon, ExclamationTriangleIcon, UserIcon, ClipboardDocumentListIcon, LinkIcon, MapPinIcon as PinIcon } from '@heroicons/vue/24/outline'; 
+import { TrashIcon, MagnifyingGlassIcon, InboxIcon, EyeIcon, ArrowDownTrayIcon, FunnelIcon, ArchiveBoxXMarkIcon, ChevronDownIcon, XMarkIcon, DocumentDuplicateIcon, CloudArrowUpIcon, BanknotesIcon, ExclamationCircleIcon, ArrowPathIcon, CheckCircleIcon, UserGroupIcon, ScaleIcon, PhoneIcon, EnvelopeIcon, BuildingOfficeIcon, ClockIcon, ExclamationTriangleIcon, UserIcon, ClipboardDocumentListIcon, LinkIcon, MapPinIcon as PinIcon, EllipsisVerticalIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'; 
 
 const togglePin = (caso) => {
     router.patch(route('casos.pin', caso.id), {}, {
@@ -39,17 +42,109 @@ const props = defineProps({
 
 // --- Lógica de Búsqueda y Filtros Combinada ---
 const selectedJuzgado = ref(props.selectedJuzgado || null);
+const filterStorageKey = 'casos.index.filters';
+const filterKeys = ['search', 'abogado_id', 'cooperativa_id', 'juzgado_id', 'tipo_entidad', 'etapa_procesal', 'sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy'];
+const booleanFilterKeys = ['sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy'];
+
+const parseBooleanFilter = (value) => value === true || value === 'true' || value === 1 || value === '1';
+
+const readStoredFilters = () => {
+    if (typeof window === 'undefined') return {};
+
+    try {
+        return JSON.parse(sessionStorage.getItem(filterStorageKey) || '{}') || {};
+    } catch {
+        return {};
+    }
+};
+
+const storedFilters = readStoredFilters();
+
+const initialFilterValue = (key, fallback = '') => props.filters?.[key] ?? storedFilters[key] ?? fallback;
+
+const hasUsefulFilterValue = (filters) => filterKeys.some((key) => {
+    if (booleanFilterKeys.includes(key)) {
+        return parseBooleanFilter(filters[key]);
+    }
+
+    return String(filters[key] ?? '').trim() !== '';
+});
+
+const hasUsefulUrlFilter = () => {
+    if (typeof window === 'undefined') return false;
+
+    const params = new URLSearchParams(window.location.search);
+    return filterKeys.some((key) => {
+        if (!params.has(key)) return false;
+        if (booleanFilterKeys.includes(key)) {
+            return parseBooleanFilter(params.get(key));
+        }
+
+        return String(params.get(key) ?? '').trim() !== '';
+    });
+};
 
 const filterForm = reactive({
-    search: props.filters?.search ?? '',
-    abogado_id: props.filters?.abogado_id ?? '',
-    cooperativa_id: props.filters?.cooperativa_id ?? '',
-    juzgado_id: props.filters?.juzgado_id ?? '',
-    tipo_entidad: props.filters?.tipo_entidad ?? '',
-    etapa_procesal: props.filters?.etapa_procesal ?? '',
-    sin_radicado: props.filters?.sin_radicado === 'true' || props.filters?.sin_radicado === true,
-    inactivo_15_dias: props.filters?.inactivo_15_dias === 'true' || props.filters?.inactivo_15_dias === true,
+    search: initialFilterValue('search'),
+    abogado_id: initialFilterValue('abogado_id'),
+    cooperativa_id: initialFilterValue('cooperativa_id'),
+    juzgado_id: initialFilterValue('juzgado_id'),
+    tipo_entidad: initialFilterValue('tipo_entidad'),
+    etapa_procesal: initialFilterValue('etapa_procesal'),
+    sin_radicado: parseBooleanFilter(initialFilterValue('sin_radicado', false)),
+    inactivo_20_dias: parseBooleanFilter(initialFilterValue('inactivo_20_dias', false)),
+    cerrados: parseBooleanFilter(initialFilterValue('cerrados', false)),
+    actualizados_hoy: parseBooleanFilter(initialFilterValue('actualizados_hoy', false)),
 });
+
+const controlFilterKeys = ['sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy'];
+
+const currentFilterPayload = () => ({
+    search: filterForm.search,
+    abogado_id: filterForm.abogado_id,
+    cooperativa_id: filterForm.cooperativa_id,
+    juzgado_id: filterForm.juzgado_id,
+    tipo_entidad: filterForm.tipo_entidad,
+    etapa_procesal: filterForm.etapa_procesal,
+    sin_radicado: filterForm.sin_radicado,
+    inactivo_20_dias: filterForm.inactivo_20_dias,
+    cerrados: filterForm.cerrados,
+    actualizados_hoy: filterForm.actualizados_hoy,
+});
+
+const persistFilters = (filters) => {
+    if (typeof window === 'undefined') return;
+
+    if (hasUsefulFilterValue(filters)) {
+        sessionStorage.setItem(filterStorageKey, JSON.stringify(filters));
+    } else {
+        sessionStorage.removeItem(filterStorageKey);
+    }
+};
+
+const reapplyStoredFiltersIfNeeded = () => {
+    if (!hasUsefulUrlFilter() && hasUsefulFilterValue(storedFilters)) {
+        router.get(route('casos.index'), storedFilters, {
+            replace: true,
+            preserveState: false,
+        });
+        return true;
+    }
+
+    return false;
+};
+
+const clearControlFilters = () => {
+    controlFilterKeys.forEach(key => {
+        filterForm[key] = false;
+    });
+};
+
+const applyControlFilter = (filterKey) => {
+    const nextValue = !filterForm[filterKey];
+    clearControlFilters();
+    filterForm[filterKey] = nextValue;
+};
 
 watch(selectedJuzgado, (val) => {
     filterForm.juzgado_id = val?.id || '';
@@ -63,10 +158,16 @@ const isDirty = computed(() => {
            filterForm.tipo_entidad !== '' || 
            filterForm.etapa_procesal !== '' ||
            filterForm.sin_radicado === true ||
-           filterForm.inactivo_15_dias === true;
+           filterForm.inactivo_20_dias === true ||
+           filterForm.cerrados === true ||
+           filterForm.actualizados_hoy === true;
 });
 
 const resetFilters = () => {
+    if (typeof window !== 'undefined') {
+        sessionStorage.removeItem(filterStorageKey);
+    }
+
     filterForm.search = '';
     filterForm.abogado_id = '';
     filterForm.cooperativa_id = '';
@@ -75,21 +176,17 @@ const resetFilters = () => {
     selectedJuzgado.value = null;
     filterForm.etapa_procesal = '';
     filterForm.sin_radicado = false;
-    filterForm.inactivo_15_dias = false;
+    filterForm.inactivo_20_dias = false;
+    filterForm.cerrados = false;
+    filterForm.actualizados_hoy = false;
 };
 
 watch(filterForm, debounce(() => {
+    const filters = currentFilterPayload();
+    persistFilters(filters);
+
     router.get(route('casos.index'), 
-        { 
-            search: filterForm.search, 
-            abogado_id: filterForm.abogado_id,
-            cooperativa_id: filterForm.cooperativa_id,
-            juzgado_id: filterForm.juzgado_id,
-            tipo_entidad: filterForm.tipo_entidad,
-            etapa_procesal: filterForm.etapa_procesal,
-            sin_radicado: filterForm.sin_radicado,
-            inactivo_15_dias: filterForm.inactivo_15_dias,
-        }, 
+        filters, 
         {
             preserveState: true,
             replace: true,
@@ -99,16 +196,7 @@ watch(filterForm, debounce(() => {
 
 // --- Lógica de Exportación ---
 const exportarExcel = () => {
-    window.location.href = route('casos.export', { 
-        search: filterForm.search,
-        abogado_id: filterForm.abogado_id,
-        cooperativa_id: filterForm.cooperativa_id,
-        juzgado_id: filterForm.juzgado_id,
-        tipo_entidad: filterForm.tipo_entidad,
-        etapa_procesal: filterForm.etapa_procesal,
-        sin_radicado: filterForm.sin_radicado,
-        inactivo_15_dias: filterForm.inactivo_15_dias,
-    });
+    window.location.href = route('casos.export', currentFilterPayload());
 };
 
 // --- Utilidades ---
@@ -221,6 +309,36 @@ const closeQuickView = () => {
     setTimeout(() => { selectedCaso.value = null; }, 300);
 };
 
+watch(() => props.casos.data, (casos) => {
+    if (!selectedCaso.value) return;
+
+    const refreshed = casos.find(c => c.id === selectedCaso.value.id);
+    if (refreshed) {
+        selectedCaso.value = refreshed;
+        return;
+    }
+
+    closeQuickView();
+});
+
+// --- MODALES DE GESTIÓN ---
+const casoToManage = ref(null);
+const showCloseModal = ref(false);
+const closeForm = useForm({ nota_cierre: '' });
+
+const openCloseModal = (caso) => {
+    casoToManage.value = caso;
+    closeForm.reset();
+    showCloseModal.value = true;
+};
+
+const submitCloseCase = () => {
+    closeForm.patch(route('casos.close', casoToManage.value.id), {
+        preserveScroll: true,
+        onSuccess: () => { showCloseModal.value = false; casoToManage.value = null; }
+    });
+};
+
 const currentIndex = computed(() => {
     if (!selectedCaso.value) return -1;
     return props.casos.data.findIndex(c => c.id === selectedCaso.value.id);
@@ -259,6 +377,8 @@ const prevCaso = () => {
 };
 
 onMounted(() => {
+    if (reapplyStoredFiltersIfNeeded()) return;
+
     const params = new URLSearchParams(window.location.search);
     const autonext = params.get('autonext');
     if (autonext && props.casos.data.length > 0) {
@@ -368,7 +488,7 @@ const copyLegalInfo = (caso) => {
                 </div>
 
                 <!-- STATS / KPI CARDS -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                     <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md">
                         <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform">
                             <ArchiveBoxXMarkIcon class="w-16 h-16 text-indigo-600" />
@@ -379,7 +499,12 @@ const copyLegalInfo = (caso) => {
                         <p class="text-[9px] text-gray-500 font-bold mt-1 uppercase tracking-tighter">En base de datos</p>
                     </div>
 
-                    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md">
+                    <button
+                        type="button"
+                        @click="applyControlFilter('sin_radicado')"
+                        :class="filterForm.sin_radicado ? 'ring-2 ring-amber-400 border-amber-200 dark:border-amber-500/70' : ''"
+                        class="text-left w-full bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    >
                         <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-amber-600">
                             <ExclamationCircleIcon class="w-16 h-16" />
                         </div>
@@ -387,7 +512,22 @@ const copyLegalInfo = (caso) => {
                         <div v-if="!stats" class="h-8 w-16 bg-gray-100 dark:bg-gray-700 animate-pulse rounded"></div>
                         <p v-else class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.sin_radicado }}</p>
                         <p class="text-[9px] text-amber-500 font-bold mt-1 uppercase tracking-tighter">Pendientes de trámite</p>
-                    </div>
+                    </button>
+
+                    <button
+                        type="button"
+                        @click="applyControlFilter('cerrados')"
+                        :class="filterForm.cerrados ? 'ring-2 ring-red-400 border-red-200 dark:border-red-500/70' : ''"
+                        class="text-left w-full bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                    >
+                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-red-600">
+                            <CheckCircleIcon class="w-16 h-16" />
+                        </div>
+                        <p class="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1">Casos Cerrados</p>
+                        <div v-if="!stats" class="h-8 w-16 bg-gray-100 dark:bg-gray-700 animate-pulse rounded"></div>
+                        <p v-else class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.cerrados }}</p>
+                        <p class="text-[9px] text-red-500 font-bold mt-1 uppercase tracking-tighter">Expedientes finalizados</p>
+                    </button>
 
                     <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md">
                         <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-green-600">
@@ -399,7 +539,12 @@ const copyLegalInfo = (caso) => {
                         <p class="text-[9px] text-green-500 font-bold mt-1 uppercase tracking-tighter">Cartera total pendiente</p>
                     </div>
 
-                    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md">
+                    <button
+                        type="button"
+                        @click="applyControlFilter('actualizados_hoy')"
+                        :class="filterForm.actualizados_hoy ? 'ring-2 ring-indigo-400 border-indigo-200 dark:border-indigo-500/70' : ''"
+                        class="text-left w-full bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    >
                         <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-indigo-600">
                             <ArrowPathIcon class="w-16 h-16" />
                         </div>
@@ -407,7 +552,7 @@ const copyLegalInfo = (caso) => {
                         <div v-if="!stats" class="h-8 w-16 bg-gray-100 dark:bg-gray-700 animate-pulse rounded"></div>
                         <p v-else class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.actualizados_hoy }}</p>
                         <p class="text-[9px] text-indigo-500 font-bold mt-1 uppercase tracking-tighter">Gestiones en las últimas 24h</p>
-                    </div>
+                    </button>
                 </div>
 
                 <!-- BARRA DE FILTROS AVANZADA -->
@@ -415,7 +560,7 @@ const copyLegalInfo = (caso) => {
                     <div class="flex flex-col xl:flex-row gap-6">
                         <!-- Búsqueda Principal -->
                         <div class="relative flex-grow">
-                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Búsqueda Maestra</label>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Buscar</label>
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <MagnifyingGlassIcon class="h-4 w-4 text-gray-400" />
@@ -479,7 +624,7 @@ const copyLegalInfo = (caso) => {
                             <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Filtros de Control</label>
                             <div class="flex items-center gap-2">
                                 <button 
-                                    @click="filterForm.sin_radicado = !filterForm.sin_radicado"
+                                    @click="applyControlFilter('sin_radicado')"
                                     :class="filterForm.sin_radicado ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-50 text-gray-500 border-gray-200'"
                                     class="flex-1 px-3 py-3 rounded-xl border text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-1.5"
                                 >
@@ -487,12 +632,12 @@ const copyLegalInfo = (caso) => {
                                     Sin Radicado
                                 </button>
                                 <button 
-                                    @click="filterForm.inactivo_15_dias = !filterForm.inactivo_15_dias"
-                                    :class="filterForm.inactivo_15_dias ? 'bg-amber-600 text-white border-amber-600' : 'bg-gray-50 text-gray-500 border-gray-200'"
+                                    @click="applyControlFilter('inactivo_20_dias')"
+                                    :class="filterForm.inactivo_20_dias ? 'bg-amber-600 text-white border-amber-600' : 'bg-gray-50 text-gray-500 border-gray-200'"
                                     class="flex-1 px-3 py-3 rounded-xl border text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-1.5"
                                 >
-                                    <div :class="filterForm.inactivo_15_dias ? 'bg-white' : 'bg-amber-300'" class="w-1.5 h-1.5 rounded-full"></div>
-                                    +15d Inactivo
+                                    <div :class="filterForm.inactivo_20_dias ? 'bg-white' : 'bg-amber-300'" class="w-1.5 h-1.5 rounded-full"></div>
+                                    +20d Inactivo
                                 </button>
                             </div>
                         </div>
@@ -565,11 +710,22 @@ const copyLegalInfo = (caso) => {
                                                 {{ caso.deudor?.nombre_completo ?? 'Sin deudor' }}
                                             </Link>
                                             <div class="flex items-center gap-1.5 mt-1">
+                                                <div 
+                                                     class="w-2.5 h-2.5 rounded-full"
+                                                     :class="{
+                                                         'bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]': caso.viabilidad_estado === 'verde',
+                                                         'bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.6)]': caso.viabilidad_estado === 'amarillo',
+                                                         'bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]': caso.viabilidad_estado === 'rojo',
+                                                         'bg-gray-300 dark:bg-gray-600': !caso.viabilidad_estado || caso.viabilidad_estado === 'pendiente'
+                                                     }"
+                                                     :title="'Estado de Viabilidad: ' + (caso.viabilidad_estado || 'pendiente').toUpperCase()">
+                                                </div>
                                                 <span class="text-[10px] font-bold px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded">
                                                     ID #{{ caso.id }}
                                                 </span>
                                                 <span v-if="caso.radicado" class="text-[10px] text-gray-400 flex items-center gap-1 group/rad">
                                                     Rad: {{ caso.radicado }}
+                                                    <span v-if="caso.es_spoa_nunc" class="text-[7px] font-black bg-indigo-100 text-indigo-700 px-1 rounded uppercase tracking-tighter">SPOA/NUNC</span>
                                                     <button @click.stop="copyToClipboard(caso.radicado)" class="opacity-0 group-hover/rad:opacity-100 transition-opacity">
                                                         <DocumentDuplicateIcon class="w-3 h-3 hover:text-indigo-500" />
                                                     </button>
@@ -636,6 +792,16 @@ const copyLegalInfo = (caso) => {
                                     <!-- Acciones Sticky -->
                                     <td class="sticky right-0 bg-white dark:bg-gray-800 group-hover:bg-indigo-50/50 dark:group-hover:bg-gray-700 px-6 py-4 whitespace-nowrap text-right z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] transition-colors" :class="{'!bg-indigo-50/50 dark:!bg-indigo-900/20': caso.is_pinned}" @click.stop>
                                         <div class="flex items-center justify-end gap-2">
+                                            <!-- BOTÓN FINALIZAR (Solo si no está cerrado) -->
+                                            <button 
+                                                v-if="!caso.nota_cierre && ['admin', 'abogado', 'gestor'].includes($page.props.auth.user.tipo_usuario)"
+                                                @click.stop="openCloseModal(caso)"
+                                                class="p-2 text-amber-600 bg-amber-50 dark:bg-amber-900/30 rounded-lg hover:bg-amber-600 hover:text-white transition-all shadow-sm"
+                                                title="Finalizar/Cerrar Proceso"
+                                            >
+                                                <ArchiveBoxXMarkIcon class="h-5 w-5" />
+                                            </button>
+
                                             <button 
                                                 @click.stop="togglePin(caso)"
                                                 class="p-2 rounded-lg transition-all shadow-sm"
@@ -652,14 +818,32 @@ const copyLegalInfo = (caso) => {
                                                 <EyeIcon class="h-5 w-5" />
                                             </Link>
                                             
-                                            <button
-                                                v-if="$page.props.auth.user.tipo_usuario === 'admin'"
-                                                @click="confirmCaseDeletion(caso)"
-                                                class="p-2 text-red-500 bg-red-50 dark:bg-red-900/30 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm"
-                                                title="Eliminar registro"
-                                            >
-                                                <TrashIcon class="h-5 w-5" />
-                                            </button>
+                                            <Dropdown align="right" width="48" teleport>
+                                                <template #trigger>
+                                                    <button class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">
+                                                        <EllipsisVerticalIcon class="w-5 h-5" />
+                                                    </button>
+                                                </template>
+                                                <template #content>
+                                                    <DropdownLink :href="route('casos.edit', caso.id)">
+                                                        <div class="flex items-center gap-2"><PencilSquareIcon class="w-4 h-4" /> Editar Caso</div>
+                                                    </DropdownLink>
+                                                    <button 
+                                                        v-if="!caso.nota_cierre && ['admin', 'abogado', 'gestor'].includes($page.props.auth.user.tipo_usuario)" 
+                                                        @click="openCloseModal(caso)" 
+                                                        class="block w-full text-left px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 font-bold border-t dark:border-gray-700 mt-1"
+                                                    >
+                                                        <div class="flex items-center gap-2"><ArchiveBoxXMarkIcon class="w-4 h-4" /> Finalizar Proceso</div>
+                                                    </button>
+                                                    <button 
+                                                        v-if="$page.props.auth.user.tipo_usuario === 'admin'" 
+                                                        @click="confirmCaseDeletion(caso)" 
+                                                        class="block w-full text-left px-4 py-2 text-sm bg-red-600 text-white hover:bg-red-700 font-black uppercase tracking-widest border-t border-red-700 mt-2 py-3 shadow-inner"
+                                                    >
+                                                        <div class="flex items-center justify-center gap-2"><TrashIcon class="w-4 h-4" /> ¡ELIMINAR REGISTRO!</div>
+                                                    </button>
+                                                </template>
+                                            </Dropdown>
                                         </div>
                                     </td>
                                 </tr>
@@ -864,6 +1048,7 @@ const copyLegalInfo = (caso) => {
                                 <p class="text-[9px] font-bold text-gray-400 uppercase">Radicado Judicial</p>
                                 <p class="text-xs font-black text-gray-800 dark:text-gray-200 flex items-center gap-2 break-all">
                                     {{ selectedCaso.radicado || 'SIN ASIGNAR' }}
+                                    <span v-if="selectedCaso.es_spoa_nunc" class="text-[8px] font-black bg-indigo-100 text-indigo-700 px-1 rounded uppercase tracking-tighter">SPOA/NUNC</span>
                                     <button v-if="selectedCaso.radicado" @click.stop="copyToClipboard(selectedCaso.radicado)" class="text-gray-400 hover:text-indigo-500 transition-colors shrink-0">
                                         <DocumentDuplicateIcon class="w-3.5 h-3.5" />
                                     </button>
@@ -1010,6 +1195,26 @@ const copyLegalInfo = (caso) => {
                     <Link :href="route('casos.show', selectedCaso.id)" class="w-full sm:w-auto px-8 py-3.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] transition-all hover:bg-black dark:hover:bg-gray-100 shadow-xl shadow-gray-200 dark:shadow-none active:scale-[0.98] text-center">
                         Ver Expediente Completo &rarr;
                     </Link>
+                </div>
+            </div>
+        </Modal>
+
+        <Modal :show="showCloseModal" @close="showCloseModal = false" centered>
+            <div class="p-8">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="p-2 bg-red-50 rounded-lg">
+                        <ArchiveBoxXMarkIcon class="w-6 h-6 text-red-600" />
+                    </div>
+                    <h2 class="text-xl font-black text-gray-900">Finalizar / Cerrar Expediente</h2>
+                </div>
+                <p class="text-sm text-gray-500 mb-6 font-medium">Indica el motivo de cierre para el caso de <span class="font-bold text-red-600">{{ casoToManage?.deudor?.nombre_completo }}</span>.</p>
+                <div class="space-y-2">
+                    <InputLabel value="Nota de Finalización" class="font-bold text-xs uppercase" />
+                    <Textarea v-model="closeForm.nota_cierre" class="w-full rounded-xl border-gray-200" rows="4" placeholder="Ej: Pago total recibido, acuerdo conciliatorio, desistimiento..." />
+                </div>
+                <div class="mt-8 flex flex-col sm:flex-row justify-end gap-3">
+                    <SecondaryButton @click="showCloseModal = false" class="!rounded-xl !px-6">Cancelar</SecondaryButton>
+                    <DangerButton @click="submitCloseCase" class="!rounded-xl !px-8 !font-black shadow-lg shadow-red-100" :disabled="closeForm.processing">Confirmar Cierre</DangerButton>
                 </div>
             </div>
         </Modal>

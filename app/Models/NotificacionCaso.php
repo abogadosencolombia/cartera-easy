@@ -27,4 +27,22 @@ class NotificacionCaso extends Model
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
     public function caso(): BelongsTo { return $this->belongsTo(Caso::class); }
     public function proceso(): BelongsTo { return $this->belongsTo(ProcesoRadicado::class, 'proceso_id'); }
+
+    public function scopeDeExpedientesEnSeguimiento($query)
+    {
+        return $query->where(function ($query) {
+            $query->where(function ($query) {
+                $query->whereNotNull('caso_id')
+                    ->whereHas('caso', fn ($caso) => $caso->paraSeguimiento());
+            })
+            ->orWhere(function ($query) {
+                $query->whereNotNull('proceso_id')
+                    ->whereHas('proceso', fn ($proceso) => $proceso->paraSeguimiento());
+            })
+            ->orWhere(function ($query) {
+                $query->whereNull('caso_id')
+                    ->whereNull('proceso_id');
+            });
+        });
+    }
 }

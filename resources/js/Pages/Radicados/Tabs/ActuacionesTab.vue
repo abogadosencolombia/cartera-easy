@@ -7,7 +7,8 @@ import {
     PencilIcon, 
     TrashIcon,
     ChatBubbleBottomCenterTextIcon,
-    ArrowPathIcon
+    ArrowPathIcon,
+    SparklesIcon
 } from '@heroicons/vue/24/outline';
 import { useForm } from '@inertiajs/vue3';
 import DatePicker from '@/Components/DatePicker.vue';
@@ -49,6 +50,33 @@ const actuacionForm = useForm({
     fecha_actuacion: new Date().toISOString().slice(0, 10)
 });
 
+const generarNotaInteligente = () => {
+    const p = props.proceso;
+    const etapa = p.etapa_actual?.nombre || 'Trámite';
+    let texto = `En la fecha, se verifica el estado del proceso en la etapa de ${etapa}. `;
+    
+    if (etapa.includes('MANDAMIENTO')) {
+        texto += "Se observa que el despacho ha librado mandamiento de pago conforme a las pretensiones de la demanda. Se procede con el trámite de notificación.";
+    } else if (etapa.includes('DEMANDA')) {
+        texto += "Se confirma la radicación exitosa del libelo demandatorio. Se queda a la espera del auto admisorio.";
+    } else if (etapa.includes('AUDIENCIA')) {
+        texto += "Se asiste a la diligencia judicial programada, dejando constancia de los puntos tratados y las decisiones del juez.";
+    } else {
+        texto += "Se realiza seguimiento de rutina al expediente digital, constatando que el proceso sigue su curso normal sin novedades extraordinarias.";
+    }
+
+    actuacionForm.nota = texto;
+    
+    Swal.fire({
+        title: 'Nota Generada',
+        text: 'He redactado una nota profesional basada en la etapa actual. Puedes editarla antes de guardar.',
+        icon: 'success',
+        toast: true,
+        position: 'top-end',
+        timer: 3000
+    });
+};
+
 const handleSave = () => {
     if (!actuacionForm.nota) return;
     emit('save', { ...actuacionForm.data() });
@@ -61,8 +89,11 @@ const handleSave = () => {
         
         <!-- REGISTRO RÁPIDO -->
         <div v-if="!isClosed" class="bg-indigo-50/50 dark:bg-indigo-900/10 p-8 rounded-3xl border border-indigo-100 dark:border-indigo-900/30">
-            <h3 class="text-sm font-black text-indigo-900 dark:text-indigo-300 uppercase tracking-widest mb-6 flex items-center gap-2">
-                <PlusIcon class="w-5 h-5" /> Nueva Actuación Procesal
+            <h3 class="text-sm font-black text-indigo-900 dark:text-indigo-300 uppercase tracking-widest mb-6 flex items-center justify-between">
+                <div class="flex items-center gap-2"><PlusIcon class="w-5 h-5" /> Nueva Actuación Procesal</div>
+                <button type="button" @click="generarNotaInteligente" class="text-[9px] bg-indigo-600 text-white px-3 py-1 rounded-lg flex items-center gap-1 hover:bg-indigo-700 transition-all shadow-md">
+                    <SparklesIcon class="w-3.5 h-3.5" /> Redacción Mágica
+                </button>
             </h3>
             <form @submit.prevent="handleSave" class="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div class="md:col-span-3 space-y-2">

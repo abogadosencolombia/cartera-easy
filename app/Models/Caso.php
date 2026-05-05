@@ -22,6 +22,35 @@ class Caso extends Model
 {
     use HasFactory, SoftDeletes;
 
+    public const ESTADOS_CIERRE_PROCESO = [
+        'CERRADO',
+        'FINALIZADO',
+        'ARCHIVADO',
+        'TERMINADO',
+        'Cerrado',
+        'Finalizado',
+        'Archivado',
+        'Terminado',
+        'cerrado',
+        'finalizado',
+        'archivado',
+        'terminado',
+    ];
+    public const ESTADOS_CIERRE_OPERATIVO = [
+        'CERRADO',
+        'FINALIZADO',
+        'ARCHIVADO',
+        'TERMINADO',
+        'Cerrado',
+        'Finalizado',
+        'Archivado',
+        'Terminado',
+        'cerrado',
+        'finalizado',
+        'archivado',
+        'terminado',
+    ];
+
     protected $fillable = [
         'cooperativa_id', 'user_id', 'deudor_id',
         'referencia_credito', 'radicado',
@@ -41,7 +70,8 @@ class Caso extends Model
         'juzgado_id', 'especialidad_id',
         'estado',
         'nota_cierre', // <--- ¡AQUÍ ESTABA EL PROBLEMA! Faltaba esta autorización.
-        'clonado_de_id', 'is_pinned', 'checklist_seguimiento'
+        'clonado_de_id', 'is_pinned', 'checklist_seguimiento',
+        'viabilidad_juridica', 'viabilidad_estado', 'sin_codeudores', 'es_spoa_nunc'
         ];
 
         protected $casts = [
@@ -56,6 +86,9 @@ class Caso extends Model
         'ultima_actvidad' => 'datetime',
         'is_pinned' => 'boolean',
         'checklist_seguimiento' => 'array',
+        'viabilidad_juridica' => 'array',
+        'sin_codeudores' => 'boolean',
+        'es_spoa_nunc' => 'boolean',
         ];
 
     /**
@@ -87,7 +120,7 @@ class Caso extends Model
                 if ($fechaVencimiento->isFuture()) {
                     return 0;
                 }
-                return $fechaVencimiento->diffInDays($hoy);
+                return (int) $fechaVencimiento->diffInDays($hoy);
             }
         );
     }
@@ -109,6 +142,36 @@ class Caso extends Model
                 }
             }
         );
+    }
+
+    public function scopeParaSeguimiento($query)
+    {
+        return $query
+            ->whereNull('nota_cierre')
+            ->where(function ($query) {
+                $query->whereNull('estado_proceso')
+                    ->orWhereNotIn('estado_proceso', self::ESTADOS_CIERRE_PROCESO);
+            })
+            ->where(function ($query) {
+                $query->whereNull('estado')
+                    ->orWhereNotIn('estado', self::ESTADOS_CIERRE_OPERATIVO);
+            });
+    }
+
+    public function scopeCerrados($query)
+    {
+        return $query->where(function ($query) {
+            $query->whereNotNull('nota_cierre')
+                ->orWhereIn('estado_proceso', self::ESTADOS_CIERRE_PROCESO)
+                ->orWhereIn('estado', self::ESTADOS_CIERRE_OPERATIVO);
+        });
+    }
+
+    public function estaEnSeguimiento(): bool
+    {
+        return empty($this->nota_cierre)
+            && !in_array($this->estado_proceso, self::ESTADOS_CIERRE_PROCESO, true)
+            && !in_array($this->estado, self::ESTADOS_CIERRE_OPERATIVO, true);
     }
 
     public function cooperativa(): BelongsTo { return $this->belongsTo(Cooperativa::class); }

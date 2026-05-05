@@ -425,12 +425,18 @@ const isClosed = computed(() => props.proceso.estado === 'CERRADO');
                   <h3 class="text-lg font-bold mb-4">Seguimiento y Fechas</h3>
                   <div class="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-6">
                       <div>
-                          <InputLabel value="Radicado" />
+                          <div class="flex justify-between items-center mb-1">
+                              <InputLabel value="Radicado" />
+                              <label class="flex items-center gap-1.5 cursor-pointer group">
+                                  <input type="checkbox" v-model="form.es_spoa_nunc" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3 h-3" />
+                                  <span class="text-[9px] font-black uppercase text-gray-400 group-hover:text-indigo-600 transition-colors">¿Es SPOA/NUNC?</span>
+                              </label>
+                          </div>
                           <TextInput 
                               v-model="form.radicado" 
                               @input="handleRadicadoInput"
                               class="mt-1 block w-full font-mono" 
-                              placeholder="XXXXX-XX-XX-XXX-XXXX-XXXXX-XX"
+                              :placeholder="form.es_spoa_nunc ? '21 dígitos (Sistema Penal)' : '14 a 23 dígitos (Sin caracteres especiales)'"
                           />
                           <InputError :message="form.errors.radicado" />
                       </div>

@@ -16,7 +16,7 @@ class UrgencyController extends Controller
         $riesgoDate = $hoy->copy()->addDays(2);
 
         // 1. Obtener Radicados Urgentes
-        $radicados = ProcesoRadicado::where('estado', 'ACTIVO')
+        $radicados = ProcesoRadicado::paraSeguimiento()
             ->where('fecha_proxima_revision', '<=', $riesgoDate)
             ->with(['demandantes:id,nombre_completo', 'demandados:id,nombre_completo'])
             ->get()
@@ -35,9 +35,9 @@ class UrgencyController extends Controller
                 ];
             });
 
-        // 2. Obtener Casos (Cooperativas) Urgentes (Inactivos > 10 días)
-        $casos = Caso::where('estado_proceso', '!=', 'cerrado')
-            ->where('updated_at', '<', now()->subDays(10))
+        // 2. Obtener Casos (Cooperativas) Urgentes (Inactivos > 20 días)
+        $casos = Caso::paraSeguimiento()
+            ->where('updated_at', '<', now()->subDays(20))
             ->with(['deudor:id,nombre_completo'])
             ->get()
             ->map(function($c) {

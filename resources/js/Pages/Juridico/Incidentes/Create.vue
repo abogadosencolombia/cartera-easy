@@ -7,6 +7,7 @@ import TextInput from '@/Components/TextInput.vue';
 import Textarea from '@/Components/Textarea.vue'; // Asumo que tienes un componente Textarea
 import SelectInput from '@/Components/SelectInput.vue'; // Y uno para Select
 import { Head, useForm } from '@inertiajs/vue3';
+import { useFormDraft } from '@/composables/useFormDraft';
 
 // Recibimos los usuarios que el Controlador nos envió
 const props = defineProps({
@@ -21,10 +22,15 @@ const form = useForm({
     origen: 'manual', // Valor por defecto
 });
 
+const { clearDraft } = useFormDraft(form, 'draft:create:juridico.incidentes');
+
 // Función que se llama al enviar el formulario
 const submit = () => {
     form.post(route('admin.incidentes-juridicos.store'), {
-        onFinish: () => form.reset('asunto', 'descripcion', 'usuario_responsable_id'),
+        onSuccess: () => {
+            clearDraft();
+            form.reset('asunto', 'descripcion', 'usuario_responsable_id');
+        },
     });
 };
 </script>

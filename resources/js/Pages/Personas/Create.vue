@@ -15,6 +15,7 @@ import {
 } from '@heroicons/vue/24/outline';
 import { reactive, computed } from 'vue';
 import Swal from 'sweetalert2';
+import { useFormDraft } from '@/composables/useFormDraft';
 
 const props = defineProps({
   allCooperativas: { type: Array, default: () => [] },
@@ -39,9 +40,11 @@ const form = useForm('CreatePersona', {
   social_links: [],
   addresses: [],
   es_demandado: false,
-  cooperativas_ids: [],
+  cooperativas_ids: [9],
   abogados_ids: [],
 });
+
+const { clearDraft } = useFormDraft(form, 'draft:create:personas');
 
 const addLinkRow = () => { form.social_links.push(reactive({ label: '', url: '' })); };
 const removeLinkRow = (idx) => { form.social_links.splice(idx, 1); };
@@ -59,9 +62,13 @@ const toggleAbogados = () => {
 };
 
 const submit = () => {
+    if (form.cooperativas_ids.length === 0) {
+        form.cooperativas_ids = [9];
+    }
     form.post(route('personas.store'), {
         preserveScroll: true, 
         onSuccess: () => {
+            clearDraft();
             Swal.fire({ title: '¡Registrada!', text: 'La persona ha sido creada correctamente.', icon: 'success', timer: 2000, showConfirmButton: false });
             form.reset();
         },

@@ -7,6 +7,7 @@ import TextInput from '@/Components/TextInput.vue';
 import DatePicker from '@/Components/DatePicker.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import Textarea from '@/Components/Textarea.vue';
+import Checkbox from '@/Components/Checkbox.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import SelectInput from '@/Components/SelectInput.vue';
 import AsyncSelect from '@/Components/AsyncSelect.vue';
@@ -34,13 +35,15 @@ import {
     LinkIcon,
     GlobeAltIcon,
     HashtagIcon,
-    CalendarDaysIcon
+    CalendarDaysIcon,
+    ExclamationTriangleIcon
 } from '@heroicons/vue/24/outline';
 import { Head, Link, useForm, useRemember } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
 import axios from 'axios';
 import { debounce } from 'lodash';
 import { formatRadicado, addDaysToDate, addMonthsToDate, toUpperCase, calculateDV } from '@/Utils/formatters';
+import { useFormDraft } from '@/composables/useFormDraft';
 
 const props = defineProps({
     casoAClonar: { type: Object, default: null },
@@ -108,6 +111,7 @@ const initialData = {
     link_drive: props.casoAClonar?.link_drive || '',
     link_expediente: props.casoAClonar?.link_expediente || '',
     clonado_de_id: props.casoAClonar?.id || null,
+    sin_codeudores: !!props.casoAClonar?.sin_codeudores,
 };
 
 const selectedJuzgado = ref(null);
@@ -116,6 +120,7 @@ watch(selectedJuzgado, (val) => {
 });
 
 const form = useForm(initialData);
+const { clearDraft } = useFormDraft(form, `draft:create:casos:${props.casoAClonar?.id || 'nuevo'}`);
 
 watch(() => props.casoAClonar, (newCaso) => {
     form.defaults({
@@ -168,6 +173,7 @@ watch(() => props.casoAClonar, (newCaso) => {
         link_drive: newCaso?.link_drive || '',
         link_expediente: newCaso?.link_expediente || '',
         clonado_de_id: newCaso?.id || null,
+        sin_codeudores: !!newCaso?.sin_codeudores,
     });
     form.reset();
 }, { immediate: true });
@@ -180,7 +186,10 @@ watch(() => form.deudor.numero_documento, (newVal) => {
 });
 
 // --- HELPERS DINÁMICOS ---
-const addCodeudor = () => form.codeudores.push({ nombre_completo: '', tipo_documento: 'CC', numero_documento: '', celular: '', correo: '', addresses: [], social_links: [] });
+const addCodeudor = () => {
+    form.sin_codeudores = false;
+    form.codeudores.push({ nombre_completo: '', tipo_documento: 'CC', numero_documento: '', celular: '', correo: '', addresses: [], social_links: [] });
+};
 const removeCodeudor = (index) => form.codeudores.splice(index, 1);
 const addAddress = (idx) => form.codeudores[idx].addresses.push({ label: 'Casa', address: '', city: '' });
 const removeAddress = (idx, addrIdx) => form.codeudores[idx].addresses.splice(addrIdx, 1);
@@ -318,7 +327,9 @@ const submit = () => {
             id: data.deudor.selected?.id ?? data.deudor_id 
         },
         deudor_id: data.deudor.is_new ? null : (data.deudor.selected?.id ?? data.deudor_id),
-    })).post(route('casos.store'));
+    })).post(route('casos.store'), {
+        onSuccess: clearDraft,
+    });
 };
 </script>
 
@@ -522,16 +533,22 @@ const submit = () => {
                                     <InputError :message="form.errors.referencia_credito" class="mt-2" />
                                 </div>
                                 <div>
-                                    <InputLabel value="Número de Radicado" class="font-bold text-xs uppercase text-gray-400 mb-2" />
+                                    <div class="flex justify-between items-center mb-2">
+                                        <InputLabel value="Número de Radicado" class="font-bold text-xs uppercase text-gray-400" />
+                                        <label class="flex items-center gap-1.5 cursor-pointer group">
+                                            <input type="checkbox" v-model="form.es_spoa_nunc" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3 h-3" />
+                                            <span class="text-[9px] font-black uppercase text-gray-400 group-hover:text-indigo-600 transition-colors">¿Es SPOA/NUNC?</span>
+                                        </label>
+                                    </div>
                                     <div class="relative">
                                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <HashtagIcon class="h-4 w-4 text-gray-400" />
+                                            <HashtagIcon class="h-4 w-4" :class="form.es_spoa_nunc ? 'text-indigo-500' : 'text-gray-400'" />
                                         </div>
                                         <TextInput 
                                             v-model="form.radicado" 
                                             @input="handleRadicadoInput"
                                             class="pl-10 block w-full font-mono bg-gray-50/50 focus:bg-white transition-all" 
-                                            placeholder="XXXXX-XX-XX-XXX-XXXX-XXXXX-XX"
+                                            :placeholder="form.es_spoa_nunc ? '21 dígitos (Sistema Penal)' : '23 dígitos numéricos (Sin puntos ni guiones)'"
                                         />
                                     </div>
                                     <InputError :message="form.errors.radicado" class="mt-2" />
@@ -767,7 +784,36 @@ const submit = () => {
                         </div>
 
                         <div class="p-8 space-y-8">
-                            <div v-if="form.codeudores.length === 0" class="py-16 border-2 border-dashed border-gray-100 dark:border-gray-700 rounded-3xl text-center">
+                            <!-- Alerta de "Sin Codeudores" -->
+                            <div v-if="form.codeudores.length === 0 && !form.sin_codeudores" class="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 rounded-2xl flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
+                                <div class="flex items-center gap-3">
+                                    <div class="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                                        <ExclamationTriangleIcon class="w-5 h-5 text-amber-600" />
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xs font-black text-amber-800 dark:text-amber-300 uppercase tracking-widest">¿Este proceso no tiene codeudores?</h4>
+                                        <p class="text-[10px] text-amber-600 dark:text-amber-500 font-bold uppercase tracking-tighter">Se recomienda vincular al menos uno o marcar la casilla de "No aplica".</p>
+                                    </div>
+                                </div>
+                                <button type="button" @click="form.sin_codeudores = true" class="px-4 py-2 bg-white dark:bg-gray-800 border border-amber-200 dark:border-gray-700 rounded-xl text-[10px] font-black uppercase text-amber-600 hover:bg-amber-600 hover:text-white transition-all shadow-sm">
+                                    Marcar que no tiene
+                                </button>
+                            </div>
+
+                            <div v-if="form.sin_codeudores" class="p-4 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-800/50 rounded-2xl flex items-center justify-between gap-4 animate-in zoom-in-95">
+                                <div class="flex items-center gap-3">
+                                    <div class="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+                                        <CheckCircleIcon class="w-5 h-5 text-emerald-600" />
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xs font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-widest">Confirmado: Sin Codeudores</h4>
+                                        <p class="text-[10px] text-emerald-600 dark:text-emerald-500 font-bold uppercase tracking-tighter">El proceso se registrará oficialmente como "Sin garantía de codeudor".</p>
+                                    </div>
+                                </div>
+                                <button type="button" @click="form.sin_codeudores = false" class="text-[10px] font-bold text-emerald-600 uppercase hover:underline">Cambiar</button>
+                            </div>
+
+                            <div v-if="form.codeudores.length === 0 && !form.sin_codeudores" class="py-16 border-2 border-dashed border-gray-100 dark:border-gray-700 rounded-3xl text-center">
                                 <div class="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-full w-fit mx-auto mb-4 text-gray-300">
                                     <UsersIcon class="h-10 w-10" />
                                 </div>

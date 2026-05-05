@@ -44,12 +44,26 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
             $query->whereHas('juzgado', fn($jq) => $jq->where('nombre', 'ilike', "%{$tipo}%"));
         }
         if (!empty($this->filtros['etapa_procesal'])) $query->where('etapa_procesal', $this->filtros['etapa_procesal']);
-        if (!empty($this->filtros['sin_radicado'])) {
+        
+        $sinRadicado = filter_var($this->filtros['sin_radicado'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        if ($sinRadicado) {
             $query->where(function($q) { $q->whereNull('radicado')->orWhere('radicado', ''); });
         }
-        if (!empty($this->filtros['inactivo_15_dias'])) {
-            $query->where('updated_at', '<', now()->subDays(15))
-                  ->where('estado_proceso', '!=', 'cerrado');
+
+        $cerrados = filter_var($this->filtros['cerrados'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        if ($cerrados) {
+            $query->cerrados();
+        }
+
+        $actualizadosHoy = filter_var($this->filtros['actualizados_hoy'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        if ($actualizadosHoy) {
+            $query->whereBetween('updated_at', [now()->startOfDay(), now()->endOfDay()]);
+        }
+
+        $inactivo20 = filter_var($this->filtros['inactivo_20_dias'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        if ($inactivo20) {
+            $query->where('updated_at', '<', now()->subDays(20))
+                  ->paraSeguimiento();
         }
 
         return $query->latest('updated_at');
@@ -80,6 +94,7 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
             'Etapa Procesal (Seleccionar lista)',
             'Estado Caso (ACTIVO/CERRADO)',
             'Estado Proceso',
+            'Viabilidad',
             'Tipo Garantia',
             'Origen Documental',
             'Medio de Contacto',
@@ -112,6 +127,7 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
         return [
             $caso->id,
             $caso->radicado,
+            $caso->es_spoa_nunc ? 'SI' : 'NO',
             $caso->referencia_credito,
             $caso->deudor?->nombre_completo,
             $caso->deudor?->numero_documento,
@@ -132,6 +148,7 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
             $caso->etapa_procesal,
             $caso->estado ?? 'ACTIVO',
             $caso->estado_proceso,
+            strtoupper($caso->viabilidad_estado ?? 'PENDIENTE'),
             $caso->tipo_garantia_asociada,
             $caso->origen_documental,
             $caso->medio_contacto,
@@ -161,6 +178,68 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
         return [
             AfterSheet::class => function(AfterSheet $event) {
                 $sheet = $event->sheet->getDelegate();
+                $lastRow = $sheet->getHighestRow();
+                $lastCol = $sheet->getHighestColumn();
+                $fullRange = "A1:{$lastCol}{$lastRow}";
+
+                // 1. Estilo General y Alineación
+                $sheet->getStyle($fullRange)->getAlignment()->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_TOP);
+                
+                // 2. Encabezados Premium
+                $headerRange = "A1:{$lastCol}1";
+                $sheet->getStyle($headerRange)->getFont()->setBold(true)->setSize(11);
+                $sheet->getStyle($headerRange)->getFill()
+                    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                    ->getStartColor()->setARGB('4F46E5');
+                $sheet->getStyle($headerRange)->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+                $sheet->getStyle($headerRange)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+
+                // 3. Bordes Finos
+                $sheet->getStyle($fullRange)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+                $sheet->getStyle($fullRange)->getBorders()->getAllBorders()->getColor()->setARGB('E2E8F0');
+
+                // 4. Ajuste de Anchos y Text Wrapping
+                $longTextFields = [
+                    'D' => 35, // Nombre Deudor
+                    'L' => 45, // Codeudores
+                    'M' => 30, // Abogados
+                    'N' => 25, // Cooperativa
+                    'O' => 35, // Juzgado
+                    'P' => 20, // Especialidad
+                    'Q' => 25, // Tipo Proceso
+                    'R' => 25, // Subtipo
+                    'S' => 25, // Subproceso
+                    'T' => 25, // Etapa
+                    'AL' => 50, // Notas Legales
+                    'AM' => 40, // Nota Cierre
+                    'AJ' => 40, // Link Drive
+                    'AK' => 40, // Link Expediente
+                ];
+
+                foreach ($longTextFields as $col => $width) {
+                    $sheet->getColumnDimension($col)->setAutoSize(false);
+                    $sheet->getColumnDimension($col)->setWidth($width);
+                    $sheet->getStyle("{$col}2:{$col}{$lastRow}")->getAlignment()->setWrapText(true);
+                }
+
+                // Auto-size para el resto
+                foreach(range('A','Z') as $col) {
+                    if (!isset($longTextFields[$col])) $sheet->getColumnDimension($col)->setAutoSize(true);
+                }
+                foreach(['AA','AB','AC','AD','AE','AF','AG','AH','AI','AN','AO','AP','AQ'] as $col) {
+                    if (!isset($longTextFields[$col])) $sheet->getColumnDimension($col)->setAutoSize(true);
+                }
+
+                // 5. Cebra
+                for ($row = 2; $row <= $lastRow; $row++) {
+                    if ($row % 2 == 0) {
+                        $sheet->getStyle("A{$row}:{$lastCol}{$row}")->getFill()
+                            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                            ->getStartColor()->setARGB('F8FAFC');
+                    }
+                }
+
+                // 6. Validaciones
                 $spreadsheet = $sheet->getParent();
                 $dataSheet = $spreadsheet->createSheet();
                 $dataSheet->setTitle('DATA_SISTEMA');
@@ -176,16 +255,10 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
                 $this->fillColumn($dataSheet, 'C', $especialidades);
                 $this->fillColumn($dataSheet, 'D', $etapas);
 
-                $this->applyValidation($sheet, 'N2:N5000', 'DATA_SISTEMA!$A$1:$A$' . count($cooperativas));
-                $this->applyValidation($sheet, 'O2:O5000', 'DATA_SISTEMA!$B$1:$B$' . count($juzgados));
-                $this->applyValidation($sheet, 'P2:P5000', 'DATA_SISTEMA!$C$1:$C$' . count($especialidades));
-                $this->applyValidation($sheet, 'T2:T5000', 'DATA_SISTEMA!$D$1:$D$' . count($etapas));
-
-                $sheet->getStyle('A1:AQ1')->getFont()->setBold(true);
-                $sheet->getStyle('A1:AQ1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('4F46E5');
-                $sheet->getStyle('A1:AQ1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
-                foreach(range('A','Z') as $col) { $sheet->getColumnDimension($col)->setAutoSize(true); }
-                foreach(['AA','AB','AC','AD','AE','AF','AG','AH','AI','AJ','AK','AL','AM','AN','AO','AP','AQ'] as $col) { $sheet->getColumnDimension($col)->setAutoSize(true); }
+                $this->applyValidation($sheet, "N2:N{$lastRow}", 'DATA_SISTEMA!$A$1:$A$' . count($cooperativas));
+                $this->applyValidation($sheet, "O2:O{$lastRow}", 'DATA_SISTEMA!$B$1:$B$' . count($juzgados));
+                $this->applyValidation($sheet, "P2:P{$lastRow}", 'DATA_SISTEMA!$C$1:$C$' . count($especialidades));
+                $this->applyValidation($sheet, "T2:T{$lastRow}", 'DATA_SISTEMA!$D$1:$D$' . count($etapas));
             },
         ];
     }

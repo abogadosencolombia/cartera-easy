@@ -43,8 +43,6 @@ class ProcesoRadicadoController extends Controller
             });
         }
 
-        if ($request->boolean('sin_radicado')) { $query->where(function($q) { $q->whereNull('radicado')->orWhere('radicado', ''); }); }
-        if ($request->boolean('solo_vencidos')) { $query->where('fecha_proxima_revision', '<', now()->toDateString())->where('estado', 'ACTIVO'); }
         if ($request->filled('estado') && $request->estado !== 'TODOS') { $query->where('estado', $request->estado); }
         if ($request->filled('juzgado_id')) { $query->where('juzgado_id', $request->juzgado_id); }
         if ($request->filled('tipo_entidad')) {
@@ -52,13 +50,25 @@ class ProcesoRadicadoController extends Controller
             $query->whereHas('juzgado', fn($q) => $q->where('nombre', 'ilike', "%{$tipo}%"));
         }
 
+        $inicioHoy = now()->startOfDay();
+        $finHoy = now()->endOfDay();
+        $aplicarActualizadosHoy = fn ($q) => $q->whereBetween('updated_at', [$inicioHoy, $finHoy]);
+
         // --- Estadísticas para los KPI Cards ---
         $statsQuery = (clone $query)->reorder();
+
+        if ($request->boolean('sin_radicado')) { $query->where(function($q) { $q->whereNull('radicado')->orWhere('radicado', ''); }); }
+        if ($request->boolean('solo_vencidos')) { $query->where('fecha_proxima_revision', '<', now()->toDateString())->paraSeguimiento(); }
+        if ($request->boolean('cerrados')) { $query->cerrados(); }
+        if ($request->boolean('actualizados_hoy')) { $aplicarActualizadosHoy($query); }
+
         $stats = [
             'total' => (clone $statsQuery)->count(),
             'sin_radicado' => (clone $statsQuery)->where(fn($q) => $q->whereNull('radicado')->orWhere('radicado', ''))->count(),
-            'vencidos' => (clone $statsQuery)->where('fecha_proxima_revision', '<', now()->toDateString())->where('estado', 'ACTIVO')->count(),
-            'revisar_hoy' => (clone $statsQuery)->where('fecha_proxima_revision', now()->toDateString())->where('estado', 'ACTIVO')->count(),
+            'cerrados' => (clone $statsQuery)->cerrados()->count(),
+            'vencidos' => (clone $statsQuery)->where('fecha_proxima_revision', '<', now()->toDateString())->paraSeguimiento()->count(),
+            'revisar_hoy' => (clone $statsQuery)->where('fecha_proxima_revision', now()->toDateString())->paraSeguimiento()->count(),
+            'actualizados_hoy' => $aplicarActualizadosHoy(clone $statsQuery)->count(),
         ];
 
         return Inertia::render('Radicados/Index', [
@@ -80,12 +90,34 @@ class ProcesoRadicadoController extends Controller
     {
         $this->authorize('update', $proceso);
         $proceso->update(['is_pinned' => !$proceso->is_pinned]);
-        
+
         return back()->with('success', $proceso->is_pinned ? 'Proceso fijado correctamente.' : 'Proceso desfijado.');
     }
 
-    public function quickReview(ProcesoRadicado $proceso)
+    public function updateViabilidad(Request $request, ProcesoRadicado $proceso)
     {
+        $this->authorize('update', $proceso);
+
+        $validated = $request->validate([
+            'viabilidad_juridica' => 'required|array',
+            'viabilidad_estado' => 'required|string|in:verde,amarillo,rojo,pendiente',
+        ]);
+
+        $proceso->update($validated);
+
+        AuditoriaEvento::create([
+            'user_id' => Auth::id(),
+            'evento' => 'ACTUALIZAR_VIABILIDAD_RADICADO',
+            'descripcion_breve' => "Actualización de ficha de viabilidad jurídica del radicado",
+            'auditable_id' => $proceso->id,
+            'auditable_type' => ProcesoRadicado::class,
+            'direccion_ip' => $request->ip(),
+        ]);
+
+        return back()->with('success', 'Ficha de viabilidad actualizada.');
+    }
+
+    public function quickReview(ProcesoRadicado $proceso)    {
         $this->authorize('update', $proceso);
         
         // Actualizamos fecha de revisión hoy y sumamos 15 días para la próxima
@@ -250,6 +282,7 @@ class ProcesoRadicadoController extends Controller
 
                 $procesoData = [
                     'radicado' => $radicadoDestino,
+                    'es_spoa_nunc' => $row['es_spoa_nunc'] ?? false,
                     'fecha_radicado' => $row['fecha_radicado'] ?? ($existente?->fecha_radicado),
                     'naturaleza' => $row['naturaleza'] ?? ($existente?->naturaleza),
                     'asunto' => $row['asunto'] ?? ($existente?->asunto),
@@ -265,12 +298,25 @@ class ProcesoRadicadoController extends Controller
                     'fecha_proxima_revision' => $row['fecha_proxima_revision'] ?? ($existente?->fecha_proxima_revision),
                 ];
 
+                if ($existente) {
+                    foreach (['link_expediente', 'ubicacion_drive', 'observaciones'] as $campo) {
+                        if (($procesoData[$campo] ?? null) === null || trim((string) $procesoData[$campo]) === '') {
+                            $procesoData[$campo] = $existente->{$campo};
+                        }
+                    }
+                }
+
                 if (!$existente) {
                     $procesoData['created_by'] = Auth::id();
                     $procesoData['fecha_cambio_etapa'] = now();
                 }
 
-                $proceso = ProcesoRadicado::updateOrCreate(['id' => $row['id_interno'] ?? ($existente?->id ?? 0)], $procesoData);
+                if ($existente) {
+                    $existente->update($procesoData);
+                    $proceso = $existente->refresh();
+                } else {
+                    $proceso = ProcesoRadicado::create($procesoData);
+                }
                 
                 if (!empty($row['demandantes_nombres'])) $this->procesarPartes($proceso, $row['demandantes_nombres'], 'DEMANDANTE');
                 if (!empty($row['demandados_nombres'])) $this->procesarPartes($proceso, $row['demandados_nombres'], 'DEMANDADO');
@@ -461,6 +507,13 @@ class ProcesoRadicadoController extends Controller
             'fecha_proxima_revision' => $request->fecha_proxima_revision
         ]);
         $etapaNueva = EtapaProcesal::find($request->etapa_procesal_id)->nombre;
+
+        // --- AUTOMATIZACIÓN: Crear Actuación para que el abogado no tenga que escribirla ---
+        $proceso->actuaciones()->create([
+            'user_id' => Auth::id(),
+            'nota' => "AVANCE PROCESAL: El expediente ha pasado de la etapa '{$etapaAnterior}' a '{$etapaNueva}'. " . ($request->observacion ?: 'Sin observaciones adicionales.'),
+            'fecha_actuacion' => now(),
+        ]);
 
         // Registrar en Auditoría
         $proceso->auditoria()->create([

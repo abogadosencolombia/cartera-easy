@@ -54,9 +54,12 @@ const asText = (v) => v ?? '—';
 
                         <div class="flex flex-col gap-1.5">
                             <span class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Radicado Oficial</span>
-                            <p class="text-sm font-mono font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">
-                                {{ proceso.radicado || 'SIN NÚMERO ASIGNADO' }}
-                            </p>
+                            <div class="flex items-center gap-2">
+                                <p class="text-sm font-mono font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">
+                                    {{ proceso.radicado || 'SIN NÚMERO ASIGNADO' }}
+                                </p>
+                                <span v-if="proceso.es_spoa_nunc" class="text-[9px] font-black bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-200 uppercase tracking-tighter">SPOA/NUNC</span>
+                            </div>
                         </div>
 
                         <div class="flex flex-col gap-1.5">
@@ -142,6 +145,7 @@ const asText = (v) => v ?? '—';
                 :checklist-completados="proceso.checklist_seguimiento || []"
                 :model-id="proceso.id"
                 model-type="proceso"
+                :entity="proceso"
             />
         </div>
 
