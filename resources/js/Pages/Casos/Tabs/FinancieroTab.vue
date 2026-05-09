@@ -1,6 +1,8 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import { getCaseFinancialStatus } from '@/Utils/caseFinancialStatus';
 import { 
     BanknotesIcon, 
     CheckBadgeIcon, 
@@ -14,32 +16,61 @@ import {
 const props = defineProps({
     caso: Object,
     resumen_financiero: { type: Object, default: () => ({ monto_total: 0, total_pagado: 0, saldo_pendiente: 0 }) },
+    financialStatus: { type: Object, default: null },
+    puedeEditar: { type: Boolean, default: false },
     contrato_id: Number,
     formatCurrency: Function,
 });
+
+const resolvedFinancialStatus = computed(() => props.financialStatus || getCaseFinancialStatus(props.caso));
+const financialField = (key) => resolvedFinancialStatus.value.fields.find((field) => field.key === key);
 </script>
 
 <template>
     <div class="space-y-8 animate-in fade-in duration-500">
 
+        <div
+            v-if="resolvedFinancialStatus.hasMissing"
+            class="p-5 rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/15 flex flex-col md:flex-row md:items-center justify-between gap-4"
+        >
+            <div class="flex items-start gap-3">
+                <ExclamationTriangleIcon class="w-6 h-6 text-amber-600 dark:text-amber-300 shrink-0" />
+                <div>
+                    <p class="text-sm font-black text-amber-900 dark:text-amber-100 uppercase tracking-tight">Datos financieros incompletos</p>
+                    <p class="text-xs font-semibold text-amber-700 dark:text-amber-300 mt-1">{{ resolvedFinancialStatus.detail }} Registrar estos valores mejora contratos, reportes y seguimiento de cartera.</p>
+                </div>
+            </div>
+            <Link
+                v-if="puedeEditar"
+                :href="route('casos.edit', caso?.id) + '?tab=info-principal'"
+                class="inline-flex items-center justify-center px-4 py-2 bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-700 rounded-xl text-[10px] font-black uppercase text-amber-700 dark:text-amber-200 hover:border-amber-400 transition-colors shrink-0"
+            >
+                Actualizar montos
+            </Link>
+        </div>
+
         <!-- KPIs COMPACTOS -->
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
             <div class="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm relative overflow-hidden group">
                 <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Total Obligación</p>
-                <p class="text-2xl font-black text-gray-900 dark:text-white">{{ formatCurrency(resumen_financiero?.monto_total || 0) }}</p>
+                <p v-if="financialField('monto_total')?.missing" class="text-sm font-black text-amber-600 dark:text-amber-300 uppercase">Pendiente por registrar</p>
+                <p v-else class="text-2xl font-black text-gray-900 dark:text-white">{{ formatCurrency(resumen_financiero?.monto_total || 0) }}</p>
                 <CalculatorIcon class="absolute -right-2 -bottom-2 w-16 h-16 text-gray-100 dark:text-gray-700/50 -rotate-12" />
             </div>
 
             <div class="bg-rose-50/50 dark:bg-rose-900/10 p-6 rounded-xl border border-rose-100 dark:border-rose-900/30 shadow-sm relative overflow-hidden">
                 <p class="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-widest mb-2">Deuda Actual</p>
-                <p class="text-2xl font-black text-rose-700 dark:text-rose-300">{{ formatCurrency(caso?.monto_deuda_actual || 0) }}</p>
+                <p v-if="financialField('monto_deuda_actual')?.missing" class="text-sm font-black text-amber-600 dark:text-amber-300 uppercase">Pendiente por registrar</p>
+                <p v-else class="text-2xl font-black text-rose-700 dark:text-rose-300">{{ formatCurrency(caso?.monto_deuda_actual || 0) }}</p>
                 <p class="mt-2 text-[9px] font-bold text-rose-400 uppercase">Valor vigente del caso</p>
                 <BanknotesIcon class="absolute -right-2 -bottom-2 w-16 h-16 text-rose-100 dark:text-rose-900/30 -rotate-12" />
             </div>
 
             <div class="bg-emerald-50/50 dark:bg-emerald-900/10 p-6 rounded-xl border border-emerald-100 dark:border-emerald-900/30 shadow-sm">
                 <p class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-2">Recaudo Total</p>
-                <p class="text-2xl font-black text-emerald-700 dark:text-emerald-300">{{ formatCurrency(resumen_financiero?.total_pagado || 0) }}</p>
+                <p v-if="financialField('monto_total_pagado')?.missing" class="text-sm font-black text-amber-600 dark:text-amber-300 uppercase">Pendiente por registrar</p>
+                <p v-else-if="financialField('monto_total_pagado')?.displayLabel" class="text-sm font-black text-emerald-700 dark:text-emerald-300 uppercase">{{ financialField('monto_total_pagado').displayLabel }}</p>
+                <p v-else class="text-2xl font-black text-emerald-700 dark:text-emerald-300">{{ formatCurrency(resumen_financiero?.total_pagado || 0) }}</p>
                 <div class="mt-3 h-1.5 bg-emerald-200 dark:bg-emerald-900 rounded-full overflow-hidden">
                     <div class="h-full bg-emerald-500" :style="{ width: (resumen_financiero?.monto_total > 0 ? (resumen_financiero.total_pagado / resumen_financiero.monto_total * 100) : 0) + '%' }"></div>
                 </div>

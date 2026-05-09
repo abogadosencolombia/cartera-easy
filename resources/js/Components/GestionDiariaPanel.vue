@@ -2,7 +2,7 @@
 import { ref, watch, onMounted } from 'vue';
 import { usePage, router } from '@inertiajs/vue3';
 import axios from 'axios';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 import SelectInput from '@/Components/SelectInput.vue';
 import { 
     XMarkIcon, 
@@ -23,7 +23,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close']);
 
-const Toast = Swal.mixin({
+const Toast = AppAlert.mixin({
     toast: true,
     timer: 3000,
 });
@@ -124,7 +124,7 @@ const markAsDone = async (id) => {
 
 // Eliminar
 const deleteNota = async (id) => {
-    const result = await Swal.fire({
+    const result = await AppAlert.fire({
         title: '¿ELIMINAR REGISTRO?',
         text: "ESTA ACCIÓN NO SE PUEDE DESHACER",
         icon: 'warning',

@@ -15,7 +15,7 @@ import DropdownLink from '@/Components/DropdownLink.vue';
 import Textarea from '@/Components/Textarea.vue';
 import { debounce } from 'lodash';
 import { useProcesos } from '@/composables/useProcesos';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 import { 
     MagnifyingGlassIcon, 
     FunnelIcon, 
@@ -329,7 +329,7 @@ const togglePin = (proceso) => {
 };
 
 const quickReview = (proceso) => {
-    Swal.fire({
+    AppAlert.fire({
         title: '¿Marcar como revisado?',
         text: 'Se actualizará la revisión a HOY y se programará la próxima en 15 días.',
         icon: 'question',
@@ -347,7 +347,7 @@ const quickReview = (proceso) => {
 };
 
 const deleteProceso = (proceso) => {
-    Swal.fire({
+    AppAlert.fire({
         title: '¿Suspender Expediente?',
         html: `
             <div class="text-left space-y-3">
@@ -376,7 +376,7 @@ const deleteProceso = (proceso) => {
         if (result.isConfirmed) {
             router.delete(route('procesos.destroy', proceso.id), {
                 preserveScroll: true,
-                onSuccess: () => Swal.fire('Suspendido', 'El proceso ha sido movido a la papelera.', 'success')
+                onSuccess: () => AppAlert.fire('Suspendido', 'El proceso ha sido movido a la papelera.', 'success')
             });
         }
     });
@@ -432,7 +432,7 @@ const copyLegalInfo = (proceso) => {
     text += `Asunto: ${asunto}\n`;
     
     navigator.clipboard.writeText(text).then(() => {
-        Swal.fire({
+        AppAlert.fire({
             title: '¡Copiado!',
             text: 'Información lista para pegar.',
             icon: 'success',

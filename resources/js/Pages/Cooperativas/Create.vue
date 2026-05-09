@@ -22,7 +22,7 @@ import {
     MapPinIcon,
     DocumentTextIcon
 } from '@heroicons/vue/24/outline';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 import { useFormDraft } from '@/composables/useFormDraft';
 
 const form = useForm({
@@ -52,7 +52,7 @@ const submit = () => {
         preserveScroll: true,
         onSuccess: () => {
             clearDraft();
-            Swal.fire({
+            AppAlert.fire({
                 title: '¡Registrada!',
                 text: 'La cooperativa ha sido creada exitosamente.',
                 icon: 'success',
@@ -62,7 +62,7 @@ const submit = () => {
         },
         onError: (errors) => {
             const firstErr = Object.values(errors)[0];
-            Swal.fire({
+            AppAlert.fire({
                 title: 'Atención',
                 text: firstErr || 'Revise los campos obligatorios marcados en rojo.',
                 icon: 'warning',

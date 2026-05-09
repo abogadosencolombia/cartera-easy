@@ -1,5 +1,5 @@
 import axios, { isCancel } from 'axios';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 window.axios = axios;
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
@@ -61,7 +61,7 @@ window.axios.interceptors.response.use(
                     return axios(originalRequest);
                     
                 } catch (refreshError) {
-                    Swal.fire({
+                    AppAlert.fire({
                         icon: 'warning',
                         title: 'Sesión expirada',
                         text: 'Tu sesión ha expirado por inactividad. La página se recargará para continuar.',
@@ -77,21 +77,21 @@ window.axios.interceptors.response.use(
             // 2. Manejo de Errores Comunes (500, 403, 404)
             if (!originalRequest.silent) {
                 if (status >= 500) {
-                    Swal.fire({
+                    AppAlert.fire({
                         toast: true, position: 'top-end', showConfirmButton: false, timer: 5000, timerProgressBar: true,
                         icon: 'error',
                         title: 'Error del Servidor',
                         text: 'Ocurrió un problema procesando tu solicitud. El equipo técnico ha sido notificado.'
                     });
                 } else if (status === 403) {
-                    Swal.fire({
+                    AppAlert.fire({
                         toast: true, position: 'top-end', showConfirmButton: false, timer: 5000, timerProgressBar: true,
                         icon: 'warning',
                         title: 'Acceso Denegado',
                         text: error.response.data?.message || 'No tienes permisos para realizar esta acción.'
                     });
                 } else if (status === 404) {
-                    Swal.fire({
+                    AppAlert.fire({
                         toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true,
                         icon: 'info',
                         title: 'No encontrado',
@@ -102,7 +102,7 @@ window.axios.interceptors.response.use(
         } else if (error.request) {
             // El servidor no respondió (Caída de red o petición abortada por el navegador)
             // Solo mostrar alerta si NO es un error de cancelación (ya manejado arriba)
-            Swal.fire({
+            AppAlert.fire({
                 toast: true, position: 'top-end', showConfirmButton: false, timer: 5000, timerProgressBar: true,
                 icon: 'error',
                 title: 'Error de Conexión',

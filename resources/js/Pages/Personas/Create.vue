@@ -14,7 +14,7 @@ import {
     BriefcaseIcon, ShieldCheckIcon, CheckCircleIcon, ArrowPathIcon, ArrowLeftIcon
 } from '@heroicons/vue/24/outline';
 import { reactive, computed } from 'vue';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 import { useFormDraft } from '@/composables/useFormDraft';
 
 const props = defineProps({
@@ -69,12 +69,12 @@ const submit = () => {
         preserveScroll: true, 
         onSuccess: () => {
             clearDraft();
-            Swal.fire({ title: '¡Registrada!', text: 'La persona ha sido creada correctamente.', icon: 'success', timer: 2000, showConfirmButton: false });
+            AppAlert.fire({ title: '¡Registrada!', text: 'La persona ha sido creada correctamente.', icon: 'success', timer: 2000, showConfirmButton: false });
             form.reset();
         },
         onError: (errors) => {
             const firstErr = Object.values(errors)[0];
-            Swal.fire({ title: 'Atención', text: firstErr || 'Revise los campos obligatorios.', icon: 'warning', confirmButtonColor: '#4f46e5' });
+            AppAlert.fire({ title: 'Atención', text: firstErr || 'Revise los campos obligatorios.', icon: 'warning', confirmButtonColor: '#4f46e5' });
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     });

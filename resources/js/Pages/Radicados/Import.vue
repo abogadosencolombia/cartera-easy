@@ -14,7 +14,7 @@ import {
     ArrowPathIcon,
     UserIcon
 } from '@heroicons/vue/24/outline';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SelectInput from '@/Components/SelectInput.vue';
 
@@ -49,19 +49,19 @@ const uploadFile = () => {
             results.value = res.data;
         })
         .catch(err => {
-            Swal.fire('Error', 'El archivo no tiene el formato correcto o está corrupto.', 'error');
+            AppAlert.fire('Error', 'El archivo no tiene el formato correcto o está corrupto.', 'error');
         })
         .finally(() => processing.value = false);
 };
 
 const confirmImport = () => {
     if (!confirmed.value) {
-        Swal.fire('Atención', 'Debe marcar la casilla de revisión para continuar.', 'warning');
+        AppAlert.fire('Atención', 'Debe marcar la casilla de revisión para continuar.', 'warning');
         return;
     }
 
     if (!results.value || !results.value.rows) {
-        Swal.fire('Error', 'No hay datos válidos para importar.', 'error');
+        AppAlert.fire('Error', 'No hay datos válidos para importar.', 'error');
         return;
     }
 
@@ -73,7 +73,7 @@ const confirmImport = () => {
     }, {
         preserveScroll: true,
         onSuccess: () => {
-            Swal.fire({
+            AppAlert.fire({
                 title: '¡Éxito!',
                 text: 'Los expedientes han sido procesados correctamente.',
                 icon: 'success',
@@ -82,7 +82,7 @@ const confirmImport = () => {
         },
         onError: (err) => {
             console.error('Error en importación:', err);
-            Swal.fire('Error', 'Ocurrió un fallo al guardar los datos. Revise la consola.', 'error');
+            AppAlert.fire('Error', 'Ocurrió un fallo al guardar los datos. Revise la consola.', 'error');
         },
         onFinish: () => {
             processing.value = false;

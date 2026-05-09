@@ -19,6 +19,7 @@ const tiposEntidad = [
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import { ref, watch, reactive, computed, onMounted } from 'vue';
 import { TrashIcon, MagnifyingGlassIcon, InboxIcon, EyeIcon, ArrowDownTrayIcon, FunnelIcon, ArchiveBoxXMarkIcon, ChevronDownIcon, XMarkIcon, DocumentDuplicateIcon, CloudArrowUpIcon, BanknotesIcon, ExclamationCircleIcon, ArrowPathIcon, CheckCircleIcon, UserGroupIcon, ScaleIcon, PhoneIcon, EnvelopeIcon, BuildingOfficeIcon, ClockIcon, ExclamationTriangleIcon, UserIcon, ClipboardDocumentListIcon, LinkIcon, MapPinIcon as PinIcon, EllipsisVerticalIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'; 
+import { getCaseFinancialStatus } from '@/Utils/caseFinancialStatus';
 
 const togglePin = (caso) => {
     router.patch(route('casos.pin', caso.id), {}, {
@@ -26,7 +27,7 @@ const togglePin = (caso) => {
     });
 };
 import { debounce } from 'lodash';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 
 const props = defineProps({
     casos: Object,
@@ -273,6 +274,9 @@ const formatCurrency = (value) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })
     .format(value || 0);
 
+const financialStatusFor = (caso) => getCaseFinancialStatus(caso);
+const financialFieldFor = (caso, key) => financialStatusFor(caso).fields.find((field) => field.key === key);
+
 // --- Lógica de Eliminación ---
 const confirmingCaseDeletion = ref(false);
 const caseToDelete = ref(null);
@@ -400,11 +404,13 @@ onMounted(() => {
 const caseStatus = computed(() => {
     if (!selectedCaso.value) return null;
     const c = selectedCaso.value;
+    const financialStatus = financialStatusFor(c);
     return {
         hasRadicado: !!c.radicado,
         hasJuzgado: !!c.juzgado,
         hasAbogado: c.users && c.users.length > 0,
-        hasFinancial: (c.monto_total || 0) > 0,
+        hasFinancial: !financialStatus.hasMissing,
+        financialMissing: financialStatus.missingLabels,
         isCompleted: !!c.radicado && !!c.juzgado && (c.users && c.users.length > 0)
     };
 });
@@ -430,7 +436,7 @@ const copyLegalInfo = (caso) => {
     }
     
     navigator.clipboard.writeText(text).then(() => {
-        Swal.fire({
+        AppAlert.fire({
             title: '¡Copiado!',
             text: 'Datos listos para pegar.',
             icon: 'success',
@@ -746,6 +752,14 @@ const copyLegalInfo = (caso) => {
                                                     :title="'Integridad del expediente: ' + (caso.integridad_score || 0) + '%'"
                                                 >
                                                     {{ caso.integridad_score || 0 }}%
+                                                </span>
+                                                <span
+                                                    v-if="financialStatusFor(caso).hasMissing"
+                                                    class="inline-flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-100"
+                                                    :title="financialStatusFor(caso).detail"
+                                                >
+                                                    <BanknotesIcon class="w-3 h-3" />
+                                                    Finanzas
                                                 </span>
                                                 <span v-if="caso.radicado" class="text-[10px] text-gray-400 flex items-center gap-1 group/rad">
                                                     Rad: {{ caso.radicado }}
@@ -1133,31 +1147,46 @@ const copyLegalInfo = (caso) => {
                             <BanknotesIcon class="w-4 h-4 text-indigo-500" />
                             <h3 class="text-[10px] sm:text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest">Situación Económica</h3>
                         </div>
+                        <div
+                            v-if="financialStatusFor(selectedCaso).hasMissing"
+                            class="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                        >
+                            <div>
+                                <p class="text-[10px] font-black text-amber-700 dark:text-amber-300 uppercase tracking-widest">Montos por completar</p>
+                                <p class="text-xs font-semibold text-amber-700 dark:text-amber-300 mt-1">{{ financialStatusFor(selectedCaso).detail }}</p>
+                            </div>
+                            <Link
+                                :href="route('casos.edit', selectedCaso.id) + '?tab=info-principal'"
+                                class="inline-flex items-center justify-center px-3 py-2 bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-700 rounded-xl text-[10px] font-black uppercase text-amber-700 dark:text-amber-200 hover:border-amber-400 transition-colors shrink-0"
+                            >
+                                Editar
+                            </Link>
+                        </div>
                         <div class="bg-gray-900 dark:bg-black p-5 sm:p-7 rounded-3xl text-white relative overflow-hidden shadow-xl w-full">
                             <div class="absolute right-0 top-0 p-4 opacity-5 pointer-events-none">
                                 <BanknotesIcon class="w-32 h-32 rotate-12" />
                             </div>
                             <div class="relative z-10">
                                 <p class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400 mb-2">Deuda Pendiente Actual</p>
-                                <h4 class="text-xl sm:text-4xl font-black tracking-tight break-all">{{ formatCurrency(selectedCaso.monto_total - selectedCaso.monto_total_pagado) }}</h4>
+                                <h4 v-if="financialFieldFor(selectedCaso, 'monto_deuda_actual')?.missing" class="text-base sm:text-2xl font-black tracking-tight uppercase text-amber-200">Pendiente por registrar</h4>
+                                <h4 v-else class="text-xl sm:text-4xl font-black tracking-tight break-all">{{ formatCurrency(selectedCaso.monto_deuda_actual) }}</h4>
                                 
                                 <div class="grid grid-cols-1 xs:grid-cols-2 gap-4 sm:gap-8 mt-8 border-t border-white/10 pt-5">
                                     <div class="min-w-0">
                                         <p class="text-[9px] font-black text-gray-500 uppercase tracking-wider mb-1">Obligación Base</p>
-                                        <p class="text-sm font-black text-gray-200 truncate">{{ formatCurrency(selectedCaso.monto_total) }}</p>
+                                        <p v-if="financialFieldFor(selectedCaso, 'monto_total')?.missing" class="text-xs font-black text-amber-200 uppercase">Por registrar</p>
+                                        <p v-else class="text-sm font-black text-gray-200 truncate">{{ formatCurrency(selectedCaso.monto_total) }}</p>
                                     </div>
                                     <div class="min-w-0">
                                         <p class="text-[9px] font-black text-green-500 uppercase tracking-wider mb-1">Total Recaudado</p>
-                                        <p class="text-sm font-black text-green-400 truncate">{{ formatCurrency(selectedCaso.monto_total_pagado) }}</p>
+                                        <p v-if="financialFieldFor(selectedCaso, 'monto_total_pagado')?.missing" class="text-xs font-black text-amber-200 uppercase">Por registrar</p>
+                                        <p v-else-if="financialFieldFor(selectedCaso, 'monto_total_pagado')?.displayLabel" class="text-xs font-black text-green-300 uppercase">{{ financialFieldFor(selectedCaso, 'monto_total_pagado').displayLabel }}</p>
+                                        <p v-else class="text-sm font-black text-green-400 truncate">{{ formatCurrency(selectedCaso.monto_total_pagado) }}</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div class="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-4 px-1 pt-2">
-                            <div class="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
-                                <p class="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Tasa Interés</p>
-                                <p class="text-xs font-black text-gray-800 dark:text-gray-200">{{ selectedCaso.tasa_interes_corriente || '0.00' }}%</p>
-                            </div>
                             <div class="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
                                 <p class="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Apertura</p>
                                 <p class="text-xs font-black text-gray-800 dark:text-gray-200">{{ formatDate(selectedCaso.fecha_apertura) }}</p>

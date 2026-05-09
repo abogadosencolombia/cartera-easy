@@ -20,7 +20,7 @@ import {
     PencilSquareIcon,
     SparklesIcon
 } from '@heroicons/vue/24/outline';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 
 const props = defineProps({
     caso: Object,
@@ -64,7 +64,7 @@ const generarNotaInteligente = () => {
 
     actuacionForm.nota = texto;
     
-    Swal.fire({
+    AppAlert.fire({
         title: 'Nota Generada',
         text: 'He redactado una nota para este caso. Puedes ajustarla.',
         icon: 'success',
@@ -77,7 +77,7 @@ const generarNotaInteligente = () => {
 const guardarActuacion = () => {
     actuacionForm.post(route('casos.actuaciones.store', props.caso.id), {
         preserveScroll: true,
-        onSuccess: () => { actuacionForm.reset(); Swal.fire({ title: 'Registrado', icon: 'success', timer: 1000, showConfirmButton: false }); }
+        onSuccess: () => { actuacionForm.reset(); AppAlert.fire({ title: 'Registrado', icon: 'success', timer: 1000, showConfirmButton: false }); }
     });
 };
 
@@ -100,7 +100,7 @@ const actualizarActuacion = () => {
 };
 
 const eliminarActuacion = (id) => {
-    Swal.fire({ title: '¿Eliminar?', icon: 'warning', showCancelButton: true }).then((result) => {
+    AppAlert.fire({ title: '¿Eliminar?', icon: 'warning', showCancelButton: true }).then((result) => {
         if (result.isConfirmed) router.delete(route('casos.actuaciones.destroy', id));
     });
 };

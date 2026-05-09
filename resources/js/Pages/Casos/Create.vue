@@ -105,7 +105,6 @@ const initialData = {
     monto_deuda_actual: props.casoAClonar?.monto_deuda_actual?.toString() || '0',
     monto_total_pagado: props.casoAClonar?.monto_total_pagado?.toString() || '0',
     
-    tasa_interes_corriente: props.casoAClonar?.tasa_interes_corriente?.toString() || '0',
     origen_documental: props.casoAClonar?.origen_documental || 'pagaré',
     medio_contacto: props.casoAClonar?.medio_contacto || null,
     link_drive: props.casoAClonar?.link_drive || '',
@@ -167,7 +166,6 @@ watch(() => props.casoAClonar, (newCaso) => {
         monto_deuda_actual: newCaso?.monto_deuda_actual?.toString() || '0',
         monto_total_pagado: newCaso?.monto_total_pagado?.toString() || '0',
         
-        tasa_interes_corriente: newCaso?.tasa_interes_corriente?.toString() || '0',
         origen_documental: newCaso?.origen_documental || 'pagaré',
         medio_contacto: newCaso?.medio_contacto || null,
         link_drive: newCaso?.link_drive || '',
@@ -552,16 +550,6 @@ const submit = () => {
                                         />
                                     </div>
                                     <InputError :message="form.errors.radicado" class="mt-2" />
-                                </div>
-                                <div>
-                                    <InputLabel value="Tasa Interés Corriente *" class="font-bold text-xs uppercase text-gray-400 mb-2" />
-                                    <div class="relative">
-                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <span class="text-gray-400 font-black text-sm">%</span>
-                                        </div>
-                                        <TextInput v-model="form.tasa_interes_corriente" type="number" step="0.01" class="pl-10 block w-full bg-gray-50/50 focus:bg-white transition-all" />
-                                    </div>
-                                    <InputError :message="form.errors.tasa_interes_corriente" class="mt-2" />
                                 </div>
                             </div>
 

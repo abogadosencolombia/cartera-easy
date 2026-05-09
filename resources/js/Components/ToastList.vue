@@ -1,11 +1,11 @@
 <script setup>
 import { watch, onMounted } from 'vue';
 import { usePage } from '@inertiajs/vue3';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 
 const page = usePage();
 
-const Toast = Swal.mixin({
+const Toast = AppAlert.mixin({
     toast: true,
     timer: 4500,
 });
@@ -52,6 +52,6 @@ onMounted(() => {
 </script>
 
 <template>
-  <!-- Este componente ya no necesita renderizar HTML, SweetAlert maneja el DOM -->
+  <!-- AppAlert maneja el DOM de las notificaciones personalizadas. -->
   <div style="display: none;"></div>
 </template>

@@ -14,7 +14,7 @@ import {
     InformationCircleIcon,
     ArrowPathIcon
 } from '@heroicons/vue/24/outline';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 
 const props = defineProps({
     // Recibiremos listas para que el usuario corrija IDs si fallan
@@ -45,20 +45,20 @@ const uploadFile = () => {
             results.value = res.data;
         })
         .catch(err => {
-            Swal.fire('Error', 'El archivo no tiene el formato correcto o está corrupto.', 'error');
+            AppAlert.fire('Error', 'El archivo no tiene el formato correcto o está corrupto.', 'error');
         })
         .finally(() => processing.value = false);
 };
 
 const confirmImport = () => {
     if (!confirmed.value) {
-        Swal.fire('Atención', 'Debe marcar la casilla de revisión para continuar.', 'warning');
+        AppAlert.fire('Atención', 'Debe marcar la casilla de revisión para continuar.', 'warning');
         return;
     }
     processing.value = true;
     router.post(route('casos.import.store'), { data: results.value.rows }, {
         onSuccess: () => {
-            Swal.fire('¡Éxito!', 'Los casos han sido importados y actualizados correctamente.', 'success');
+            AppAlert.fire('¡Éxito!', 'Los casos han sido importados y actualizados correctamente.', 'success');
         },
         onFinish: () => processing.value = false
     });

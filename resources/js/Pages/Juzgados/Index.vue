@@ -7,7 +7,7 @@ import TextInput from '@/Components/TextInput.vue';
 import Pagination from '@/Components/Pagination.vue'; 
 import { reactive, watch, computed } from 'vue';
 import { debounce } from 'lodash';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 import { 
     MagnifyingGlassIcon, 
     PencilSquareIcon, 
@@ -45,7 +45,7 @@ const clearFilters = () => {
 
 // --- Lógica para Eliminar ---
 const deleteJuzgado = (id, nombre) => {
-    Swal.fire({
+    AppAlert.fire({
         title: '¿Eliminar Despacho?',
         text: `¿Estás seguro de que deseas eliminar a "${nombre}"? Esta acción no se puede deshacer.`,
         icon: 'warning',
@@ -60,7 +60,7 @@ const deleteJuzgado = (id, nombre) => {
             router.delete(route('juzgados.destroy', id), {
                 preserveScroll: true,
                 onSuccess: () => {
-                    Swal.fire({
+                    AppAlert.fire({
                         title: 'Eliminado',
                         text: 'El despacho ha sido eliminado correctamente.',
                         icon: 'success',

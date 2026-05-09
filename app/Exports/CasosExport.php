@@ -101,12 +101,10 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
             'Monto Credito Inicial',
             'Deuda Actual (Capital)',
             'Total Pagado',
-            'Tasa Interes Corriente (%)',
             'Fecha Inicio Credito (AAAA-MM-DD)',
             'Fecha Demanda/Apertura',
             'Fecha Vencimiento',
             'Fecha Ultimo Pago',
-            'Fecha Tasa Interes',
             'URL Carpeta Drive',
             'URL Expediente Digital',
             'Notas Legales / Observaciones',
@@ -154,12 +152,10 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
             $caso->monto_total,
             $caso->monto_deuda_actual,
             $caso->monto_total_pagado,
-            $caso->tasa_interes_corriente,
             $caso->fecha_inicio_credito ? $caso->fecha_inicio_credito->format('Y-m-d') : '',
             $caso->fecha_apertura ? $caso->fecha_apertura->format('Y-m-d') : '',
             $caso->fecha_vencimiento ? $caso->fecha_vencimiento->format('Y-m-d') : '',
             $caso->fecha_ultimo_pago ? $caso->fecha_ultimo_pago->format('Y-m-d') : '',
-            $caso->fecha_tasa_interes ? $caso->fecha_tasa_interes->format('Y-m-d') : '',
             $caso->link_drive,
             $caso->link_expediente,
             $caso->notas_legales,
@@ -209,10 +205,10 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
                     'S' => 25, // Subtipo
                     'T' => 25, // Subproceso
                     'U' => 25, // Etapa
-                    'AL' => 50, // Notas Legales
-                    'AM' => 40, // Nota Cierre
-                    'AJ' => 40, // Link Drive
-                    'AK' => 40, // Link Expediente
+                    'AJ' => 50, // Notas Legales
+                    'AK' => 40, // Nota Cierre
+                    'AH' => 40, // Link Drive
+                    'AI' => 40, // Link Expediente
                 ];
 
                 foreach ($longTextFields as $col => $width) {

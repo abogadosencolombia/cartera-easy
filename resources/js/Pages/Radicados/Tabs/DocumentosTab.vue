@@ -11,7 +11,7 @@ import {
     XMarkIcon,
     PlusIcon
 } from '@heroicons/vue/24/outline';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 
 const props = defineProps({
     proceso: { type: Object, required: true },

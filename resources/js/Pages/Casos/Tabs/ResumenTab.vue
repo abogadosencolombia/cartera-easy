@@ -1,6 +1,6 @@
 <script setup>
 import { useForm, router, Link } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
 import DateTimePicker from '@/Components/DateTimePicker.vue';
@@ -10,7 +10,9 @@ import InputError from '@/Components/InputError.vue';
 import CumplimientoLegal from '@/Components/CumplimientoLegal.vue';
 import GuiaEtapa from '@/Components/GuiaEtapa.vue';
 import { addDaysToDate, addMonthsToDate } from '@/Utils/formatters';
+import { getCaseFinancialStatus } from '@/Utils/caseFinancialStatus';
 import { 
+    CreditCardIcon,
     ScaleIcon, 
     UserCircleIcon, 
     UsersIcon, 
@@ -24,12 +26,15 @@ import {
     BuildingOfficeIcon,
     IdentificationIcon,
     CalendarIcon,
+    ClipboardDocumentListIcon,
     PlusIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     caso: { type: Object, required: true },
     resumen_financiero: { type: Object, required: true },
+    financialStatus: { type: Object, default: null },
+    puedeEditar: { type: Boolean, default: false },
     formatCurrency: { type: Function, required: true },
     formatDate: { type: Function, required: true },
     formatLabel: { type: Function, required: true },
@@ -37,6 +42,8 @@ const props = defineProps({
 
 const codeudorAbiertoId = ref(null);
 const toggleCodeudor = (id) => { codeudorAbiertoId.value = (codeudorAbiertoId.value === id) ? null : id; };
+const resolvedFinancialStatus = computed(() => props.financialStatus || getCaseFinancialStatus(props.caso));
+const financialField = (key) => resolvedFinancialStatus.value.fields.find((field) => field.key === key);
 
 const safeJsonParse = (jsonString) => {
     if (!jsonString) return [];
@@ -136,22 +143,39 @@ const submitNotification = () => {
                     <h3 class="font-bold text-gray-900 dark:text-white uppercase tracking-tight text-sm">Detalles del Crédito</h3>
                 </div>
 
+                <div
+                    v-if="resolvedFinancialStatus.hasMissing"
+                    class="mb-6 p-4 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/15 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                >
+                    <div>
+                        <p class="text-xs font-black text-amber-900 dark:text-amber-100 uppercase">Montos por confirmar</p>
+                        <p class="text-[11px] font-semibold text-amber-700 dark:text-amber-300 mt-1">{{ resolvedFinancialStatus.detail }}</p>
+                    </div>
+                    <Link
+                        v-if="puedeEditar"
+                        :href="route('casos.edit', caso.id) + '?tab=info-principal'"
+                        class="inline-flex items-center justify-center px-3 py-2 bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-700 rounded-lg text-[10px] font-black uppercase text-amber-700 dark:text-amber-200 hover:border-amber-400 transition-colors shrink-0"
+                    >
+                        Editar montos
+                    </Link>
+                </div>
+
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="space-y-1">
                         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Monto de Crédito (Capital)</p>
-                        <p class="text-sm font-black text-gray-900 dark:text-white">{{ formatCurrency(caso.monto_total) }}</p>
+                        <p v-if="financialField('monto_total')?.missing" class="text-xs font-black text-amber-600 dark:text-amber-300 uppercase">Pendiente por registrar</p>
+                        <p v-else class="text-sm font-black text-gray-900 dark:text-white">{{ formatCurrency(caso.monto_total) }}</p>
                     </div>
                     <div class="space-y-1">
                         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Deuda Actual</p>
-                        <p class="text-sm font-black text-rose-600 dark:text-rose-400">{{ formatCurrency(caso.monto_deuda_actual) }}</p>
+                        <p v-if="financialField('monto_deuda_actual')?.missing" class="text-xs font-black text-amber-600 dark:text-amber-300 uppercase">Pendiente por registrar</p>
+                        <p v-else class="text-sm font-black text-rose-600 dark:text-rose-400">{{ formatCurrency(caso.monto_deuda_actual) }}</p>
                     </div>
                     <div class="space-y-1">
                         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Pagado</p>
-                        <p class="text-sm font-black text-emerald-600 dark:text-emerald-400">{{ formatCurrency(caso.monto_total_pagado) }}</p>
-                    </div>
-                    <div class="space-y-1">
-                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Tasa Interés Corriente</p>
-                        <p class="text-xs font-bold text-gray-700 dark:text-gray-200">{{ caso.tasa_interes_corriente }}%</p>
+                        <p v-if="financialField('monto_total_pagado')?.missing" class="text-xs font-black text-amber-600 dark:text-amber-300 uppercase">Pendiente por registrar</p>
+                        <p v-else-if="financialField('monto_total_pagado')?.displayLabel" class="text-xs font-black text-gray-500 dark:text-gray-300 uppercase">{{ financialField('monto_total_pagado').displayLabel }}</p>
+                        <p v-else class="text-sm font-black text-emerald-600 dark:text-emerald-400">{{ formatCurrency(caso.monto_total_pagado) }}</p>
                     </div>
                     <div class="space-y-1">
                         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fecha Inicio Crédito</p>

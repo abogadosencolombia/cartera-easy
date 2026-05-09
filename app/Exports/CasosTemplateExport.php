@@ -43,12 +43,10 @@ class CasosTemplateExport implements WithHeadings, WithEvents
             'Monto Credito Inicial',
             'Deuda Actual (Capital)',
             'Total Pagado',
-            'Tasa Interes Corriente (%)',
             'Fecha Inicio Credito (AAAA-MM-DD)',
             'Fecha Demanda/Apertura',
             'Fecha Vencimiento',
             'Fecha Ultimo Pago',
-            'Fecha Tasa Interes',
             'URL Carpeta Drive',
             'URL Expediente Digital',
             'Notas Legales / Observaciones',
@@ -83,11 +81,11 @@ class CasosTemplateExport implements WithHeadings, WithEvents
                 $this->applyValidation($sheet, 'P2:P5000', 'DATA_SISTEMA!$C$1:$C$' . count($especialidades));
                 $this->applyValidation($sheet, 'T2:T5000', 'DATA_SISTEMA!$D$1:$D$' . count($etapas));
 
-                $sheet->getStyle('A1:AN1')->getFont()->setBold(true);
-                $sheet->getStyle('A1:AN1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('4F46E5');
-                $sheet->getStyle('A1:AN1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+                $sheet->getStyle('A1:AL1')->getFont()->setBold(true);
+                $sheet->getStyle('A1:AL1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('4F46E5');
+                $sheet->getStyle('A1:AL1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
                 foreach(range('A','Z') as $col) { $sheet->getColumnDimension($col)->setAutoSize(true); }
-                foreach(['AA','AB','AC','AD','AE','AF','AG','AH','AI','AJ','AK','AL','AM','AN'] as $col) { $sheet->getColumnDimension($col)->setAutoSize(true); }
+                foreach(['AA','AB','AC','AD','AE','AF','AG','AH','AI','AJ','AK','AL'] as $col) { $sheet->getColumnDimension($col)->setAutoSize(true); }
             },
         ];
     }

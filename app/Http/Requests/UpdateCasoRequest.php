@@ -67,7 +67,6 @@ class UpdateCasoRequest extends FormRequest
             'monto_total' => ['required', 'numeric'],
             'monto_deuda_actual' => ['nullable', 'numeric'],
             'monto_total_pagado' => ['nullable', 'numeric'],
-            'tasa_interes_corriente' => ['required', 'numeric'],
             'fecha_inicio_credito' => ['nullable', 'date'],
             'notas_legales' => ['nullable', 'string'],
             
@@ -109,7 +108,6 @@ class UpdateCasoRequest extends FormRequest
             'deudor.nombre_completo.required_if' => 'El nombre del deudor es obligatorio.',
             'deudor.numero_documento.required_if' => 'El número de documento es obligatorio.',
             'monto_total.required' => 'El monto del crédito es obligatorio.',
-            'tasa_interes_corriente.required' => 'La tasa de interés es obligatoria.',
             'user_id.required' => 'Debe asignar al menos un responsable.',
             'cooperativa_id.required' => 'Debe seleccionar la cooperativa o empresa del caso.',
         ];

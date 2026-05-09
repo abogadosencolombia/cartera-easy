@@ -22,7 +22,7 @@ import {
     MapPinIcon,
     XMarkIcon
 } from '@heroicons/vue/24/outline';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 
 const props = defineProps({
     cooperativa: Object,
@@ -54,7 +54,7 @@ const submit = () => {
     form.post(route('cooperativas.update', props.cooperativa.id), {
         preserveScroll: true,
         onSuccess: () => {
-            Swal.fire({
+            AppAlert.fire({
                 title: '¡Actualizado!',
                 text: 'Los datos de la entidad han sido actualizados.',
                 icon: 'success',
@@ -64,7 +64,7 @@ const submit = () => {
         },
         onError: (errors) => {
             const firstErr = Object.values(errors)[0];
-            Swal.fire({
+            AppAlert.fire({
                 title: 'Atención',
                 text: firstErr || 'Revise los errores en el formulario.',
                 icon: 'warning',

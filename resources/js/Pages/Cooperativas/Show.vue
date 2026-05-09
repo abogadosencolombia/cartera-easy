@@ -32,7 +32,7 @@ import {
     ArrowPathIcon,
     LockClosedIcon
 } from '@heroicons/vue/24/outline';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 
 const props = defineProps({
     cooperativa: { type: Object, required: true },
@@ -63,14 +63,14 @@ const submitDocument = () => {
         onSuccess: () => {
             confirmingDocumentUpload.value = false;
             docForm.reset();
-            Swal.fire({ title: '¡Subido!', text: 'Documento legal registrado.', icon: 'success', timer: 1500, showConfirmButton: false });
+            AppAlert.fire({ title: '¡Subido!', text: 'Documento legal registrado.', icon: 'success', timer: 1500, showConfirmButton: false });
         },
     });
 };
 
-// --- Lógica de Borrado con SweetAlert2 ---
+// --- Lógica de Borrado con AppAlert ---
 const deleteDocument = (doc) => {
-    Swal.fire({
+    AppAlert.fire({
         title: '¿Eliminar documento?',
         text: `Se borrará el archivo "${doc.tipo_documento}".`,
         icon: 'warning',
@@ -81,7 +81,7 @@ const deleteDocument = (doc) => {
         if (result.isConfirmed) {
             router.delete(route('documentos.destroy', doc.id), {
                 preserveScroll: true,
-                onSuccess: () => Swal.fire('Eliminado', 'El archivo ha sido removido.', 'success'),
+                onSuccess: () => AppAlert.fire('Eliminado', 'El archivo ha sido removido.', 'success'),
             });
         }
     });
@@ -371,4 +371,3 @@ const getRandomColor = (id) => {
 <style scoped>
 .animate-in { animation-duration: 0.4s; animation-fill-mode: both; }
 </style>
-

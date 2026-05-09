@@ -11,7 +11,7 @@ import {
     ScaleIcon, CheckCircleIcon, UserGroupIcon, CloudArrowUpIcon
 } from '@heroicons/vue/24/outline';
 import { ref, computed } from 'vue';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 
 const props = defineProps({
   persona: { type: Object, required: true },
@@ -57,7 +57,7 @@ const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     
-    Swal.fire({
+    AppAlert.fire({
         title: '¿Subir documento?',
         text: `Se adjuntará "${file.name}" al expediente.`,
         icon: 'question',
@@ -72,7 +72,7 @@ const handleFileChange = (e) => {
                 onSuccess: () => {
                     formUpload.reset();
                     if (fileInput.value) fileInput.value.value = null;
-                    Swal.fire('¡Éxito!', 'Documento cargado correctamente.', 'success');
+                    AppAlert.fire('¡Éxito!', 'Documento cargado correctamente.', 'success');
                 },
             });
         } else {
@@ -82,7 +82,7 @@ const handleFileChange = (e) => {
 };
 
 const deleteDocument = (docId) => {
-    Swal.fire({
+    AppAlert.fire({
         title: '¿Eliminar archivo?',
         text: "Esta acción no se puede deshacer.",
         icon: 'warning',
@@ -92,7 +92,7 @@ const deleteDocument = (docId) => {
     }).then((result) => {
         if (result.isConfirmed) {
             router.delete(route('personas.delete_document', docId), {
-                onSuccess: () => Swal.fire('Eliminado', 'El archivo ha sido borrado.', 'success')
+                onSuccess: () => AppAlert.fire('Eliminado', 'El archivo ha sido borrado.', 'success')
             });
         }
     });

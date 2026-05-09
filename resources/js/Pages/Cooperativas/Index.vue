@@ -22,7 +22,7 @@ import {
     BuildingOfficeIcon
 } from '@heroicons/vue/24/outline';
 import { debounce } from 'lodash';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 
 const props = defineProps({
     cooperativas: Object,
@@ -50,7 +50,7 @@ const clearFilters = () => {
 
 // --- Lógica para eliminación profesional ---
 const deleteItem = (item) => {
-    Swal.fire({
+    AppAlert.fire({
         title: '¿Eliminar cooperativa?',
         text: `Estás a punto de eliminar "${item.nombre}". Esta acción es permanente y afectará a todos los registros vinculados.`,
         icon: 'warning',
@@ -62,7 +62,7 @@ const deleteItem = (item) => {
         if (result.isConfirmed) {
             router.delete(route('cooperativas.destroy', item.id), {
                 onSuccess: () => {
-                    Swal.fire({
+                    AppAlert.fire({
                         title: '¡Eliminado!',
                         text: 'La entidad ha sido removida del sistema.',
                         icon: 'success',

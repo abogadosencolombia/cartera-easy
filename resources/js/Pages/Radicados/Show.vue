@@ -37,7 +37,7 @@ import {
     ScaleIcon,
     PlusIcon
 } from '@heroicons/vue/24/outline';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 
 // --- IMPORTAMOS LOS COMPONENTES DE PESTAÑA ---
 import ResumenTab from './Tabs/ResumenTab.vue';
@@ -253,7 +253,7 @@ const copyLegalInfo = () => {
     
     let text = `EXPEDIENTE JUDICIAL\nRadicado: ${radicado}\nJuzgado: ${juzgado}\nDemandantes: ${demandantes}\nDemandados: ${demandados}\nAsunto: ${asunto}`;
     navigator.clipboard.writeText(text).then(() => {
-        Swal.fire({ title: '¡Copiado!', icon: 'success', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
+        AppAlert.fire({ title: '¡Copiado!', icon: 'success', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
     });
 };
 

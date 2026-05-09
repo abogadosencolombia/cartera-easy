@@ -68,7 +68,6 @@ class StoreCasoRequest extends FormRequest
             'monto_total' => ['required', 'numeric', 'min:0'],
             'monto_deuda_actual' => ['nullable', 'numeric', 'min:0'],
             'monto_total_pagado' => ['nullable', 'numeric', 'min:0'],
-            'tasa_interes_corriente' => ['required', 'numeric', 'min:0', 'max:100'],
             'fecha_inicio_credito' => ['nullable', 'date', 'before_or_equal:today'],
 
             // --- DEUDOR HÍBRIDO ---
@@ -114,7 +113,6 @@ class StoreCasoRequest extends FormRequest
             'deudor.nombre_completo.required_if' => 'El nombre del deudor es obligatorio.',
             'deudor.numero_documento.required_if' => 'El número de documento es obligatorio.',
             'monto_total.required' => 'El monto del crédito es obligatorio.',
-            'tasa_interes_corriente.required' => 'La tasa de interés es obligatoria.',
             'user_id.required' => 'Debe asignar al menos un abogado responsable.',
             'cooperativa_id.required' => 'Debe seleccionar la cooperativa o empresa del caso.',
         ];

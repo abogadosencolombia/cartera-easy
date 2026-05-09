@@ -34,7 +34,7 @@ import {
     XMarkIcon,
     HandThumbUpIcon
 } from '@heroicons/vue/24/outline';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 
 const props = defineProps({
   etapas: { type: Array, required: true },
@@ -190,7 +190,7 @@ const submit = () => {
     preserveScroll: true,
     onSuccess: () => {
       clearDraft();
-      Swal.fire({
+      AppAlert.fire({
           title: '¡Éxito!',
           text: 'El radicado ha sido registrado correctamente.',
           icon: 'success',
@@ -202,7 +202,7 @@ const submit = () => {
     onError: (errors) => {
       const errorKeys = Object.keys(errors);
       if (errorKeys.length > 0) {
-        Swal.fire({
+        AppAlert.fire({
             title: 'Hay errores en el formulario',
             text: 'Por favor revise los campos marcados en rojo en los diferentes pasos.',
             icon: 'warning',

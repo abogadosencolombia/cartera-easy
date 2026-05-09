@@ -16,7 +16,7 @@ import Textarea from '@/Components/Textarea.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import InputError from '@/Components/InputError.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 
 const props = defineProps({
     proceso: { type: Object, required: true },
@@ -68,7 +68,7 @@ const generarNotaInteligente = () => {
 
     actuacionForm.nota = texto;
     
-    Swal.fire({
+    AppAlert.fire({
         title: 'Nota Generada',
         text: 'He redactado una nota profesional basada en la etapa actual. Puedes editarla antes de guardar.',
         icon: 'success',

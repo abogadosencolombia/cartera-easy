@@ -14,7 +14,7 @@ import {
   UserIcon, ShieldCheckIcon
 } from '@heroicons/vue/24/outline';
 import { debounce } from 'lodash';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 
 const props = defineProps({
   personas: Object,      
@@ -72,7 +72,7 @@ const deletePersona = (id) => {
   const persona = props.personas.data.find(p => p.id === id);
   const nombre = persona ? persona.nombre_completo : 'esta persona';
 
-  Swal.fire({
+  AppAlert.fire({
     title: '¿Suspender Registro?',
     html: `
       <div class="text-left space-y-3">
@@ -105,7 +105,7 @@ const deletePersona = (id) => {
             onSuccess: () => {
                 const flash = usePage().props.flash;
                 if (!flash.error) {
-                    Swal.fire({
+                    AppAlert.fire({
                         title: 'Suspendido',
                         text: 'El registro se movió a la papelera correctamente.',
                         icon: 'success',
@@ -124,7 +124,7 @@ const restorePersona = (id) => {
       onSuccess: () => {
           const flash = usePage().props.flash;
           if (!flash.error) {
-              Swal.fire('Reactivada', 'La persona vuelve a estar activa.', 'success');
+              AppAlert.fire('Reactivada', 'La persona vuelve a estar activa.', 'success');
           }
       }
   });

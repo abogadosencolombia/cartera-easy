@@ -3,7 +3,8 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, usePage, useRemember, router } from '@inertiajs/vue3';
 import { ref, computed, onMounted, watch } from 'vue';
 import { addDaysToDate, addMonthsToDate } from '@/Utils/formatters';
-import Swal from '@/Utils/swal';
+import { getCaseFinancialStatus } from '@/Utils/caseFinancialStatus';
+import AppAlert from '@/Utils/appAlert';
 
 // --- IMPORTAMOS LOS COMPONENTES DE PESTAÑA ---
 import ResumenTab from './Tabs/ResumenTab.vue';
@@ -100,15 +101,18 @@ const puedeEditar = computed(() => {
     return !props.caso.bloqueado;
 });
 
+const financialStatus = computed(() => getCaseFinancialStatus(props.caso));
+const financialField = (key) => financialStatus.value.fields.find((field) => field.key === key);
+
 const copyLegalInfo = () => {
     const text = `EXPEDIENTE: ${props.caso.radicado || 'N/A'}\nDEUDOR: ${props.caso.deudor?.nombre_completo || 'N/A'}\nJUZGADO: ${props.caso.juzgado?.nombre || 'N/A'}`;
     navigator.clipboard.writeText(text).then(() => {
-        Swal.fire({ title: 'Copiado', icon: 'success', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
+        AppAlert.fire({ title: 'Copiado', icon: 'success', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
     });
 };
 
 const confirmUnlockCase = () => {
-    Swal.fire({
+    AppAlert.fire({
         title: '¿Desbloquear?',
         text: "Permitirá editar este proceso nuevamente.",
         icon: 'warning',
@@ -180,6 +184,29 @@ const confirmUnlockCase = () => {
                     </div>
                 </div>
 
+                <!-- Alerta Informativa: Montos por completar -->
+                <div
+                    v-if="financialStatus.hasMissing"
+                    class="rounded-2xl p-5 bg-amber-50 dark:bg-amber-900/15 border border-amber-200 dark:border-amber-800 flex flex-col md:flex-row md:items-center justify-between gap-4"
+                >
+                    <div class="flex items-start gap-4">
+                        <div class="p-2.5 bg-amber-100 dark:bg-amber-900/40 rounded-xl shrink-0">
+                            <BanknotesIcon class="w-6 h-6 text-amber-600 dark:text-amber-300" />
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-black text-amber-900 dark:text-amber-100 uppercase tracking-tight">Información financiera por completar</h3>
+                            <p class="text-xs font-semibold text-amber-700 dark:text-amber-300 mt-1">{{ financialStatus.detail }} No bloquea la gestión, pero mejora reportes, liquidaciones y priorización.</p>
+                        </div>
+                    </div>
+                    <Link
+                        v-if="puedeEditar"
+                        :href="route('casos.edit', caso.id) + '?tab=info-principal'"
+                        class="inline-flex items-center justify-center px-4 py-2 bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-700 text-amber-700 dark:text-amber-200 rounded-xl font-black text-[10px] uppercase tracking-widest hover:border-amber-400 transition-colors shrink-0"
+                    >
+                        Completar montos
+                    </Link>
+                </div>
+
                 <!-- DASHBOARD COMPACTO -->
                 <div class="bg-white dark:bg-gray-800 shadow-sm rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                     <div class="grid grid-cols-1 lg:grid-cols-4">
@@ -199,15 +226,19 @@ const confirmUnlockCase = () => {
                         <div class="lg:col-span-3 p-5 grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div class="border-r border-gray-100 dark:border-gray-700 last:border-0 pr-4">
                                 <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1"><BanknotesIcon class="h-3 w-3" /> Capital</p>
-                                <p class="text-sm font-bold text-gray-900 dark:text-white">{{ formatCurrency(resumen_financiero.monto_total) }}</p>
+                                <p v-if="financialField('monto_total')?.missing" class="text-xs font-black text-amber-600 dark:text-amber-300 uppercase">Por registrar</p>
+                                <p v-else class="text-sm font-bold text-gray-900 dark:text-white">{{ formatCurrency(resumen_financiero.monto_total) }}</p>
                             </div>
                             <div class="border-r border-gray-100 dark:border-gray-700 last:border-0 pr-4">
-                                <p class="text-[9px] font-bold text-rose-500 uppercase tracking-widest mb-1 flex items-center gap-1"><ExclamationTriangleIcon class="h-3 w-3" /> Saldo</p>
-                                <p class="text-sm font-bold text-rose-600 dark:text-rose-400">{{ formatCurrency(resumen_financiero.saldo_pendiente) }}</p>
+                                <p class="text-[9px] font-bold text-rose-500 uppercase tracking-widest mb-1 flex items-center gap-1"><ExclamationTriangleIcon class="h-3 w-3" /> Deuda Actual</p>
+                                <p v-if="financialField('monto_deuda_actual')?.missing" class="text-xs font-black text-amber-600 dark:text-amber-300 uppercase">Por registrar</p>
+                                <p v-else class="text-sm font-bold text-rose-600 dark:text-rose-400">{{ formatCurrency(caso.monto_deuda_actual) }}</p>
                             </div>
                             <div class="border-r border-gray-100 dark:border-gray-700 last:border-0 pr-4">
                                 <p class="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mb-1 flex items-center gap-1"><CheckCircleIcon class="h-3 w-3" /> Pagado</p>
-                                <p class="text-sm font-bold text-emerald-600 dark:text-emerald-400">{{ formatCurrency(resumen_financiero.total_pagado) }}</p>
+                                <p v-if="financialField('monto_total_pagado')?.missing" class="text-xs font-black text-amber-600 dark:text-amber-300 uppercase">Por registrar</p>
+                                <p v-else-if="financialField('monto_total_pagado')?.displayLabel" class="text-xs font-black text-gray-500 dark:text-gray-300 uppercase">{{ financialField('monto_total_pagado').displayLabel }}</p>
+                                <p v-else class="text-sm font-bold text-emerald-600 dark:text-emerald-400">{{ formatCurrency(resumen_financiero.total_pagado) }}</p>
                             </div>
                             <div>
                                 <template v-if="resumen_financiero.dias_mora > 0">
@@ -254,10 +285,10 @@ const confirmUnlockCase = () => {
                     </div>
 
                     <div class="p-6">
-                        <ResumenTab v-show="activeTab === 'resumen'" :caso="caso" :resumen_financiero="resumen_financiero" :formatCurrency="formatCurrency" :formatDate="formatDate" :formatLabel="formatLabel" />
+                        <ResumenTab v-show="activeTab === 'resumen'" :caso="caso" :resumen_financiero="resumen_financiero" :financial-status="financialStatus" :puede-editar="puedeEditar" :formatCurrency="formatCurrency" :formatDate="formatDate" :formatLabel="formatLabel" />
                         <ExpedienteIntegrityPanel v-show="activeTab === 'integridad'" :summary="caso.integridad_resumen" :edit-href="route('casos.edit', caso.id)" @go-tab="setActiveTab" />
                         <DocumentosTab v-show="activeTab === 'documentos'" :caso="caso" :plantillas="plantillas" :puedeEditar="puedeEditar" />
-                        <FinancieroTab v-show="activeTab === 'financiero'" :caso="caso" :resumen_financiero="resumen_financiero" :contrato_id="caso.contrato?.id" :formatCurrency="formatCurrency" />
+                        <FinancieroTab v-show="activeTab === 'financiero'" :caso="caso" :resumen_financiero="resumen_financiero" :financial-status="financialStatus" :puede-editar="puedeEditar" :contrato_id="caso.contrato?.id" :formatCurrency="formatCurrency" />
                         <ActuacionesTab v-show="activeTab === 'actuaciones'" :caso="caso" :actuaciones="actuaciones" :is-form-disabled="!puedeEditar" />
                         <ActividadTab v-show="activeTab === 'actividad'" :bitacoras="bitacoras" :auditoria="auditoria" />
                     </div>

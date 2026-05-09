@@ -424,12 +424,12 @@ class CasoController extends Controller
                     'monto_total' => $row['monto_total'] ?? 0,
                     'monto_deuda_actual' => $row['monto_deuda_actual'] ?? 0,
                     'monto_total_pagado' => $row['monto_total_pagado'] ?? 0,
-                    'tasa_interes_corriente' => $row['tasa_interes_corriente'] ?? 0,
+                    'tasa_interes_corriente' => 0,
                     'fecha_inicio_credito' => $row['fecha_inicio_credito'] ?? now(),
                     'fecha_apertura' => $row['fecha_apertura'] ?? now(),
                     'fecha_vencimiento' => $row['fecha_vencimiento'],
                     'fecha_ultimo_pago' => $row['fecha_ultimo_pago'],
-                    'fecha_tasa_interes' => $row['fecha_tasa_interes'],
+                    'fecha_tasa_interes' => null,
                     'tipo_garantia_asociada' => !empty($row['tipo_garantia_asociada']) ? $row['tipo_garantia_asociada'] : 'sin garantía',
                     'origen_documental' => !empty($row['origen_documental']) ? $row['origen_documental'] : 'otro',
                     'medio_contacto' => !empty($row['medio_contacto']) ? $row['medio_contacto'] : 'otro',
@@ -605,6 +605,7 @@ class CasoController extends Controller
         $userIds = $validated['user_id'];
 
         unset($validated['deudor'], $validated['codeudores'], $validated['user_id']);
+        $validated['tasa_interes_corriente'] = $validated['tasa_interes_corriente'] ?? 0;
 
         $caso = null;
         try {

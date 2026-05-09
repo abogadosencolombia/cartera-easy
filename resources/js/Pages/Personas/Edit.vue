@@ -16,7 +16,7 @@ import {
     ArrowPathIcon, ArrowLeftIcon, UserIcon, TrashIcon, LinkIcon
 } from '@heroicons/vue/24/outline';
 import { reactive, computed } from 'vue';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 
 const props = defineProps({
   persona: { type: Object, required: true },
@@ -69,11 +69,11 @@ const submit = () => {
     form.post(route('personas.update', props.persona.id), {
         preserveScroll: true,
         onSuccess: () => {
-            Swal.fire({ title: '¡Actualizado!', text: 'Los datos han sido guardados correctamente.', icon: 'success', timer: 2000, showConfirmButton: false });
+            AppAlert.fire({ title: '¡Actualizado!', text: 'Los datos han sido guardados correctamente.', icon: 'success', timer: 2000, showConfirmButton: false });
         },
         onError: (errors) => {
             const firstErr = Object.values(errors)[0];
-            Swal.fire({ title: 'Atención', text: firstErr || 'Revise los campos marcados en rojo.', icon: 'warning', confirmButtonColor: '#4f46e5' });
+            AppAlert.fire({ title: 'Atención', text: firstErr || 'Revise los campos marcados en rojo.', icon: 'warning', confirmButtonColor: '#4f46e5' });
         }
     });
 };

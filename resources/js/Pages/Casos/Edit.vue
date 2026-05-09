@@ -19,6 +19,7 @@ import { ref, computed, watch, onMounted } from 'vue';
 import axios from 'axios';
 import { debounce } from 'lodash';
 import { formatRadicado, addDaysToDate, addMonthsToDate, toUpperCase, calculateDV } from '@/Utils/formatters';
+import { getCaseFinancialStatus } from '@/Utils/caseFinancialStatus';
 import { 
     TrashIcon, InformationCircleIcon, ScaleIcon, UsersIcon, LockClosedIcon, 
     PlusIcon, ChevronUpIcon, ChevronDownIcon, ArchiveBoxXMarkIcon, ArrowPathIcon,
@@ -104,7 +105,6 @@ const form = useForm({
     monto_total: props.caso.monto_total,
     monto_deuda_actual: props.caso.monto_deuda_actual,
     monto_total_pagado: props.caso.monto_total_pagado,
-    tasa_interes_corriente: props.caso.tasa_interes_corriente,
     bloqueado: !!props.caso.bloqueado,
     motivo_bloqueo: props.caso.motivo_bloqueo ?? '',
     notas_legales: props.caso.notas_legales,
@@ -113,6 +113,8 @@ const form = useForm({
     sin_codeudores: !!props.caso.sin_codeudores,
     es_spoa_nunc: !!props.caso.es_spoa_nunc,
 });
+
+const financialFormStatus = computed(() => getCaseFinancialStatus(form));
 
 watch(() => props.caso.id, (newId) => {
     if (newId) {
@@ -150,7 +152,6 @@ watch(() => props.caso.id, (newId) => {
             monto_total: props.caso.monto_total,
             monto_deuda_actual: props.caso.monto_deuda_actual,
             monto_total_pagado: props.caso.monto_total_pagado,
-            tasa_interes_corriente: props.caso.tasa_interes_corriente,
             bloqueado: !!props.caso.bloqueado,
             motivo_bloqueo: props.caso.motivo_bloqueo ?? '',
             notas_legales: props.caso.notas_legales,
@@ -298,29 +299,45 @@ const submit = () => {
     <Head :title="'Editar Caso #' + caso.id" />
     <AuthenticatedLayout>
         <template #header>
-             <div class="flex items-center justify-between">
-                 <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200">Editando Caso <span class="text-indigo-500">#{{ caso.id }}</span></h2>
-                 <div class="flex gap-3">
-                     <Link :href="route('casos.show', caso.id)"><SecondaryButton>Cancelar</SecondaryButton></Link>
-                     <PrimaryButton @click="submit" :disabled="form.processing || isFormDisabled">Actualizar Caso</PrimaryButton>
+             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                 <div class="min-w-0">
+                     <p class="text-xs font-black uppercase tracking-[0.22em] text-indigo-600 dark:text-indigo-400">Edición de expediente</p>
+                     <h2 class="mt-1 truncate text-2xl font-black tracking-tight text-gray-950 dark:text-gray-100">
+                        Caso <span class="text-indigo-600 dark:text-indigo-400">#{{ caso.id }}</span>
+                     </h2>
+                     <p class="mt-1 max-w-3xl text-sm font-medium text-gray-500 dark:text-gray-400">
+                        Actualiza los datos principales, judiciales, garantías y notas internas del caso.
+                     </p>
+                 </div>
+                 <div class="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+                     <Link :href="route('casos.show', caso.id)" class="w-full sm:w-auto"><SecondaryButton class="w-full justify-center sm:w-auto">Cancelar</SecondaryButton></Link>
+                     <PrimaryButton class="w-full justify-center sm:w-auto" @click="submit" :disabled="form.processing || isFormDisabled">Actualizar Caso</PrimaryButton>
                  </div>
              </div>
         </template>
 
-        <div class="py-12">
-            <div class="max-w-5xl mx-auto sm:px-6 lg:px-8 space-y-8">
-                <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg overflow-visible">
-                    <div class="border-b border-gray-200 dark:border-gray-700">
-                        <nav class="-mb-px flex space-x-6 px-6 overflow-x-auto">
-                            <button @click="setActiveTab('info-principal')" :class="[activeTab === 'info-principal' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500']" class="py-4 px-1 border-b-2 font-medium text-sm flex items-center"><InformationCircleIcon class="h-5 w-5 mr-2"/> Info Principal</button>
-                            <button @click="setActiveTab('proceso-judicial')" :class="[activeTab === 'proceso-judicial' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500']" class="py-4 px-1 border-b-2 font-medium text-sm flex items-center"><ScaleIcon class="h-5 w-5 mr-2"/> Proceso Judicial</button>
-                            <button @click="setActiveTab('codeudores')" :class="[activeTab === 'codeudores' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500']" class="py-4 px-1 border-b-2 font-medium text-sm flex items-center"><UsersIcon class="h-5 w-5 mr-2"/> Codeudores</button>
-                            <button @click="setActiveTab('control-notas')" :class="[activeTab === 'control-notas' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500']" class="py-4 px-1 border-b-2 font-medium text-sm flex items-center"><LockClosedIcon class="h-5 w-5 mr-2"/> Control y Notas</button>
+        <div class="case-edit-page py-8 lg:py-10">
+            <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
+                <div class="overflow-visible rounded-2xl border border-gray-200 bg-white shadow-sm ring-1 ring-gray-950/5 dark:border-gray-700 dark:bg-gray-900 dark:ring-white/10">
+                    <div class="border-b border-gray-200 bg-gray-50/80 px-4 py-3 dark:border-gray-700 dark:bg-gray-800/60 sm:px-6">
+                        <nav class="grid grid-flow-col auto-cols-[minmax(12rem,1fr)] gap-2 overflow-x-auto pb-1">
+                            <button @click="setActiveTab('info-principal')" :class="[activeTab === 'info-principal' ? 'border-indigo-500 bg-white text-indigo-700 shadow-sm dark:bg-gray-900 dark:text-indigo-300' : 'border-transparent text-gray-600 hover:border-gray-200 hover:bg-white/70 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:bg-gray-900/50']" class="flex min-h-14 items-center gap-3 whitespace-nowrap rounded-xl border px-4 py-3 text-left text-sm font-black transition">
+                                <InformationCircleIcon class="h-5 w-5 shrink-0"/><span>Info Principal</span>
+                            </button>
+                            <button @click="setActiveTab('proceso-judicial')" :class="[activeTab === 'proceso-judicial' ? 'border-indigo-500 bg-white text-indigo-700 shadow-sm dark:bg-gray-900 dark:text-indigo-300' : 'border-transparent text-gray-600 hover:border-gray-200 hover:bg-white/70 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:bg-gray-900/50']" class="flex min-h-14 items-center gap-3 whitespace-nowrap rounded-xl border px-4 py-3 text-left text-sm font-black transition">
+                                <ScaleIcon class="h-5 w-5 shrink-0"/><span>Proceso Judicial</span>
+                            </button>
+                            <button @click="setActiveTab('codeudores')" :class="[activeTab === 'codeudores' ? 'border-indigo-500 bg-white text-indigo-700 shadow-sm dark:bg-gray-900 dark:text-indigo-300' : 'border-transparent text-gray-600 hover:border-gray-200 hover:bg-white/70 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:bg-gray-900/50']" class="flex min-h-14 items-center gap-3 whitespace-nowrap rounded-xl border px-4 py-3 text-left text-sm font-black transition">
+                                <UsersIcon class="h-5 w-5 shrink-0"/><span>Codeudores</span>
+                            </button>
+                            <button @click="setActiveTab('control-notas')" :class="[activeTab === 'control-notas' ? 'border-indigo-500 bg-white text-indigo-700 shadow-sm dark:bg-gray-900 dark:text-indigo-300' : 'border-transparent text-gray-600 hover:border-gray-200 hover:bg-white/70 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:bg-gray-900/50']" class="flex min-h-14 items-center gap-3 whitespace-nowrap rounded-xl border px-4 py-3 text-left text-sm font-black transition">
+                                <LockClosedIcon class="h-5 w-5 shrink-0"/><span>Control y Notas</span>
+                            </button>
                         </nav>
                     </div>
 
                     <!-- Alertas de Duplicados o Identificación Incompleta -->
-                    <div class="px-8 pt-4 space-y-4">
+                    <div class="space-y-4 px-4 pt-5 sm:px-6 lg:px-8">
                         <!-- Alerta Crítica: Sin Codeudores -->
                         <div v-if="form.codeudores.length === 0 && !form.sin_codeudores && !isMinimized" 
                             class="p-5 bg-rose-50 dark:bg-rose-900/20 border-2 border-rose-200 dark:border-rose-800 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 animate-in slide-in-from-top-4">
@@ -403,11 +420,12 @@ const submit = () => {
                         </div>
                     </div>
 
-                    <div class="p-8">
+                    <div class="p-4 sm:p-6 lg:p-8">
                         <fieldset :disabled="isFormDisabled">
                             <!-- TAB 1 -->
                             <section v-show="activeTab === 'info-principal'" class="space-y-8">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="rounded-2xl border border-gray-200 bg-gray-50/60 p-4 dark:border-gray-700 dark:bg-gray-800/35 sm:p-6">
+                                <div class="grid grid-cols-1 gap-5 md:grid-cols-2 lg:gap-6">
                                     <div><InputLabel value="Cooperativa / Empresa *" /><AsyncSelect v-model="form.cooperativa_id" :endpoint="route('cooperativas.search')" placeholder="Asignar a..." label-key="nombre" /><InputError :message="form.errors.cooperativa_id" /></div>
                                     <div><InputLabel value="Abogado(s) a Cargo *" /><AsyncSelect v-model="form.user_id" :endpoint="route('users.search')" multiple placeholder="Asignar gestores..." label-key="name" /><InputError :message="form.errors.user_id" /></div>
                                     <div class="md:col-span-2 space-y-4">
@@ -417,7 +435,7 @@ const submit = () => {
                                             <InputError :message="form.errors.deudor_id" />
                                             <InputError :message="form.errors['deudor.id']" />
                                         </div>
-                                        <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg dark:border-gray-700">
+                                        <div v-else class="grid grid-cols-1 gap-4 rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm dark:border-indigo-900/60 dark:bg-gray-900 md:grid-cols-3">
                                             <div>
                                                 <TextInput v-model="form.deudor.nombre_completo" @blur="form.deudor.nombre_completo = toUpperCase(form.deudor.nombre_completo)" placeholder="Nombre completo" class="w-full" />
                                                 <InputError :message="form.errors['deudor.nombre_completo']" />
@@ -446,7 +464,7 @@ const submit = () => {
                                                 <TextInput v-model="form.deudor.correo_1" type="email" placeholder="Correo Electrónico" class="w-full" />
                                                 <InputError :message="form.errors['deudor.correo_1']" />
                                             </div>
-                                            <div class="col-span-3 grid grid-cols-2 gap-4 mt-2">
+                                            <div class="md:col-span-3 grid grid-cols-1 gap-4 mt-2 md:grid-cols-2">
                                                 <div>
                                                     <AsyncSelect v-model="form.deudor.cooperativas_ids" :endpoint="route('cooperativas.search')" multiple label-key="nombre" placeholder="Cooperativas * (Mín. 1)" />
                                                     <InputError :message="form.errors['deudor.cooperativas_ids']" class="mt-2" />
@@ -456,38 +474,56 @@ const submit = () => {
                                         </div>
                                     </div>
                                 </div>
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t dark:border-gray-700">
-                                    <div><InputLabel value="Número De Pagaré" /><TextInput v-model="form.referencia_credito" class="w-full" /><InputError :message="form.errors.referencia_credito" /></div>
-                                    <div><InputLabel value="Monto de Crédito *" /><TextInput v-model="form.monto_total" type="number" step="0.01" class="w-full" /><InputError :message="form.errors.monto_total" /></div>
-                                    <div><InputLabel value="Monto Deuda Actual" /><TextInput v-model="form.monto_deuda_actual" type="number" step="0.01" class="w-full" /><InputError :message="form.errors.monto_deuda_actual" /></div>
-                                    <div><InputLabel value="Total Pagado" /><TextInput v-model="form.monto_total_pagado" type="number" step="0.01" class="w-full" /><InputError :message="form.errors.monto_total_pagado" /></div>
-                                    <div><InputLabel value="Tasa Interés Corriente *" /><TextInput v-model="form.tasa_interes_corriente" type="number" step="0.01" class="w-full" /><InputError :message="form.errors.tasa_interes_corriente" /></div>
+                                </div>
+                                <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:p-6 space-y-4">
                                     <div>
-                                        <InputLabel value="Fecha de Demanda *" />
-                                        <DatePicker v-model="form.fecha_apertura" class="w-full" />
-                                        <div class="mt-1 flex gap-1">
-                                            <button type="button" @click="addDays('fecha_apertura', 3)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+3d</button>
-                                            <button type="button" @click="addDays('fecha_apertura', 5)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+5d</button>
-                                            <button type="button" @click="addMonths('fecha_apertura', 1)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+1m</button>
-                                        </div>
-                                        <InputError :message="form.errors.fecha_apertura" />
+                                        <h3 class="text-base font-black text-gray-950 dark:text-gray-100">Información financiera y fechas</h3>
+                                        <p class="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Montos, pagaré y fechas operativas del crédito.</p>
                                     </div>
-                                    <div>
-                                        <InputLabel value="Fecha Vencimiento" />
-                                        <DatePicker v-model="form.fecha_vencimiento" class="w-full" />
-                                        <div class="mt-1 flex gap-1">
-                                            <button type="button" @click="addMonths('fecha_vencimiento', 6)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+6m</button>
-                                            <button type="button" @click="addMonths('fecha_vencimiento', 12)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+1a</button>
+                                    <div
+                                        v-if="financialFormStatus.hasMissing"
+                                        class="p-4 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/15 flex items-start gap-3"
+                                    >
+                                        <InformationCircleIcon class="h-5 w-5 text-amber-600 dark:text-amber-300 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p class="text-xs font-black text-amber-900 dark:text-amber-100 uppercase">Montos financieros por completar</p>
+                                            <p class="text-[11px] font-semibold text-amber-700 dark:text-amber-300 mt-1">{{ financialFormStatus.detail }} Puede continuar, pero el expediente quedará marcado para revisión.</p>
                                         </div>
-                                        <InputError :message="form.errors.fecha_vencimiento" />
                                     </div>
-                                    <div><InputLabel value="Fecha Inicio Crédito" /><DatePicker v-model="form.fecha_inicio_credito" class="w-full" /><InputError :message="form.errors.fecha_inicio_credito" /></div>
+
+                                    <div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                                        <div><InputLabel value="Número De Pagaré" /><TextInput v-model="form.referencia_credito" class="w-full" /><InputError :message="form.errors.referencia_credito" /></div>
+                                        <div><InputLabel value="Monto de Crédito *" /><TextInput v-model="form.monto_total" type="number" step="0.01" class="w-full" /><InputError :message="form.errors.monto_total" /></div>
+                                        <div><InputLabel value="Monto Deuda Actual" /><TextInput v-model="form.monto_deuda_actual" type="number" step="0.01" class="w-full" /><InputError :message="form.errors.monto_deuda_actual" /></div>
+                                        <div><InputLabel value="Total Pagado" /><TextInput v-model="form.monto_total_pagado" type="number" step="0.01" class="w-full" /><InputError :message="form.errors.monto_total_pagado" /></div>
+                                        <div>
+                                            <InputLabel value="Fecha de Demanda *" />
+                                            <DatePicker v-model="form.fecha_apertura" class="w-full" />
+                                            <div class="mt-1 flex gap-1">
+                                                <button type="button" @click="addDays('fecha_apertura', 3)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+3d</button>
+                                                <button type="button" @click="addDays('fecha_apertura', 5)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+5d</button>
+                                                <button type="button" @click="addMonths('fecha_apertura', 1)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+1m</button>
+                                            </div>
+                                            <InputError :message="form.errors.fecha_apertura" />
+                                        </div>
+                                        <div>
+                                            <InputLabel value="Fecha Vencimiento" />
+                                            <DatePicker v-model="form.fecha_vencimiento" class="w-full" />
+                                            <div class="mt-1 flex gap-1">
+                                                <button type="button" @click="addMonths('fecha_vencimiento', 6)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+6m</button>
+                                                <button type="button" @click="addMonths('fecha_vencimiento', 12)" class="text-[9px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-bold hover:bg-indigo-100 text-gray-600">+1a</button>
+                                            </div>
+                                            <InputError :message="form.errors.fecha_vencimiento" />
+                                        </div>
+                                        <div><InputLabel value="Fecha Inicio Crédito" /><DatePicker v-model="form.fecha_inicio_credito" class="w-full" /><InputError :message="form.errors.fecha_inicio_credito" /></div>
+                                    </div>
                                 </div>
                             </section>
 
                             <!-- TAB 2 -->
                             <section v-show="activeTab === 'proceso-judicial'" class="space-y-8">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="rounded-2xl border border-gray-200 bg-gray-50/60 p-4 dark:border-gray-700 dark:bg-gray-800/35 sm:p-6">
+                                <div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                                     <div>
                                         <div class="flex justify-between items-center mb-1">
                                             <InputLabel value="Radicado" />
@@ -572,17 +608,29 @@ const submit = () => {
                                     <div><InputLabel value="Tipo de Garantía *" /><SelectInput v-model="form.tipo_garantia_asociada"><option value="codeudor">Codeudor</option><option value="hipotecaria">Hipotecaria</option><option value="prendaria">Prendaria</option><option value="sin garantía">Sin garantía</option></SelectInput><InputError :message="form.errors.tipo_garantia_asociada" /></div>
                                     <div><InputLabel value="Origen Documental *" /><SelectInput v-model="form.origen_documental"><option value="pagaré">Pagaré</option><option value="libranza">Libranza</option><option value="contrato">Contrato</option><option value="otro">Otro</option></SelectInput><InputError :message="form.errors.origen_documental" /></div>
                                     <div><InputLabel value="Medio de Contacto" /><SelectInput v-model="form.medio_contacto"><option :value="null">-- Seleccione --</option><option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="telefono">Teléfono</option></SelectInput><InputError :message="form.errors.medio_contacto" /></div>
-                                    <div class="md:col-span-1"><InputLabel value="URL Carpeta Drive (Opcional)" /><TextInput v-model="form.link_drive" type="url" class="w-full" placeholder="https://drive.google.com/..." /><InputError :message="form.errors.link_drive" /></div>
-                                    <div class="md:col-span-1"><InputLabel value="URL Expediente Digital (Opcional)" /><TextInput v-model="form.link_expediente" type="url" class="w-full" placeholder="https://expediente.justicia.gov.co/..." /><InputError :message="form.errors.link_expediente" /></div>
+                                    <div class="xl:col-span-3 grid grid-cols-1 gap-5 md:grid-cols-2">
+                                        <div><InputLabel value="URL Carpeta Drive (Opcional)" /><TextInput v-model="form.link_drive" type="url" class="w-full" placeholder="https://drive.google.com/..." /><InputError :message="form.errors.link_drive" /></div>
+                                        <div><InputLabel value="URL Expediente Digital (Opcional)" /><TextInput v-model="form.link_expediente" type="url" class="w-full" placeholder="https://expediente.justicia.gov.co/..." /><InputError :message="form.errors.link_expediente" /></div>
+                                    </div>
+                                </div>
                                 </div>
                             </section>
 
                             <!-- TAB 3 -->
                             <section v-show="activeTab === 'codeudores'" class="space-y-6">
-                                <div class="flex justify-between items-center"><h3 class="font-bold">Lista de Codeudores</h3><PrimaryButton type="button" @click="addCodeudor">+ Añadir</PrimaryButton></div>
-                                <div v-for="(c, i) in form.codeudores" :key="i" class="p-6 border rounded-lg dark:border-gray-700 bg-gray-50/20 relative">
-                                    <button @click="removeCodeudor(i)" class="absolute top-4 right-4 text-red-500 hover:text-red-700"><TrashIcon class="h-5 w-5"/></button>
-                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div class="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-gray-50/60 p-4 dark:border-gray-700 dark:bg-gray-800/35 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                                    <div>
+                                        <h3 class="text-base font-black text-gray-950 dark:text-gray-100">Lista de Codeudores</h3>
+                                        <p class="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Garantías personales asociadas al expediente.</p>
+                                    </div>
+                                    <PrimaryButton type="button" @click="addCodeudor" class="justify-center">+ Añadir</PrimaryButton>
+                                </div>
+                                <div v-for="(c, i) in form.codeudores" :key="i" class="relative rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:p-6">
+                                    <button @click="removeCodeudor(i)" class="absolute right-4 top-4 rounded-lg p-2 text-red-500 transition hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20"><TrashIcon class="h-5 w-5"/></button>
+                                    <div class="mb-5 pr-12">
+                                        <p class="text-xs font-black uppercase tracking-[0.18em] text-gray-400">Codeudor #{{ i + 1 }}</p>
+                                    </div>
+                                    <div class="grid grid-cols-1 gap-5 md:grid-cols-3">
                                         <div class="md:col-span-1"><InputLabel value="Nombre Completo *" /><TextInput v-model="c.nombre_completo" @blur="c.nombre_completo = toUpperCase(c.nombre_completo)" class="mt-1 block w-full" required/><InputError :message="form.errors[`codeudores.${i}.nombre_completo`]" /></div>
                                         <div><InputLabel value="Tipo Documento" /><SelectInput v-model="c.tipo_documento"><option value="CC">Cédula de Ciudadanía</option><option value="NIT">NIT</option><option value="CE">Cédula de Extranjería</option></SelectInput></div>
                                         <div>
@@ -606,8 +654,8 @@ const submit = () => {
 
                             <!-- TAB 4 -->
                             <section v-show="activeTab === 'control-notas'" class="space-y-8">
-                                <div><InputLabel value="Notas Legales / Internas" /><Textarea v-model="form.notas_legales" rows="4" class="w-full" /><InputError :message="form.errors.notas_legales" /></div>
-                                <div v-if="user.tipo_usuario === 'admin'" class="p-4 border border-red-200 rounded-lg bg-red-50 dark:bg-red-900/20">
+                                <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:p-6"><InputLabel value="Notas Legales / Internas" /><Textarea v-model="form.notas_legales" rows="5" class="w-full" /><InputError :message="form.errors.notas_legales" /></div>
+                                <div v-if="user.tipo_usuario === 'admin'" class="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/60 dark:bg-red-900/20 sm:p-6">
                                     <div class="flex items-center justify-between">
                                         <div><h4 class="font-bold text-red-800 dark:text-red-200">{{ caso.nota_cierre ? 'Reabrir' : 'Cerrar' }} Caso</h4></div>
                                         <PrimaryButton v-if="caso.nota_cierre" @click="submitReopen" class="bg-blue-600">Reabrir</PrimaryButton>
@@ -631,6 +679,67 @@ const submit = () => {
     </AuthenticatedLayout>
 </template>
 
-<style>
-/* Estilos adicionales si fueran necesarios */
+<style scoped>
+.case-edit-page :deep(label),
+.case-edit-page :deep(.block.font-medium) {
+    margin-bottom: 0.4rem;
+    color: rgb(55 65 81);
+    font-size: 0.75rem;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+}
+
+.dark .case-edit-page :deep(label),
+.dark .case-edit-page :deep(.block.font-medium) {
+    color: rgb(209 213 219);
+}
+
+.case-edit-page :deep(input:not([type="checkbox"]):not([type="radio"])),
+.case-edit-page :deep(textarea),
+.case-edit-page :deep(select) {
+    width: 100%;
+    min-width: 0;
+    border-radius: 0.75rem;
+    border-color: rgb(209 213 219);
+    background-color: rgb(255 255 255);
+    color: rgb(17 24 39);
+    font-size: 0.875rem;
+    font-weight: 650;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+}
+
+.case-edit-page :deep(input:not([type="checkbox"]):not([type="radio"])),
+.case-edit-page :deep(select) {
+    min-height: 2.75rem;
+}
+
+.case-edit-page :deep(textarea) {
+    min-height: 7rem;
+    resize: vertical;
+}
+
+.case-edit-page :deep(input:focus),
+.case-edit-page :deep(textarea:focus),
+.case-edit-page :deep(select:focus) {
+    border-color: rgb(79 70 229);
+    box-shadow: 0 0 0 3px rgb(99 102 241 / 0.14);
+}
+
+.dark .case-edit-page :deep(input:not([type="checkbox"]):not([type="radio"])),
+.dark .case-edit-page :deep(textarea),
+.dark .case-edit-page :deep(select) {
+    border-color: rgb(55 65 81);
+    background-color: rgb(17 24 39);
+    color: rgb(243 244 246);
+}
+
+.case-edit-page :deep(.relative.w-full > .min-h-\[42px\]) {
+    min-height: 2.75rem;
+    border-radius: 0.75rem;
+}
+
+.case-edit-page :deep(.text-red-600),
+.case-edit-page :deep(.text-red-500) {
+    overflow-wrap: anywhere;
+}
 </style>

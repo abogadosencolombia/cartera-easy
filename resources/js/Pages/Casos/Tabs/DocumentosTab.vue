@@ -27,7 +27,7 @@ import {
     PlusIcon,
     XMarkIcon
 } from '@heroicons/vue/24/outline';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 
 const props = defineProps({
     caso: Object,
@@ -94,7 +94,7 @@ const submitDocument = () => {
         preserveScroll: true,
         onSuccess: () => { 
             closeUploadModal(); 
-            Swal.fire({ title: '¡Subidos!', text: 'Los documentos se han cargado correctamente.', icon: 'success', timer: 2000, showConfirmButton: false }); 
+            AppAlert.fire({ title: '¡Subidos!', text: 'Los documentos se han cargado correctamente.', icon: 'success', timer: 2000, showConfirmButton: false }); 
         },
     });
 };
@@ -105,7 +105,7 @@ const confirmDocumentDeletion = (documento) => { documentToDelete.value = docume
 const deleteDocument = () => {
     useForm({}).delete(route('documentos-caso.destroy', documentToDelete.value.id), {
         preserveScroll: true,
-        onSuccess: () => { confirmingDocumentDeletion.value = false; Swal.fire('Eliminado', '', 'success'); },
+        onSuccess: () => { confirmingDocumentDeletion.value = false; AppAlert.fire('Eliminado', '', 'success'); },
     });
 };
 
@@ -114,7 +114,7 @@ const generarDocForm = useForm({ plantilla_id: null, caso_id: props.caso.id, es_
 const submitGenerarDocumento = () => {
     generarDocForm.post(route('documentos.generar'), {
         preserveScroll: true,
-        onSuccess: () => { mostrandoModalGenerar.value = false; Swal.fire({ title: '¡Generando!', icon: 'info', timer: 2000, showConfirmButton: false }); },
+        onSuccess: () => { mostrandoModalGenerar.value = false; AppAlert.fire({ title: '¡Generando!', icon: 'info', timer: 2000, showConfirmButton: false }); },
     });
 };
 </script>

@@ -5,7 +5,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import InputError from '@/Components/InputError.vue';
 import { ref } from 'vue';
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 import { 
     ArrowUpTrayIcon, 
     ArrowLeftIcon, 
@@ -37,7 +37,7 @@ const handleDrop = (e) => {
 
 const submit = () => {
     if (!form.file) {
-        Swal.fire({
+        AppAlert.fire({
             title: 'Archivo Requerido',
             text: 'Por favor selecciona un archivo Excel (.xlsx) para continuar.',
             icon: 'info',
@@ -50,7 +50,7 @@ const submit = () => {
         forceFormData: true,
         preserveScroll: true,
         onSuccess: () => {
-            Swal.fire({
+            AppAlert.fire({
                 title: '¡Importación Exitosa!',
                 text: 'El directorio de juzgados ha sido actualizado correctamente.',
                 icon: 'success',
@@ -61,7 +61,7 @@ const submit = () => {
         },
         onError: (errors) => {
             console.error(errors);
-            Swal.fire({
+            AppAlert.fire({
                 title: 'Error en Importación',
                 text: 'No pudimos procesar el archivo. Revisa que el formato sea correcto y no tenga filas vacías al inicio.',
                 icon: 'error',

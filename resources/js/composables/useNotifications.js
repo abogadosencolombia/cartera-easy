@@ -1,7 +1,7 @@
-import Swal from '@/Utils/swal';
+import AppAlert from '@/Utils/appAlert';
 
 export function useNotifications() {
-    const Toast = Swal.mixin({
+    const Toast = AppAlert.mixin({
         toast: true,
         timer: 4000,
     });
@@ -15,7 +15,7 @@ export function useNotifications() {
     };
 
     const confirm = async (options = {}) => {
-        return await Swal.fire({
+        return await AppAlert.fire({
             title: options.title || '¿Estás seguro?',
             text: options.text || 'Esta acción no se puede deshacer.',
             icon: options.icon || 'warning',
