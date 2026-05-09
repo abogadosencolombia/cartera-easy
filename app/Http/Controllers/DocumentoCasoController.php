@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Services\ExpedienteIntegrityService;
+use App\Services\ValidacionLegalService;
 
 class DocumentoCasoController extends Controller
 {
@@ -104,6 +106,8 @@ class DocumentoCasoController extends Controller
 
         // Registro de revisión diaria por acción
         $this->registrarRevisionAutomatica($caso);
+        app(ValidacionLegalService::class)->generarValidacionesParaCaso($caso->refresh());
+        app(ExpedienteIntegrityService::class)->refresh($caso);
 
         return back()->with('success', '¡Documentos subidos exitosamente!');
     }
@@ -150,6 +154,9 @@ class DocumentoCasoController extends Controller
             'direccion_ip' => request()->ip(),
             'user_agent' => request()->userAgent(),
         ]);
+
+        app(ValidacionLegalService::class)->generarValidacionesParaCaso($documento->caso->refresh());
+        app(ExpedienteIntegrityService::class)->refresh($documento->caso);
 
         return back()->with('success', '¡Documento eliminado exitosamente!');
     }

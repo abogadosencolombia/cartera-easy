@@ -80,6 +80,7 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
         return [
             'ID INTERNO',
             'Radicado',
+            'SPOA/NUNC',
             'Fecha Radicacion',
             'Naturaleza',
             'A Favor De',
@@ -88,7 +89,6 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
             'Etapa Procesal',
             'Fecha Cambio Etapa',
             'Estado',
-            'Viabilidad',
             'Informacion Incompleta',
             'Demandantes',
             'Demandados',
@@ -130,7 +130,6 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
             $proceso->etapaActual?->nombre,
             $proceso->fecha_cambio_etapa ? $proceso->fecha_cambio_etapa->format('Y-m-d') : '',
             $proceso->estado,
-            strtoupper($proceso->viabilidad_estado ?? 'PENDIENTE'),
             $proceso->info_incompleta ? 'SI' : 'NO',
             $formatoPartes($proceso->demandantes),
             $formatoPartes($proceso->demandados),
@@ -178,10 +177,9 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
 
                 // 4. Ajuste de Anchos y Text Wrapping para campos largos
                 $longTextFields = [
-                    'D' => 20, // Naturaleza
-                    'E' => 25, // A Favor De
-                    'F' => 45, // Asunto
-                    'K' => 15, // Viabilidad
+                    'E' => 20, // Naturaleza
+                    'F' => 25, // A Favor De
+                    'G' => 45, // Asunto
                     'M' => 35, // Demandantes
                     'N' => 35, // Demandados
                     'R' => 30, // Correos Juzgado

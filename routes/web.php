@@ -186,7 +186,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('procesos/{proceso}/edit', [ProcesoRadicadoController::class, 'edit'])->name('procesos.edit');
     Route::patch('procesos/{proceso}', [ProcesoRadicadoController::class, 'update'])->name('procesos.update');
     Route::patch('procesos/{proceso}/pin', [ProcesoRadicadoController::class, 'togglePin'])->name('procesos.pin');
-    Route::patch('procesos/{proceso}/viabilidad', [ProcesoRadicadoController::class, 'updateViabilidad'])->name('procesos.viabilidad.update');
     Route::patch('procesos/{proceso}/quick-review', [ProcesoRadicadoController::class, 'quickReview'])->name('procesos.quick_review');
     Route::patch('procesos/{proceso}/checklist', [ProcesoRadicadoController::class, 'updateChecklist'])->name('procesos.checklist.update');
     Route::delete('procesos/{proceso}', [ProcesoRadicadoController::class, 'destroy'])->name('procesos.destroy');
@@ -262,7 +261,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::resource('casos', CasoController::class);
         Route::patch('/casos/{caso}/pin', [CasoController::class, 'togglePin'])->name('casos.pin');
-        Route::patch('/casos/{caso}/viabilidad', [CasoController::class, 'updateViabilidad'])->name('casos.viabilidad.update');
         Route::patch('/casos/{caso}/checklist', [CasoController::class, 'updateChecklist'])->name('casos.checklist.update');
         Route::patch('/casos/{caso}/unlock', [CasoController::class, 'unlock'])->name('casos.unlock');
         Route::patch('/casos/{caso}/reopen', [CasoController::class, 'reopen'])->name('casos.reopen');
@@ -278,7 +276,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/personas/{persona}/casos-existentes', [PersonaController::class, 'getCasos'])->name('personas.casos_existentes');
         Route::resource('personas', PersonaController::class);
         Route::get('/casos/verificar/duplicados', [CasoController::class, 'verificarDuplicados'])->name('casos.verificar_duplicados');
-        Route::resource('casos', CasoController::class);
 
         Route::post('/personas/{persona}/documentos', [PersonaController::class, 'uploadDocument'])->name('personas.upload_document');
         Route::get('/personas/documentos/{documento}', [PersonaController::class, 'downloadDocument'])->name('personas.download_document');
@@ -443,7 +440,13 @@ Route::any('brand-assets/{any?}', [ChatwootProxyController::class, 'proxy'])->wh
 Route::any('vite/{any?}', [ChatwootProxyController::class, 'proxy'])->where('any', '.*')->middleware('web');
 Route::any('packs/{any?}', [ChatwootProxyController::class, 'proxy'])->where('any', '.*')->middleware('web');
 Route::any('storage/{any?}', [ChatwootProxyController::class, 'proxy'])->where('any', '.*')->middleware('web');
-Route::any('sw.js', [ChatwootProxyController::class, 'proxy'])->middleware('web');
+Route::get('sw.js', function () {
+    return response()->file(public_path('sw.js'), [
+        'Content-Type' => 'application/javascript; charset=UTF-8',
+        'Service-Worker-Allowed' => '/',
+        'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+    ]);
+});
 Route::any('chatwoot-sw.js', [ChatwootProxyController::class, 'proxy'])->middleware('web');
 Route::any('manifest.json', [ChatwootProxyController::class, 'proxy'])->middleware('web');
 Route::any('cable/{any?}', [ChatwootProxyController::class, 'proxy'])->where('any', '.*')->middleware('web');

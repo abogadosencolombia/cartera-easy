@@ -16,6 +16,7 @@ import Textarea from '@/Components/Textarea.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import InputError from '@/Components/InputError.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import Swal from '@/Utils/swal';
 
 const props = defineProps({
     proceso: { type: Object, required: true },

@@ -30,6 +30,8 @@ use Carbon\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\CasosExport;
 use App\Traits\RegistraRevisionTrait;
+use App\Services\ExpedienteIntegrityService;
+use App\Services\ValidacionLegalService;
 
 class CasoController extends Controller
 {
@@ -39,6 +41,8 @@ class CasoController extends Controller
     {
         $this->authorize('viewAny', Caso::class);
         $user = Auth::user();
+        $integrityService = app(ExpedienteIntegrityService::class);
+        $integridadDisponible = $integrityService->supportsPersistence('casos');
 
         $query = Caso::with([
             'cooperativa', 
@@ -167,7 +171,13 @@ class CasoController extends Controller
                   ->paraSeguimiento();
         }
 
+        if ($integridadDisponible && $request->boolean('integridad_baja')) {
+            $query->where('integridad_score', '<', 80)
+                  ->paraSeguimiento();
+        }
+
         $casos = $query->orderBy('is_pinned', 'desc')->orderBy('updated_at', 'desc')->paginate(20)->withQueryString();
+        $integrityService->refreshMissing($casos->getCollection(), force: !$integridadDisponible);
 
         $abogados = [];
         $cooperativas = [];
@@ -189,6 +199,9 @@ class CasoController extends Controller
             'cerrados' => (clone $statsQuery)->cerrados()->count(),
             'saldo_total' => (clone $statsQuery)->selectRaw('SUM(COALESCE(monto_total, 0) - COALESCE(monto_total_pagado, 0)) as total')->value('total') ?? 0,
             'actualizados_hoy' => $aplicarActualizadosHoy(clone $statsQuery)->count(),
+            'integridad_baja' => $integridadDisponible
+                ? (clone $statsQuery)->where('integridad_score', '<', 80)->paraSeguimiento()->count()
+                : 0,
         ];
 
         return Inertia::render('Casos/Index', [
@@ -197,7 +210,7 @@ class CasoController extends Controller
             'cooperativas' => $cooperativas,
             'selectedJuzgado' => $selectedJuzgado,
             'etapas_procesales' => $etapas_procesales,
-            'filters' => $request->only(['search', 'abogado_id', 'cooperativa_id', 'juzgado_id', 'tipo_entidad', 'etapa_procesal', 'sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy']),
+            'filters' => $request->only(['search', 'abogado_id', 'cooperativa_id', 'juzgado_id', 'tipo_entidad', 'etapa_procesal', 'sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy', 'integridad_baja']),
             'stats' => $stats,
             'can' => ['delete_cases' => true],
         ]);
@@ -574,40 +587,11 @@ class CasoController extends Controller
         return response()->json($duplicates);
     }
 
-    public function updateViabilidad(Request $request, Caso $caso): RedirectResponse
-    {
-        $this->authorize('update', $caso);
-
-        $validated = $request->validate([
-            'viabilidad_juridica' => 'required|array',
-            'viabilidad_estado' => 'required|string|in:verde,amarillo,rojo,pendiente',
-        ]);
-
-        $caso->update($validated);
-
-        // --- AUTOMATIZACIÓN: Registrar en la bitácora del caso para que el historial esté al día ---
-        $caso->bitacoras()->create([
-            'user_id' => Auth::id(),
-            'accion' => 'DICTAMEN JURÍDICO',
-            'comentario' => "Se ha actualizado el dictamen de viabilidad a estado: " . strtoupper($validated['viabilidad_estado']) . ". Análisis técnico: " . ($validated['viabilidad_juridica']['analisis_tecnico'] ?? 'No especificado'),
-        ]);
-
-        AuditoriaEvento::create([
-            'user_id' => Auth::id(),
-            'evento' => 'ACTUALIZAR_VIABILIDAD',
-            'descripcion_breve' => "Actualización de ficha de viabilidad jurídica",
-            'auditable_id' => $caso->id,
-            'auditable_type' => Caso::class,
-            'direccion_ip' => $request->ip(),
-        ]);
-
-        return back()->with('success', 'Ficha de viabilidad actualizada correctamente.');
-    }
-
     public function updateChecklist(Request $request, Caso $caso)
     {
         $this->authorize('update', $caso);
         $caso->update(['checklist_seguimiento' => $request->input('checklist', [])]);
+        app(ExpedienteIntegrityService::class)->refresh($caso->refresh());
         return back()->with('success', 'Checklist actualizado.');
     }
 
@@ -722,6 +706,9 @@ class CasoController extends Controller
             return back()->withInput()->with('error', 'Ocurrió un error al registrar el caso: ' . $e->getMessage());
         }
 
+        app(ValidacionLegalService::class)->generarValidacionesParaCaso($caso->refresh());
+        app(ExpedienteIntegrityService::class)->refresh($caso);
+
         return to_route('casos.show', $caso->id)->with('success', '¡Caso registrado exitosamente!');
     }
 
@@ -731,6 +718,10 @@ class CasoController extends Controller
         
         // Registro automático de revisión diaria
         $this->registrarRevisionAutomatica($caso);
+
+        if (!$caso->integridad_resumen) {
+            app(ExpedienteIntegrityService::class)->refresh($caso);
+        }
 
         $caso->load([
             'deudor:id,nombre_completo,numero_documento,tipo_documento,dv,celular_1,celular_2,correo_1,correo_2,addresses',
@@ -916,6 +907,9 @@ class CasoController extends Controller
             return back()->withInput()->with('error', 'Ocurrió un error al actualizar el caso: ' . $e->getMessage());
         }
 
+        app(ValidacionLegalService::class)->generarValidacionesParaCaso($caso->refresh());
+        app(ExpedienteIntegrityService::class)->refresh($caso);
+
         return to_route('casos.show', $caso->id)->with('success', '¡Caso actualizado exitosamente!');
     }
 
@@ -947,6 +941,7 @@ class CasoController extends Controller
         $validated = $request->validate(['nota_cierre' => ['required', 'string', 'max:2000']]);
         $caso->update(['nota_cierre' => $validated['nota_cierre']]);
         $caso->bitacoras()->create(['user_id' => auth()->id(), 'accion' => 'Cierre de Caso', 'comentario' => $validated['nota_cierre']]);
+        app(ExpedienteIntegrityService::class)->refresh($caso->refresh());
         return to_route('casos.edit', $caso->id)->with('success', '¡Caso cerrado exitosamente!');
     }
 
@@ -955,6 +950,7 @@ class CasoController extends Controller
         if (Auth::user()->tipo_usuario !== 'admin') return to_route('casos.edit', $caso->id)->with('error', 'No autorizado.');
         $caso->update(['nota_cierre' => null]);
         $caso->bitacoras()->create(['user_id' => auth()->id(), 'accion' => 'Reapertura de Caso', 'comentario' => 'Reabierto por admin.']);
+        app(ExpedienteIntegrityService::class)->refresh($caso->refresh());
         return to_route('casos.edit', $caso->id)->with('success', '¡Caso reabierto exitosamente!');
     }
 
@@ -962,6 +958,7 @@ class CasoController extends Controller
     {
         $validated = $request->validate(['nota' => ['required', 'string'], 'fecha_actuacion' => ['required', 'date']]);
         $caso->actuaciones()->create(['nota' => $validated['nota'], 'fecha_actuacion' => $validated['fecha_actuacion'], 'user_id' => Auth::id()]);
+        app(ExpedienteIntegrityService::class)->refresh($caso->refresh());
         return back()->with('success', 'Actuación registrada.');
     }
 
@@ -969,12 +966,31 @@ class CasoController extends Controller
     {
         $validated = $request->validate(['nota' => ['required', 'string'], 'fecha_actuacion' => ['required', 'date']]);
         $actuacion->update($validated);
+        if ($actuacion->actuable instanceof Caso) {
+            app(ExpedienteIntegrityService::class)->refresh($actuacion->actuable->refresh());
+        }
         return back(303)->with('success', 'Actuación actualizada.');
     }
 
-    public function destroyActuacion(Actuacion $actuacion) { $actuacion->delete(); return back(303)->with('success', 'Actuación eliminada.'); }
+    public function destroyActuacion(Actuacion $actuacion)
+    {
+        $caso = $actuacion->actuable;
+        $actuacion->delete();
 
-    public function unlock(Request $request, Caso $caso): RedirectResponse { $caso->update(['bloqueado' => false, 'motivo_bloqueo' => null]); return to_route('casos.show', $caso->id)->with('success', 'Desbloqueado.'); }
+        if ($caso instanceof Caso) {
+            app(ExpedienteIntegrityService::class)->refresh($caso->refresh());
+        }
+
+        return back(303)->with('success', 'Actuación eliminada.');
+    }
+
+    public function unlock(Request $request, Caso $caso): RedirectResponse
+    {
+        $caso->update(['bloqueado' => false, 'motivo_bloqueo' => null]);
+        app(ExpedienteIntegrityService::class)->refresh($caso->refresh());
+
+        return to_route('casos.show', $caso->id)->with('success', 'Desbloqueado.');
+    }
 
     public function clonar(Caso $caso): Response
     {

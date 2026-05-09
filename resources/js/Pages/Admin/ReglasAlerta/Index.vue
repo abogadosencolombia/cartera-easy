@@ -112,13 +112,13 @@ const getHumanDescription = (tipo, dias) => {
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
                 
                 <!-- Mensajes Flash -->
-                <div v-if="$page.props.flash.success" class="mb-6 bg-green-50 border-l-4 border-green-500 text-green-700 p-4 rounded-r shadow-sm flex items-center">
-                    <ShieldCheckIcon class="h-5 w-5 mr-2" />
-                    <p>{{ $page.props.flash.success }}</p>
+                <div v-if="$page.props.flash.success" class="mb-6 cc-inline-alert cc-inline-alert-success">
+                    <ShieldCheckIcon class="cc-inline-alert-icon" />
+                    <p class="cc-inline-alert-text">{{ $page.props.flash.success }}</p>
                 </div>
-                <div v-if="$page.props.flash.error" class="mb-6 bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-r shadow-sm flex items-center">
-                    <ExclamationCircleIcon class="h-5 w-5 mr-2" />
-                    <p>{{ $page.props.flash.error }}</p>
+                <div v-if="$page.props.flash.error" class="mb-6 cc-inline-alert cc-inline-alert-error">
+                    <ExclamationCircleIcon class="cc-inline-alert-icon" />
+                    <p class="cc-inline-alert-text">{{ $page.props.flash.error }}</p>
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">

@@ -168,13 +168,17 @@ const handleFileUpload = (event) => {
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
                 
                 <!-- Mensajes Flash -->
-                <div v-if="page.props.flash.success" class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-md shadow-sm animate-fade-in-down" role="alert">
-                    <p class="font-bold">¡Éxito!</p>
-                    <p>{{ page.props.flash.success }}</p>
+                <div v-if="page.props.flash.success" class="cc-inline-alert cc-inline-alert-success animate-fade-in-down" role="alert">
+                    <div>
+                        <p class="cc-inline-alert-title">¡Éxito!</p>
+                        <p class="cc-inline-alert-text">{{ page.props.flash.success }}</p>
+                    </div>
                 </div>
-                <div v-if="page.props.flash.error" class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md shadow-sm animate-fade-in-down" role="alert">
-                    <p class="font-bold">¡Error!</p>
-                    <p>{{ page.props.flash.error }}</p>
+                <div v-if="page.props.flash.error" class="cc-inline-alert cc-inline-alert-error animate-fade-in-down" role="alert">
+                    <div>
+                        <p class="cc-inline-alert-title">¡Error!</p>
+                        <p class="cc-inline-alert-text">{{ page.props.flash.error }}</p>
+                    </div>
                 </div>
 
                 <!-- Panel de Filtros Compacto -->

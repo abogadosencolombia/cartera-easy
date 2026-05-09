@@ -1,5 +1,5 @@
 import axios, { isCancel } from 'axios';
-import Swal from 'sweetalert2';
+import Swal from '@/Utils/swal';
 window.axios = axios;
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';

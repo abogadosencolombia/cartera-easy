@@ -130,9 +130,9 @@ watch(() => usePage().props.flash, (newFlash) => {
                 </div>
 
                 <!-- ALERTAS -->
-                <div v-if="flash.success" class="bg-emerald-50 border-l-4 border-emerald-400 p-4 rounded-r-xl shadow-sm flex items-center">
-                    <ShieldCheckIcon class="h-5 w-5 text-emerald-500 mr-3" />
-                    <span class="text-emerald-800 text-sm font-bold">{{ flash.success }}</span>
+                <div v-if="flash.success" class="cc-inline-alert cc-inline-alert-success">
+                    <ShieldCheckIcon class="cc-inline-alert-icon" />
+                    <span class="cc-inline-alert-text">{{ flash.success }}</span>
                 </div>
 
                 <!-- FILTROS Y TABLA -->

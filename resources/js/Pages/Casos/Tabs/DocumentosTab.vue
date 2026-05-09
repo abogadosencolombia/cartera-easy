@@ -27,7 +27,7 @@ import {
     PlusIcon,
     XMarkIcon
 } from '@heroicons/vue/24/outline';
-import Swal from 'sweetalert2';
+import Swal from '@/Utils/swal';
 
 const props = defineProps({
     caso: Object,

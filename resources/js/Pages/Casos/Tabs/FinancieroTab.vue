@@ -23,11 +23,18 @@ const props = defineProps({
     <div class="space-y-8 animate-in fade-in duration-500">
 
         <!-- KPIs COMPACTOS -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
             <div class="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm relative overflow-hidden group">
                 <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Total Obligación</p>
                 <p class="text-2xl font-black text-gray-900 dark:text-white">{{ formatCurrency(resumen_financiero?.monto_total || 0) }}</p>
                 <CalculatorIcon class="absolute -right-2 -bottom-2 w-16 h-16 text-gray-100 dark:text-gray-700/50 -rotate-12" />
+            </div>
+
+            <div class="bg-rose-50/50 dark:bg-rose-900/10 p-6 rounded-xl border border-rose-100 dark:border-rose-900/30 shadow-sm relative overflow-hidden">
+                <p class="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-widest mb-2">Deuda Actual</p>
+                <p class="text-2xl font-black text-rose-700 dark:text-rose-300">{{ formatCurrency(caso?.monto_deuda_actual || 0) }}</p>
+                <p class="mt-2 text-[9px] font-bold text-rose-400 uppercase">Valor vigente del caso</p>
+                <BanknotesIcon class="absolute -right-2 -bottom-2 w-16 h-16 text-rose-100 dark:text-rose-900/30 -rotate-12" />
             </div>
 
             <div class="bg-emerald-50/50 dark:bg-emerald-900/10 p-6 rounded-xl border border-emerald-100 dark:border-emerald-900/30 shadow-sm">
@@ -38,10 +45,10 @@ const props = defineProps({
                 </div>
             </div>
 
-            <div class="bg-rose-50/50 dark:bg-rose-900/10 p-6 rounded-xl border border-rose-100 dark:border-rose-900/30 shadow-sm">
-                <p class="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-widest mb-2">Saldo Pendiente</p>
-                <p class="text-2xl font-black text-rose-700 dark:text-rose-300">{{ formatCurrency(resumen_financiero?.saldo_pendiente || 0) }}</p>
-                <p class="mt-2 text-[9px] font-bold text-rose-400 uppercase">En gestión de cobro</p>
+            <div class="bg-amber-50/50 dark:bg-amber-900/10 p-6 rounded-xl border border-amber-100 dark:border-amber-900/30 shadow-sm">
+                <p class="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-2">Saldo Pendiente</p>
+                <p class="text-2xl font-black text-amber-700 dark:text-amber-300">{{ formatCurrency(resumen_financiero?.saldo_pendiente || 0) }}</p>
+                <p class="mt-2 text-[9px] font-bold text-amber-500 uppercase">En gestión de cobro</p>
             </div>
         </div>
 

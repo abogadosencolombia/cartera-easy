@@ -71,7 +71,13 @@ class Caso extends Model
         'estado',
         'nota_cierre', // <--- ¡AQUÍ ESTABA EL PROBLEMA! Faltaba esta autorización.
         'clonado_de_id', 'is_pinned', 'checklist_seguimiento',
-        'viabilidad_juridica', 'viabilidad_estado', 'sin_codeudores', 'es_spoa_nunc'
+        'integridad_score', 'integridad_resumen',
+        'sin_codeudores', 'es_spoa_nunc'
+        ];
+
+        protected $hidden = [
+        'viabilidad_juridica',
+        'viabilidad_estado',
         ];
 
         protected $casts = [
@@ -83,10 +89,11 @@ class Caso extends Model
         'tasa_interes_corriente' => 'decimal:2',
         'fecha_inicio_credito' => 'date',
         'bloqueado' => 'boolean',
-        'ultima_actvidad' => 'datetime',
+        'ultima_actividad' => 'datetime',
         'is_pinned' => 'boolean',
         'checklist_seguimiento' => 'array',
-        'viabilidad_juridica' => 'array',
+        'integridad_score' => 'integer',
+        'integridad_resumen' => 'array',
         'sin_codeudores' => 'boolean',
         'es_spoa_nunc' => 'boolean',
         ];

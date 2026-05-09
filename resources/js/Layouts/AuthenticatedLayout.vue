@@ -23,17 +23,10 @@ import {
     FolderIcon,
     BellIcon,
     UsersIcon,
-    ScaleIcon,
     ArrowTrendingUpIcon,
     Cog6ToothIcon,
-    DocumentTextIcon,
-    ListBulletIcon,
     GlobeAltIcon,
-    BanknotesIcon,
     ClipboardDocumentCheckIcon,
-    ShieldCheckIcon,
-    ExclamationTriangleIcon,
-    BuildingOffice2Icon,
 } from "@heroicons/vue/24/outline";
 
 // 2. DEFINICIÓN DEL MENÚ ------------------------------------------------------
@@ -417,14 +410,16 @@ onBeforeUnmount(() => {
         Saltar al contenido
     </a>
 
-    <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
+    <div class="min-h-screen min-w-0 bg-gray-100 dark:bg-gray-900">
         <!-- NAVBAR PRINCIPAL - Añadimos z-[100] para que los dropdowns floten sobre todo -->
         <nav
             class="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 relative z-[100]"
         >
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-visible">
-                <div class="flex justify-between h-16 overflow-visible">
-                    <div class="flex overflow-visible">
+            <div
+                class="mx-auto max-w-screen-2xl px-3 sm:px-4 lg:px-6 xl:px-8 overflow-visible"
+            >
+                <div class="flex h-16 items-center justify-between gap-3 overflow-visible">
+                    <div class="flex min-w-0 flex-1 items-center overflow-visible">
                         <div class="shrink-0 flex items-center">
                             <Link :href="route('dashboard')">
                                 <ApplicationLogo class="block h-9 w-auto" />
@@ -433,7 +428,7 @@ onBeforeUnmount(() => {
 
                         <!-- Menú de Escritorio -->
                         <div
-                            class="hidden space-x-4 sm:-my-px sm:ms-10 sm:flex"
+                            class="hidden min-w-0 flex-1 items-center gap-1 xl:ms-6 xl:flex xl:gap-2"
                         >
                             <template
                                 v-for="item in visibleMenu"
@@ -444,12 +439,12 @@ onBeforeUnmount(() => {
                                     v-if="item.label === 'Gestión Diaria'"
                                     type="button"
                                     @click="showGestionPanel = true"
-                                    class="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium leading-5 text-gray-500 hover:text-gray-700 hover:border-gray-300 transition focus:outline-none"
+                                    class="inline-flex h-16 shrink-0 items-center border-b-2 border-transparent px-2 text-xs font-semibold leading-5 text-gray-500 transition hover:text-gray-700 hover:border-gray-300 focus:outline-none xl:text-sm"
                                 >
                                     <div class="relative flex items-center">
                                         <component
                                             :is="item.icon"
-                                            class="h-5 w-5 mr-1"
+                                            class="mr-1 h-4 w-4 xl:h-5 xl:w-5"
                                         />
                                         <span>{{ item.label }}</span>
                                         <span
@@ -507,7 +502,7 @@ onBeforeUnmount(() => {
                                 <!-- Opción 4: Dropdowns -->
                                 <div
                                     v-else-if="item.type === 'dropdown'"
-                                    class="hidden sm:flex sm:items-center sm:ms-1"
+                                    class="hidden shrink-0 xl:flex xl:items-center"
                                 >
                                     <Dropdown
                                         align="left"
@@ -519,7 +514,7 @@ onBeforeUnmount(() => {
                                     >
                                         <template #trigger>
                                             <button
-                                                class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium leading-5 focus:outline-none transition"
+                                                class="inline-flex h-16 shrink-0 items-center border-b-2 px-2 text-xs font-semibold leading-5 transition focus:outline-none xl:text-sm"
                                                 :class="
                                                     isRouteActive(item.active)
                                                         ? 'border-indigo-400 dark:border-indigo-600 text-gray-900 dark:text-gray-100'
@@ -528,11 +523,11 @@ onBeforeUnmount(() => {
                                             >
                                                 <component
                                                     :is="item.icon"
-                                                    class="h-5 w-5 mr-1"
+                                                    class="mr-1 h-4 w-4 xl:h-5 xl:w-5"
                                                 />
                                                 {{ item.label }}
                                                 <svg
-                                                    class="ms-2 -me-0.5 h-4 w-4"
+                                                    class="ms-1 h-4 w-4"
                                                     xmlns="http://www.w3.org/2000/svg"
                                                     fill="currentColor"
                                                     viewBox="0 0 20 20"
@@ -601,10 +596,10 @@ onBeforeUnmount(() => {
                     </div>
 
                     <!-- Menú de Usuario (Escritorio) -->
-                    <div class="hidden sm:flex sm:items-center sm:ms-6">
+                    <div class="hidden shrink-0 items-center xl:ms-3 xl:flex">
                         <Link
                             :href="route('notificaciones.index')"
-                            class="relative p-2 mr-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none transition duration-150 ease-in-out"
+                            class="relative mr-1 p-2 text-gray-400 transition duration-150 ease-in-out hover:text-gray-500 focus:outline-none dark:hover:text-gray-300"
                             title="Notificaciones"
                         >
                             <BellIcon class="h-6 w-6" />
@@ -632,11 +627,13 @@ onBeforeUnmount(() => {
                                 <template #trigger>
                                     <button
                                         type="button"
-                                        class="inline-flex items-center px-3 py-2 text-sm leading-4 rounded-md text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300"
+                                        class="inline-flex max-w-[11rem] items-center rounded-md bg-white px-3 py-2 text-sm leading-4 text-gray-500 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300 xl:max-w-[14rem]"
                                     >
-                                        {{ currentUser.name }}
+                                        <span class="truncate">{{
+                                            currentUser.name
+                                        }}</span>
                                         <svg
-                                            class="ms-2 -me-0.5 h-4 w-4"
+                                            class="ms-2 h-4 w-4 shrink-0"
                                             xmlns="http://www.w3.org/2000/svg"
                                             fill="currentColor"
                                             viewBox="0 0 20 20"
@@ -665,7 +662,7 @@ onBeforeUnmount(() => {
                     </div>
 
                     <!-- Botón de Hamburguesa (Móvil) -->
-                    <div class="-me-2 flex items-center sm:hidden gap-2">
+                    <div class="-me-2 flex items-center gap-2 xl:hidden">
                         <!-- Campana en Móvil -->
                         <Link
                             :href="route('notificaciones.index')"
@@ -739,7 +736,7 @@ onBeforeUnmount(() => {
                     block: showingNavigationDropdown,
                     hidden: !showingNavigationDropdown,
                 }"
-                class="sm:hidden"
+                class="border-t border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800 xl:hidden"
             >
                 <div class="pt-2 pb-3 space-y-1">
                     <template v-for="item in visibleMenu" :key="item.label">
@@ -773,21 +770,48 @@ onBeforeUnmount(() => {
                             />
                             {{ item.label }}
                         </ResponsiveNavLink>
-                        <template v-if="item.type === 'dropdown'">
-                            <div class="px-4 pt-2 pb-1">
+                        <template v-else-if="item.type === 'dropdown'">
+                            <div class="px-4 pb-1 pt-4">
                                 <span
-                                    class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase"
+                                    class="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-gray-500"
                                     >{{ item.label }}</span
                                 >
                             </div>
-                            <ResponsiveNavLink
-                                v-for="subItem in item.items"
-                                :key="subItem.label"
-                                :href="subItem.href"
-                                :active="isRouteActive(subItem.active)"
+                            <template
+                                v-for="(subItem, index) in item.items"
+                                :key="`${item.label}-${index}`"
                             >
-                                <span class="ms-7">{{ subItem.label }}</span>
-                            </ResponsiveNavLink>
+                                <div
+                                    v-if="subItem.type === 'divider'"
+                                    class="mx-4 my-1 border-t border-gray-100 dark:border-gray-700"
+                                ></div>
+                                <a
+                                    v-else-if="subItem.type === 'external'"
+                                    :href="subItem.href"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="block w-full border-l-4 border-transparent py-2 ps-10 pe-4 text-start text-base font-medium text-gray-600 transition duration-150 ease-in-out hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                                >
+                                    <span class="block truncate">{{
+                                        subItem.label
+                                    }}</span>
+                                    <span
+                                        v-if="subItem.recommendation"
+                                        class="mt-0.5 block truncate text-xs font-semibold text-gray-400 dark:text-gray-500"
+                                    >
+                                        {{ subItem.recommendation }}
+                                    </span>
+                                </a>
+                                <ResponsiveNavLink
+                                    v-else
+                                    :href="subItem.href"
+                                    :active="isRouteActive(subItem.active)"
+                                >
+                                    <span class="ms-7 block truncate">{{
+                                        subItem.label
+                                    }}</span>
+                                </ResponsiveNavLink>
+                            </template>
                         </template>
                     </template>
                 </div>
@@ -797,11 +821,11 @@ onBeforeUnmount(() => {
                 >
                     <div class="px-4">
                         <div
-                            class="font-medium text-base text-gray-800 dark:text-gray-200"
+                            class="truncate text-base font-medium text-gray-800 dark:text-gray-200"
                         >
                             {{ currentUser.name }}
                         </div>
-                        <div class="font-medium text-sm text-gray-500">
+                        <div class="truncate text-sm font-medium text-gray-500">
                             {{ currentUser.email }}
                         </div>
                     </div>
@@ -828,7 +852,7 @@ onBeforeUnmount(() => {
             </div>
         </header>
 
-        <main id="main-content">
+        <main id="main-content" class="min-w-0">
             <slot />
         </main>
 

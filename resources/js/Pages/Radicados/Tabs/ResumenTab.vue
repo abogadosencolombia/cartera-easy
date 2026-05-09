@@ -1,5 +1,5 @@
 <script setup>
-import { 
+import {
     ScaleIcon, 
     BuildingLibraryIcon,
     CalendarDaysIcon,
@@ -25,7 +25,6 @@ const asText = (v) => v ?? '—';
         
         <!-- COLUMNA IZQUIERDA: DETALLES TÉCNICOS (8/12) -->
         <div class="lg:col-span-8 space-y-8">
-            
             <!-- Bloque: Datos del Expediente -->
             <div class="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-visible transition-all hover:shadow-md">
                 <div class="px-8 py-5 bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
@@ -181,7 +180,7 @@ const asText = (v) => v ?? '—';
                                 <ClipboardDocumentCheckIcon class="w-5 h-5 text-indigo-600" />
                             </div>
                             <div>
-                                <p class="text-[9px] font-black text-indigo-900 dark:text-indigo-300 uppercase tracking-tighter">Estado de Integridad</p>
+                                <p class="text-[9px] font-black text-indigo-900 dark:text-indigo-300 uppercase tracking-tighter">Estado de Datos</p>
                                 <p class="text-[11px] font-bold text-indigo-700 dark:text-indigo-400">
                                     {{ proceso.info_incompleta ? 'REVISIÓN REQUERIDA' : 'DATOS COMPLETOS' }}
                                 </p>

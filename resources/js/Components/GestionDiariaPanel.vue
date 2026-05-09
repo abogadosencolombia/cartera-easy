@@ -2,7 +2,7 @@
 import { ref, watch, onMounted } from 'vue';
 import { usePage, router } from '@inertiajs/vue3';
 import axios from 'axios';
-import Swal from 'sweetalert2';
+import Swal from '@/Utils/swal';
 import SelectInput from '@/Components/SelectInput.vue';
 import { 
     XMarkIcon, 
@@ -23,17 +23,9 @@ const props = defineProps({
 
 const emit = defineEmits(['close']);
 
-// Configuración de Toast
 const Toast = Swal.mixin({
     toast: true,
-    position: 'top-end',
-    showConfirmButton: false,
     timer: 3000,
-    timerProgressBar: true,
-    didOpen: (toast) => {
-        toast.onmouseenter = Swal.stopTimer;
-        toast.onmouseleave = Swal.resumeTimer;
-    }
 });
 
 // Estado

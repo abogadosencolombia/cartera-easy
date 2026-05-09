@@ -51,9 +51,14 @@ class ProcesoRadicado extends Model
         'is_pinned',
         'checklist_seguimiento',
         'a_favor_de',
+        'integridad_score',
+        'integridad_resumen',
+        'es_spoa_nunc'
+    ];
+
+    protected $hidden = [
         'viabilidad_juridica',
         'viabilidad_estado',
-        'es_spoa_nunc'
     ];
 
     /**
@@ -81,7 +86,8 @@ class ProcesoRadicado extends Model
         'info_incompleta' => 'boolean',
         'is_pinned' => 'boolean',
         'checklist_seguimiento' => 'array',
-        'viabilidad_juridica' => 'array',
+        'integridad_score' => 'integer',
+        'integridad_resumen' => 'array',
         'es_spoa_nunc' => 'boolean',
     ];
 

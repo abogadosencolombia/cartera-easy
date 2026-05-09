@@ -22,7 +22,7 @@ import {
     BuildingOfficeIcon
 } from '@heroicons/vue/24/outline';
 import { debounce } from 'lodash';
-import Swal from 'sweetalert2';
+import Swal from '@/Utils/swal';
 
 const props = defineProps({
     cooperativas: Object,

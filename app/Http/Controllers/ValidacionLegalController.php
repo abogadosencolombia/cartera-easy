@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ValidacionLegal;
+use App\Services\ExpedienteIntegrityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -27,6 +28,9 @@ class ValidacionLegalController extends Controller
         ]);
 
         // El Observer se encargará de registrar el cambio en el historial y la bitácora.
+        if ($validacion->caso) {
+            app(ExpedienteIntegrityService::class)->refresh($validacion->caso->refresh());
+        }
 
         return back()->with('success', '¡Falla de cumplimiento corregida exitosamente!');
     }

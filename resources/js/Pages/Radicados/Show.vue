@@ -33,10 +33,11 @@ import {
     UsersIcon,
     FolderOpenIcon,
     ExclamationTriangleIcon,
+    ClipboardDocumentListIcon,
     ScaleIcon,
     PlusIcon
 } from '@heroicons/vue/24/outline';
-import Swal from 'sweetalert2';
+import Swal from '@/Utils/swal';
 
 // --- IMPORTAMOS LOS COMPONENTES DE PESTAÑA ---
 import ResumenTab from './Tabs/ResumenTab.vue';
@@ -44,7 +45,7 @@ import PartesTab from './Tabs/PartesTab.vue';
 import DocumentosTab from './Tabs/DocumentosTab.vue';
 import ActuacionesTab from './Tabs/ActuacionesTab.vue';
 import ActividadTab from './Tabs/ActividadTab.vue';
-import ViabilidadTab from '../Casos/Tabs/ViabilidadTab.vue';
+import ExpedienteIntegrityPanel from '@/Components/ExpedienteIntegrityPanel.vue';
 
 const props = defineProps({
     proceso: { type: Object, required: true },
@@ -55,7 +56,7 @@ const props = defineProps({
 const page = usePage();
 const user = computed(() => page.props.auth.user);
 
-const validTabs = ['resumen', 'viabilidad', 'partes', 'documentos', 'actuaciones', 'actividad'];
+const validTabs = ['resumen', 'integridad', 'partes', 'documentos', 'actuaciones', 'actividad'];
 const getInitialTab = () => {
     if (typeof window === 'undefined') return 'resumen';
     const params = new URLSearchParams(window.location.search);
@@ -326,30 +327,6 @@ const statusClasses = {
     <div class="py-6">
       <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
-        <!-- BANNER DE SEGURIDAD JURÍDICA (AUTOMÁTICO) -->
-        <div v-if="proceso.viabilidad_estado && proceso.viabilidad_estado !== 'pendiente'" 
-            class="rounded-2xl p-4 flex items-center justify-between border-2 animate-in slide-in-from-top-4"
-            :class="{
-                'bg-emerald-50 border-emerald-200 text-emerald-800': proceso.viabilidad_estado === 'verde',
-                'bg-amber-50 border-amber-200 text-amber-800': proceso.viabilidad_estado === 'amarillo',
-                'bg-rose-50 border-rose-200 text-rose-800': proceso.viabilidad_estado === 'rojo',
-            }">
-            <div class="flex items-center gap-4">
-                <div class="p-3 rounded-xl bg-white shadow-sm">
-                    <ShieldCheckIcon v-if="proceso.viabilidad_estado === 'verde'" class="w-6 h-6 text-emerald-600" />
-                    <ExclamationTriangleIcon v-if="proceso.viabilidad_estado === 'amarillo'" class="w-6 h-6 text-amber-600" />
-                    <XCircleIcon v-if="proceso.viabilidad_estado === 'rojo'" class="w-6 h-6 text-rose-600" />
-                </div>
-                <div>
-                    <h4 class="text-sm font-black uppercase tracking-tight">
-                        {{ proceso.viabilidad_estado === 'verde' ? 'EXPEDIENTE JURÍDICAMENTE APTO' : (proceso.viabilidad_estado === 'amarillo' ? 'REVISIÓN REQUERIDA' : 'RADICACIÓN BLOQUEADA') }}
-                    </h4>
-                    <p class="text-[10px] font-bold uppercase opacity-70">DICTAMEN DE VIABILIDAD: {{ proceso.viabilidad_estado }}</p>
-                </div>
-            </div>
-            <button @click="setActiveTab('viabilidad')" class="px-4 py-2 bg-white rounded-xl text-[10px] font-black uppercase shadow-sm hover:shadow-md transition-all">Revisar Dictamen</button>
-        </div>
-        
         <!-- DASHBOARD COMPACTO -->
         <div class="bg-white dark:bg-gray-800 shadow-sm rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div class="grid grid-cols-1 lg:grid-cols-4">
@@ -404,7 +381,7 @@ const statusClasses = {
                 <nav class="-mb-px flex space-x-6 overflow-x-auto scrollbar-hide">
                     <button v-for="tab in [
                         { id: 'resumen', label: 'General', icon: InformationCircleIcon },
-                        { id: 'viabilidad', label: 'Viabilidad', icon: ShieldCheckIcon },
+                        { id: 'integridad', label: 'Integridad', icon: CheckCircleIcon, badge: `${proceso.integridad_score || proceso.integridad_resumen?.score || 0}%` },
                         { id: 'partes', label: 'Partes', icon: UsersIcon },
                         { id: 'documentos', label: 'Soportes', icon: FolderOpenIcon },
                         { id: 'actuaciones', label: 'Actuaciones', icon: ClipboardDocumentListIcon },
@@ -414,6 +391,13 @@ const statusClasses = {
                     class="flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-bold text-[11px] uppercase tracking-wider transition-all group">
                         <component :is="tab.icon" :class="[activeTab === tab.id ? 'text-indigo-600' : 'text-gray-300 group-hover:text-gray-400']" class="h-4 w-4 mr-2 transition-colors" />
                         {{ tab.label }}
+                        <span
+                            v-if="tab.badge"
+                            class="ml-2 rounded-full px-2 py-0.5 text-[9px] font-black"
+                            :class="activeTab === tab.id ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'"
+                        >
+                            {{ tab.badge }}
+                        </span>
                     </button>
                 </nav>
             </div>
@@ -439,8 +423,8 @@ const statusClasses = {
                     </template>
                 </ResumenTab>
 
-                <!-- TAB: VIABILIDAD -->
-                <ViabilidadTab v-show="activeTab === 'viabilidad'" :entity="proceso" type="proceso" />
+                <!-- TAB: INTEGRIDAD -->
+                <ExpedienteIntegrityPanel v-show="activeTab === 'integridad'" :summary="proceso.integridad_resumen" :edit-href="route('procesos.edit', proceso.id)" @go-tab="setActiveTab" />
 
                 <!-- TAB: PARTES -->
                 <PartesTab v-show="activeTab === 'partes'" :proceso="proceso" />

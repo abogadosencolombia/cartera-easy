@@ -14,7 +14,7 @@ import {
     BriefcaseIcon, ShieldCheckIcon, CheckCircleIcon, ArrowPathIcon, ArrowLeftIcon
 } from '@heroicons/vue/24/outline';
 import { reactive, computed } from 'vue';
-import Swal from 'sweetalert2';
+import Swal from '@/Utils/swal';
 import { useFormDraft } from '@/composables/useFormDraft';
 
 const props = defineProps({

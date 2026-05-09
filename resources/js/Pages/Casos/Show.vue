@@ -3,7 +3,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, usePage, useRemember, router } from '@inertiajs/vue3';
 import { ref, computed, onMounted, watch } from 'vue';
 import { addDaysToDate, addMonthsToDate } from '@/Utils/formatters';
-import Swal from 'sweetalert2';
+import Swal from '@/Utils/swal';
 
 // --- IMPORTAMOS LOS COMPONENTES DE PESTAÑA ---
 import ResumenTab from './Tabs/ResumenTab.vue';
@@ -11,7 +11,7 @@ import DocumentosTab from './Tabs/DocumentosTab.vue';
 import FinancieroTab from './Tabs/FinancieroTab.vue';
 import ActuacionesTab from './Tabs/ActuacionesTab.vue';
 import ActividadTab from './Tabs/ActividadTab.vue';
-import ViabilidadTab from './Tabs/ViabilidadTab.vue';
+import ExpedienteIntegrityPanel from '@/Components/ExpedienteIntegrityPanel.vue';
 
 // Iconos
 import {
@@ -30,8 +30,7 @@ import {
     ExclamationTriangleIcon,
     BanknotesIcon,
     CalendarDaysIcon,
-    BriefcaseIcon,
-    ShieldCheckIcon
+    BriefcaseIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -45,7 +44,7 @@ const props = defineProps({
 });
 
 const page = usePage();
-const validTabs = ['resumen', 'viabilidad', 'documentos', 'financiero', 'actuaciones', 'actividad'];
+const validTabs = ['resumen', 'integridad', 'documentos', 'financiero', 'actuaciones', 'actividad'];
 const getInitialTab = () => {
     if (typeof window === 'undefined') return 'resumen';
     const params = new URLSearchParams(window.location.search);
@@ -181,30 +180,6 @@ const confirmUnlockCase = () => {
                     </div>
                 </div>
 
-                <!-- BANNER DE SEGURIDAD JURÍDICA (AUTOMÁTICO) -->
-                <div v-if="caso.viabilidad_estado && caso.viabilidad_estado !== 'pendiente'" 
-                    class="rounded-2xl p-4 flex items-center justify-between border-2 animate-in slide-in-from-top-4"
-                    :class="{
-                        'bg-emerald-50 border-emerald-200 text-emerald-800': caso.viabilidad_estado === 'verde',
-                        'bg-amber-50 border-amber-200 text-amber-800': caso.viabilidad_estado === 'amarillo',
-                        'bg-rose-50 border-rose-200 text-rose-800': caso.viabilidad_estado === 'rojo',
-                    }">
-                    <div class="flex items-center gap-4">
-                        <div class="p-3 rounded-xl bg-white shadow-sm">
-                            <ShieldCheckIcon v-if="caso.viabilidad_estado === 'verde'" class="w-6 h-6 text-emerald-600" />
-                            <ExclamationTriangleIcon v-if="caso.viabilidad_estado === 'amarillo'" class="w-6 h-6 text-amber-600" />
-                            <XCircleIcon v-if="caso.viabilidad_estado === 'rojo'" class="w-6 h-6 text-rose-600" />
-                        </div>
-                        <div>
-                            <h4 class="text-sm font-black uppercase tracking-tight">
-                                {{ caso.viabilidad_estado === 'verde' ? 'EXPEDIENTE BLINDADO' : (caso.viabilidad_estado === 'amarillo' ? 'REVISIÓN REQUERIDA' : 'DEMANDA BLOQUEADA') }}
-                            </h4>
-                            <p class="text-[10px] font-bold uppercase opacity-70">DICTAMEN DEL DIRECTOR JURÍDICO: {{ caso.viabilidad_estado }}</p>
-                        </div>
-                    </div>
-                    <button @click="setActiveTab('viabilidad')" class="px-4 py-2 bg-white rounded-xl text-[10px] font-black uppercase shadow-sm hover:shadow-md transition-all">Ver Ficha Técnica</button>
-                </div>
-                
                 <!-- DASHBOARD COMPACTO -->
                 <div class="bg-white dark:bg-gray-800 shadow-sm rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                     <div class="grid grid-cols-1 lg:grid-cols-4">
@@ -255,7 +230,7 @@ const confirmUnlockCase = () => {
                             <button
                                 v-for="tab in [
                                     { id: 'resumen', label: 'Resumen', icon: InformationCircleIcon },
-                                    { id: 'viabilidad', label: 'Viabilidad', icon: ShieldCheckIcon },
+                                    { id: 'integridad', label: 'Integridad', icon: CheckCircleIcon, badge: `${caso.integridad_score || caso.integridad_resumen?.score || 0}%` },
                                     { id: 'documentos', label: 'Documentos', icon: FolderOpenIcon },
                                     { id: 'financiero', label: 'Financiero', icon: CreditCardIcon },
                                     { id: 'actuaciones', label: 'Actuaciones', icon: ClipboardDocumentListIcon },
@@ -267,13 +242,20 @@ const confirmUnlockCase = () => {
                             >
                                 <component :is="tab.icon" :class="[activeTab === tab.id ? 'text-indigo-600' : 'text-gray-300 group-hover:text-gray-400']" class="h-4 w-4 mr-2 transition-colors" />
                                 {{ tab.label }}
+                                <span
+                                    v-if="tab.badge"
+                                    class="ml-2 rounded-full px-2 py-0.5 text-[9px] font-black"
+                                    :class="activeTab === tab.id ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'"
+                                >
+                                    {{ tab.badge }}
+                                </span>
                             </button>
                         </nav>
                     </div>
 
                     <div class="p-6">
                         <ResumenTab v-show="activeTab === 'resumen'" :caso="caso" :resumen_financiero="resumen_financiero" :formatCurrency="formatCurrency" :formatDate="formatDate" :formatLabel="formatLabel" />
-                        <ViabilidadTab v-show="activeTab === 'viabilidad'" :entity="caso" type="caso" />
+                        <ExpedienteIntegrityPanel v-show="activeTab === 'integridad'" :summary="caso.integridad_resumen" :edit-href="route('casos.edit', caso.id)" @go-tab="setActiveTab" />
                         <DocumentosTab v-show="activeTab === 'documentos'" :caso="caso" :plantillas="plantillas" :puedeEditar="puedeEditar" />
                         <FinancieroTab v-show="activeTab === 'financiero'" :caso="caso" :resumen_financiero="resumen_financiero" :contrato_id="caso.contrato?.id" :formatCurrency="formatCurrency" />
                         <ActuacionesTab v-show="activeTab === 'actuaciones'" :caso="caso" :actuaciones="actuaciones" :is-form-disabled="!puedeEditar" />

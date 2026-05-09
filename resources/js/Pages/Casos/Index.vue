@@ -26,7 +26,7 @@ const togglePin = (caso) => {
     });
 };
 import { debounce } from 'lodash';
-import Swal from 'sweetalert2';
+import Swal from '@/Utils/swal';
 
 const props = defineProps({
     casos: Object,
@@ -43,8 +43,8 @@ const props = defineProps({
 // --- Lógica de Búsqueda y Filtros Combinada ---
 const selectedJuzgado = ref(props.selectedJuzgado || null);
 const filterStorageKey = 'casos.index.filters';
-const filterKeys = ['search', 'abogado_id', 'cooperativa_id', 'juzgado_id', 'tipo_entidad', 'etapa_procesal', 'sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy'];
-const booleanFilterKeys = ['sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy'];
+const filterKeys = ['search', 'abogado_id', 'cooperativa_id', 'juzgado_id', 'tipo_entidad', 'etapa_procesal', 'sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy', 'integridad_baja'];
+const booleanFilterKeys = ['sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy', 'integridad_baja'];
 
 const parseBooleanFilter = (value) => value === true || value === 'true' || value === 1 || value === '1';
 
@@ -95,9 +95,10 @@ const filterForm = reactive({
     inactivo_20_dias: parseBooleanFilter(initialFilterValue('inactivo_20_dias', false)),
     cerrados: parseBooleanFilter(initialFilterValue('cerrados', false)),
     actualizados_hoy: parseBooleanFilter(initialFilterValue('actualizados_hoy', false)),
+    integridad_baja: parseBooleanFilter(initialFilterValue('integridad_baja', false)),
 });
 
-const controlFilterKeys = ['sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy'];
+const controlFilterKeys = ['sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy', 'integridad_baja'];
 
 const currentFilterPayload = () => ({
     search: filterForm.search,
@@ -110,6 +111,7 @@ const currentFilterPayload = () => ({
     inactivo_20_dias: filterForm.inactivo_20_dias,
     cerrados: filterForm.cerrados,
     actualizados_hoy: filterForm.actualizados_hoy,
+    integridad_baja: filterForm.integridad_baja,
 });
 
 const persistFilters = (filters) => {
@@ -160,7 +162,8 @@ const isDirty = computed(() => {
            filterForm.sin_radicado === true ||
            filterForm.inactivo_20_dias === true ||
            filterForm.cerrados === true ||
-           filterForm.actualizados_hoy === true;
+           filterForm.actualizados_hoy === true ||
+           filterForm.integridad_baja === true;
 });
 
 const resetFilters = () => {
@@ -179,6 +182,7 @@ const resetFilters = () => {
     filterForm.inactivo_20_dias = false;
     filterForm.cerrados = false;
     filterForm.actualizados_hoy = false;
+    filterForm.integridad_baja = false;
 };
 
 watch(filterForm, debounce(() => {
@@ -488,7 +492,7 @@ const copyLegalInfo = (caso) => {
                 </div>
 
                 <!-- STATS / KPI CARDS -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                     <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md">
                         <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform">
                             <ArchiveBoxXMarkIcon class="w-16 h-16 text-indigo-600" />
@@ -512,6 +516,21 @@ const copyLegalInfo = (caso) => {
                         <div v-if="!stats" class="h-8 w-16 bg-gray-100 dark:bg-gray-700 animate-pulse rounded"></div>
                         <p v-else class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.sin_radicado }}</p>
                         <p class="text-[9px] text-amber-500 font-bold mt-1 uppercase tracking-tighter">Pendientes de trámite</p>
+                    </button>
+
+                    <button
+                        type="button"
+                        @click="applyControlFilter('integridad_baja')"
+                        :class="filterForm.integridad_baja ? 'ring-2 ring-rose-400 border-rose-200 dark:border-rose-500/70' : ''"
+                        class="text-left w-full bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-rose-400"
+                    >
+                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-rose-600">
+                            <ExclamationTriangleIcon class="w-16 h-16" />
+                        </div>
+                        <p class="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Integridad Baja</p>
+                        <div v-if="!stats" class="h-8 w-16 bg-gray-100 dark:bg-gray-700 animate-pulse rounded"></div>
+                        <p v-else class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.integridad_baja }}</p>
+                        <p class="text-[9px] text-rose-500 font-bold mt-1 uppercase tracking-tighter">Expedientes por completar</p>
                     </button>
 
                     <button
@@ -639,6 +658,14 @@ const copyLegalInfo = (caso) => {
                                     <div :class="filterForm.inactivo_20_dias ? 'bg-white' : 'bg-amber-300'" class="w-1.5 h-1.5 rounded-full"></div>
                                     +20d Inactivo
                                 </button>
+                                <button 
+                                    @click="applyControlFilter('integridad_baja')"
+                                    :class="filterForm.integridad_baja ? 'bg-rose-600 text-white border-rose-600' : 'bg-gray-50 text-gray-500 border-gray-200'"
+                                    class="flex-1 px-3 py-3 rounded-xl border text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-1.5"
+                                >
+                                    <div :class="filterForm.integridad_baja ? 'bg-white' : 'bg-rose-300'" class="w-1.5 h-1.5 rounded-full"></div>
+                                    Integridad
+                                </button>
                             </div>
                         </div>
 
@@ -710,18 +737,15 @@ const copyLegalInfo = (caso) => {
                                                 {{ caso.deudor?.nombre_completo ?? 'Sin deudor' }}
                                             </Link>
                                             <div class="flex items-center gap-1.5 mt-1">
-                                                <div 
-                                                     class="w-2.5 h-2.5 rounded-full"
-                                                     :class="{
-                                                         'bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]': caso.viabilidad_estado === 'verde',
-                                                         'bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.6)]': caso.viabilidad_estado === 'amarillo',
-                                                         'bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]': caso.viabilidad_estado === 'rojo',
-                                                         'bg-gray-300 dark:bg-gray-600': !caso.viabilidad_estado || caso.viabilidad_estado === 'pendiente'
-                                                     }"
-                                                     :title="'Estado de Viabilidad: ' + (caso.viabilidad_estado || 'pendiente').toUpperCase()">
-                                                </div>
                                                 <span class="text-[10px] font-bold px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded">
                                                     ID #{{ caso.id }}
+                                                </span>
+                                                <span
+                                                    class="text-[9px] font-black px-1.5 py-0.5 rounded border"
+                                                    :class="(caso.integridad_score || 0) >= 85 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : ((caso.integridad_score || 0) >= 60 ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-rose-50 text-rose-700 border-rose-100')"
+                                                    :title="'Integridad del expediente: ' + (caso.integridad_score || 0) + '%'"
+                                                >
+                                                    {{ caso.integridad_score || 0 }}%
                                                 </span>
                                                 <span v-if="caso.radicado" class="text-[10px] text-gray-400 flex items-center gap-1 group/rad">
                                                     Rad: {{ caso.radicado }}

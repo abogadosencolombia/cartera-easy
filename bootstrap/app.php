@@ -9,6 +9,7 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Session\TokenMismatchException;
 use Inertia\Inertia;
 use App\Http\Middleware\EnsureSingleActiveSession;
+use App\Http\Middleware\PreventCachedAuthenticatedPages;
 // ===== INICIO DE LA NUEVA CORRECCIÓN =====
 // Importamos la excepción de Conflicto (Error 409)
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -28,19 +29,12 @@ return Application::configure(basePath: dirname(__DIR__))
             TrustProxies::class,  // PRIMERO TrustProxies
             \App\Http\Middleware\HandleInertiaRequests::class,  // DESPUÉS Inertia
             EnsureSingleActiveSession::class,
+            PreventCachedAuthenticatedPages::class,
         ]);
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckUserRole::class,
             'juzgado.access' => \App\Http\Middleware\EnsureJuzgadoAccess::class,
         ]);
-    })
-    // IMPORTANTE: sin type-hint para evitar el TypeError entre versiones
-    ->withSchedule(function ($schedule) {
-            $schedule->job(new \App\Jobs\ProcesarAlertasProgramadas)
-                ->everyMinute()
-                ->name('procesar_alertas_programadas')
-                ->withoutOverlapping(55)
-                ->timezone(config('app.timezone'));
     })
     ->withExceptions(function (Exceptions $exceptions) {
         

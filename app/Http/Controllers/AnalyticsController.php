@@ -56,30 +56,7 @@ class AnalyticsController extends Controller
             'vencidos' => $radVencidos + $casosVencidos,
         ];
 
-        // 2b. VIABILIDAD JURÍDICA GLOBAL (NUEVO)
-        $viabilidadProcesos = ProcesoRadicado::paraSeguimiento()
-            ->select('viabilidad_estado', DB::raw('count(*) as total'))
-            ->groupBy('viabilidad_estado')
-            ->get();
-
-        $viabilidadCasos = Caso::paraSeguimiento()
-            ->select('viabilidad_estado', DB::raw('count(*) as total'))
-            ->groupBy('viabilidad_estado')
-            ->get();
-
-        $viabilidadMerged = collect($viabilidadProcesos)
-            ->concat($viabilidadCasos)
-            ->groupBy(fn($item) => $item->viabilidad_estado ?: 'pendiente')
-            ->map(fn($group) => $group->sum('total'));
-
-        $chartViabilidad = [
-            'verde' => $viabilidadMerged->get('verde', 0),
-            'amarillo' => $viabilidadMerged->get('amarillo', 0),
-            'rojo' => $viabilidadMerged->get('rojo', 0),
-            'pendiente' => $viabilidadMerged->get('pendiente', 0),
-        ];
-
-        // 2c. CARGA DE TRABAJO POR ABOGADO (UNIFICADA)
+        // 2b. CARGA DE TRABAJO POR ABOGADO (UNIFICADA)
         $cargaAbogados = User::where('estado_activo', true)
             ->whereIn('tipo_usuario', ['admin', 'abogado', 'gestor'])
             ->withCount(['procesos' => function($query) {

@@ -7,7 +7,7 @@ import TextInput from '@/Components/TextInput.vue';
 import Pagination from '@/Components/Pagination.vue'; 
 import { reactive, watch, computed } from 'vue';
 import { debounce } from 'lodash';
-import Swal from 'sweetalert2';
+import Swal from '@/Utils/swal';
 import { 
     MagnifyingGlassIcon, 
     PencilSquareIcon, 

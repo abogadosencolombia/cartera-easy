@@ -15,7 +15,7 @@ import DropdownLink from '@/Components/DropdownLink.vue';
 import Textarea from '@/Components/Textarea.vue';
 import { debounce } from 'lodash';
 import { useProcesos } from '@/composables/useProcesos';
-import Swal from 'sweetalert2';
+import Swal from '@/Utils/swal';
 import { 
     MagnifyingGlassIcon, 
     FunnelIcon, 
@@ -113,8 +113,8 @@ const tiposEntidad = [
 
 // --- FILTROS ---
 const filterStorageKey = 'radicados.index.filters';
-const filterKeys = ['search', 'estado', 'juzgado_id', 'tipo_entidad', 'sin_radicado', 'solo_vencidos', 'cerrados', 'actualizados_hoy'];
-const booleanFilterKeys = ['sin_radicado', 'solo_vencidos', 'cerrados', 'actualizados_hoy'];
+const filterKeys = ['search', 'estado', 'juzgado_id', 'tipo_entidad', 'sin_radicado', 'solo_vencidos', 'cerrados', 'actualizados_hoy', 'integridad_baja'];
+const booleanFilterKeys = ['sin_radicado', 'solo_vencidos', 'cerrados', 'actualizados_hoy', 'integridad_baja'];
 
 const parseBooleanFilter = (value) => value === true || value === 'true' || value === 1 || value === '1';
 
@@ -171,6 +171,7 @@ const sinRadicado = ref(parseBooleanFilter(initialFilterValue('sin_radicado', fa
 const soloVencidos = ref(parseBooleanFilter(initialFilterValue('solo_vencidos', false)));
 const cerrados = ref(parseBooleanFilter(initialFilterValue('cerrados', false)));
 const actualizadosHoy = ref(parseBooleanFilter(initialFilterValue('actualizados_hoy', false)));
+const integridadBaja = ref(parseBooleanFilter(initialFilterValue('integridad_baja', false)));
 
 const currentFilterPayload = () => ({
     search: search.value,
@@ -181,6 +182,7 @@ const currentFilterPayload = () => ({
     solo_vencidos: soloVencidos.value,
     cerrados: cerrados.value,
     actualizados_hoy: actualizadosHoy.value,
+    integridad_baja: integridadBaja.value,
 });
 
 const persistFilters = (filters) => {
@@ -215,6 +217,7 @@ const clearControlFilters = () => {
     soloVencidos.value = false;
     cerrados.value = false;
     actualizadosHoy.value = false;
+    integridadBaja.value = false;
 };
 
 const applyControlFilter = (filterKey) => {
@@ -223,6 +226,7 @@ const applyControlFilter = (filterKey) => {
         solo_vencidos: soloVencidos,
         cerrados,
         actualizados_hoy: actualizadosHoy,
+        integridad_baja: integridadBaja,
     };
     const target = filterRefs[filterKey];
     if (!target) return;
@@ -233,7 +237,7 @@ const applyControlFilter = (filterKey) => {
 };
 
 const isDirty = computed(() => {
-    return search.value !== '' || estado.value !== 'TODOS' || juzgadoId.value !== '' || tipoEntidad.value !== '' || sinRadicado.value === true || soloVencidos.value === true || cerrados.value === true || actualizadosHoy.value === true;
+    return search.value !== '' || estado.value !== 'TODOS' || juzgadoId.value !== '' || tipoEntidad.value !== '' || sinRadicado.value === true || soloVencidos.value === true || cerrados.value === true || actualizadosHoy.value === true || integridadBaja.value === true;
 });
 
 const resetFilters = () => {
@@ -250,6 +254,7 @@ const resetFilters = () => {
     soloVencidos.value = false;
     cerrados.value = false;
     actualizadosHoy.value = false;
+    integridadBaja.value = false;
 };
 
 const applyFilters = debounce(() => {
@@ -259,7 +264,7 @@ const applyFilters = debounce(() => {
     router.get(route('procesos.index'), filters, { preserveState: true, replace: true });
 }, 300);
 
-watch([search, estado, juzgadoId, tipoEntidad, sinRadicado, soloVencidos, cerrados, actualizadosHoy], applyFilters);
+watch([search, estado, juzgadoId, tipoEntidad, sinRadicado, soloVencidos, cerrados, actualizadosHoy, integridadBaja], applyFilters);
 
 onMounted(() => {
     reapplyStoredFiltersIfNeeded();
@@ -488,7 +493,7 @@ const copyLegalInfo = (proceso) => {
             <div class="max-w-8xl mx-auto sm:px-6 lg:px-8 space-y-4">
                 
                 <!-- STATS / KPI CARDS -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
                     <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md">
                         <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-indigo-600">
                             <ScaleIcon class="w-16 h-16" />
@@ -538,6 +543,20 @@ const copyLegalInfo = (proceso) => {
                         <p class="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Actualizados Hoy</p>
                         <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.actualizados_hoy }}</p>
                         <p class="text-[9px] text-indigo-500 font-bold mt-1 uppercase tracking-tighter">Cambios del día</p>
+                    </button>
+
+                    <button
+                        type="button"
+                        @click="applyControlFilter('integridad_baja')"
+                        :class="integridadBaja ? 'ring-2 ring-rose-400 border-rose-200 dark:border-rose-500/70' : ''"
+                        class="text-left w-full bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-rose-400"
+                    >
+                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-rose-600">
+                            <ExclamationTriangleIcon class="w-16 h-16" />
+                        </div>
+                        <p class="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Integridad Baja</p>
+                        <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.integridad_baja }}</p>
+                        <p class="text-[9px] text-rose-500 font-bold mt-1 uppercase tracking-tighter">Expedientes por completar</p>
                     </button>
 
                     <button
@@ -618,6 +637,14 @@ const copyLegalInfo = (proceso) => {
                             >
                                 <div :class="soloVencidos ? 'bg-white' : 'bg-red-300'" class="w-1.5 h-1.5 rounded-full"></div>
                                 Vencidos
+                            </button>
+                            <button 
+                                @click="applyControlFilter('integridad_baja')"
+                                :class="integridadBaja ? 'bg-rose-600 text-white border-rose-600' : 'bg-gray-50 text-gray-500 border-gray-200'"
+                                class="flex-1 px-3 py-3 rounded-xl border text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-1.5"
+                            >
+                                <div :class="integridadBaja ? 'bg-white' : 'bg-rose-300'" class="w-1.5 h-1.5 rounded-full"></div>
+                                Integridad
                             </button>
                         </div>
                     </div>
@@ -701,20 +728,17 @@ const copyLegalInfo = (proceso) => {
                                         <div v-if="proceso.is_pinned" class="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-r"></div>
                                         <div class="flex flex-col">
                                             <div class="flex items-center gap-2">
-                                                <div 
-                                                     class="w-2.5 h-2.5 rounded-full shrink-0"
-                                                     :class="{
-                                                         'bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]': proceso.viabilidad_estado === 'verde',
-                                                         'bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.6)]': proceso.viabilidad_estado === 'amarillo',
-                                                         'bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]': proceso.viabilidad_estado === 'rojo',
-                                                         'bg-gray-300 dark:bg-gray-600': !proceso.viabilidad_estado || proceso.viabilidad_estado === 'pendiente'
-                                                     }"
-                                                     :title="'Estado de Viabilidad: ' + (proceso.viabilidad_estado || 'pendiente').toUpperCase()">
-                                                </div>
                                                 <Link @click.stop :href="route('procesos.show', proceso.id)" class="text-sm font-black text-indigo-600 dark:text-indigo-400 hover:underline">
                                                     {{ proceso.radicado || 'SIN RADICADO' }}
                                                 </Link>
                                                 <span v-if="proceso.es_spoa_nunc" class="text-[7px] font-black bg-indigo-100 text-indigo-700 px-1 rounded uppercase tracking-tighter">SPOA/NUNC</span>
+                                                <span
+                                                    class="text-[9px] font-black px-1.5 py-0.5 rounded border"
+                                                    :class="(proceso.integridad_score || 0) >= 85 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : ((proceso.integridad_score || 0) >= 60 ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-rose-50 text-rose-700 border-rose-100')"
+                                                    :title="'Integridad del expediente: ' + (proceso.integridad_score || 0) + '%'"
+                                                >
+                                                    {{ proceso.integridad_score || 0 }}%
+                                                </span>
                                                 <button v-if="proceso.radicado" @click.stop="copyToClipboard(proceso.radicado)" class="text-gray-300 hover:text-indigo-500 transition-colors">
                                                     <DocumentDuplicateIcon class="w-3.5 h-3.5" />
                                                 </button>

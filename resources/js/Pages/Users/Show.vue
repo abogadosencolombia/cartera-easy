@@ -107,9 +107,9 @@ const getDocumentUrl = (path) => path ? `/storage/${path}` : null;
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
                 
                 <!-- ALERTAS -->
-                <div v-if="flash.success" class="bg-emerald-50 border-l-4 border-emerald-400 p-4 rounded-r-xl shadow-sm flex items-center animate-in fade-in slide-in-from-top-4">
-                    <CheckCircleIcon class="h-5 w-5 text-emerald-500 mr-3" />
-                    <span class="text-emerald-800 text-sm font-bold">{{ flash.success }}</span>
+                <div v-if="flash.success" class="cc-inline-alert cc-inline-alert-success animate-in fade-in slide-in-from-top-4">
+                    <CheckCircleIcon class="cc-inline-alert-icon" />
+                    <span class="cc-inline-alert-text">{{ flash.success }}</span>
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">

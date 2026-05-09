@@ -10,6 +10,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth; // ✅ Auth
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Services\ExpedienteIntegrityService;
 
 class DocumentoProcesoController extends Controller
 {
@@ -63,6 +64,8 @@ class DocumentoProcesoController extends Controller
             ]);
         });
 
+        app(ExpedienteIntegrityService::class)->refresh($proceso->refresh());
+
         return back()->with('success', 'Documentos cargados y próxima revisión actualizada.');
     }
 
@@ -115,6 +118,8 @@ class DocumentoProcesoController extends Controller
             'direccion_ip' => request()->ip(),
             'user_agent' => request()->userAgent(),
         ]);
+
+        app(ExpedienteIntegrityService::class)->refresh($proceso->refresh());
 
         return back()->with('success', 'Documento eliminado.');
     }

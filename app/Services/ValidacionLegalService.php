@@ -6,6 +6,7 @@ use App\Models\Caso;
 use App\Models\RequisitoDocumento;
 use App\Models\ValidacionLegal;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class ValidacionLegalService
 {
@@ -16,7 +17,14 @@ class ValidacionLegalService
     {
         Log::info("--- [ValidacionLegalService] Iniciando para Caso ID: {$caso->id} ---");
 
-        $requisitos = RequisitoDocumento::where('tipo_proceso', $caso->tipo_proceso)->get();
+        $requisitos = RequisitoDocumento::whereHas('tipoProceso', function ($query) use ($caso) {
+                $query->where('nombre', $caso->tipo_proceso);
+            })
+            ->where(function ($query) use ($caso) {
+                $query->where('cooperativa_id', $caso->cooperativa_id)
+                    ->orWhereNull('cooperativa_id');
+            })
+            ->get();
 
         if ($requisitos->isEmpty()) {
             Log::info("-> No se encontraron requisitos para el tipo de proceso '{$caso->tipo_proceso}'.");
@@ -27,18 +35,14 @@ class ValidacionLegalService
 
         foreach ($requisitos as $requisito) {
             $nombreDocumento = $requisito->tipo_documento_requerido;
-            $tipoValidacion = $this->mapearDocumentoATipoValidacion($nombreDocumento);
-
-            if (is_null($tipoValidacion)) {
-                Log::warning("--> Documento requerido '{$nombreDocumento}' no tiene un tipo de validación legal mapeado. Saltando.");
-                continue;
-            }
-
-            $documentoExiste = $caso->documentos()->where('tipo_documento', $nombreDocumento)->exists();
+            $documentos = $caso->documentos()->pluck('tipo_documento')
+                ->map(fn ($tipo) => $this->normalizarDocumento($tipo));
+            $documentoExiste = $documentos->contains($this->normalizarDocumento($nombreDocumento));
 
             ValidacionLegal::updateOrCreate(
-                [ 'caso_id' => $caso->id, 'tipo' => $tipoValidacion ],
+                ['caso_id' => $caso->id, 'requisito_id' => $requisito->id],
                 [
+                    'tipo' => 'documento_requerido',
                     'estado' => $documentoExiste ? 'cumple' : 'incumple',
                     'observacion' => $documentoExiste
                         ? "Documento '{$nombreDocumento}' adjunto correctamente."
@@ -53,15 +57,10 @@ class ValidacionLegalService
     }
 
     /**
-     * Mapea el nombre de un documento al tipo de validación del enum.
+     * Normaliza nombres para comparar "pagaré", "pagare" y variantes de mayúsculas.
      */
-    private function mapearDocumentoATipoValidacion(string $nombreDocumento): ?string
+    private function normalizarDocumento(string $nombreDocumento): string
     {
-        $mapa = [
-            'pagaré' => 'sin_pagaré',
-            'carta instrucciones' => 'sin_carta_instrucciones',
-            'certificación saldo' => 'sin_certificacion_saldo',
-        ];
-        return $mapa[strtolower($nombreDocumento)] ?? null;
+        return Str::of($nombreDocumento)->ascii()->lower()->squish()->toString();
     }
 }

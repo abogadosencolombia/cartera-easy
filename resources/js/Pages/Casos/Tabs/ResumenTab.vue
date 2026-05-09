@@ -58,7 +58,6 @@ const submitNotification = () => {
         
         <!-- COLUMNA IZQUIERDA -->
         <div class="lg:col-span-8 space-y-6">
-            
             <!-- DETALLES DEL PROCESO -->
             <div class="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
                 <div class="flex items-center gap-3 mb-6 border-b border-gray-50 dark:border-gray-700 pb-4">
@@ -200,7 +199,7 @@ const submitNotification = () => {
                 <a v-if="caso.link_expediente" :href="caso.link_expediente" target="_blank" class="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:border-emerald-300 transition-all group">
                     <div class="flex items-center gap-3">
                         <GlobeAltIcon class="w-5 h-5 text-emerald-500" />
-                        <span class="text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-tight">Rama Judicial (Tyba)</span>
+                        <span class="text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-tight">Expediente Digital</span>
                     </div>
                     <ArrowTopRightOnSquareIcon class="h-4 w-4 text-gray-300 group-hover:text-emerald-500" />
                 </a>

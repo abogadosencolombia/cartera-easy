@@ -118,9 +118,11 @@ const closeModal = () => {
 
                 <!-- Columna de la Tabla de Reglas Existentes -->
                 <div class="lg:col-span-2">
-                    <div v-if="page.props.flash.success" class="mb-4 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-md shadow-md" role="alert">
-                        <p class="font-bold">¡Éxito!</p>
-                        <p>{{ page.props.flash.success }}</p>
+                    <div v-if="page.props.flash.success" class="mb-4 cc-inline-alert cc-inline-alert-success" role="alert">
+                        <div>
+                            <p class="cc-inline-alert-title">¡Éxito!</p>
+                            <p class="cc-inline-alert-text">{{ page.props.flash.success }}</p>
+                        </div>
                     </div>
                     <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                         <div class="p-6 text-gray-900 dark:text-gray-100">

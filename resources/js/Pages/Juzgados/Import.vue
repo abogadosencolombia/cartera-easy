@@ -5,7 +5,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import InputError from '@/Components/InputError.vue';
 import { ref } from 'vue';
-import Swal from 'sweetalert2';
+import Swal from '@/Utils/swal';
 import { 
     ArrowUpTrayIcon, 
     ArrowLeftIcon, 

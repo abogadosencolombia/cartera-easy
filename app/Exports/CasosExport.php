@@ -74,6 +74,7 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
         return [
             'ID SISTEMA (NO MODIFICAR)',
             'Radicado (23 digitos)',
+            'SPOA/NUNC',
             'Referencia Credito / Pagare',
             'Nombre Deudor',
             'Documento Deudor',
@@ -94,7 +95,6 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
             'Etapa Procesal (Seleccionar lista)',
             'Estado Caso (ACTIVO/CERRADO)',
             'Estado Proceso',
-            'Viabilidad',
             'Tipo Garantia',
             'Origen Documental',
             'Medio de Contacto',
@@ -148,7 +148,6 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
             $caso->etapa_procesal,
             $caso->estado ?? 'ACTIVO',
             $caso->estado_proceso,
-            strtoupper($caso->viabilidad_estado ?? 'PENDIENTE'),
             $caso->tipo_garantia_asociada,
             $caso->origen_documental,
             $caso->medio_contacto,
@@ -200,16 +199,16 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
 
                 // 4. Ajuste de Anchos y Text Wrapping
                 $longTextFields = [
-                    'D' => 35, // Nombre Deudor
-                    'L' => 45, // Codeudores
-                    'M' => 30, // Abogados
-                    'N' => 25, // Cooperativa
-                    'O' => 35, // Juzgado
-                    'P' => 20, // Especialidad
-                    'Q' => 25, // Tipo Proceso
-                    'R' => 25, // Subtipo
-                    'S' => 25, // Subproceso
-                    'T' => 25, // Etapa
+                    'E' => 35, // Nombre Deudor
+                    'M' => 45, // Codeudores
+                    'N' => 30, // Abogados
+                    'O' => 25, // Cooperativa
+                    'P' => 35, // Juzgado
+                    'Q' => 20, // Especialidad
+                    'R' => 25, // Tipo Proceso
+                    'S' => 25, // Subtipo
+                    'T' => 25, // Subproceso
+                    'U' => 25, // Etapa
                     'AL' => 50, // Notas Legales
                     'AM' => 40, // Nota Cierre
                     'AJ' => 40, // Link Drive
@@ -226,7 +225,7 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
                 foreach(range('A','Z') as $col) {
                     if (!isset($longTextFields[$col])) $sheet->getColumnDimension($col)->setAutoSize(true);
                 }
-                foreach(['AA','AB','AC','AD','AE','AF','AG','AH','AI','AN','AO','AP','AQ'] as $col) {
+                foreach(['AA','AB','AC','AD','AE','AF','AG','AH','AI','AN','AO','AP','AQ','AR'] as $col) {
                     if (!isset($longTextFields[$col])) $sheet->getColumnDimension($col)->setAutoSize(true);
                 }
 

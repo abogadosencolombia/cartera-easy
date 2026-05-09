@@ -24,7 +24,9 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Services\ExpedienteIntegrityService;
 
 class ProcesoRadicadoController extends Controller
 {
@@ -33,6 +35,8 @@ class ProcesoRadicadoController extends Controller
     public function index(Request $request): Response
     {
         $this->authorize('viewAny', ProcesoRadicado::class);
+        $integrityService = app(ExpedienteIntegrityService::class);
+        $integridadDisponible = $integrityService->supportsPersistence('proceso_radicados');
         $query = ProcesoRadicado::with(['abogado:id,name', 'responsableRevision:id,name', 'juzgado:id,nombre', 'tipoProceso:id,nombre', 'demandantes', 'demandados', 'etapaActual:id,nombre,riesgo']);
 
         if ($search = $request->input('search')) {
@@ -61,6 +65,7 @@ class ProcesoRadicadoController extends Controller
         if ($request->boolean('solo_vencidos')) { $query->where('fecha_proxima_revision', '<', now()->toDateString())->paraSeguimiento(); }
         if ($request->boolean('cerrados')) { $query->cerrados(); }
         if ($request->boolean('actualizados_hoy')) { $aplicarActualizadosHoy($query); }
+        if ($integridadDisponible && $request->boolean('integridad_baja')) { $query->where('integridad_score', '<', 80)->paraSeguimiento(); }
 
         $stats = [
             'total' => (clone $statsQuery)->count(),
@@ -69,10 +74,16 @@ class ProcesoRadicadoController extends Controller
             'vencidos' => (clone $statsQuery)->where('fecha_proxima_revision', '<', now()->toDateString())->paraSeguimiento()->count(),
             'revisar_hoy' => (clone $statsQuery)->where('fecha_proxima_revision', now()->toDateString())->paraSeguimiento()->count(),
             'actualizados_hoy' => $aplicarActualizadosHoy(clone $statsQuery)->count(),
+            'integridad_baja' => $integridadDisponible
+                ? (clone $statsQuery)->where('integridad_score', '<', 80)->paraSeguimiento()->count()
+                : 0,
         ];
 
+        $procesos = $query->orderBy('is_pinned', 'desc')->latest('updated_at')->paginate(15)->withQueryString();
+        $integrityService->refreshMissing($procesos->getCollection(), force: !$integridadDisponible);
+
         return Inertia::render('Radicados/Index', [
-            'procesos' => $query->orderBy('is_pinned', 'desc')->latest('updated_at')->paginate(15)->withQueryString(),
+            'procesos' => $procesos,
             'filtros'  => $request->all(),
             'selectedJuzgado' => $request->filled('juzgado_id') ? Juzgado::find($request->juzgado_id, ['id', 'nombre']) : null,
             'juzgados' => [], // Enviamos vacío para evitar lentitud, el select ahora será asíncrono
@@ -94,29 +105,6 @@ class ProcesoRadicadoController extends Controller
         return back()->with('success', $proceso->is_pinned ? 'Proceso fijado correctamente.' : 'Proceso desfijado.');
     }
 
-    public function updateViabilidad(Request $request, ProcesoRadicado $proceso)
-    {
-        $this->authorize('update', $proceso);
-
-        $validated = $request->validate([
-            'viabilidad_juridica' => 'required|array',
-            'viabilidad_estado' => 'required|string|in:verde,amarillo,rojo,pendiente',
-        ]);
-
-        $proceso->update($validated);
-
-        AuditoriaEvento::create([
-            'user_id' => Auth::id(),
-            'evento' => 'ACTUALIZAR_VIABILIDAD_RADICADO',
-            'descripcion_breve' => "Actualización de ficha de viabilidad jurídica del radicado",
-            'auditable_id' => $proceso->id,
-            'auditable_type' => ProcesoRadicado::class,
-            'direccion_ip' => $request->ip(),
-        ]);
-
-        return back()->with('success', 'Ficha de viabilidad actualizada.');
-    }
-
     public function quickReview(ProcesoRadicado $proceso)    {
         $this->authorize('update', $proceso);
         
@@ -125,6 +113,7 @@ class ProcesoRadicadoController extends Controller
             'fecha_revision' => now(),
             'fecha_proxima_revision' => now()->addDays(15)
         ]);
+        app(ExpedienteIntegrityService::class)->refresh($proceso->refresh());
 
         // Registro en Auditoría
         $proceso->auditoria()->create([
@@ -142,6 +131,7 @@ class ProcesoRadicadoController extends Controller
     {
         $this->authorize('update', $proceso);
         $proceso->update(['checklist_seguimiento' => $request->input('checklist', [])]);
+        app(ExpedienteIntegrityService::class)->refresh($proceso->refresh());
         return back()->with('success', 'Checklist actualizado.');
     }
 
@@ -416,6 +406,8 @@ class ProcesoRadicadoController extends Controller
                 'detalle_nuevo' => $detalleNuevo,
                 'direccion_ip' => request()->ip()
             ]);
+
+            app(ExpedienteIntegrityService::class)->refresh($proceso->refresh());
             
             return to_route('procesos.show', $proceso->id)->with('success', 'Radicado creado correctamente.'); 
         });
@@ -424,6 +416,10 @@ class ProcesoRadicadoController extends Controller
     public function show(ProcesoRadicado $proceso): Response 
     { 
         $this->authorize('view', $proceso); 
+        if (!$proceso->integridad_resumen) {
+            app(ExpedienteIntegrityService::class)->refresh($proceso);
+        }
+
         $proceso->load(['abogado', 'responsableRevision', 'juzgado', 'tipoProceso', 'demandantes', 'demandados', 'etapaActual', 'actuaciones.user', 'documentos', 'contrato']); 
         
         return Inertia::render('Radicados/Show', [
@@ -486,6 +482,8 @@ class ProcesoRadicadoController extends Controller
                 'detalle_nuevo' => $nuevo,
                 'direccion_ip' => request()->ip()
             ]);
+
+            app(ExpedienteIntegrityService::class)->refresh($proceso->refresh());
             
             return to_route('procesos.show', $proceso->id)->with('success', 'Radicado actualizado correctamente.'); 
         });
@@ -525,6 +523,8 @@ class ProcesoRadicadoController extends Controller
             'detalle_nuevo' => ['observacion' => $request->observacion]
         ]);
 
+        app(ExpedienteIntegrityService::class)->refresh($proceso->refresh());
+
         return back()->with('success', 'Etapa procesal actualizada.');
     }
 
@@ -555,6 +555,8 @@ class ProcesoRadicadoController extends Controller
             'direccion_ip' => request()->ip()
         ]);
 
+        app(ExpedienteIntegrityService::class)->refresh($proceso->refresh());
+
         return back()->with('success', 'Actuación registrada.');
     }
 
@@ -569,6 +571,7 @@ class ProcesoRadicadoController extends Controller
 
         $validated = $request->validate(['nota' => ['required', 'string'], 'fecha_actuacion' => ['required', 'date']]);
         $actuacion->update($validated);
+        app(ExpedienteIntegrityService::class)->refresh($proceso->refresh());
 
         return back(303)->with('success', 'Actuación actualizada.');
     }
@@ -582,6 +585,7 @@ class ProcesoRadicadoController extends Controller
         $this->authorize('update', $proceso);
 
         $actuacion->delete(); 
+        app(ExpedienteIntegrityService::class)->refresh($proceso->refresh());
         return back(303)->with('success', 'Actuación eliminada.'); 
     }
 
@@ -596,11 +600,15 @@ class ProcesoRadicadoController extends Controller
         
         // 1. Procesar Demandantes
         foreach ($demandantes as $d) {
+            if (!empty($d['sin_info']) && empty($d['nombre_completo'])) {
+                $d['nombre_completo'] = 'DEMANDANTE POR IDENTIFICAR';
+            }
+
             $personaId = $d['id'] ?? ($d['selected']['id'] ?? null);
             
             if (!empty($d['is_new'])) {
                 $numDoc = $d['numero_documento'] ?? null;
-                if (!empty($d['sin_info']) && empty($numDoc)) {
+                if (empty($numDoc)) {
                     $numDoc = 'TEMP-' . substr(md5(uniqid()), 0, 12);
                 }
 
@@ -609,7 +617,7 @@ class ProcesoRadicadoController extends Controller
                     $persona = Persona::withTrashed()->find($personaId);
                     if ($persona) {
                         $persona->update([
-                            'nombre_completo' => $d['nombre_completo'],
+                            'nombre_completo' => trim($d['nombre_completo'] ?? 'SIN NOMBRE'),
                             'tipo_documento' => $d['tipo_documento'] ?? 'CC',
                             'numero_documento' => $numDoc,
                             'dv' => $d['dv'] ?? null,
@@ -617,7 +625,7 @@ class ProcesoRadicadoController extends Controller
                     }
                 } else {
                     $persona = Persona::create([
-                        'nombre_completo' => $d['nombre_completo'],
+                        'nombre_completo' => trim($d['nombre_completo'] ?? 'SIN NOMBRE'),
                         'tipo_documento' => $d['tipo_documento'] ?? 'CC',
                         'numero_documento' => $numDoc,
                         'dv' => $d['dv'] ?? null,
@@ -637,11 +645,15 @@ class ProcesoRadicadoController extends Controller
         
         // 2. Procesar Demandados
         foreach ($demandados as $d) {
+            if (!empty($d['sin_info']) && empty($d['nombre_completo'])) {
+                $d['nombre_completo'] = 'DEMANDADO POR IDENTIFICAR';
+            }
+
             $personaId = $d['id'] ?? ($d['selected']['id'] ?? null);
 
             if (!empty($d['is_new'])) {
                 $numDoc = $d['numero_documento'] ?? null;
-                if (!empty($d['sin_info']) && empty($numDoc)) {
+                if (empty($numDoc)) {
                     $numDoc = 'TEMP-' . substr(md5(uniqid()), 0, 12);
                 }
                 
@@ -649,7 +661,7 @@ class ProcesoRadicadoController extends Controller
                     $persona = Persona::withTrashed()->find($personaId);
                     if ($persona) {
                         $persona->update([
-                            'nombre_completo' => $d['nombre_completo'],
+                            'nombre_completo' => trim($d['nombre_completo'] ?? 'SIN NOMBRE'),
                             'tipo_documento' => $d['tipo_documento'] ?? 'CC',
                             'numero_documento' => $numDoc,
                             'dv' => $d['dv'] ?? null,
@@ -657,7 +669,7 @@ class ProcesoRadicadoController extends Controller
                     }
                 } else {
                     $persona = Persona::create([
-                        'nombre_completo' => $d['nombre_completo'],
+                        'nombre_completo' => trim($d['nombre_completo'] ?? 'SIN NOMBRE'),
                         'tipo_documento' => $d['tipo_documento'] ?? 'CC',
                         'numero_documento' => $numDoc,
                         'dv' => $d['dv'] ?? null,
@@ -677,10 +689,28 @@ class ProcesoRadicadoController extends Controller
         
         $proceso->personas()->sync($syncData);
 
+        $infoIncompleta = collect(array_merge($demandantes, $demandados))->contains(function ($personaData) {
+            $numeroDocumento = strtoupper(trim((string) ($personaData['numero_documento'] ?? '')));
+            $nombre = Str::of((string) ($personaData['nombre_completo'] ?? ''))->ascii()->lower()->toString();
+
+            return !empty($personaData['sin_info'])
+                || Str::startsWith($numeroDocumento, 'TEMP-')
+                || Str::contains($nombre, 'por identificar');
+        }) || Persona::whereIn('id', array_keys($syncData))->get()->contains(function ($persona) {
+            $numeroDocumento = strtoupper(trim((string) $persona->numero_documento));
+            $nombre = Str::of((string) $persona->nombre_completo)->ascii()->lower()->toString();
+
+            return blank($persona->nombre_completo)
+                || blank($numeroDocumento)
+                || Str::startsWith($numeroDocumento, 'TEMP-')
+                || Str::contains($nombre, 'por identificar');
+        });
+
         // Actualizar columnas directas para compatibilidad
         $proceso->update([
             'demandante_id' => $firstDemandanteId,
-            'demandado_id' => $firstDemandadoId
+            'demandado_id' => $firstDemandadoId,
+            'info_incompleta' => $infoIncompleta,
         ]);
     }
     
@@ -705,6 +735,19 @@ class ProcesoRadicadoController extends Controller
         return to_route('procesos.index')->with('success', 'El proceso ha sido suspendido y movido a la papelera.'); 
     }
 
-    public function close(Request $request, ProcesoRadicado $proceso) { $proceso->update(['estado' => 'CERRADO', 'nota_cierre' => $request->nota_cierre]); return back()->with('success', 'Cerrado.'); }
-    public function reopen(ProcesoRadicado $proceso) { $proceso->update(['estado' => 'ACTIVO', 'nota_cierre' => null]); return back()->with('success', 'Reabierto.'); }
+    public function close(Request $request, ProcesoRadicado $proceso)
+    {
+        $proceso->update(['estado' => 'CERRADO', 'nota_cierre' => $request->nota_cierre]);
+        app(ExpedienteIntegrityService::class)->refresh($proceso->refresh());
+
+        return back()->with('success', 'Cerrado.');
+    }
+
+    public function reopen(ProcesoRadicado $proceso)
+    {
+        $proceso->update(['estado' => 'ACTIVO', 'nota_cierre' => null]);
+        app(ExpedienteIntegrityService::class)->refresh($proceso->refresh());
+
+        return back()->with('success', 'Reabierto.');
+    }
 }
