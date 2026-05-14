@@ -30,7 +30,7 @@ const missingInfo = computed(() => {
     if (!p.celular_1 && !p.correo_1) missing.push('Contacto (Celular/Correo)');
     if (!p.fecha_nacimiento) missing.push('Fecha de nacimiento');
     if (!p.fecha_expedicion) missing.push('Fecha de expedición');
-    if (!hasData(p.cooperativas)) missing.push('Asignación de Empresa');
+    if (!p.sin_empresa_o_cooperativa && !hasData(p.cooperativas)) missing.push('Asignación de Empresa');
     if (!hasData(p.abogados)) missing.push('Asignación de Responsable');
     return missing;
 });
@@ -423,6 +423,7 @@ const getRandomColor = (id) => {
                             <div v-if="hasData(persona.cooperativas)" class="flex flex-wrap gap-2">
                                 <span v-for="c in persona.cooperativas" :key="c.id" class="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-black rounded-lg border border-emerald-100 uppercase tracking-tighter">{{ c.nombre }}</span>
                             </div>
+                            <p v-else-if="persona.sin_empresa_o_cooperativa" class="inline-flex px-2.5 py-1 bg-amber-50 text-amber-700 text-[10px] font-black rounded-lg border border-amber-100 uppercase tracking-tighter">Sin empresa o cooperativa</p>
                             <p v-else class="text-[10px] font-bold text-gray-400 italic">No hay empresas vinculadas</p>
                         </div>
                         <div class="pt-6 border-t border-gray-50 dark:border-gray-700">

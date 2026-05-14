@@ -34,8 +34,14 @@ class ProcesarAlertasProgramadas implements ShouldQueue
             ->deExpedientesEnSeguimiento()
             ->with('user')
             ->orderBy('id')
-            ->chunkById(50, function ($lote) use ($now, $tz) {
+            ->chunkById(5, function ($lote) use ($now, $tz) {
+                $enviados = 0;
+
                 foreach ($lote as $a) {
+                    if ($enviados >= 5) {
+                        return false;
+                    }
+
                     $user = $a->user;
                     if (!$user || empty($user->email)) {
                         $a->forceFill(['completed' => true, 'last_sent_at' => $now])->save();
@@ -52,7 +58,8 @@ class ProcesarAlertasProgramadas implements ShouldQueue
                             'last_sent_at' => $now,
                             'completed'    => true,
                         ])->save();
-                        usleep(1000000); // 1.0s pause seguridad mail
+                        $enviados++;
+                        sleep(10);
                         continue;
                     }
 
@@ -85,7 +92,8 @@ class ProcesarAlertasProgramadas implements ShouldQueue
                             'last_sent_at' => $now,
                             'completed'    => true,
                         ])->save();
-                        usleep(1000000); // 1.0s pause seguridad mail
+                        $enviados++;
+                        sleep(10);
                         continue;
                     }
 
@@ -97,7 +105,8 @@ class ProcesarAlertasProgramadas implements ShouldQueue
                                 $a->caso_id, $a->mensaje, false, $a->prioridad ?? 'media', $a->proceso_id
                             ));
                             $a->forceFill(['last_sent_at' => $now])->save();
-                            usleep(1000000); // 1.0s pause seguridad mail
+                            $enviados++;
+                            sleep(10);
                         }
                     }
                 }

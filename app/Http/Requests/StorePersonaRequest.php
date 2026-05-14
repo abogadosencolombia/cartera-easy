@@ -12,6 +12,23 @@ class StorePersonaRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'es_demandado' => $this->normalizeBooleanInput($this->input('es_demandado')),
+            'sin_empresa_o_cooperativa' => $this->normalizeBooleanInput($this->input('sin_empresa_o_cooperativa')),
+        ]);
+    }
+
+    private function normalizeBooleanInput($value)
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? $value;
+    }
+
     public function rules(): array
     {
         $user = $this->user();
@@ -37,6 +54,7 @@ class StorePersonaRequest extends FormRequest
             'correo_1'           => 'nullable|email|max:255',
             'correo_2'           => 'nullable|email|max:255',
             'es_demandado'       => 'nullable|boolean',
+            'sin_empresa_o_cooperativa' => 'nullable|boolean',
             'empresa'            => 'nullable|string|max:255',
             'cargo'              => 'nullable|string|max:255',
             'observaciones'      => 'nullable|string',
@@ -57,7 +75,7 @@ class StorePersonaRequest extends FormRequest
             'social_links.*.url'    => ['nullable','url','max:2048'],
 
             // Relaciones
-            'cooperativas_ids'      => ['required', 'array', 'min:1'],
+            'cooperativas_ids'      => ['nullable', 'array'],
             'cooperativas_ids.*'    => ['integer', 'exists:cooperativas,id'],
             'abogados_ids'          => ['nullable', 'array'],
             'abogados_ids.*'        => ['integer', 'exists:users,id'],

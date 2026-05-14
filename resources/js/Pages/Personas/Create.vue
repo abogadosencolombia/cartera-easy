@@ -39,12 +39,24 @@ const form = useForm('CreatePersona', {
   observaciones: '',
   social_links: [],
   addresses: [],
-  es_demandado: false,
-  cooperativas_ids: [9],
+  es_demandado: '0',
+  sin_empresa_o_cooperativa: true,
+  cooperativas_ids: [],
   abogados_ids: [],
 });
 
 const { clearDraft } = useFormDraft(form, 'draft:create:personas');
+
+const EXCLUSIVE_COOPERATIVA_ID = 9;
+const exclusiveCooperativaId = computed(() => {
+    const specialOption = props.allCooperativas.find(c => /^(sin|si)\s+empresa|empresa\s+o\s+cooperativa/i.test(c.nombre || ''));
+    return specialOption?.id ?? EXCLUSIVE_COOPERATIVA_ID;
+});
+const isExclusiveCooperativa = (id) => Number(id) === Number(exclusiveCooperativaId.value);
+const regularCooperativaIds = computed(() => props.allCooperativas.filter(c => !isExclusiveCooperativa(c.id)).map(c => c.id));
+const isCooperativaSelected = (id) => isExclusiveCooperativa(id)
+    ? form.sin_empresa_o_cooperativa
+    : form.cooperativas_ids.some(selectedId => Number(selectedId) === Number(id));
 
 const addLinkRow = () => { form.social_links.push(reactive({ label: '', url: '' })); };
 const removeLinkRow = (idx) => { form.social_links.splice(idx, 1); };
@@ -54,7 +66,29 @@ const addAddressRow = () => { form.addresses.push(reactive({ label: 'Casa', addr
 const removeAddressRow = (idx) => { form.addresses.splice(idx, 1); };
 
 const toggleCooperativas = () => {
-    form.cooperativas_ids = form.cooperativas_ids.length === props.allCooperativas.length ? [] : props.allCooperativas.map(c => c.id);
+    const selectedRegularCount = regularCooperativaIds.value.filter(id => isCooperativaSelected(id)).length;
+    form.sin_empresa_o_cooperativa = false;
+    form.cooperativas_ids = selectedRegularCount === regularCooperativaIds.value.length ? [] : [...regularCooperativaIds.value];
+};
+
+const toggleCooperativa = (id, checked) => {
+    if (isExclusiveCooperativa(id)) {
+        form.sin_empresa_o_cooperativa = checked;
+        form.cooperativas_ids = [];
+        return;
+    }
+
+    const withoutExclusive = form.cooperativas_ids.filter(selectedId => !isExclusiveCooperativa(selectedId));
+
+    if (checked) {
+        form.sin_empresa_o_cooperativa = false;
+        form.cooperativas_ids = withoutExclusive.some(selectedId => Number(selectedId) === Number(id))
+            ? withoutExclusive
+            : [...withoutExclusive, id];
+        return;
+    }
+
+    form.cooperativas_ids = withoutExclusive.filter(selectedId => Number(selectedId) !== Number(id));
 };
 
 const toggleAbogados = () => {
@@ -63,7 +97,7 @@ const toggleAbogados = () => {
 
 const submit = () => {
     if (form.cooperativas_ids.length === 0) {
-        form.cooperativas_ids = [9];
+        form.sin_empresa_o_cooperativa = true;
     }
     form.post(route('personas.store'), {
         preserveScroll: true, 
@@ -140,8 +174,8 @@ const submit = () => {
                 <div class="space-y-2">
                     <InputLabel value="Rol de la Persona *" class="font-bold text-xs uppercase" />
                     <SelectInput v-model="form.es_demandado" class="w-full">
-                        <option :value="false">Deudor / Cliente</option>
-                        <option :value="true">Demandado</option>
+                        <option value="0">Deudor / Cliente</option>
+                        <option value="1">Demandado</option>
                     </SelectInput>
                     <InputError :message="form.errors.es_demandado" />
                 </div>
@@ -265,7 +299,7 @@ const submit = () => {
                     <InputError :message="form.errors.cooperativas_ids" class="mb-4" />
                     <div class="grid grid-cols-1 gap-2">
                         <label v-for="c in allCooperativas" :key="c.id" class="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-xl cursor-pointer hover:bg-emerald-50 transition-all border border-transparent hover:border-emerald-100 group">
-                            <input type="checkbox" :value="c.id" v-model="form.cooperativas_ids" class="rounded-lg border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                            <input type="checkbox" :checked="isCooperativaSelected(c.id)" @change="toggleCooperativa(c.id, $event.target.checked)" class="rounded-lg border-gray-300 text-emerald-600 focus:ring-emerald-500" />
                             <span class="text-xs font-bold text-gray-700 dark:text-gray-300 group-hover:text-emerald-700 transition-colors">{{ c.nombre }}</span>
                         </label>
                     </div>

@@ -22,7 +22,7 @@ class ProcesarAlertasGestion extends Command
             ->get();
 
         $enviadosEnEstaRonda = 0;
-        $maximoCorreosPorRonda = 15; // Límite de seguridad para Hostinger
+        $maximoCorreosPorRonda = 5; // Límite conservador para Hostinger
 
         foreach ($notas as $nota) {
             if ($enviadosEnEstaRonda >= $maximoCorreosPorRonda) {
@@ -57,8 +57,8 @@ class ProcesarAlertasGestion extends Command
 
                 if ($notificado) {
                     $enviadosEnEstaRonda++;
-                    $this->info("Pausa de 3s para SMTP...");
-                    sleep(3); 
+                    $this->info("Pausa de 10s para SMTP...");
+                    sleep(10);
                 }
             } catch (\Exception $e) {
                 $errorMessage = $e->getMessage();
@@ -71,8 +71,8 @@ class ProcesarAlertasGestion extends Command
                     return;
                 }
                 
-                // Aun en error no crítico, pausamos 3s
-                sleep(3);
+                // Aun en error no crítico, pausamos para no saturar SMTP.
+                sleep(10);
             }
         }
 

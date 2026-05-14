@@ -17,6 +17,7 @@ class Persona extends Model
     protected $fillable = [
         'nombre_completo', 'tipo_documento', 'numero_documento', 'dv', 'telefono_fijo',
         'celular_1', 'celular_2', 'correo_1', 'correo_2', 'empresa', 'cargo', 'es_demandado',
+        'sin_empresa_o_cooperativa',
         'observaciones', 'social_links', 'addresses', 'fecha_expedicion', 'fecha_nacimiento',
         'direccion', 'ciudad', // ✅ Añadidos campos que faltaban
     ];
@@ -27,6 +28,7 @@ class Persona extends Model
         'fecha_expedicion' => 'date',
         'fecha_nacimiento' => 'date',
         'es_demandado' => 'boolean',
+        'sin_empresa_o_cooperativa' => 'boolean',
     ];
 
     protected function fechaExpedicion(): Attribute

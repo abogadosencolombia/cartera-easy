@@ -102,6 +102,9 @@ const roleIcons = {
                         Editar Usuario
                     </h2>
                     <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">Actualizando el perfil de: <span class="text-indigo-600 font-bold">{{ user.name }}</span></p>
+                    <p v-if="!user.estado_activo && user.tipo_usuario === 'cliente'" class="mt-2 inline-flex rounded-full bg-amber-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-800">
+                        Cuenta pendiente de aprobación
+                    </p>
                 </div>
             </div>
         </template>
@@ -277,7 +280,7 @@ const roleIcons = {
                                     <Checkbox v-model:checked="form.estado_activo" :disabled="isEditingSelf" class="h-6 w-6 text-rose-600 rounded-lg" />
                                     <div class="ml-4">
                                         <span class="text-sm font-black text-rose-900 dark:text-rose-300 uppercase">Cuenta Activa</span>
-                                        <p class="text-xs text-rose-500 dark:text-rose-400/60 leading-none mt-1">Desactive esta opción para suspender el acceso de inmediato.</p>
+                                        <p class="text-xs text-rose-500 dark:text-rose-400/60 leading-snug mt-1">Para aprobar un registro nuevo, asigne el rol correcto y active esta opción. Si está desactivada, el usuario no podrá ingresar.</p>
                                     </div>
                                 </label>
                             </div>

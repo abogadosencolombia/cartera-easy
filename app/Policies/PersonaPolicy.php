@@ -22,10 +22,18 @@ class PersonaPolicy
     }
 
     /**
-     * Valida si hay intersección entre las cooperativas del usuario y las de la persona.
+     * Valida si el usuario comparte cooperativa, está asignado o la persona no tiene empresa/cooperativa.
      */
-    private function sharesCooperativa(User $user, Persona $persona): bool
+    private function canAccessPersona(User $user, Persona $persona): bool
     {
+        if ($persona->sin_empresa_o_cooperativa) {
+            return true;
+        }
+
+        if ($persona->abogados()->where('users.id', $user->id)->exists()) {
+            return true;
+        }
+
         $userCoops = $user->cooperativas->pluck('id');
         return $persona->cooperativas()->whereIn('cooperativas.id', $userCoops)->exists();
     }
@@ -43,7 +51,7 @@ class PersonaPolicy
      */
     public function view(User $user, Persona $persona): bool
     {
-        return in_array($user->tipo_usuario, ['gestor', 'abogado']) && $this->sharesCooperativa($user, $persona);
+        return in_array($user->tipo_usuario, ['gestor', 'abogado']) && $this->canAccessPersona($user, $persona);
     }
 
     /**
@@ -59,7 +67,7 @@ class PersonaPolicy
      */
     public function update(User $user, Persona $persona): bool
     {
-        return in_array($user->tipo_usuario, ['gestor', 'abogado']) && $this->sharesCooperativa($user, $persona);
+        return in_array($user->tipo_usuario, ['gestor', 'abogado']) && $this->canAccessPersona($user, $persona);
     }
 
     /**
@@ -67,7 +75,7 @@ class PersonaPolicy
      */
     public function delete(User $user, Persona $persona): bool
     {
-        return in_array($user->tipo_usuario, ['gestor', 'abogado']) && $this->sharesCooperativa($user, $persona);
+        return in_array($user->tipo_usuario, ['gestor', 'abogado']) && $this->canAccessPersona($user, $persona);
     }
 
     /**
@@ -75,6 +83,6 @@ class PersonaPolicy
      */
     public function restore(User $user, Persona $persona): bool
     {
-        return in_array($user->tipo_usuario, ['gestor', 'abogado']) && $this->sharesCooperativa($user, $persona);
+        return in_array($user->tipo_usuario, ['gestor', 'abogado']) && $this->canAccessPersona($user, $persona);
     }
 }

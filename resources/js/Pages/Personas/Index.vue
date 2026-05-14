@@ -33,6 +33,14 @@ const params = reactive({
   direction: props.filters.direction || 'desc',
 });
 
+const SIN_EMPRESA_FILTER = 'sin_empresa_o_cooperativa';
+const isSpecialNoCompanyCooperativa = (cooperativa) => {
+    const nombre = cooperativa?.nombre || '';
+    return Number(cooperativa?.id) === 9
+        || /^(sin|si)\s+empresa|empresa\s+o\s+cooperativa/i.test(nombre);
+};
+const cooperativasFiltro = computed(() => props.cooperativas.filter(c => !isSpecialNoCompanyCooperativa(c)));
+
 const sortOption = computed({
   get: () => `${params.sort}|${params.direction}`,
   set: (val) => { 
@@ -138,7 +146,7 @@ const getRandomColor = (id) => {
 const checkIncompleta = (p) => {
     const faltaContacto = !p.celular_1 && !p.correo_1;
     const faltaFechas = !p.fecha_nacimiento || !p.fecha_expedicion;
-    const faltaAsignacion = !p.cooperativas?.length || !p.abogados?.length;
+    const faltaAsignacion = (!p.sin_empresa_o_cooperativa && !p.cooperativas?.length) || !p.abogados?.length;
     return faltaContacto || faltaFechas || faltaAsignacion;
 };
 
@@ -223,7 +231,8 @@ const copyToClipboard = (text) => {
                         <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1 ml-1">Empresa</label>
                         <SelectInput v-model="params.cooperativa_id" class="w-full py-2.5">
                             <option value="">Todas</option>
-                            <option v-for="c in cooperativas" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+                            <option :value="SIN_EMPRESA_FILTER">Sin empresa o cooperativa</option>
+                            <option v-for="c in cooperativasFiltro" :key="c.id" :value="c.id">{{ c.nombre }}</option>
                         </SelectInput>
                     </div>
                     <div>
@@ -321,7 +330,8 @@ const copyToClipboard = (text) => {
                       <span v-for="c in p.cooperativas" :key="c.id" class="text-[9px] font-black bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 px-2 py-1 rounded-lg border border-gray-100 dark:border-gray-600 truncate max-w-[120px]" :title="c.nombre">
                           {{ c.nombre }}
                       </span>
-                      <span v-if="!p.cooperativas?.length" class="text-[10px] font-bold text-gray-400 italic">Sin empresas</span>
+                      <span v-if="p.sin_empresa_o_cooperativa && !p.cooperativas?.length" class="text-[9px] font-black bg-amber-50 text-amber-700 px-2 py-1 rounded-lg border border-amber-100">Sin empresa o cooperativa</span>
+                      <span v-else-if="!p.cooperativas?.length" class="text-[10px] font-bold text-gray-400 italic">Sin empresas</span>
                     </div>
                   </td>
 

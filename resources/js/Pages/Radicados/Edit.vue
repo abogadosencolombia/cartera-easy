@@ -113,6 +113,7 @@ const form = useForm(`EditRadicado:${props.proceso.id}`, {
   demandados: loadPersonasArray(props.proceso.demandados),
 
   radicado: props.proceso.radicado ?? '',
+  es_spoa_nunc: !!props.proceso.es_spoa_nunc,
   fecha_radicado: formatDateForInput(props.proceso.fecha_radicado),
   fecha_revision: formatDateForInput(props.proceso.fecha_revision),
   fecha_proxima_revision: formatDateForInput(props.proceso.fecha_proxima_revision),

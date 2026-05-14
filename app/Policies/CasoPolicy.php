@@ -25,7 +25,9 @@ class CasoPolicy
             return true;
         }
         if (in_array($user->tipo_usuario, ['gestor', 'abogado'])) {
-            return $user->cooperativas->contains($caso->cooperativa_id);
+            return $user->cooperativas->contains($caso->cooperativa_id)
+                || (int) $caso->user_id === (int) $user->id
+                || $caso->users()->where('users.id', $user->id)->exists();
         }
         if ($user->tipo_usuario === 'cliente') {
             return in_array($user->persona_id, [$caso->deudor_id, $caso->codeudor1_id, $caso->codeudor2_id]);
@@ -58,7 +60,9 @@ class CasoPolicy
 
         // Un gestor/abogado puede actualizar un caso (si no está bloqueado) si pertenece a una de sus cooperativas.
         if (in_array($user->tipo_usuario, ['gestor', 'abogado'])) {
-            return $user->cooperativas->contains($caso->cooperativa_id);
+            return $user->cooperativas->contains($caso->cooperativa_id)
+                || (int) $caso->user_id === (int) $user->id
+                || $caso->users()->where('users.id', $user->id)->exists();
         }
 
         return false;

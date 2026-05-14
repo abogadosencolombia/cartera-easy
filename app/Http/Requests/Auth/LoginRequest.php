@@ -51,7 +51,7 @@ class LoginRequest extends FormRequest
         if ($user && !$user->estado_activo) {
             // Si está inactivo, lanzamos un error de validación específico.
             throw ValidationException::withMessages([
-                'email' => 'Esta cuenta de usuario ha sido suspendida.',
+                'email' => 'Esta cuenta está pendiente de aprobación o se encuentra suspendida. Contacte a un administrador.',
             ]);
         }
 

@@ -634,6 +634,8 @@ class CasoController extends Controller
                             'correo_1' => $datosDeudor['correo_1'] ?? null,
                         ]);
                     }
+
+                    $this->syncPersonaAssignments($deudor, $datosDeudor);
                     $validated['deudor_id'] = $deudor->id;
                 } elseif (!empty($datosDeudor['id'])) {
                     // Si no es nuevo, simplemente nos aseguramos de que el ID sea el correcto
@@ -821,6 +823,8 @@ class CasoController extends Controller
                             'correo_1' => $datosDeudor['correo_1'] ?? null,
                         ]);
                     }
+
+                    $this->syncPersonaAssignments($deudor, $datosDeudor);
                     $validated['deudor_id'] = $deudor->id;
                 } elseif (!empty($datosDeudor['id'])) {
                     $validated['deudor_id'] = $datosDeudor['id'];
@@ -1026,5 +1030,25 @@ class CasoController extends Controller
             $ids[] = $c->id;
         }
         $caso->codeudores()->sync($ids);
+    }
+
+    private function syncPersonaAssignments(Persona $persona, array $data): void
+    {
+        $cooperativaIds = collect($data['cooperativas_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $persona->forceFill([
+            'sin_empresa_o_cooperativa' => empty($cooperativaIds),
+        ])->save();
+
+        $persona->cooperativas()->sync($cooperativaIds);
+
+        if (array_key_exists('abogados_ids', $data)) {
+            $persona->abogados()->sync($data['abogados_ids'] ?? []);
+        }
     }
 }

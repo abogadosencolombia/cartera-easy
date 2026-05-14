@@ -97,6 +97,7 @@ class CooperativaController extends Controller
     public function destroy(Cooperativa $cooperativa): RedirectResponse
     {
         $this->authorize('delete', $cooperativa);
+
         $cooperativa->delete();
         return to_route('cooperativas.index')->with('success', '¡Cooperativa eliminada exitosamente!');
     }
@@ -138,4 +139,5 @@ class CooperativaController extends Controller
             $term
         );
     }
+
 }

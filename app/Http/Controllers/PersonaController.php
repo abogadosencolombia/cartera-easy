@@ -32,13 +32,7 @@ class PersonaController extends Controller
         $user = Auth::user();
         $query = Persona::with(['cooperativas', 'abogados']);
 
-        // --- FILTRO DE SEGURIDAD POR COOPERATIVA ---
-        if ($user->tipo_usuario !== 'admin') {
-            $cooperativaIds = $user->cooperativas->pluck('id');
-            $query->whereHas('cooperativas', function ($q) use ($cooperativaIds) {
-                $q->whereIn('cooperativas.id', $cooperativaIds);
-            });
-        }
+        $this->applyPersonaVisibilityFilter($query, $user);
 
         // --- 1. Filtro de Estado (Activos / Suspendidos) ---
         if ($request->input('status') === 'suspended') {
@@ -58,6 +52,15 @@ class PersonaController extends Controller
 
         // --- 3. Filtro por Cooperativa ---
         $query->when($request->input('cooperativa_id'), function ($q, $coopId) {
+            if ($coopId === 'sin_empresa_o_cooperativa') {
+                $q->where(function ($sq) {
+                    $sq->where('sin_empresa_o_cooperativa', true)
+                        ->orWhereDoesntHave('cooperativas');
+                });
+
+                return;
+            }
+
             $q->whereHas('cooperativas', function ($sq) use ($coopId) {
                 $sq->where('cooperativas.id', $coopId);
             });
@@ -123,20 +126,21 @@ class PersonaController extends Controller
         $this->authorize('create', Persona::class);
 
         $validated = $request->validated();
+        [$personaData, $cooperativaIds] = $this->preparePersonaDataAndCooperativas($validated);
 
         // Buscamos si ya existe (incluyendo borrados)
         $persona = Persona::withTrashed()->where('numero_documento', $validated['numero_documento'])->first();
 
         if ($persona) {
-            $persona->update($validated);
+            $persona->update($personaData);
             if ($persona->trashed()) {
                 $persona->restore();
             }
         } else {
-            $persona = Persona::create($validated);
+            $persona = Persona::create($personaData);
         }
         
-        if ($request->has('cooperativas_ids')) $persona->cooperativas()->sync($request->input('cooperativas_ids'));
+        $persona->cooperativas()->sync($cooperativaIds);
         if ($request->has('abogados_ids')) $persona->abogados()->sync($request->input('abogados_ids'));
 
         AuditoriaEvento::create([
@@ -221,8 +225,10 @@ class PersonaController extends Controller
         
         $this->authorize('update', $persona);
 
-        $persona->update($request->validated());
-        if ($request->has('cooperativas_ids')) $persona->cooperativas()->sync($request->input('cooperativas_ids'));
+        [$personaData, $cooperativaIds] = $this->preparePersonaDataAndCooperativas($request->validated());
+
+        $persona->update($personaData);
+        $persona->cooperativas()->sync($cooperativaIds);
         if ($request->has('abogados_ids')) $persona->abogados()->sync($request->input('abogados_ids'));
 
         AuditoriaEvento::create([
@@ -325,13 +331,7 @@ class PersonaController extends Controller
 
         $query = Persona::withoutTrashed();
 
-        // Aplicamos el filtro de seguridad por cooperativa (mismo que en index)
-        if ($user->tipo_usuario !== 'admin') {
-            $cooperativaIds = $user->cooperativas->pluck('id');
-            $query->whereHas('cooperativas', function ($q) use ($cooperativaIds) {
-                $q->whereIn('cooperativas.id', $cooperativaIds);
-            });
-        }
+        $this->applyPersonaVisibilityFilter($query, $user);
 
         if (!empty($term)) {
             $words = explode(' ', $term);
@@ -360,6 +360,58 @@ class PersonaController extends Controller
             ['a', 'e', 'i', 'o', 'u', 'u', 'A', 'E', 'I', 'O', 'U', 'U'],
             $term
         );
+    }
+
+    private function applyPersonaVisibilityFilter($query, User $user): void
+    {
+        if ($user->tipo_usuario === 'admin') {
+            return;
+        }
+
+        $cooperativaIds = $user->cooperativas->pluck('id');
+
+        $query->where(function ($q) use ($user, $cooperativaIds) {
+            $q->where('sin_empresa_o_cooperativa', true)
+                ->orWhereHas('abogados', fn ($aq) => $aq->where('users.id', $user->id))
+                ->orWhereHas('cooperativas', fn ($cq) => $cq->whereIn('cooperativas.id', $cooperativaIds));
+        });
+    }
+
+    private function preparePersonaDataAndCooperativas(array $validated): array
+    {
+        $requestedCooperativas = collect($validated['cooperativas_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        $specialCooperativaId = $this->specialCooperativaId();
+
+        $regularCooperativas = $requestedCooperativas
+            ->reject(fn ($id) => $specialCooperativaId && $id === $specialCooperativaId)
+            ->values();
+
+        $sinEmpresa = (bool) ($validated['sin_empresa_o_cooperativa'] ?? false)
+            || $requestedCooperativas->isEmpty()
+            || ($specialCooperativaId && $requestedCooperativas->contains($specialCooperativaId) && $regularCooperativas->isEmpty());
+
+        $validated['sin_empresa_o_cooperativa'] = $sinEmpresa;
+        unset($validated['cooperativas_ids'], $validated['abogados_ids']);
+
+        return [$validated, $sinEmpresa ? [] : $regularCooperativas->all()];
+    }
+
+    private function specialCooperativaId(): ?int
+    {
+        $id = Cooperativa::query()
+            ->where('id', 9)
+            ->orWhere('nombre', 'ilike', 'sin empresa%')
+            ->orWhere('nombre', 'ilike', 'si empresa%')
+            ->orWhere('nombre', 'ilike', '%empresa o cooperativa%')
+            ->orderByRaw('CASE WHEN id = 9 THEN 0 ELSE 1 END')
+            ->value('id');
+
+        return $id ? (int) $id : null;
     }
 
     /**

@@ -371,6 +371,7 @@ class ProcesoRadicadoController extends Controller
         
         return DB::transaction(function() use ($request) {
             $data = $request->validated(); 
+            unset($data['demandantes'], $data['demandados']);
             $data['created_by'] = Auth::id(); 
             $data['fecha_cambio_etapa'] = now(); 
             
@@ -428,7 +429,7 @@ class ProcesoRadicadoController extends Controller
             'auditoria' => $proceso->auditoria()->with('usuario:id,name')->latest()->take(50)->get(),
         ]); 
     }
-    public function edit(ProcesoRadicado $proceso): Response { $this->authorize('update', $proceso); $proceso->load(['demandantes', 'demandados', 'abogado', 'responsableRevision', 'juzgado', 'tipoProceso']); return Inertia::render('Radicados/Edit', ['proceso' => $proceso, 'etapas' => EtapaProcesal::orderBy('orden')->get(['id', 'nombre'])]); }
+    public function edit(ProcesoRadicado $proceso): Response { $this->authorize('update', $proceso); $proceso->load(['demandantes.cooperativas:id,nombre', 'demandantes.abogados:id,name', 'demandados.cooperativas:id,nombre', 'demandados.abogados:id,name', 'abogado', 'responsableRevision', 'juzgado', 'tipoProceso']); return Inertia::render('Radicados/Edit', ['proceso' => $proceso, 'etapas' => EtapaProcesal::orderBy('orden')->get(['id', 'nombre'])]); }
     
     public function update(UpdateProcesoRadicadoRequest $request, ProcesoRadicado $proceso) 
     { 
@@ -436,7 +437,10 @@ class ProcesoRadicadoController extends Controller
         
         return DB::transaction(function() use ($request, $proceso) {
             $original = $proceso->getRawOriginal();
-            $proceso->update($request->validated()); 
+            $data = $request->validated();
+            unset($data['demandantes'], $data['demandados']);
+
+            $proceso->update($data); 
             $changes = $proceso->getChanges();
             
             $this->syncPersonasFrontend($proceso, $request->input('demandantes', []), $request->input('demandados', []));
@@ -621,6 +625,7 @@ class ProcesoRadicadoController extends Controller
                             'tipo_documento' => $d['tipo_documento'] ?? 'CC',
                             'numero_documento' => $numDoc,
                             'dv' => $d['dv'] ?? null,
+                            'es_demandado' => false,
                         ]);
                     }
                 } else {
@@ -629,11 +634,11 @@ class ProcesoRadicadoController extends Controller
                         'tipo_documento' => $d['tipo_documento'] ?? 'CC',
                         'numero_documento' => $numDoc,
                         'dv' => $d['dv'] ?? null,
+                        'es_demandado' => false,
                     ]);
                 }
                 
-                if ($persona && !empty($d['cooperativas_ids'])) $persona->cooperativas()->sync($d['cooperativas_ids']);
-                if ($persona && !empty($d['abogados_ids'])) $persona->abogados()->sync($d['abogados_ids']);
+                if ($persona) $this->syncPersonaAssignments($persona, $d);
                 $personaId = $persona?->id;
             }
 
@@ -665,6 +670,7 @@ class ProcesoRadicadoController extends Controller
                             'tipo_documento' => $d['tipo_documento'] ?? 'CC',
                             'numero_documento' => $numDoc,
                             'dv' => $d['dv'] ?? null,
+                            'es_demandado' => true,
                         ]);
                     }
                 } else {
@@ -673,11 +679,11 @@ class ProcesoRadicadoController extends Controller
                         'tipo_documento' => $d['tipo_documento'] ?? 'CC',
                         'numero_documento' => $numDoc,
                         'dv' => $d['dv'] ?? null,
+                        'es_demandado' => true,
                     ]);
                 }
 
-                if ($persona && !empty($d['cooperativas_ids'])) $persona->cooperativas()->sync($d['cooperativas_ids']);
-                if ($persona && !empty($d['abogados_ids'])) $persona->abogados()->sync($d['abogados_ids']);
+                if ($persona) $this->syncPersonaAssignments($persona, $d);
                 $personaId = $persona?->id;
             }
 
@@ -712,6 +718,26 @@ class ProcesoRadicadoController extends Controller
             'demandado_id' => $firstDemandadoId,
             'info_incompleta' => $infoIncompleta,
         ]);
+    }
+
+    private function syncPersonaAssignments(Persona $persona, array $data): void
+    {
+        $cooperativaIds = collect($data['cooperativas_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $persona->forceFill([
+            'sin_empresa_o_cooperativa' => empty($cooperativaIds),
+        ])->save();
+
+        $persona->cooperativas()->sync($cooperativaIds);
+
+        if (array_key_exists('abogados_ids', $data)) {
+            $persona->abogados()->sync($data['abogados_ids'] ?? []);
+        }
     }
     
     public function destroy(ProcesoRadicado $proceso) 

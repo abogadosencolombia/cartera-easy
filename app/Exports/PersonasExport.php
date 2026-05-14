@@ -84,7 +84,14 @@ class PersonasExport implements FromQuery, WithHeadings, WithMapping, ShouldAuto
         
         // 3. Cooperativa
         if (!empty($filters['cooperativa_id'])) {
-            $query->whereHas('cooperativas', fn($sq) => $sq->where('cooperativas.id', $filters['cooperativa_id']));
+            if ($filters['cooperativa_id'] === 'sin_empresa_o_cooperativa') {
+                $query->where(function ($q) {
+                    $q->where('sin_empresa_o_cooperativa', true)
+                        ->orWhereDoesntHave('cooperativas');
+                });
+            } else {
+                $query->whereHas('cooperativas', fn($sq) => $sq->where('cooperativas.id', $filters['cooperativa_id']));
+            }
         }
         
         // 4. Abogado
@@ -152,7 +159,9 @@ class PersonasExport implements FromQuery, WithHeadings, WithMapping, ShouldAuto
             $persona->empresa,
             $persona->cargo,
             $mapArray($persona->addresses, 'label', 'address'),
-            $persona->cooperativas->pluck('nombre')->join(', '),
+            $persona->sin_empresa_o_cooperativa && $persona->cooperativas->isEmpty()
+                ? 'Sin empresa o cooperativa'
+                : $persona->cooperativas->pluck('nombre')->join(', '),
             $persona->abogados->pluck('name')->join(', '),
             $persona->deleted_at ? 'Suspendido' : 'Activo',
         ];

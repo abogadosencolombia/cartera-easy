@@ -27,8 +27,12 @@ const filteredUsers = computed(() => {
         filtered = filtered.filter(user => user.tipo_usuario === roleFilter.value);
     }
     if (statusFilter.value !== '') {
-        const isActive = statusFilter.value === '1';
-        filtered = filtered.filter(user => user.estado_activo === isActive);
+        if (statusFilter.value === 'pending') {
+            filtered = filtered.filter(user => !user.estado_activo && user.tipo_usuario === 'cliente');
+        } else {
+            const isActive = statusFilter.value === '1';
+            filtered = filtered.filter(user => user.estado_activo === isActive);
+        }
     }
     if (searchQuery.value) {
         filtered = filtered.filter(user =>
@@ -45,6 +49,7 @@ const stats = computed(() => {
         total: props.users.length,
         activos: props.users.filter(u => u.estado_activo).length,
         suspendidos: props.users.filter(u => !u.estado_activo).length,
+        pendientes: props.users.filter(u => !u.estado_activo && u.tipo_usuario === 'cliente').length,
     };
 });
 
@@ -99,7 +104,7 @@ watch(() => usePage().props.flash, (newFlash) => {
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
                 
                 <!-- TARJETAS DE ESTADÍSTICAS -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-6">
                     <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center">
                         <div class="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 mr-4">
                             <UsersIcon class="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
@@ -125,6 +130,15 @@ watch(() => usePage().props.flash, (newFlash) => {
                         <div>
                             <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Suspendidos</p>
                             <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.suspendidos }}</p>
+                        </div>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-amber-100 dark:border-amber-900/40 flex items-center">
+                        <div class="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 mr-4">
+                            <LockClosedIcon class="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Pendientes</p>
+                            <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.pendientes }}</p>
                         </div>
                     </div>
                 </div>
@@ -174,13 +188,14 @@ watch(() => usePage().props.flash, (newFlash) => {
                                 <Dropdown align="left" width="full">
                                     <template #trigger>
                                         <button type="button" class="flex w-full items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700 dark:bg-gray-900 bg-white px-4 py-2.5 text-sm font-bold shadow-sm hover:border-indigo-500 transition-all dark:text-gray-300">
-                                            <span>{{ statusFilter === '' ? 'Cualquiera' : (statusFilter === '1' ? 'Activos' : 'Suspendidos') }}</span>
+                                            <span>{{ statusFilter === '' ? 'Cualquiera' : (statusFilter === '1' ? 'Activos' : (statusFilter === 'pending' ? 'Pendientes' : 'Suspendidos')) }}</span>
                                             <ChevronDownIcon class="h-4 w-4 text-gray-400" />
                                         </button>
                                     </template>
                                     <template #content>
                                         <div class="py-1 bg-white dark:bg-gray-800 shadow-2xl ring-1 ring-black ring-opacity-5 rounded-xl">
                                             <button @click="statusFilter = ''" class="block w-full text-left px-4 py-2 text-sm hover:bg-indigo-50 dark:hover:bg-indigo-900/20" :class="{ 'text-indigo-600 font-bold': statusFilter === '' }">Cualquiera</button>
+                                            <button @click="statusFilter = 'pending'" class="block w-full text-left px-4 py-2 text-sm hover:bg-amber-50 dark:hover:bg-amber-900/20" :class="{ 'text-amber-600 font-bold': statusFilter === 'pending' }">Pendientes de aprobación</button>
                                             <button @click="statusFilter = '1'" class="block w-full text-left px-4 py-2 text-sm hover:bg-indigo-50 dark:hover:bg-indigo-900/20" :class="{ 'text-indigo-600 font-bold': statusFilter === '1' }">Activos</button>
                                             <button @click="statusFilter = '0'" class="block w-full text-left px-4 py-2 text-sm hover:bg-indigo-50 dark:hover:bg-indigo-900/20" :class="{ 'text-indigo-600 font-bold': statusFilter === '0' }">Suspendidos</button>
                                         </div>
@@ -229,6 +244,10 @@ watch(() => usePage().props.flash, (newFlash) => {
                                             <span v-if="user.estado_activo" class="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
                                                 <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
                                                 Activo
+                                            </span>
+                                            <span v-else-if="user.tipo_usuario === 'cliente'" class="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                                                <span class="h-1.5 w-1.5 rounded-full bg-amber-500 mr-2"></span>
+                                                Pendiente
                                             </span>
                                             <span v-else class="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400">
                                                 <span class="h-1.5 w-1.5 rounded-full bg-rose-500 mr-2"></span>

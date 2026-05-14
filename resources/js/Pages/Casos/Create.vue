@@ -111,6 +111,7 @@ const initialData = {
     link_expediente: props.casoAClonar?.link_expediente || '',
     clonado_de_id: props.casoAClonar?.id || null,
     sin_codeudores: !!props.casoAClonar?.sin_codeudores,
+    es_spoa_nunc: !!props.casoAClonar?.es_spoa_nunc,
 };
 
 const selectedJuzgado = ref(null);
@@ -172,6 +173,7 @@ watch(() => props.casoAClonar, (newCaso) => {
         link_expediente: newCaso?.link_expediente || '',
         clonado_de_id: newCaso?.id || null,
         sin_codeudores: !!newCaso?.sin_codeudores,
+        es_spoa_nunc: !!newCaso?.es_spoa_nunc,
     });
     form.reset();
 }, { immediate: true });

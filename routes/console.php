@@ -15,21 +15,21 @@ Schedule::command('tareas:check-vencidas')
     ->name('check_tareas_vencidas');
 
 Schedule::job(new \App\Jobs\ProcesarAlertasProgramadas)
-    ->everyMinute()
+    ->everyFiveMinutes()
     ->withoutOverlapping(55)
     ->name('procesar_alertas_programadas');
 
 Schedule::command('gestion:procesar-alertas')
-    ->everyFifteenMinutes()
+    ->everyThirtyMinutes()
     ->timezone('America/Bogota')
-    ->withoutOverlapping(14)
+    ->withoutOverlapping(29)
     ->name('procesar_alertas_gestion_diaria');
 
 Schedule::command('alertas:procesar-vencimientos')
-    ->everyThirtyMinutes()
+    ->hourly()
     ->between('07:00', '22:00')
     ->timezone('America/Bogota')
-    ->withoutOverlapping(29)
+    ->withoutOverlapping(59)
     ->name('generar_alertas_juridicas_financieras');
 
 Schedule::command('app:calculate-late-fees')

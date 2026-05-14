@@ -90,9 +90,9 @@ class GenerarAlertasCron extends Command
                             ->exists();
 
                         if (!$yaNotificado) {
-                            // Límite de ráfaga (20) para evitar saturación de Hostinger
-                            if ($countProcesos >= 20) {
-                                $this->warn("Límite de ráfaga (20) alcanzado en procesos. El resto se enviará en la próxima ejecución.");
+                            // Límite de ráfaga conservador para evitar saturación de Hostinger.
+                            if ($countProcesos >= 5) {
+                                $this->warn("Límite de ráfaga (5) alcanzado en procesos. El resto se enviará en la próxima ejecución.");
                                 break;
                             }
 
@@ -100,8 +100,8 @@ class GenerarAlertasCron extends Command
                             $countProcesos++;
                             $this->info("Notificación enviada para Proceso #{$proceso->id}");
                             
-                            // Pausa de 3 segundos obligatoria para estabilizar la conexión SMTP
-                            sleep(3);
+                            // Pausa obligatoria para estabilizar la conexión SMTP.
+                            sleep(10);
                         }
                     }
                 }
@@ -137,9 +137,9 @@ class GenerarAlertasCron extends Command
             $countPagos = 0;
 
             foreach ($cuotas as $cuota) {
-                // Límite de ráfaga para pagos (máximo 20 por ejecución)
-                if ($countPagos >= 20) {
-                    $this->warn("Límite de ráfaga (20) alcanzado en pagos. El resto se procesará luego.");
+                // Límite de ráfaga para pagos.
+                if ($countPagos >= 5) {
+                    $this->warn("Límite de ráfaga (5) alcanzado en pagos. El resto se procesará luego.");
                     break;
                 }
 
@@ -176,8 +176,8 @@ class GenerarAlertasCron extends Command
                         $enviado = $this->crearNotificacionPago($cuota, $admins, 'mora', $mensajePago, $tituloPago);
                         if ($enviado) {
                             $countPagos++;
-                            // Pausa de seguridad obligatoria
-                            sleep(3);
+                            // Pausa de seguridad obligatoria.
+                            sleep(10);
                         }
                     } catch (\Exception $e) {
                         $msg = $e->getMessage();
@@ -186,7 +186,7 @@ class GenerarAlertasCron extends Command
                             $this->error("Rate Limit detectado en pagos. Abortando.");
                             break;
                         }
-                        sleep(3);
+                        sleep(10);
                     }
                 }
             }
@@ -209,8 +209,8 @@ class GenerarAlertasCron extends Command
                     $user->name, $titulo, $mensaje, $link, $detalles
                 ));
                 $this->info("Correo enviado a {$user->email}");
-                // Pausa obligatoria para Hostinger
-                sleep(3);
+                // Pausa obligatoria para Hostinger.
+                sleep(10);
             } 
         } catch (\Exception $e) {
             $msg = $e->getMessage();
@@ -221,7 +221,7 @@ class GenerarAlertasCron extends Command
                 $this->error("Rate Limit detectado en enviarCorreo. Deteniendo proceso.");
                 die(); // En un helper privado que se usa en bucles, die() es lo más seguro
             }
-            sleep(3);
+            sleep(10);
         }
     }
 

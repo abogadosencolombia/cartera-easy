@@ -55,7 +55,7 @@ class UpdateProcesoRadicadoRequest extends FormRequest
             'demandantes.*.numero_documento' => ['nullable', 'string', 'max:255'],
             'demandantes.*.tipo_documento'   => ['nullable', 'string', 'max:255'],
             'demandantes.*.sin_info'         => ['nullable', 'boolean'],
-            'demandantes.*.cooperativas_ids' => ['required_if:demandantes.*.is_new,true', 'nullable', 'array', 'min:1'],
+            'demandantes.*.cooperativas_ids' => ['nullable', 'array'],
             'demandantes.*.abogados_ids'     => ['nullable', 'array'],
 
             'demandados'              => ['nullable', 'array'],
@@ -65,7 +65,7 @@ class UpdateProcesoRadicadoRequest extends FormRequest
             'demandados.*.numero_documento' => ['nullable', 'string', 'max:255'],
             'demandados.*.tipo_documento'   => ['nullable', 'string', 'max:255'],
             'demandados.*.sin_info'         => ['nullable', 'boolean'],
-            'demandados.*.cooperativas_ids' => ['required_if:demandados.*.is_new,true', 'nullable', 'array', 'min:1'],
+            'demandados.*.cooperativas_ids' => ['nullable', 'array'],
             'demandados.*.abogados_ids'     => ['nullable', 'array'],
         ];
     }
