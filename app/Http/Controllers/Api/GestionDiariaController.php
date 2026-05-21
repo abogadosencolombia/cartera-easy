@@ -9,6 +9,7 @@ use App\Models\Caso;
 use App\Models\ProcesoRadicado;
 use App\Models\Contrato;
 use App\Models\Juzgado;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -29,18 +30,21 @@ class GestionDiariaController extends Controller
         $request->validate([
             'descripcion' => 'required|min:5',
             'despacho' => 'required',
-            'termino' => 'required',
+            'termino' => 'nullable|string|max:100',
+            'expires_at' => 'required|date|after:now',
             'archivos.*' => 'nullable|file|max:10240', // 20MB por archivo
         ]);
+
+        $expiresAt = Carbon::parse($request->expires_at);
 
         $nota = NotaGestion::create([
             'user_id' => Auth::id(),
             'descripcion' => strtoupper($request->descripcion),
             'despacho' => strtoupper($request->despacho),
-            'termino' => strtoupper($request->termino),
+            'termino' => strtoupper($request->termino ?: $expiresAt->format('d/m/Y H:i')),
             'relacionable_type' => $request->relacionable_type ?: null,
             'relacionable_id' => $request->relacionable_id ?: null,
-            'expires_at' => now()->addHours(8),
+            'expires_at' => $expiresAt,
         ]);
 
         if ($request->hasFile('archivos')) {

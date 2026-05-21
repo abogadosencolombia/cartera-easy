@@ -61,7 +61,7 @@ const NAV_ITEMS = [
         type: "dropdown",
         label: "Casos",
         icon: FolderIcon,
-        active: ["casos.*", "procesos.*", "revision.*", "reportes.*"],
+        active: ["casos.*", "procesos.*", "revision.*"],
         roles: ["admin", "gestor", "abogado"],
         items: [
             {
@@ -81,12 +81,6 @@ const NAV_ITEMS = [
                 label: "Revisión Diaria",
                 href: route("revision.index"),
                 active: "revision.*",
-                roles: ["admin", "gestor", "abogado"],
-            },
-            {
-                label: "Reportes",
-                href: route("reportes.index"),
-                active: "reportes.*",
                 roles: ["admin", "gestor", "abogado"],
             },
         ],
@@ -163,7 +157,7 @@ const NAV_ITEMS = [
                 label: "Incidentes Jurídicos",
                 href: route("admin.incidentes-juridicos.index"),
                 active: "admin.incidentes-juridicos.*",
-                roles: ["admin", "abogado"],
+                roles: ["admin"],
             },
             {
                 label: "Tareas del Sistema",
@@ -383,9 +377,14 @@ const resetIdleLogoutTimer = () => {
     );
 };
 
+const openGestionDiariaPanel = () => {
+    showGestionPanel.value = true;
+};
+
 // 6. CICLO DE VIDA ------------------------------------------------------------
 onMounted(() => {
     initPush().catch(() => {});
+    window.addEventListener("open-gestion-diaria", openGestionDiariaPanel);
     activityEvents.forEach((eventName) => {
         window.addEventListener(eventName, resetIdleLogoutTimer, {
             passive: true,
@@ -396,6 +395,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     clearIdleLogoutTimer();
+    window.removeEventListener("open-gestion-diaria", openGestionDiariaPanel);
     activityEvents.forEach((eventName) => {
         window.removeEventListener(eventName, resetIdleLogoutTimer);
     });

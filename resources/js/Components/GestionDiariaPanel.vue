@@ -1,6 +1,6 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue';
-import { usePage, router } from '@inertiajs/vue3';
+import { computed, ref, watch, onMounted } from 'vue';
+import { router } from '@inertiajs/vue3';
 import axios from 'axios';
 import AppAlert from '@/Utils/appAlert';
 import SelectInput from '@/Components/SelectInput.vue';
@@ -31,10 +31,24 @@ const Toast = AppAlert.mixin({
 // Estado
 const loading = ref(false);
 const notas = ref([]);
+const toDatetimeLocal = (date) => {
+    const pad = (value) => String(value).padStart(2, '0');
+    return [
+        date.getFullYear(),
+        pad(date.getMonth() + 1),
+        pad(date.getDate()),
+    ].join('-') + `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+const defaultReminder = () => {
+    const date = new Date();
+    date.setHours(date.getHours() + 8, 0, 0, 0);
+    return toDatetimeLocal(date);
+};
 const form = ref({
     descripcion: '',
     despacho: '',
     termino: '',
+    expires_at: defaultReminder(),
     relacionable_type: '',
     relacionable_id: null,
     archivos: []
@@ -42,6 +56,17 @@ const form = ref({
 
 const fileInput = ref(null);
 const selectedFiles = ref([]);
+
+const pendientes = computed(() => notas.value.filter((nota) => !nota.is_completed));
+const completadas = computed(() => notas.value.filter((nota) => nota.is_completed));
+const fileLimitReached = computed(() => selectedFiles.value.length >= 3);
+const minReminder = computed(() => toDatetimeLocal(new Date()));
+const quickReminders = [
+    { label: '1 h', hours: 1 },
+    { label: '4 h', hours: 4 },
+    { label: 'Hoy 6 p.m.', endOfDay: true },
+    { label: 'Mañana', hours: 24 },
+];
 
 // Búsquedas
 const searchDespacho = ref('');
@@ -74,9 +99,30 @@ const removeFile = (index) => {
     selectedFiles.value.splice(index, 1);
 };
 
+const setQuickReminder = (option) => {
+    const date = new Date();
+    if (option.endOfDay) {
+        date.setHours(18, 0, 0, 0);
+        if (date <= new Date()) date.setDate(date.getDate() + 1);
+    } else {
+        date.setHours(date.getHours() + option.hours, 0, 0, 0);
+    }
+
+    form.value.expires_at = toDatetimeLocal(date);
+    form.value.termino = option.label;
+};
+
+const clearRelacion = () => {
+    form.value.relacionable_type = '';
+    form.value.relacionable_id = null;
+    searchVinculacion.value = '';
+    resultadosVinculacion.value = [];
+    showVinculacionResults.value = false;
+};
+
 // Guardar Nota
 const saveNota = async () => {
-    if (!form.value.descripcion || !form.value.despacho || !form.value.termino) {
+    if (!form.value.descripcion || !form.value.despacho || !form.value.expires_at) {
         Toast.fire({ icon: 'warning', title: 'CAMPOS OBLIGATORIOS VACÍOS' });
         return;
     }
@@ -86,7 +132,8 @@ const saveNota = async () => {
         const formData = new FormData();
         formData.append('descripcion', form.value.descripcion);
         formData.append('despacho', form.value.despacho);
-        formData.append('termino', form.value.termino);
+        formData.append('termino', form.value.termino || form.value.expires_at);
+        formData.append('expires_at', form.value.expires_at);
         formData.append('relacionable_type', form.value.relacionable_type || '');
         if (form.value.relacionable_id) formData.append('relacionable_id', form.value.relacionable_id);
         
@@ -98,7 +145,7 @@ const saveNota = async () => {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
 
-        form.value = { descripcion: '', despacho: '', termino: '', relacionable_type: '', relacionable_id: null, archivos: [] };
+        form.value = { descripcion: '', despacho: '', termino: '', expires_at: defaultReminder(), relacionable_type: '', relacionable_id: null, archivos: [] };
         selectedFiles.value = [];
         searchDespacho.value = '';
         searchVinculacion.value = '';
@@ -219,11 +266,21 @@ const selectVinculacion = (item) => {
 
 const getSemaforoClass = (semaforo) => {
     switch(semaforo) {
-        case 'success': return 'bg-green-500 shadow-green-200';
+        case 'success': return 'bg-emerald-500 shadow-emerald-200';
         case 'danger-blink': return 'bg-red-600 animate-pulse shadow-red-200';
         case 'danger': return 'bg-red-600 shadow-red-200';
-        case 'warning': return 'bg-yellow-400 shadow-yellow-100';
-        default: return 'bg-blue-500 shadow-blue-100';
+        case 'warning': return 'bg-amber-400 shadow-amber-100';
+        default: return 'bg-sky-500 shadow-sky-100';
+    }
+};
+
+const getSemaforoLabel = (semaforo) => {
+    switch(semaforo) {
+        case 'success': return 'Al día';
+        case 'danger-blink': return 'Vence ahora';
+        case 'danger': return 'Urgente';
+        case 'warning': return 'Próximo';
+        default: return 'Programado';
     }
 };
 
@@ -252,91 +309,132 @@ onMounted(fetchNotas);
 
 <template>
     <div v-if="show" class="fixed inset-0 z-[100] overflow-hidden">
-        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" @click="$emit('close')"></div>
+        <div class="absolute inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity" @click="$emit('close')"></div>
         
-        <div class="absolute inset-y-0 right-0 w-full max-w-xl bg-white shadow-2xl flex flex-col transform transition-transform duration-300">
+        <div class="absolute inset-y-0 right-0 flex w-full max-w-2xl transform flex-col bg-white shadow-2xl transition-transform duration-300 dark:bg-gray-950">
             <!-- Header -->
-            <div class="p-6 bg-indigo-600 text-white flex justify-between items-center shadow-lg">
-                <div>
-                    <h2 class="text-xl font-black uppercase tracking-tighter flex items-center italic">
-                        <ClipboardDocumentCheckIcon class="w-6 h-6 mr-2 text-white" />
-                        Hoja de Ruta Diaria
-                    </h2>
-                    <p class="text-[10px] font-bold text-white/80 uppercase tracking-[0.2em] mt-1">Control personal de términos y gestiones</p>
+            <div class="border-b border-slate-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-950">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex min-w-0 gap-3">
+                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                            <ClipboardDocumentCheckIcon class="h-6 w-6" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-xs font-black uppercase tracking-widest text-sky-600 dark:text-sky-400">Gestión diaria</p>
+                            <h2 class="mt-1 text-2xl font-black leading-tight text-slate-950 dark:text-white">Hoja de ruta</h2>
+                            <p class="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">Registre tareas, términos, vínculos y anexos sin salir del flujo.</p>
+                        </div>
+                    </div>
+                    <button @click="$emit('close')" class="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-gray-800 dark:hover:text-white">
+                        <XMarkIcon class="h-6 w-6" />
+                    </button>
                 </div>
-                <button @click="$emit('close')" class="p-2 hover:bg-white/20 rounded-full transition group">
-                    <XMarkIcon class="w-6 h-6 group-hover:rotate-90 transition-transform duration-200" />
-                </button>
+
+                <div class="mt-5 grid grid-cols-3 gap-3">
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-gray-800 dark:bg-gray-900">
+                        <p class="text-[11px] font-black uppercase tracking-widest text-slate-400">Pendientes</p>
+                        <p class="mt-1 text-2xl font-black text-slate-950 dark:text-white">{{ pendientes.length }}</p>
+                    </div>
+                    <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+                        <p class="text-[11px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300">Hechas</p>
+                        <p class="mt-1 text-2xl font-black text-emerald-700 dark:text-emerald-300">{{ completadas.length }}</p>
+                    </div>
+                    <div class="rounded-lg border border-sky-200 bg-sky-50 p-3 dark:border-sky-900/60 dark:bg-sky-950/30">
+                        <p class="text-[11px] font-black uppercase tracking-widest text-sky-700 dark:text-sky-300">Total</p>
+                        <p class="mt-1 text-2xl font-black text-sky-700 dark:text-sky-300">{{ notas.length }}</p>
+                    </div>
+                </div>
             </div>
 
             <!-- Content -->
-            <div class="flex-1 overflow-y-auto p-6 space-y-8 bg-gray-50/50">
+            <div class="flex-1 space-y-6 overflow-y-auto bg-slate-50 p-4 dark:bg-gray-900 sm:p-6">
                 
                 <!-- Formulario -->
-                <div class="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm">
-                    <h3 class="text-[10px] font-black text-blue-500 uppercase mb-6 tracking-[0.3em] flex items-center">
-                        <ChevronRightIcon class="w-3 h-3 mr-1" />
-                        Nueva Entrada de Gestión
-                    </h3>
+                <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+                    <div class="mb-5 flex items-center justify-between gap-3">
+                        <div>
+                            <h3 class="text-lg font-black text-slate-950 dark:text-white">Nueva gestión</h3>
+                            <p class="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">Los campos marcados son necesarios para guardar.</p>
+                        </div>
+                        <ChevronRightIcon class="h-5 w-5 text-sky-600 dark:text-sky-400" />
+                    </div>
                     <div class="space-y-5">
                         <div>
-                            <label class="block text-[9px] font-black text-gray-400 uppercase mb-1 ml-1">Descripción de la Tarea</label>
-                            <input v-model="form.descripcion" type="text" placeholder="¿QUÉ GESTIÓN REALIZARÁ HOY?" 
-                                   class="w-full text-xs font-black uppercase rounded-lg border-gray-200 focus:border-indigo-600 focus:ring-indigo-600 transition-all">
+                            <label class="mb-1.5 block text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Descripción <span class="text-red-500">*</span></label>
+                            <input v-model="form.descripcion" type="text" placeholder="Ej: Radicar memorial de impulso procesal"
+                                   class="w-full rounded-lg border-slate-200 text-sm font-semibold text-slate-900 transition focus:border-sky-500 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white">
                         </div>
                         
-                        <div class="grid grid-cols-2 gap-4">
+                        <div class="grid gap-4 sm:grid-cols-2">
                             <div class="relative">
-                                <label class="block text-[9px] font-black text-gray-400 uppercase mb-1 ml-1">Despacho / Entidad</label>
+                                <label class="mb-1.5 block text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Despacho / entidad <span class="text-red-500">*</span></label>
                                 <div class="relative">
-                                    <input v-model="searchDespacho" type="text" placeholder="BUSCAR..." 
-                                           class="w-full text-xs font-black uppercase rounded-lg border-gray-200 focus:border-blue-500 focus:ring-blue-500 transition-all shadow-inner text-blue-600">
+                                    <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                    <input v-model="searchDespacho" type="text" placeholder="Buscar despacho o entidad"
+                                           class="w-full rounded-lg border-slate-200 pl-9 text-sm font-semibold text-slate-900 transition focus:border-sky-500 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white">
                                     <div v-if="searchingDespacho" class="absolute right-3 top-1/2 -translate-y-1/2">
-                                        <div class="animate-spin h-3 w-3 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                        <div class="h-4 w-4 animate-spin rounded-full border-2 border-sky-500 border-t-transparent"></div>
                                     </div>
                                 </div>
-                                <div v-if="showDespachoResults" class="absolute z-10 w-full mt-1 bg-white border-2 border-indigo-600 shadow-2xl rounded-lg max-h-48 overflow-y-auto">
+                                <div v-if="showDespachoResults" class="absolute z-20 mt-2 max-h-52 w-full overflow-y-auto rounded-lg border border-sky-200 bg-white shadow-2xl dark:border-sky-900 dark:bg-gray-950">
                                     <template v-if="resultadosDespacho.length">
                                         <button v-for="j in resultadosDespacho" :key="j.id" @click="selectDespacho(j.nombre)" 
-                                                class="w-full text-left px-4 py-3 text-[10px] font-black uppercase hover:bg-indigo-600 hover:text-white border-b last:border-0 transition">
+                                                class="w-full border-b border-slate-100 px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-700 transition last:border-0 hover:bg-sky-600 hover:text-white dark:border-gray-800 dark:text-slate-200">
                                             {{ j.nombre }}
                                         </button>
                                     </template>
-                                    <div v-else-if="!searchingDespacho" class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase italic">
+                                    <div v-else-if="!searchingDespacho" class="px-4 py-3 text-xs font-bold text-slate-400">
                                         No se encontraron resultados
                                     </div>
                                 </div>
                             </div>
                             <div>
-                                <label class="block text-[9px] font-black text-gray-400 uppercase mb-1 ml-1">Término / Plazo</label>
-                                <input v-model="form.termino" type="text" placeholder="EJ: 24H / INMEDIATO" 
-                                       class="w-full text-xs font-black uppercase rounded-lg border-gray-200 focus:border-indigo-600 focus:ring-indigo-600 transition-all">
+                                <label class="mb-1.5 block text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Recordatorio <span class="text-red-500">*</span></label>
+                                <input v-model="form.expires_at" type="datetime-local" :min="minReminder"
+                                       class="w-full rounded-lg border-slate-200 text-sm font-semibold text-slate-900 transition focus:border-sky-500 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    <button
+                                        v-for="option in quickReminders"
+                                        :key="option.label"
+                                        @click="setQuickReminder(option)"
+                                        type="button"
+                                        class="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-slate-500 transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 dark:border-gray-700 dark:bg-gray-900 dark:text-slate-300 dark:hover:bg-sky-950"
+                                    >
+                                        {{ option.label }}
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="pt-4 border-t border-gray-100">
-                            <label class="block text-[9px] font-black text-gray-500 uppercase mb-3 ml-1 tracking-widest opacity-60 italic">Vincular a Expediente (Opcional)</label>
-                            <div class="grid grid-cols-2 gap-4">
-                                <SelectInput v-model="form.relacionable_type" class="text-[10px] font-black uppercase rounded-lg border-gray-200 bg-gray-50 focus:ring-blue-500">
-                                    <option value="">REGISTRO LIBRE</option>
-                                    <option value="App\Models\ProcesoRadicado">RADICADO / PROCESO</option>
-                                    <option value="App\Models\Caso">CASO COOPERATIVA</option>
-                                    <option value="App\Models\Contrato">CONTRATO HONORARIOS</option>
+                        <div class="border-t border-slate-100 pt-5 dark:border-gray-800">
+                            <div class="mb-3 flex items-center justify-between gap-3">
+                                <label class="block text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Vincular expediente</label>
+                                <button v-if="form.relacionable_type || searchVinculacion" @click="clearRelacion" type="button" class="text-xs font-black uppercase tracking-widest text-slate-400 transition hover:text-red-600">
+                                    Limpiar
+                                </button>
+                            </div>
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <SelectInput v-model="form.relacionable_type" class="rounded-lg border-slate-200 bg-white text-xs font-black uppercase tracking-wide focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900">
+                                    <option value="">Registro libre</option>
+                                    <option value="App\Models\ProcesoRadicado">Radicado / proceso</option>
+                                    <option value="App\Models\Caso">Caso cooperativa</option>
+                                    <option value="App\Models\Contrato">Contrato honorarios</option>
                                 </SelectInput>
                                 <div v-if="form.relacionable_type" class="relative">
                                     <div class="relative">
-                                        <input v-model="searchVinculacion" type="text" placeholder="BUSCAR POR NOMBRE, DOC O RADICADO..." 
-                                               class="w-full text-[10px] font-black uppercase rounded-lg border-blue-200 focus:border-blue-500 focus:ring-blue-500 shadow-sm text-blue-600">
+                                        <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                        <input v-model="searchVinculacion" type="text" placeholder="Buscar por nombre, doc o radicado"
+                                               class="w-full rounded-lg border-sky-200 pl-9 text-sm font-semibold text-slate-900 transition focus:border-sky-500 focus:ring-sky-500 dark:border-sky-900 dark:bg-gray-900 dark:text-white">
                                         <div v-if="searchingVinculacion" class="absolute right-3 top-1/2 -translate-y-1/2">
-                                            <div class="animate-spin h-3 w-3 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                            <div class="h-4 w-4 animate-spin rounded-full border-2 border-sky-500 border-t-transparent"></div>
                                         </div>
                                     </div>
-                                    <div v-if="showVinculacionResults" class="absolute z-10 w-full mt-1 bg-white border-2 border-blue-500 shadow-2xl rounded-lg max-h-60 overflow-y-auto">
+                                    <div v-if="showVinculacionResults" class="absolute z-20 mt-2 max-h-60 w-full overflow-y-auto rounded-lg border border-sky-200 bg-white shadow-2xl dark:border-sky-900 dark:bg-gray-950">
                                         <template v-if="resultadosVinculacion.length">
                                             <button v-for="v in resultadosVinculacion" :key="v.id" @click="selectVinculacion(v)" 
-                                                    class="w-full text-left px-4 py-3 hover:bg-blue-500 hover:text-white border-b last:border-0 transition text-blue-900">
-                                                <div class="text-[10px] font-black uppercase">{{ v.radicado || v.referencia_credito || v.referencia }}</div>
-                                                <div class="text-[8px] font-bold opacity-75 uppercase truncate">
+                                                    class="w-full border-b border-slate-100 px-4 py-3 text-left text-slate-800 transition last:border-0 hover:bg-sky-600 hover:text-white dark:border-gray-800 dark:text-slate-200">
+                                                <div class="text-xs font-black uppercase">{{ v.radicado || v.referencia_credito || v.referencia }}</div>
+                                                <div class="truncate text-[11px] font-bold opacity-75">
                                                     {{ v.asunto || '' }}
                                                     <span v-if="v.deudor">· {{ v.deudor.nombre_completo }} ({{ v.deudor.numero_documento }})</span>
                                                     <span v-else-if="v.cliente">· {{ v.cliente.nombre_completo }} ({{ v.cliente.numero_documento }})</span>
@@ -344,88 +442,102 @@ onMounted(fetchNotas);
                                                 </div>
                                             </button>
                                         </template>
-                                        <div v-else-if="!searchingVinculacion" class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase italic">
+                                        <div v-else-if="!searchingVinculacion" class="px-4 py-3 text-xs font-bold text-slate-400">
                                             No se encontraron resultados
                                         </div>
                                     </div>
+                                </div>
+                                <div v-else class="flex min-h-10 items-center rounded-lg border border-dashed border-slate-200 px-3 text-xs font-bold text-slate-400 dark:border-gray-700">
+                                    Sin expediente vinculado
                                 </div>
                             </div>
                         </div>
 
                         <!-- Sección de Archivos -->
-                        <div class="pt-4 border-t border-gray-100">
-                            <label class="block text-[9px] font-black text-gray-400 uppercase mb-2 ml-1">Anexos (Máx 3 PDF/IMG/EXCEL/WORD)</label>
-                            <div class="flex items-center gap-2">
-                                <button @click="$refs.fileInput.click()" type="button" 
-                                        class="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-[10px] font-black uppercase transition-all">
-                                    <PaperClipIcon class="w-4 h-4" />
-                                    {{ selectedFiles.length > 0 ? 'Agregar más' : 'Adjuntar Documentos' }}
+                        <div class="border-t border-slate-100 pt-5 dark:border-gray-800">
+                            <label class="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Anexos</label>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <button @click="fileInput?.click()" type="button" :disabled="fileLimitReached"
+                                        class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-widest text-slate-600 transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-slate-300 dark:hover:bg-sky-950">
+                                    <PaperClipIcon class="h-4 w-4" />
+                                    {{ selectedFiles.length > 0 ? 'Agregar más' : 'Adjuntar' }}
                                 </button>
                                 <input type="file" ref="fileInput" multiple @change="handleFileUpload" class="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,image/*">
-                                <span class="text-[9px] font-bold text-gray-400 uppercase italic">{{ selectedFiles.length }}/3 Archivos</span>
+                                <span class="text-xs font-bold text-slate-400">{{ selectedFiles.length }}/3 archivos PDF, imagen, Word o Excel</span>
                             </div>
                             
                             <div v-if="selectedFiles.length" class="mt-3 space-y-2">
-                                <div v-for="(file, idx) in selectedFiles" :key="idx" class="flex items-center justify-between p-2 bg-indigo-50 rounded-lg border border-indigo-100">
-                                    <div class="flex items-center gap-2 min-w-0">
-                                        <PaperClipIcon class="w-3 h-3 text-indigo-500 shrink-0" />
-                                        <span class="text-[9px] font-bold text-indigo-900 truncate uppercase">{{ file.name }}</span>
+                                <div v-for="(file, idx) in selectedFiles" :key="idx" class="flex items-center justify-between gap-3 rounded-lg border border-sky-100 bg-sky-50 p-2 dark:border-sky-900/60 dark:bg-sky-950/30">
+                                    <div class="flex min-w-0 items-center gap-2">
+                                        <PaperClipIcon class="h-4 w-4 shrink-0 text-sky-600 dark:text-sky-300" />
+                                        <span class="truncate text-xs font-bold text-sky-900 dark:text-sky-100">{{ file.name }}</span>
                                     </div>
-                                    <button @click="removeFile(idx)" class="text-red-500 hover:text-red-700 p-1">
-                                        <XMarkIcon class="w-4 h-4" />
+                                    <button @click="removeFile(idx)" class="rounded-md p-1 text-red-500 transition hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40">
+                                        <XMarkIcon class="h-4 w-4" />
                                     </button>
                                 </div>
                             </div>
                         </div>
 
                         <button @click="saveNota" :disabled="loading" 
-                                class="w-full bg-blue-500 hover:bg-indigo-600 text-white font-black py-4 rounded-xl text-[11px] uppercase tracking-[0.3em] transition-all shadow-lg hover:shadow-blue-200 disabled:opacity-50">
-                            {{ loading ? 'PROCESANDO...' : 'REGISTRAR EN HOJA DE RUTA' }}
+                                class="inline-flex w-full items-center justify-center rounded-lg bg-sky-600 px-4 py-3 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-sky-100 transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50 dark:shadow-none">
+                            <span v-if="loading" class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white/70 border-t-transparent"></span>
+                            {{ loading ? 'Procesando' : 'Registrar gestión' }}
                         </button>
                     </div>
                 </div>
 
                 <!-- Listado -->
-                <div class="space-y-4 pb-10">
-                    <div class="flex items-center justify-between px-2">
-                        <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Pendientes y Actuaciones</h4>
-                        <span class="text-[9px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{{ notas.length }} REGISTROS</span>
+                <div class="space-y-4 pb-8">
+                    <div class="flex items-center justify-between gap-3 px-1">
+                        <div>
+                            <h4 class="text-sm font-black text-slate-950 dark:text-white">Pendientes y actuaciones</h4>
+                            <p class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">Marque como hecha cuando la gestión quede registrada.</p>
+                        </div>
+                        <span class="rounded-lg border border-sky-100 bg-sky-50 px-3 py-1.5 text-xs font-black uppercase tracking-widest text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-300">{{ notas.length }} registros</span>
                     </div>
 
                     <div v-for="nota in notas" :key="nota.id" 
-                         :class="['p-5 rounded-2xl border-2 transition relative group', nota.is_completed ? 'bg-white border-gray-100 grayscale' : 'bg-white border-white shadow-md hover:shadow-lg hover:border-blue-100']">
+                         :class="['rounded-lg border p-4 transition relative group', nota.is_completed ? 'bg-white/80 border-slate-200 opacity-75 dark:bg-gray-950/70 dark:border-gray-800' : 'bg-white border-slate-200 shadow-sm hover:border-sky-200 hover:shadow-md dark:bg-gray-950 dark:border-gray-800 dark:hover:border-sky-900']">
                         
                         <div class="flex justify-between items-start gap-4">
                             <div class="flex-1 min-w-0">
-                                <div class="flex items-center space-x-3 mb-2">
-                                    <div :class="['h-3 w-3 rounded-full border-2 border-white shadow-sm shrink-0', getSemaforoClass(nota.semaforo)]"></div>
-                                    <h5 :class="['text-[11px] font-black uppercase truncate tracking-tight', nota.is_completed ? 'line-through text-gray-400' : 'text-indigo-900']">
-                                        {{ nota.descripcion }}
-                                    </h5>
+                                <div class="mb-3 flex flex-wrap items-center gap-2">
+                                    <span class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black uppercase tracking-widest text-slate-600 dark:bg-gray-800 dark:text-slate-300">
+                                        <span :class="['h-2.5 w-2.5 rounded-full shadow-sm', getSemaforoClass(nota.semaforo)]"></span>
+                                        {{ getSemaforoLabel(nota.semaforo) }}
+                                    </span>
+                                    <span v-if="nota.is_completed" class="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-black uppercase tracking-widest text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                        Finalizada
+                                    </span>
                                 </div>
+
+                                <h5 :class="['break-words text-sm font-black leading-5', nota.is_completed ? 'line-through text-slate-400' : 'text-slate-950 dark:text-white']">
+                                        {{ nota.descripcion }}
+                                </h5>
                                 
-                                <div class="grid grid-cols-2 gap-2 mb-3">
-                                    <div class="flex items-center text-[9px] font-bold text-gray-500 uppercase">
-                                        <ClockIcon class="w-3.5 h-3.5 mr-1.5 text-blue-500 opacity-70" /> 
+                                <div class="mt-3 grid gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 sm:grid-cols-2">
+                                    <div class="flex items-center">
+                                        <ClockIcon class="mr-1.5 h-4 w-4 text-sky-600 opacity-80" />
                                         {{ nota.tiempo_restante }}
                                     </div>
-                                    <div class="flex items-center text-[9px] font-bold text-gray-500 uppercase truncate">
-                                        <span class="opacity-50 mr-1 italic text-indigo-600">@</span> {{ nota.despacho }}
+                                    <div class="truncate">
+                                        <span class="mr-1 font-black text-sky-600">@</span>{{ nota.despacho }}
                                     </div>
                                 </div>
 
                                 <button v-if="nota.relacionable_type" @click="goToLink(nota)" 
-                                        class="inline-flex items-center px-3 py-1.5 bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white rounded-lg text-[9px] font-black uppercase transition-all tracking-tighter">
-                                    <LinkIcon class="w-3 h-3 mr-1.5" />
-                                    VÍNCULO: {{ nota.relacionable?.radicado || nota.relacionable?.referencia_credito || nota.relacionable?.referencia || 'SIN REF' }}
+                                        class="mt-3 inline-flex max-w-full items-center rounded-lg bg-sky-50 px-3 py-1.5 text-xs font-black uppercase tracking-wide text-sky-700 transition hover:bg-sky-600 hover:text-white dark:bg-sky-950/30 dark:text-sky-300">
+                                    <LinkIcon class="mr-1.5 h-3.5 w-3.5 shrink-0" />
+                                    <span class="truncate">{{ nota.relacionable?.radicado || nota.relacionable?.referencia_credito || nota.relacionable?.referencia || 'Sin referencia' }}</span>
                                 </button>
 
                                 <!-- Anexos en la lista -->
                                 <div v-if="nota.archivos?.length" class="mt-3 flex flex-wrap gap-2">
                                     <a v-for="file in nota.archivos" :key="file.id" 
                                        :href="route('api.gestion.download-archivo', file.id)" target="_blank"
-                                       class="flex items-center gap-1.5 px-2 py-1 bg-white border border-indigo-100 rounded text-[8px] font-bold text-indigo-600 hover:bg-indigo-50 transition-colors uppercase">
-                                        <PaperClipIcon class="w-2.5 h-2.5" />
+                                       class="flex max-w-full items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-600 transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 dark:border-gray-800 dark:bg-gray-900 dark:text-slate-300">
+                                        <PaperClipIcon class="h-3 w-3 shrink-0" />
                                         {{ file.nombre_original }}
                                     </a>
                                 </div>
@@ -433,20 +545,23 @@ onMounted(fetchNotas);
 
                             <div class="flex flex-col space-y-2 shrink-0">
                                 <button v-if="!nota.is_completed" @click="markAsDone(nota.id)" 
-                                        class="p-2.5 bg-green-50 text-green-600 hover:bg-green-600 hover:text-white rounded-xl transition-all shadow-sm border border-green-100">
-                                    <CheckCircleIcon class="w-5 h-5" />
+                                        title="Marcar como hecha"
+                                        class="rounded-lg border border-emerald-100 bg-emerald-50 p-2.5 text-emerald-600 shadow-sm transition hover:bg-emerald-600 hover:text-white dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                    <CheckCircleIcon class="h-5 w-5" />
                                 </button>
                                 <button v-if="nota.is_completed" @click="deleteNota(nota.id)" 
-                                        class="p-2.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-xl transition-all shadow-sm border border-red-100">
-                                    <TrashIcon class="w-5 h-5" />
+                                        title="Eliminar"
+                                        class="rounded-lg border border-red-100 bg-red-50 p-2.5 text-red-600 shadow-sm transition hover:bg-red-600 hover:text-white dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+                                    <TrashIcon class="h-5 w-5" />
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <div v-if="notas.length === 0" class="text-center py-20 bg-white rounded-3xl border border-dashed border-blue-100">
-                        <ExclamationCircleIcon class="w-12 h-12 mx-auto mb-3 text-blue-100" />
-                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Hoja de ruta vacía</p>
+                    <div v-if="notas.length === 0" class="rounded-lg border border-dashed border-sky-200 bg-white py-16 text-center dark:border-sky-900 dark:bg-gray-950">
+                        <ExclamationCircleIcon class="mx-auto mb-3 h-12 w-12 text-sky-200 dark:text-sky-900" />
+                        <p class="text-sm font-black uppercase tracking-widest text-slate-400">Hoja de ruta vacía</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-400">Agregue la primera gestión para empezar el seguimiento del día.</p>
                     </div>
                 </div>
             </div>

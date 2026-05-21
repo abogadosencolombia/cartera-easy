@@ -19,7 +19,6 @@ use App\Http\Controllers\PagoCasoController;
 use App\Http\Controllers\PersonaController;
 use App\Http\Controllers\PlantillaDocumentoController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\ReporteController;
 use App\Http\Controllers\RequisitoDocumentoController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ValidacionLegalController;
@@ -160,10 +159,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::patch('/profile/preferences', [ProfileController::class, 'updatePreferences'])->name('profile.preferences.update');
 
-    // --- Reportes y Validaciones ---
-    Route::get('/reportes', [ReporteController::class, 'index'])->name('reportes.index');
-    Route::get('/reportes/exportar', [ReporteController::class, 'exportar'])->name('reportes.exportar');
-    Route::get('/reportes/cumplimiento/exportar', [ReporteController::class, 'exportarCumplimiento'])->name('reportes.cumplimiento.exportar');
+    // --- Validaciones ---
     Route::put('/validaciones-legales/{validacion}/corregir', ValidacionLegalController::class)->name('validaciones.corregir');
 
     // --- Documentos Legales de Cooperativas ---
@@ -342,6 +338,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['role:admin'])->prefix('admin')->name('admin.')->group(function () {
         Route::resource('users', UserController::class);
         Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+        Route::delete('users/{user}/reject-pending', [UserController::class, 'rejectPendingRegistration'])->name('users.reject-pending');
         Route::resource('tokens', IntegracionTokenController::class);
         Route::resource('reglas-alerta', ReglaAlertaController::class)->only(['index', 'store', 'destroy']);
         Route::get('auditoria', [AuditoriaController::class, 'index'])->name('auditoria.index');

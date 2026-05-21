@@ -20,9 +20,9 @@ Schedule::job(new \App\Jobs\ProcesarAlertasProgramadas)
     ->name('procesar_alertas_programadas');
 
 Schedule::command('gestion:procesar-alertas')
-    ->everyThirtyMinutes()
+    ->everyFiveMinutes()
     ->timezone('America/Bogota')
-    ->withoutOverlapping(29)
+    ->withoutOverlapping(4)
     ->name('procesar_alertas_gestion_diaria');
 
 Schedule::command('alertas:procesar-vencimientos')

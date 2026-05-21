@@ -2,12 +2,12 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import TextInput from '@/Components/TextInput.vue';
 import Dropdown from '@/Components/Dropdown.vue';
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
 import { 
     UserIcon, BriefcaseIcon, ShieldCheckIcon, BuildingOffice2Icon, 
     PencilSquareIcon, LockClosedIcon, LockOpenIcon, EyeIcon, 
-    ChevronDownIcon, PlusIcon, UsersIcon, MagnifyingGlassIcon
+    ChevronDownIcon, PlusIcon, UsersIcon, MagnifyingGlassIcon, XMarkIcon
 } from '@heroicons/vue/24/outline';
 
 // --- PROPS ---
@@ -79,6 +79,16 @@ watch(() => usePage().props.flash, (newFlash) => {
         }, 3000);
     }
 });
+
+const confirmReject = (user) => {
+    if (!confirm(`Rechazar y eliminar la solicitud de ${user.name}? Esta acción no se puede deshacer.`)) {
+        return;
+    }
+
+    router.delete(route('admin.users.reject-pending', user.id), {
+        preserveScroll: true,
+    });
+};
 </script>
 
 <template>
@@ -263,6 +273,15 @@ watch(() => usePage().props.flash, (newFlash) => {
                                                     <PencilSquareIcon class="h-5 w-5"/>
                                                 </Link>
                                                 <template v-if="user.id !== usePage().props.auth.user.id">
+                                                    <button
+                                                        v-if="!user.estado_activo && user.tipo_usuario === 'cliente'"
+                                                        type="button"
+                                                        @click="confirmReject(user)"
+                                                        class="p-2.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all rounded-xl shadow-sm bg-gray-50 dark:bg-gray-900/50"
+                                                        title="Rechazar y eliminar"
+                                                    >
+                                                        <XMarkIcon class="h-5 w-5" />
+                                                    </button>
                                                     <Link :href="route('admin.users.toggle-status', user.id)" method="patch" as="button" class="p-2.5 transition-all rounded-xl shadow-sm bg-gray-50 dark:bg-gray-900/50" :class="user.estado_activo ? 'text-gray-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20' : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'" :title="user.estado_activo ? 'Suspender' : 'Activar'">
                                                         <component :is="user.estado_activo ? LockClosedIcon : LockOpenIcon" class="h-5 w-5" />
                                                     </Link>

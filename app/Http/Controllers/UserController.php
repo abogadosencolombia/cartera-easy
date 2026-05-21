@@ -220,6 +220,29 @@ class UserController extends Controller
 
         return to_route('admin.users.index')->with('success', $message);
     }
+
+    /**
+     * Rechaza una cuenta pendiente y elimina definitivamente el registro.
+     */
+    public function rejectPendingRegistration(User $user): RedirectResponse
+    {
+        if (!Auth::user()->isAdmin()) {
+            abort(403);
+        }
+
+        if ($user->id === auth()->id()) {
+            return to_route('admin.users.index')->with('error', 'No puede rechazar su propia cuenta.');
+        }
+
+        if ($user->estado_activo || $user->tipo_usuario !== 'cliente') {
+            return to_route('admin.users.index')->with('error', 'Solo se pueden rechazar cuentas pendientes de aprobación.');
+        }
+
+        $userName = $user->name;
+        $user->forceDelete();
+
+        return to_route('admin.users.index')->with('success', "Solicitud de {$userName} rechazada y eliminada.");
+    }
     
     /**
      * Sube y asocia la tarjeta profesional de un usuario.

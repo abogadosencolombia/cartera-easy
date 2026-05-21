@@ -41,32 +41,41 @@ class RegisteredUserController extends Controller
             ],
         ]);
 
-        $admins = User::where('tipo_usuario', 'admin')
+        $adminEmails = User::where('tipo_usuario', 'admin')
             ->where('estado_activo', true)
             ->whereNotNull('email')
-            ->get();
+            ->pluck('email')
+            ->push(config('mail.admin_address'))
+            ->filter(fn ($email) => is_string($email) && filter_var($email, FILTER_VALIDATE_EMAIL))
+            ->unique()
+            ->values();
 
-        if ($admins->isEmpty()) {
+        if ($adminEmails->isEmpty()) {
             Log::warning('Nueva cuenta pendiente sin administradores activos para notificar.', [
                 'user_id' => $user->id,
                 'email' => $user->email,
             ]);
         }
 
-        foreach ($admins as $admin) {
+        foreach ($adminEmails as $adminEmail) {
             try {
-                Mail::to($admin->email)->send(new NuevoUsuarioPendienteMail(
+                Mail::to($adminEmail)->send(new NuevoUsuarioPendienteMail(
                     $user,
                     route('admin.users.edit', $user)
                 ));
             } catch (\Throwable $exception) {
                 Log::error('No se pudo enviar notificación de usuario pendiente.', [
-                    'admin_id' => $admin->id,
+                    'admin_email' => $adminEmail,
                     'pending_user_id' => $user->id,
                     'error' => $exception->getMessage(),
                 ]);
             }
         }
+
+        Log::info('Notificaciones de usuario pendiente procesadas.', [
+            'pending_user_id' => $user->id,
+            'recipients_count' => $adminEmails->count(),
+        ]);
 
         return redirect()
             ->route('login')

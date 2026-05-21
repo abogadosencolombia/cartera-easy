@@ -76,4 +76,6 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    'admin_address' => env('MAIL_TO_ADMIN_ADDRESS'),
+
 ];

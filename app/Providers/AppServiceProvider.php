@@ -15,7 +15,6 @@ use App\Models\Persona;
 use App\Policies\PersonaPolicy;
 use App\Models\PlantillaDocumento;
 use App\Policies\PlantillaPolicy;
-use App\Policies\ReportPolicy;
 use App\Policies\UserPolicy;
 
 // ===== INICIO DE LA MODIFICACIÓN (MÓDULO DE TAREAS) =====
@@ -53,10 +52,6 @@ class AppServiceProvider extends ServiceProvider
         // Aquí le decimos a Laravel que use TareaPolicy para el modelo Tarea
         Gate::policy(Tarea::class, TareaPolicy::class);
         // ===== FIN DE LA MODIFICACIÓN =====
-
-
-        // --- REGISTRO DEL NUEVO PROTOCOLO DE SEGURIDAD ---
-        Gate::define('view-reports', [ReportPolicy::class, 'viewDashboard']);
 
 
         // Gate de administrador existente

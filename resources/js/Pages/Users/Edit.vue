@@ -6,7 +6,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import Checkbox from '@/Components/Checkbox.vue';
-import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import Multiselect from 'vue-multiselect';
 import { 
@@ -55,6 +55,16 @@ function removeAddress(index) {
 // --- SUBMIT ---
 const submit = () => {
     form.post(route('admin.users.update', props.user.id), {
+        preserveScroll: true,
+    });
+};
+
+const rejectPendingRegistration = () => {
+    if (!confirm(`Rechazar y eliminar la solicitud de ${props.user.name}? Esta acción no se puede deshacer.`)) {
+        return;
+    }
+
+    router.delete(route('admin.users.reject-pending', props.user.id), {
         preserveScroll: true,
     });
 };
@@ -290,9 +300,20 @@ const roleIcons = {
                     <!-- ACCIÓN FINAL -->
                     <div class="flex items-center justify-between p-4 bg-indigo-900 rounded-3xl shadow-2xl">
                         <p class="text-indigo-100 text-[10px] font-black uppercase tracking-widest pl-4">Revisión Final: {{ form.name }}</p>
-                        <PrimaryButton class="!bg-white !text-indigo-900 !rounded-2xl !px-10 !py-4 !text-sm !font-black hover:!bg-indigo-50 transition-all" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                            ACTUALIZAR PERFIL
-                        </PrimaryButton>
+                        <div class="flex items-center gap-3">
+                            <button
+                                v-if="!user.estado_activo && user.tipo_usuario === 'cliente' && !isEditingSelf"
+                                type="button"
+                                @click="rejectPendingRegistration"
+                                class="rounded-2xl bg-rose-600 px-6 py-4 text-sm font-black text-white transition-all hover:bg-rose-700 disabled:opacity-50"
+                                :disabled="form.processing"
+                            >
+                                RECHAZAR
+                            </button>
+                            <PrimaryButton class="!bg-white !text-indigo-900 !rounded-2xl !px-10 !py-4 !text-sm !font-black hover:!bg-indigo-50 transition-all" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
+                                ACTUALIZAR PERFIL
+                            </PrimaryButton>
+                        </div>
                     </div>
                 </form>
             </div>
