@@ -1,6 +1,7 @@
 <script setup>
+import { computed } from 'vue';
 import {
-    ScaleIcon, 
+    ScaleIcon,
     BuildingLibraryIcon,
     CalendarDaysIcon,
     EnvelopeIcon,
@@ -8,7 +9,9 @@ import {
     ArrowTopRightOnSquareIcon,
     ChatBubbleBottomCenterTextIcon,
     ClipboardDocumentCheckIcon,
-    HandThumbUpIcon
+    HandThumbUpIcon,
+    IdentificationIcon,
+    MapPinIcon,
 } from '@heroicons/vue/24/outline';
 import GuiaEtapa from '@/Components/GuiaEtapa.vue';
 
@@ -17,182 +20,251 @@ const props = defineProps({
     formatDate: { type: Function, required: true },
 });
 
-const asText = (v) => v ?? '—';
+const asText = (value) => value ?? '—';
+
+const tipoProceso = computed(() => props.proceso.tipo_proceso?.nombre || 'General');
+const despacho = computed(() => props.proceso.juzgado?.nombre || 'Pendiente de asignacion');
+const estadoDatos = computed(() => props.proceso.info_incompleta ? 'Revision requerida' : 'Datos completos');
+const fechaRadicado = computed(() => props.formatDate(props.proceso.fecha_radicado) || 'No registrada');
+const fechaCambioEtapa = computed(() => props.proceso.fecha_cambio_etapa ? props.formatDate(props.proceso.fecha_cambio_etapa) : 'Sin cambios registrados');
+const naturalezaClase = computed(() => {
+    const partes = [props.proceso.naturaleza, props.proceso.clase_proceso].filter(Boolean);
+    return partes.length ? partes.join(' / ') : 'Sin clasificar';
+});
+
+const resumenRapido = computed(() => [
+    {
+        label: 'Radicado',
+        value: props.proceso.radicado || 'Sin numero asignado',
+        detail: props.proceso.es_spoa_nunc ? 'SPOA / NUNC' : tipoProceso.value,
+        icon: IdentificationIcon,
+    },
+    {
+        label: 'Etapa actual',
+        value: props.proceso.etapa_actual?.nombre || 'No definida',
+        detail: fechaCambioEtapa.value,
+        icon: ClipboardDocumentCheckIcon,
+    },
+    {
+        label: 'Despacho',
+        value: despacho.value,
+        detail: props.proceso.estado || 'Sin estado',
+        icon: BuildingLibraryIcon,
+    },
+    {
+        label: 'Datos',
+        value: estadoDatos.value,
+        detail: props.proceso.a_favor_de ? `A favor del ${props.proceso.a_favor_de}` : 'Sin posicion registrada',
+        icon: ScaleIcon,
+    },
+]);
 </script>
 
 <template>
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in duration-500">
-        
-        <!-- COLUMNA IZQUIERDA: DETALLES TÉCNICOS (8/12) -->
-        <div class="lg:col-span-8 space-y-8">
-            <!-- Bloque: Datos del Expediente -->
-            <div class="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-visible transition-all hover:shadow-md">
-                <div class="px-8 py-5 bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                    <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs flex items-center gap-3">
-                        <BuildingLibraryIcon class="w-5 h-5 text-indigo-500" /> 
-                        Detalle Técnico del Expediente
-                    </h3>
-                    <div class="flex items-center gap-2">
-                        <span v-if="proceso.a_favor_de" class="text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter border" :class="proceso.a_favor_de === 'DEMANDANTE' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-red-50 text-red-600 border-red-100'">
-                            <HandThumbUpIcon class="w-3 h-3 inline mr-1" /> A favor del {{ proceso.a_favor_de }}
-                        </span>
-                        <span class="text-[10px] font-black text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1 rounded-full uppercase tracking-tighter border border-indigo-100 dark:border-indigo-800">
-                            {{ proceso.tipo_proceso?.nombre || 'General' }}
-                        </span>
+    <div class="space-y-5 animate-in fade-in duration-500">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div
+                v-for="item in resumenRapido"
+                :key="item.label"
+                class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+            >
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">{{ item.label }}</p>
+                        <p class="mt-1 truncate text-sm font-black text-gray-950 dark:text-white" :title="item.value">{{ item.value }}</p>
+                        <p class="mt-1 truncate text-xs font-semibold text-gray-600 dark:text-gray-300" :title="item.detail">{{ item.detail }}</p>
                     </div>
-                </div>
-                
-                <div class="p-8">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
-                        <div class="flex flex-col gap-1.5">
-                            <span class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Despacho Judicial</span>
-                            <p class="text-sm font-bold text-gray-900 dark:text-gray-100 leading-tight">
-                                {{ proceso.juzgado?.nombre || 'Pendiente de asignación' }}
-                            </p>
-                        </div>
-
-                        <div class="flex flex-col gap-1.5">
-                            <span class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Radicado Oficial</span>
-                            <div class="flex items-center gap-2">
-                                <p class="text-sm font-mono font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">
-                                    {{ proceso.radicado || 'SIN NÚMERO ASIGNADO' }}
-                                </p>
-                                <span v-if="proceso.es_spoa_nunc" class="text-[9px] font-black bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-200 uppercase tracking-tighter">SPOA/NUNC</span>
-                            </div>
-                        </div>
-
-                        <div class="flex flex-col gap-1.5">
-                            <span class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Naturaleza / Clase</span>
-                            <p class="text-sm font-bold text-gray-700 dark:text-gray-300">
-                                {{ asText(proceso.naturaleza) }} {{ proceso.clase_proceso ? ' / ' + proceso.clase_proceso : '' }}
-                            </p>
-                        </div>
-
-                        <div class="flex flex-col gap-1.5">
-                            <span class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Fecha de Radicación</span>
-                            <div class="flex items-center gap-2">
-                                <CalendarDaysIcon class="w-4 h-4 text-gray-400" />
-                                <p class="text-sm font-bold text-gray-700 dark:text-gray-300">
-                                    {{ formatDate(proceso.fecha_radicado) || 'No registrada' }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div class="flex flex-col gap-1.5">
-                            <span class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Estado del Expediente</span>
-                            <p class="text-sm font-bold uppercase" :class="proceso.estado === 'ACTIVO' ? 'text-emerald-600' : 'text-rose-600'">
-                                {{ proceso.estado }}
-                            </p>
-                        </div>
-
-                        <div v-if="proceso.fecha_cambio_etapa" class="flex flex-col gap-1.5">
-                            <span class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Último Cambio de Etapa</span>
-                            <p class="text-sm font-bold text-gray-700 dark:text-gray-300">
-                                {{ formatDate(proceso.fecha_cambio_etapa) }}
-                            </p>
-                        </div>
-
-                        <div class="md:col-span-2 space-y-2">
-                            <span class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Asunto / Descripción</span>
-                            <div class="p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700">
-                                <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium">
-                                    {{ asText(proceso.asunto) }}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Enlaces de Interés -->
-                    <div class="mt-10 pt-8 border-t border-gray-50 dark:border-gray-700 flex flex-wrap gap-4">
-                        <a v-if="proceso.ubicacion_drive" :href="proceso.ubicacion_drive" target="_blank" class="inline-flex items-center px-5 py-2.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-2xl text-xs font-black uppercase hover:bg-blue-100 transition-all shadow-sm">
-                            <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg" class="w-4 h-4 mr-2" /> Carpeta Drive
-                        </a>
-                        <a v-if="proceso.link_expediente" :href="proceso.link_expediente" target="_blank" class="inline-flex items-center px-5 py-2.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded-2xl text-xs font-black uppercase hover:bg-indigo-100 transition-all shadow-sm">
-                            <GlobeAltIcon class="w-4 h-4 mr-2" /> Expediente Digital
-                        </a>
+                    <div class="rounded-lg border border-indigo-100 bg-indigo-50 p-2 text-indigo-600 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-300">
+                        <component :is="item.icon" class="h-5 w-5" />
                     </div>
                 </div>
             </div>
-
-            <!-- Bloque: Observaciones y Cierre -->
-            <div v-if="proceso.observaciones || proceso.nota_cierre" class="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-visible">
-                <div class="px-8 py-5 border-b border-gray-50 dark:border-gray-700 flex items-center gap-3">
-                    <ChatBubbleBottomCenterTextIcon class="w-5 h-5 text-indigo-500" />
-                    <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Observaciones e Historial de Estado</h3>
-                </div>
-                <div class="p-8 space-y-6">
-                    <div v-if="proceso.observaciones">
-                        <span class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 block">Notas Internas</span>
-                        <p class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed italic">
-                            {{ proceso.observaciones }}
-                        </p>
-                    </div>
-
-                    <div v-if="proceso.nota_cierre" class="p-4 bg-rose-50 dark:bg-rose-900/20 border-l-4 border-rose-500 rounded-r-xl">
-                        <span class="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest block mb-1">Nota de Finalización / Cierre</span>
-                        <p class="text-sm text-rose-800 dark:text-rose-300 font-medium">
-                            {{ proceso.nota_cierre }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- GUÍA DE GESTIÓN POR ETAPA -->
-            <GuiaEtapa 
-                v-if="proceso.etapa_actual"
-                :etapa="proceso.etapa_actual.nombre" 
-                :checklist-completados="proceso.checklist_seguimiento || []"
-                :model-id="proceso.id"
-                model-type="proceso"
-                :entity="proceso"
-            />
         </div>
 
-        <!-- COLUMNA DERECHA: CONTACTO Y COMUNICACIÓN (4/12) -->
-        <div class="lg:col-span-4 space-y-8">
-            
-            <!-- Tarjeta: Canales de Comunicación -->
-            <div class="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-xl overflow-visible">
-                <div class="px-8 py-5 border-b border-gray-50 dark:border-gray-700 flex items-center gap-3">
-                    <EnvelopeIcon class="w-5 h-5 text-indigo-500" />
-                    <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-[10px]">Canales de Comunicación</h3>
-                </div>
-                <div class="p-8 space-y-8">
-                    <div class="space-y-4">
-                        <div class="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700">
-                            <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Correo de Radicación</span>
-                            <p class="text-xs font-bold text-gray-700 dark:text-gray-300 truncate" :title="proceso.correo_radicacion">
-                                {{ proceso.correo_radicacion || 'No registra' }}
-                            </p>
+        <div class="grid grid-cols-1 gap-5 xl:grid-cols-12">
+            <section class="xl:col-span-8 space-y-5">
+                <div class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                    <div class="flex flex-col gap-3 border-b border-gray-200 px-5 py-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-300">Resumen juridico</p>
+                            <h3 class="text-base font-black text-gray-950 dark:text-white">Datos principales del radicado</h3>
                         </div>
-                        
-                        <div class="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700">
-                            <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Correos de la Entidad</span>
-                            <p class="text-xs font-medium text-gray-600 dark:text-gray-400 leading-tight">
-                                {{ proceso.correos_juzgado || 'Sin correos adicionales' }}
-                            </p>
+                        <div class="flex flex-wrap gap-2">
+                            <span
+                                v-if="proceso.a_favor_de"
+                                class="inline-flex items-center rounded-md border px-2.5 py-1 text-[10px] font-black uppercase"
+                                :class="proceso.a_favor_de === 'DEMANDANTE'
+                                    ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300'
+                                    : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300'"
+                            >
+                                <HandThumbUpIcon class="mr-1 h-3.5 w-3.5" />
+                                A favor del {{ proceso.a_favor_de }}
+                            </span>
+                            <span class="rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[10px] font-black uppercase text-indigo-700 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-300">
+                                {{ tipoProceso }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="p-5">
+                        <dl class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                                <dt class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                                    <BuildingLibraryIcon class="h-4 w-4 text-indigo-500" />
+                                    Despacho judicial
+                                </dt>
+                                <dd class="mt-2 text-sm font-bold leading-relaxed text-gray-900 dark:text-gray-100">{{ despacho }}</dd>
+                            </div>
+
+                            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                                <dt class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                                    <IdentificationIcon class="h-4 w-4 text-indigo-500" />
+                                    Radicado oficial
+                                </dt>
+                                <dd class="mt-2 flex flex-wrap items-center gap-2">
+                                    <span class="font-mono text-sm font-black text-indigo-700 dark:text-indigo-300">{{ proceso.radicado || 'SIN NUMERO ASIGNADO' }}</span>
+                                    <span v-if="proceso.es_spoa_nunc" class="rounded-full border border-indigo-200 bg-indigo-100 px-2 py-0.5 text-[9px] font-black uppercase text-indigo-700 dark:border-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">SPOA/NUNC</span>
+                                </dd>
+                            </div>
+
+                            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                                <dt class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                                    <ScaleIcon class="h-4 w-4 text-indigo-500" />
+                                    Naturaleza / clase
+                                </dt>
+                                <dd class="mt-2 text-sm font-bold text-gray-900 dark:text-gray-100">{{ naturalezaClase }}</dd>
+                            </div>
+
+                            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                                <dt class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                                    <CalendarDaysIcon class="h-4 w-4 text-indigo-500" />
+                                    Fecha de radicacion
+                                </dt>
+                                <dd class="mt-2 text-sm font-bold text-gray-900 dark:text-gray-100">{{ fechaRadicado }}</dd>
+                            </div>
+
+                            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                                <dt class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Estado del expediente</dt>
+                                <dd
+                                    class="mt-2 text-sm font-black uppercase"
+                                    :class="proceso.estado === 'ACTIVO' || proceso.estado === 'ABIERTO' ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'"
+                                >
+                                    {{ proceso.estado || 'Sin estado' }}
+                                </dd>
+                            </div>
+
+                            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                                <dt class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Ultimo cambio de etapa</dt>
+                                <dd class="mt-2 text-sm font-bold text-gray-900 dark:text-gray-100">{{ fechaCambioEtapa }}</dd>
+                            </div>
+                        </dl>
+
+                        <div class="mt-4 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Asunto / descripcion</p>
+                            <p class="mt-2 whitespace-pre-line text-sm font-medium leading-relaxed text-gray-800 dark:text-gray-200">{{ asText(proceso.asunto) }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="proceso.observaciones || proceso.nota_cierre" class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                    <div class="flex items-center gap-2 border-b border-gray-200 px-5 py-4 dark:border-gray-700">
+                        <ChatBubbleBottomCenterTextIcon class="h-5 w-5 text-indigo-500" />
+                        <h3 class="text-sm font-black text-gray-950 dark:text-white">Observaciones e historial de estado</h3>
+                    </div>
+                    <div class="space-y-4 p-5">
+                        <div v-if="proceso.observaciones" class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Notas internas</p>
+                            <p class="mt-2 whitespace-pre-line text-sm font-medium leading-relaxed text-gray-800 dark:text-gray-200">{{ proceso.observaciones }}</p>
+                        </div>
+
+                        <div v-if="proceso.nota_cierre" class="rounded-lg border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/60 dark:bg-rose-950/30">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-rose-700 dark:text-rose-300">Nota de finalizacion / cierre</p>
+                            <p class="mt-2 whitespace-pre-line text-sm font-semibold leading-relaxed text-rose-900 dark:text-rose-200">{{ proceso.nota_cierre }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <GuiaEtapa
+                    v-if="proceso.etapa_actual"
+                    :etapa="proceso.etapa_actual.nombre"
+                    :checklist-completados="proceso.checklist_seguimiento || []"
+                    :model-id="proceso.id"
+                    model-type="proceso"
+                    :entity="proceso"
+                />
+            </section>
+
+            <aside class="xl:col-span-4 space-y-5">
+                <div class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                    <div class="flex items-center gap-2 border-b border-gray-200 px-5 py-4 dark:border-gray-700">
+                        <EnvelopeIcon class="h-5 w-5 text-indigo-500" />
+                        <div>
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-300">Contacto</p>
+                            <h3 class="text-sm font-black text-gray-950 dark:text-white">Canales y enlaces</h3>
                         </div>
                     </div>
 
-                    <div class="pt-6 border-t border-gray-50 dark:border-gray-700">
-                        <div class="flex items-center gap-3 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800">
-                            <div class="p-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm">
-                                <ClipboardDocumentCheckIcon class="w-5 h-5 text-indigo-600" />
+                    <div class="space-y-4 p-5">
+                        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Correo de radicacion</p>
+                            <p class="mt-2 break-words text-sm font-bold text-gray-900 dark:text-gray-100">{{ proceso.correo_radicacion || 'No registra' }}</p>
+                        </div>
+
+                        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Correos de la entidad</p>
+                            <p class="mt-2 whitespace-pre-line break-words text-sm font-medium leading-relaxed text-gray-800 dark:text-gray-200">{{ proceso.correos_juzgado || 'Sin correos adicionales' }}</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-3">
+                            <a
+                                v-if="proceso.ubicacion_drive"
+                                :href="proceso.ubicacion_drive"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="inline-flex items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-black text-blue-700 transition hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-300"
+                            >
+                                <span class="inline-flex items-center gap-2">
+                                    <MapPinIcon class="h-4 w-4" />
+                                    Carpeta Drive
+                                </span>
+                                <ArrowTopRightOnSquareIcon class="h-4 w-4" />
+                            </a>
+
+                            <a
+                                v-if="proceso.link_expediente"
+                                :href="proceso.link_expediente"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="inline-flex items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-black text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-300"
+                            >
+                                <span class="inline-flex items-center gap-2">
+                                    <GlobeAltIcon class="h-4 w-4" />
+                                    Expediente digital
+                                </span>
+                                <ArrowTopRightOnSquareIcon class="h-4 w-4" />
+                            </a>
+
+                            <div v-if="!proceso.ubicacion_drive && !proceso.link_expediente" class="rounded-lg border border-dashed border-gray-300 p-4 text-sm font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-300">
+                                No hay enlaces externos registrados.
                             </div>
-                            <div>
-                                <p class="text-[9px] font-black text-indigo-900 dark:text-indigo-300 uppercase tracking-tighter">Estado de Datos</p>
-                                <p class="text-[11px] font-bold text-indigo-700 dark:text-indigo-400">
-                                    {{ proceso.info_incompleta ? 'REVISIÓN REQUERIDA' : 'DATOS COMPLETOS' }}
-                                </p>
+                        </div>
+
+                        <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900/60 dark:bg-indigo-950/30">
+                            <div class="flex items-center gap-3">
+                                <div class="rounded-lg bg-white p-2 text-indigo-600 shadow-sm dark:bg-gray-900 dark:text-indigo-300">
+                                    <ClipboardDocumentCheckIcon class="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-black uppercase tracking-widest text-indigo-800 dark:text-indigo-200">Estado de datos</p>
+                                    <p class="text-sm font-black text-indigo-700 dark:text-indigo-300">{{ estadoDatos }}</p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Espacio para el widget de "Programar Notificación" que se inyectará desde el padre o se definirá como sub-componente -->
-            <slot name="notificaciones" />
-
+                <slot name="notificaciones" />
+            </aside>
         </div>
     </div>
 </template>

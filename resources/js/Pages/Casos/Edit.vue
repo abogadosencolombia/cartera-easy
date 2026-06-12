@@ -24,7 +24,8 @@ import {
     TrashIcon, InformationCircleIcon, ScaleIcon, UsersIcon, LockClosedIcon, 
     PlusIcon, ChevronUpIcon, ChevronDownIcon, ArchiveBoxXMarkIcon, ArrowPathIcon,
     BriefcaseIcon, BuildingOfficeIcon, CheckCircleIcon, ClockIcon, DocumentTextIcon,
-    UserCircleIcon, CalendarDaysIcon
+    UserCircleIcon, CalendarDaysIcon, MapPinIcon, PhoneIcon,
+    EnvelopeIcon, LinkIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -115,6 +116,48 @@ const form = useForm({
 });
 
 const financialFormStatus = computed(() => getCaseFinancialStatus(form));
+
+const caseSummaryCards = computed(() => [
+    {
+        label: 'Empresa',
+        value: form.cooperativa_id?.nombre || 'Sin asignar',
+        detail: 'Cooperativa / entidad',
+        icon: BuildingOfficeIcon,
+        class: 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-300',
+    },
+    {
+        label: 'Deudor',
+        value: form.deudor.is_new ? (form.deudor.nombre_completo || 'Nuevo deudor') : (form.deudor.selected?.nombre_completo || 'Sin deudor'),
+        detail: form.deudor.is_new ? 'Registro nuevo' : 'Persona existente',
+        icon: UserCircleIcon,
+        class: 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-300',
+    },
+    {
+        label: 'Codeudores',
+        value: form.sin_codeudores ? 'Sin codeudores' : form.codeudores.length,
+        detail: form.sin_codeudores ? 'Estado confirmado' : 'Garantias personales',
+        icon: UsersIcon,
+        class: form.sin_codeudores
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300'
+            : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300',
+    },
+    {
+        label: 'Estado',
+        value: props.caso.nota_cierre ? 'Cerrado' : 'Activo',
+        detail: isFormDisabled.value ? 'Bloqueado para edicion' : 'Editable',
+        icon: LockClosedIcon,
+        class: props.caso.nota_cierre || isFormDisabled.value
+            ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300'
+            : 'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-200',
+    },
+]);
+
+const tabItems = computed(() => [
+    { id: 'info-principal', label: 'Info principal', icon: InformationCircleIcon, badge: financialFormStatus.value.hasMissing ? 'Revisar' : null },
+    { id: 'proceso-judicial', label: 'Proceso judicial', icon: ScaleIcon, badge: form.radicado ? null : 'Sin radicado' },
+    { id: 'codeudores', label: 'Codeudores', icon: UsersIcon, badge: form.sin_codeudores ? 'Sin' : form.codeudores.length },
+    { id: 'control-notas', label: 'Control y notas', icon: LockClosedIcon, badge: props.caso.nota_cierre ? 'Cerrado' : null },
+]);
 
 watch(() => props.caso.id, (newId) => {
     if (newId) {
@@ -299,39 +342,77 @@ const submit = () => {
     <Head :title="'Editar Caso #' + caso.id" />
     <AuthenticatedLayout>
         <template #header>
-             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                  <div class="min-w-0">
-                     <p class="text-xs font-black uppercase tracking-[0.22em] text-indigo-600 dark:text-indigo-400">Edición de expediente</p>
-                     <h2 class="mt-1 truncate text-2xl font-black tracking-tight text-gray-950 dark:text-gray-100">
-                        Caso <span class="text-indigo-600 dark:text-indigo-400">#{{ caso.id }}</span>
-                     </h2>
-                     <p class="mt-1 max-w-3xl text-sm font-medium text-gray-500 dark:text-gray-400">
-                        Actualiza los datos principales, judiciales, garantías y notas internas del caso.
+                     <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Edicion de expediente</p>
+                     <div class="mt-1 flex flex-wrap items-center gap-2">
+                        <h2 class="truncate text-2xl font-black tracking-tight text-gray-950 dark:text-white">
+                            Caso #{{ caso.id }}
+                        </h2>
+                        <span class="rounded-md border px-2.5 py-1 text-[10px] font-black uppercase" :class="caso.nota_cierre ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300'">
+                            {{ caso.nota_cierre ? 'Cerrado' : 'Activo' }}
+                        </span>
+                        <span v-if="isFormDisabled" class="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+                            Bloqueado
+                        </span>
+                     </div>
+                     <p class="mt-1 max-w-4xl text-sm font-medium text-gray-600 dark:text-gray-300">
+                        Actualiza datos financieros, proceso judicial, codeudores, ubicaciones y notas internas.
                      </p>
                  </div>
-                 <div class="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
-                     <Link :href="route('casos.show', caso.id)" class="w-full sm:w-auto"><SecondaryButton class="w-full justify-center sm:w-auto">Cancelar</SecondaryButton></Link>
-                     <PrimaryButton class="w-full justify-center sm:w-auto" @click="submit" :disabled="form.processing || isFormDisabled">Actualizar Caso</PrimaryButton>
+                 <div class="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+                     <Link :href="route('casos.show', caso.id)" class="w-full sm:w-auto">
+                        <SecondaryButton class="w-full justify-center sm:w-auto">Cancelar</SecondaryButton>
+                     </Link>
+                     <PrimaryButton class="w-full justify-center sm:w-auto" @click="submit" :disabled="form.processing || isFormDisabled">
+                        <ArrowPathIcon v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
+                        Actualizar caso
+                     </PrimaryButton>
                  </div>
              </div>
         </template>
 
-        <div class="case-edit-page py-8 lg:py-10">
-            <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-                <div class="overflow-visible rounded-2xl border border-gray-200 bg-white shadow-sm ring-1 ring-gray-950/5 dark:border-gray-700 dark:bg-gray-900 dark:ring-white/10">
-                    <div class="border-b border-gray-200 bg-gray-50/80 px-4 py-3 dark:border-gray-700 dark:bg-gray-800/60 sm:px-6">
-                        <nav class="grid grid-flow-col auto-cols-[minmax(12rem,1fr)] gap-2 overflow-x-auto pb-1">
-                            <button @click="setActiveTab('info-principal')" :class="[activeTab === 'info-principal' ? 'border-indigo-500 bg-white text-indigo-700 shadow-sm dark:bg-gray-900 dark:text-indigo-300' : 'border-transparent text-gray-600 hover:border-gray-200 hover:bg-white/70 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:bg-gray-900/50']" class="flex min-h-14 items-center gap-3 whitespace-nowrap rounded-xl border px-4 py-3 text-left text-sm font-black transition">
-                                <InformationCircleIcon class="h-5 w-5 shrink-0"/><span>Info Principal</span>
-                            </button>
-                            <button @click="setActiveTab('proceso-judicial')" :class="[activeTab === 'proceso-judicial' ? 'border-indigo-500 bg-white text-indigo-700 shadow-sm dark:bg-gray-900 dark:text-indigo-300' : 'border-transparent text-gray-600 hover:border-gray-200 hover:bg-white/70 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:bg-gray-900/50']" class="flex min-h-14 items-center gap-3 whitespace-nowrap rounded-xl border px-4 py-3 text-left text-sm font-black transition">
-                                <ScaleIcon class="h-5 w-5 shrink-0"/><span>Proceso Judicial</span>
-                            </button>
-                            <button @click="setActiveTab('codeudores')" :class="[activeTab === 'codeudores' ? 'border-indigo-500 bg-white text-indigo-700 shadow-sm dark:bg-gray-900 dark:text-indigo-300' : 'border-transparent text-gray-600 hover:border-gray-200 hover:bg-white/70 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:bg-gray-900/50']" class="flex min-h-14 items-center gap-3 whitespace-nowrap rounded-xl border px-4 py-3 text-left text-sm font-black transition">
-                                <UsersIcon class="h-5 w-5 shrink-0"/><span>Codeudores</span>
-                            </button>
-                            <button @click="setActiveTab('control-notas')" :class="[activeTab === 'control-notas' ? 'border-indigo-500 bg-white text-indigo-700 shadow-sm dark:bg-gray-900 dark:text-indigo-300' : 'border-transparent text-gray-600 hover:border-gray-200 hover:bg-white/70 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:bg-gray-900/50']" class="flex min-h-14 items-center gap-3 whitespace-nowrap rounded-xl border px-4 py-3 text-left text-sm font-black transition">
-                                <LockClosedIcon class="h-5 w-5 shrink-0"/><span>Control y Notas</span>
+        <div class="case-edit-page min-h-screen bg-gray-50/60 py-6 dark:bg-gray-900/40">
+            <div class="mx-auto max-w-[1600px] space-y-5 px-4 sm:px-6 lg:px-8">
+                <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <article
+                        v-for="item in caseSummaryCards"
+                        :key="item.label"
+                        class="rounded-lg border p-4 shadow-sm"
+                        :class="item.class"
+                    >
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="text-[10px] font-black uppercase tracking-widest opacity-80">{{ item.label }}</p>
+                                <p class="mt-1 truncate text-sm font-black" :title="String(item.value)">{{ item.value }}</p>
+                                <p class="mt-1 truncate text-xs font-semibold opacity-90" :title="item.detail">{{ item.detail }}</p>
+                            </div>
+                            <component :is="item.icon" class="h-5 w-5 shrink-0 opacity-80" />
+                        </div>
+                    </article>
+                </section>
+
+                <div class="overflow-visible rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                    <div class="border-b border-gray-200 px-3 dark:border-gray-700">
+                        <nav class="flex gap-2 overflow-x-auto py-3" aria-label="Secciones de edicion del caso">
+                            <button
+                                v-for="tab in tabItems"
+                                :key="tab.id"
+                                @click="setActiveTab(tab.id)"
+                                :class="activeTab === tab.id
+                                    ? 'bg-indigo-600 text-white shadow-sm'
+                                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-950 dark:text-gray-300 dark:hover:bg-gray-700/70 dark:hover:text-white'"
+                                class="inline-flex shrink-0 items-center rounded-lg px-3 py-2 text-[11px] font-black uppercase tracking-wider transition"
+                            >
+                                <component :is="tab.icon" class="mr-2 h-4 w-4" :class="activeTab === tab.id ? 'text-white' : 'text-gray-400'" />
+                                {{ tab.label }}
+                                <span
+                                    v-if="tab.badge !== null && tab.badge !== undefined && tab.badge !== ''"
+                                    class="ml-2 rounded-full px-2 py-0.5 text-[9px] font-black"
+                                    :class="activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200'"
+                                >
+                                    {{ tab.badge }}
+                                </span>
                             </button>
                         </nav>
                     </div>
@@ -617,37 +698,159 @@ const submit = () => {
                             </section>
 
                             <!-- TAB 3 -->
-                            <section v-show="activeTab === 'codeudores'" class="space-y-6">
-                                <div class="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-gray-50/60 p-4 dark:border-gray-700 dark:bg-gray-800/35 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                            <section v-show="activeTab === 'codeudores'" class="space-y-5">
+                                <div class="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40 sm:flex-row sm:items-center sm:justify-between">
                                     <div>
-                                        <h3 class="text-base font-black text-gray-950 dark:text-gray-100">Lista de Codeudores</h3>
-                                        <p class="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Garantías personales asociadas al expediente.</p>
+                                        <p class="text-[10px] font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-300">Garantias personales</p>
+                                        <h3 class="text-base font-black text-gray-950 dark:text-white">Codeudores vinculados</h3>
+                                        <p class="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Edita identificacion, contacto, ubicaciones y enlaces digitales de cada codeudor.</p>
                                     </div>
-                                    <PrimaryButton type="button" @click="addCodeudor" class="justify-center">+ Añadir</PrimaryButton>
+                                    <div class="flex flex-col gap-2 sm:flex-row">
+                                        <button
+                                            v-if="form.codeudores.length === 0 && !form.sin_codeudores"
+                                            type="button"
+                                            @click="form.sin_codeudores = true"
+                                            class="inline-flex items-center justify-center rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-amber-700 transition hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
+                                        >
+                                            Marcar sin codeudores
+                                        </button>
+                                        <PrimaryButton type="button" @click="addCodeudor" class="justify-center">
+                                            <PlusIcon class="mr-2 h-4 w-4" /> Añadir codeudor
+                                        </PrimaryButton>
+                                    </div>
                                 </div>
-                                <div v-for="(c, i) in form.codeudores" :key="i" class="relative rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:p-6">
-                                    <button @click="removeCodeudor(i)" class="absolute right-4 top-4 rounded-lg p-2 text-red-500 transition hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20"><TrashIcon class="h-5 w-5"/></button>
-                                    <div class="mb-5 pr-12">
-                                        <p class="text-xs font-black uppercase tracking-[0.18em] text-gray-400">Codeudor #{{ i + 1 }}</p>
-                                    </div>
-                                    <div class="grid grid-cols-1 gap-5 md:grid-cols-3">
-                                        <div class="md:col-span-1"><InputLabel value="Nombre Completo *" /><TextInput v-model="c.nombre_completo" @blur="c.nombre_completo = toUpperCase(c.nombre_completo)" class="mt-1 block w-full" required/><InputError :message="form.errors[`codeudores.${i}.nombre_completo`]" /></div>
-                                        <div><InputLabel value="Tipo Documento" /><SelectInput v-model="c.tipo_documento"><option value="CC">Cédula de Ciudadanía</option><option value="NIT">NIT</option><option value="CE">Cédula de Extranjería</option></SelectInput></div>
+
+                                <div v-if="form.codeudores.length === 0 && !form.sin_codeudores" class="rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center dark:border-gray-700 dark:bg-gray-900">
+                                    <UsersIcon class="mx-auto mb-3 h-10 w-10 text-gray-300" />
+                                    <p class="text-sm font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">No se han vinculado codeudores</p>
+                                    <p class="mt-1 text-xs font-medium text-gray-500 dark:text-gray-400">Agrega un deudor solidario o confirma que el titulo no tiene garantias personales.</p>
+                                </div>
+
+                                <div v-for="(c, i) in form.codeudores" :key="i" class="relative rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                                    <div class="mb-5 flex flex-col gap-3 border-b border-gray-200 pb-4 pr-12 dark:border-gray-700 sm:flex-row sm:items-start sm:justify-between">
                                         <div>
-                                            <InputLabel value="Número Documento *" />
+                                            <p class="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-300">Codeudor #{{ i + 1 }}</p>
+                                            <h4 class="mt-1 text-base font-black text-gray-950 dark:text-white">{{ c.nombre_completo || 'Sin nombre registrado' }}</h4>
+                                            <p class="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">{{ c.tipo_documento || 'CC' }} {{ c.numero_documento || 'Sin documento' }}</p>
+                                        </div>
+                                        <button type="button" @click="removeCodeudor(i)" class="absolute right-4 top-4 rounded-lg border border-rose-200 bg-rose-50 p-2 text-rose-600 transition hover:bg-rose-600 hover:text-white dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300" title="Eliminar codeudor">
+                                            <TrashIcon class="h-4 w-4"/>
+                                        </button>
+                                    </div>
+
+                                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                        <div class="md:col-span-1">
+                                            <InputLabel value="Nombre completo *" />
+                                            <TextInput v-model="c.nombre_completo" @blur="c.nombre_completo = toUpperCase(c.nombre_completo)" class="mt-1 block w-full" required />
+                                            <InputError :message="form.errors[`codeudores.${i}.nombre_completo`]" />
+                                        </div>
+                                        <div>
+                                            <InputLabel value="Tipo documento" />
+                                            <SelectInput v-model="c.tipo_documento">
+                                                <option value="CC">Cedula de Ciudadania</option>
+                                                <option value="NIT">NIT</option>
+                                                <option value="CE">Cedula de Extranjeria</option>
+                                            </SelectInput>
+                                        </div>
+                                        <div>
+                                            <InputLabel value="Numero documento *" />
                                             <div :class="c.tipo_documento === 'NIT' ? 'grid grid-cols-4 gap-2' : ''">
                                                 <div :class="c.tipo_documento === 'NIT' ? 'col-span-3' : ''">
-                                                    <TextInput v-model="c.numero_documento" class="mt-1 block w-full" required/>
+                                                    <TextInput v-model="c.numero_documento" class="mt-1 block w-full" required />
                                                 </div>
                                                 <div v-if="c.tipo_documento === 'NIT'">
-                                                    <TextInput v-model="c.dv" maxlength="1" placeholder="DV" class="mt-1 block w-full text-center px-0" />
+                                                    <TextInput v-model="c.dv" maxlength="1" placeholder="DV" class="mt-1 block w-full px-0 text-center" />
                                                 </div>
                                             </div>
                                             <InputError :message="form.errors[`codeudores.${i}.numero_documento`]" />
                                             <InputError :message="form.errors[`codeudores.${i}.dv`]" />
                                         </div>
-                                        <div><InputLabel value="Celular" /><TextInput v-model="c.celular" class="mt-1 block w-full" placeholder="Ej: 3001234567" /></div>
-                                        <div class="md:col-span-2"><InputLabel value="Correo Electrónico" /><TextInput v-model="c.correo" type="email" class="mt-1 block w-full" placeholder="correo@ejemplo.com" /></div>
+                                        <div>
+                                            <InputLabel value="Celular" />
+                                            <div class="relative">
+                                                <PhoneIcon class="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
+                                                <TextInput v-model="c.celular" class="mt-1 block w-full pl-10" placeholder="Ej: 3001234567" />
+                                            </div>
+                                        </div>
+                                        <div class="md:col-span-2">
+                                            <InputLabel value="Correo electronico" />
+                                            <div class="relative">
+                                                <EnvelopeIcon class="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
+                                                <TextInput v-model="c.correo" type="email" class="mt-1 block w-full pl-10" placeholder="correo@ejemplo.com" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-5 grid grid-cols-1 gap-5 border-t border-gray-200 pt-5 dark:border-gray-700 xl:grid-cols-2">
+                                        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50">
+                                            <div class="mb-3 flex items-center justify-between gap-3">
+                                                <div>
+                                                    <p class="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Ubicaciones</p>
+                                                    <p class="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Direcciones conocidas del codeudor.</p>
+                                                </div>
+                                                <button type="button" @click="addAddress(i)" class="inline-flex items-center rounded-lg border border-indigo-200 bg-white px-3 py-2 text-[10px] font-black uppercase text-indigo-600 transition hover:bg-indigo-50 dark:border-indigo-900/60 dark:bg-gray-800 dark:text-indigo-300">
+                                                    <MapPinIcon class="mr-1.5 h-3.5 w-3.5" /> Añadir
+                                                </button>
+                                            </div>
+
+                                            <div v-if="!c.addresses?.length" class="rounded-lg border border-dashed border-gray-300 p-5 text-center text-xs font-bold text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                                                Sin ubicaciones registradas.
+                                            </div>
+                                            <div v-else class="space-y-3">
+                                                <div v-for="(addr, aIdx) in c.addresses" :key="aIdx" class="relative rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                                                    <button type="button" @click="removeAddress(i, aIdx)" class="absolute right-2 top-2 rounded-md p-1.5 text-rose-500 transition hover:bg-rose-50 dark:hover:bg-rose-950/30" title="Eliminar ubicacion">
+                                                        <TrashIcon class="h-3.5 w-3.5" />
+                                                    </button>
+                                                    <div class="grid grid-cols-1 gap-3 pr-8 sm:grid-cols-3">
+                                                        <div>
+                                                            <InputLabel value="Etiqueta" class="!text-[9px]" />
+                                                            <TextInput v-model="addr.label" placeholder="Casa, oficina" class="w-full !text-xs" />
+                                                        </div>
+                                                        <div class="sm:col-span-2">
+                                                            <InputLabel value="Direccion" class="!text-[9px]" />
+                                                            <TextInput v-model="addr.address" placeholder="Calle, carrera, barrio" class="w-full !text-xs" />
+                                                        </div>
+                                                        <div class="sm:col-span-3">
+                                                            <InputLabel value="Ciudad" class="!text-[9px]" />
+                                                            <TextInput v-model="addr.city" placeholder="Ciudad" class="w-full !text-xs" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50">
+                                            <div class="mb-3 flex items-center justify-between gap-3">
+                                                <div>
+                                                    <p class="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Enlaces digitales</p>
+                                                    <p class="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Perfiles, portales o datos de rastreo utiles.</p>
+                                                </div>
+                                                <button type="button" @click="c.social_links.push({ label: 'Facebook', url: '' })" class="inline-flex items-center rounded-lg border border-sky-200 bg-white px-3 py-2 text-[10px] font-black uppercase text-sky-600 transition hover:bg-sky-50 dark:border-sky-900/60 dark:bg-gray-800 dark:text-sky-300">
+                                                    <LinkIcon class="mr-1.5 h-3.5 w-3.5" /> Añadir
+                                                </button>
+                                            </div>
+
+                                            <div v-if="!c.social_links?.length" class="rounded-lg border border-dashed border-gray-300 p-5 text-center text-xs font-bold text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                                                Sin enlaces digitales registrados.
+                                            </div>
+                                            <div v-else class="space-y-3">
+                                                <div v-for="(link, sIdx) in c.social_links" :key="sIdx" class="relative rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                                                    <button type="button" @click="c.social_links.splice(sIdx, 1)" class="absolute right-2 top-2 rounded-md p-1.5 text-rose-500 transition hover:bg-rose-50 dark:hover:bg-rose-950/30" title="Eliminar enlace">
+                                                        <TrashIcon class="h-3.5 w-3.5" />
+                                                    </button>
+                                                    <div class="grid grid-cols-1 gap-3 pr-8 sm:grid-cols-3">
+                                                        <div>
+                                                            <InputLabel value="Etiqueta" class="!text-[9px]" />
+                                                            <TextInput v-model="link.label" placeholder="Facebook, LinkedIn" class="w-full !text-xs" />
+                                                        </div>
+                                                        <div class="sm:col-span-2">
+                                                            <InputLabel value="URL / referencia" class="!text-[9px]" />
+                                                            <TextInput v-model="link.url" type="text" placeholder="https://..." class="w-full !text-xs" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </section>

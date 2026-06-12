@@ -1,0 +1,1 @@
+{"version":2,"defects":[],"times":{"Tests\\Feature\\NotificacionScheduleTimeTest::test_date_only_notification_defaults_to_business_hour":0.046,"Tests\\Feature\\NotificacionScheduleTimeTest::test_explicit_morning_time_is_preserved":0.001,"Tests\\Feature\\NotificacionScheduleTimeTest::test_explicit_evening_time_is_preserved":0}}

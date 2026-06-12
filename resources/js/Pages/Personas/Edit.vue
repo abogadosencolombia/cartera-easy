@@ -131,13 +131,13 @@ const getRandomColor = (id) => {
 
   <AuthenticatedLayout>
     <template #header>
-      <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-4">
         <div class="flex items-center gap-4">
-            <Link :href="route('personas.show', persona.id)" class="p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-400 hover:text-indigo-600 transition-all shadow-sm">
+            <Link :href="route('personas.show', persona.id)" class="p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-400 hover:text-indigo-600 transition-all shadow-sm">
                 <ArrowLeftIcon class="w-6 h-6" />
             </Link>
             <div class="flex items-center gap-4">
-                <div :class="`w-14 h-14 rounded-2xl flex items-center justify-center text-white text-xl font-black shadow-lg ${getRandomColor(persona.id)}`">
+                <div :class="`w-14 h-14 rounded-lg flex items-center justify-center text-white text-xl font-black shadow-lg ${getRandomColor(persona.id)}`">
                     {{ persona.nombre_completo[0] }}
                 </div>
                 <div>
@@ -149,7 +149,7 @@ const getRandomColor = (id) => {
             </div>
         </div>
         <div class="flex items-center gap-3 w-full md:w-auto">
-            <PrimaryButton @click="submit" class="w-full md:w-auto !bg-indigo-600 hover:!bg-indigo-700 !px-10 !py-3 !text-sm !font-black !rounded-xl !shadow-xl !shadow-indigo-200 dark:!shadow-none flex items-center justify-center gap-2" :disabled="form.processing">
+            <PrimaryButton @click="submit" class="w-full md:w-auto !bg-indigo-600 hover:!bg-indigo-700 !px-10 !py-3 !text-sm !font-black !rounded-lg !shadow-sm dark:!shadow-none flex items-center justify-center gap-2" :disabled="form.processing">
                 <CheckCircleIcon v-if="!form.processing" class="w-5 h-5" />
                 <ArrowPathIcon v-else class="w-5 h-5 animate-spin" />
                 Guardar Cambios
@@ -158,21 +158,21 @@ const getRandomColor = (id) => {
       </div>
     </template>
 
-    <div class="py-12 bg-gray-50/50 dark:bg-gray-900/50 min-h-screen">
-      <div class="max-w-5xl mx-auto sm:px-6 lg:px-8 space-y-10">
+    <div class="py-6 bg-gray-50/60 dark:bg-gray-900/50 min-h-screen">
+      <div class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 space-y-5">
         
-        <form @submit.prevent="submit" class="space-y-10">
+        <form @submit.prevent="submit" class="space-y-5">
           
           <!-- SECCIÓN 1: IDENTIDAD -->
-          <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-            <div class="px-8 py-5 bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 bg-gray-50 dark:bg-gray-900/30 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
                 <IdentificationIcon class="w-5 h-5 text-indigo-500" />
                 <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Identidad y Documentación</h3>
             </div>
-            <div class="p-8 md:p-10 grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div class="md:col-span-2 space-y-2">
                     <InputLabel value="Nombre Completo o Razón Social *" class="font-bold text-xs uppercase" />
-                    <TextInput v-model="form.nombre_completo" type="text" class="w-full rounded-2xl border-gray-200 font-bold text-lg" required />
+                    <TextInput v-model="form.nombre_completo" type="text" class="w-full rounded-lg border-gray-200 font-bold text-lg" required />
                     <InputError :message="form.errors.nombre_completo" />
                 </div>
                 <div class="space-y-2">
@@ -184,8 +184,8 @@ const getRandomColor = (id) => {
                 <div class="space-y-2">
                     <InputLabel value="Número de Identificación *" class="font-bold text-xs uppercase" />
                     <div :class="form.tipo_documento === 'NIT' ? 'flex gap-2' : ''">
-                        <TextInput v-model="form.numero_documento" type="text" class="flex-1 rounded-xl border-gray-200 font-mono font-bold" required />
-                        <TextInput v-if="form.tipo_documento === 'NIT'" v-model="form.dv" maxlength="1" placeholder="DV" class="w-12 text-center rounded-xl border-gray-200 font-bold" />
+                        <TextInput v-model="form.numero_documento" type="text" class="flex-1 rounded-lg border-gray-200 font-mono font-bold" required />
+                        <TextInput v-if="form.tipo_documento === 'NIT'" v-model="form.dv" maxlength="1" placeholder="DV" class="w-12 text-center rounded-lg border-gray-200 font-bold" />
                     </div>
                     <InputError :message="form.errors.numero_documento" />
                 </div>
@@ -209,59 +209,59 @@ const getRandomColor = (id) => {
           </div>
 
           <!-- SECCIÓN 2: CONTACTO -->
-          <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-            <div class="px-8 py-5 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
                 <EnvelopeIcon class="w-5 h-5 text-indigo-500" />
                 <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Canales de Contacto</h3>
             </div>
-            <div class="p-8 md:p-10 grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div class="space-y-2">
                     <InputLabel value="Celular Principal" class="font-bold text-xs uppercase" />
                     <div class="relative">
                         <PhoneIcon class="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                        <TextInput v-model="form.celular_1" class="pl-10 w-full rounded-xl border-gray-200" />
+                        <TextInput v-model="form.celular_1" class="pl-10 w-full rounded-lg border-gray-200" />
                     </div>
                 </div>
                 <div class="space-y-2">
                     <InputLabel value="Correo Principal" class="font-bold text-xs uppercase" />
                     <div class="relative">
                         <EnvelopeIcon class="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                        <TextInput v-model="form.correo_1" type="email" class="pl-10 w-full rounded-xl border-gray-200" />
+                        <TextInput v-model="form.correo_1" type="email" class="pl-10 w-full rounded-lg border-gray-200" />
                     </div>
                 </div>
                 <div class="space-y-2">
                     <InputLabel value="Celular Alternativo" class="font-bold text-xs uppercase" />
-                    <TextInput v-model="form.celular_2" class="w-full rounded-xl border-gray-200" />
+                    <TextInput v-model="form.celular_2" class="w-full rounded-lg border-gray-200" />
                 </div>
                 <div class="space-y-2">
                     <InputLabel value="Correo Alternativo" class="font-bold text-xs uppercase" />
-                    <TextInput v-model="form.correo_2" type="email" class="w-full rounded-xl border-gray-200" />
+                    <TextInput v-model="form.correo_2" type="email" class="w-full rounded-lg border-gray-200" />
                 </div>
                 <div class="space-y-2">
                     <InputLabel value="Teléfono Fijo" class="font-bold text-xs uppercase" />
-                    <TextInput v-model="form.telefono_fijo" class="w-full rounded-xl border-gray-200" />
+                    <TextInput v-model="form.telefono_fijo" class="w-full rounded-lg border-gray-200" />
                 </div>
             </div>
           </div>
 
           <!-- SECCIÓN 3: LOCALIZACIÓN -->
-          <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-            <div class="px-8 py-5 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center">
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                 <div class="flex items-center gap-3">
                     <MapPinIcon class="w-5 h-5 text-red-500" />
                     <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Direcciones Físicas</h3>
                 </div>
-                <button type="button" @click="addAddressRow" class="inline-flex items-center px-4 py-2 bg-red-50 text-red-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm">
+                <button type="button" @click="addAddressRow" class="inline-flex items-center px-4 py-2 bg-red-50 text-red-700 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm">
                     <PlusIcon class="w-4 h-4 mr-2" /> Añadir Ubicación
                 </button>
             </div>
-            <div class="p-8 md:p-10">
+            <div class="p-5">
                 <div v-if="!form.addresses.length" class="text-center py-10 opacity-30">
                     <MapPinIcon class="w-12 h-12 mx-auto text-gray-300 mb-2" />
                     <p class="text-xs font-black uppercase tracking-widest text-gray-400">No hay direcciones registradas</p>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div v-for="(addr, idx) in form.addresses" :key="idx" class="p-6 bg-gray-50 dark:bg-gray-900/50 rounded-3xl border border-gray-100 dark:border-gray-700 relative group animate-in zoom-in-95 duration-200">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div v-for="(addr, idx) in form.addresses" :key="idx" class="p-6 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700 relative group animate-in zoom-in-95 duration-200">
                         <button type="button" @click="removeAddressRow(idx)" class="absolute -top-2 -right-2 p-1.5 bg-white dark:bg-gray-800 text-red-500 rounded-full shadow-md border dark:border-gray-700 opacity-0 group-hover:opacity-100 transition-all"><XMarkIcon class="w-4 h-4"/></button>
                         <div class="space-y-4">
                             <div class="grid grid-cols-2 gap-4">
@@ -285,41 +285,41 @@ const getRandomColor = (id) => {
           </div>
 
           <!-- SECCIÓN 4: LABORAL -->
-          <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-            <div class="px-8 py-5 border-b border-gray-50 dark:border-gray-700 flex items-center gap-3">
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
                 <BriefcaseIcon class="w-5 h-5 text-indigo-500" />
                 <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Entorno Profesional</h3>
             </div>
-            <div class="p-8 md:p-10 grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div class="space-y-2">
                     <InputLabel value="Empresa / Entidad" class="font-bold text-xs uppercase" />
-                    <TextInput v-model="form.empresa" class="w-full rounded-xl" />
+                    <TextInput v-model="form.empresa" class="w-full rounded-lg" />
                 </div>
                 <div class="space-y-2">
                     <InputLabel value="Cargo Actual" class="font-bold text-xs uppercase" />
-                    <TextInput v-model="form.cargo" class="w-full rounded-xl" />
+                    <TextInput v-model="form.cargo" class="w-full rounded-lg" />
                 </div>
                 <div class="md:col-span-2 space-y-2">
                     <InputLabel value="Observaciones Internas" class="font-bold text-xs uppercase" />
-                    <Textarea v-model="form.observaciones" rows="3" class="w-full rounded-2xl border-gray-200" />
+                    <Textarea v-model="form.observaciones" rows="3" class="w-full rounded-lg border-gray-200" />
                 </div>
             </div>
           </div>
 
           <!-- SECCIÓN 5: ASIGNACIONES CORPORATIVAS -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-                <div class="px-8 py-5 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                     <div class="flex items-center gap-3">
                         <BuildingOfficeIcon class="w-5 h-5 text-emerald-500" />
                         <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-[10px]">Vincular Empresas *</h3>
                     </div>
                     <button type="button" @click="toggleCooperativas" class="text-[9px] font-black uppercase text-indigo-600 hover:underline">Alternar Todos</button>
                 </div>
-                <div class="p-8 max-h-64 overflow-y-auto custom-scrollbar">
+                <div class="p-5 max-h-64 overflow-y-auto custom-scrollbar">
                     <InputError :message="form.errors.cooperativas_ids" class="mb-4" />
                     <div class="grid grid-cols-1 gap-2">
-                        <label v-for="c in allCooperativas" :key="c.id" class="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-xl cursor-pointer hover:bg-emerald-50 transition-all border border-transparent hover:border-emerald-100 group">
+                        <label v-for="c in allCooperativas" :key="c.id" class="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-pointer hover:bg-emerald-50 transition-all border border-transparent hover:border-emerald-100 group">
                             <input type="checkbox" :checked="isCooperativaSelected(c.id)" @change="toggleCooperativa(c.id, $event.target.checked)" class="rounded-lg border-gray-300 text-emerald-600" />
                             <span class="text-xs font-bold text-gray-700 dark:text-gray-300 group-hover:text-emerald-700 transition-colors">{{ c.nombre }}</span>
                         </label>
@@ -327,17 +327,17 @@ const getRandomColor = (id) => {
                 </div>
               </div>
 
-              <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-                <div class="px-8 py-5 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center">
+              <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                     <div class="flex items-center gap-3">
                         <ShieldCheckIcon class="w-5 h-5 text-violet-500" />
                         <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-[10px]">Asignar Responsables</h3>
                     </div>
                     <button type="button" @click="toggleAbogados" class="text-[9px] font-black uppercase text-indigo-600 hover:underline">Alternar Todos</button>
                 </div>
-                <div class="p-8 max-h-64 overflow-y-auto custom-scrollbar">
+                <div class="p-5 max-h-64 overflow-y-auto custom-scrollbar">
                     <div class="grid grid-cols-1 gap-2">
-                        <label v-for="a in allAbogados" :key="a.id" class="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-xl cursor-pointer hover:bg-violet-50 transition-all border border-transparent hover:border-violet-100 group">
+                        <label v-for="a in allAbogados" :key="a.id" class="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-pointer hover:bg-violet-50 transition-all border border-transparent hover:border-violet-100 group">
                             <input type="checkbox" :value="a.id" v-model="form.abogados_ids" class="rounded-lg border-gray-300 text-violet-600" />
                             <span class="text-xs font-bold text-gray-700 dark:text-gray-300 group-hover:text-violet-700 transition-colors">{{ a.name }}</span>
                         </label>
@@ -347,23 +347,23 @@ const getRandomColor = (id) => {
           </div>
 
           <!-- SECCIÓN 6: REDES SOCIALES -->
-          <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-            <div class="px-8 py-5 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center">
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                 <div class="flex items-center gap-3">
                     <GlobeAltIcon class="w-5 h-5 text-blue-500" />
                     <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Redes y Enlaces Digitales</h3>
                 </div>
-                <button type="button" @click="addLinkRow" class="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+                <button type="button" @click="addLinkRow" class="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all shadow-sm">
                     <PlusIcon class="w-4 h-4 mr-2" /> Añadir Perfil
                 </button>
             </div>
-            <div class="p-8 md:p-10">
+            <div class="p-5">
                 <div v-if="!form.social_links.length" class="text-center py-10 opacity-30">
                     <GlobeAltIcon class="w-12 h-12 mx-auto text-gray-300 mb-2" />
                     <p class="text-xs font-black uppercase tracking-widest text-gray-400">Sin presencia digital registrada</p>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div v-for="(l, idx) in form.social_links" :key="idx" class="p-5 bg-gray-50 dark:bg-gray-900/50 rounded-3xl border border-gray-100 dark:border-gray-700 flex items-end gap-3 animate-in zoom-in-95 duration-200">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div v-for="(l, idx) in form.social_links" :key="idx" class="p-5 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700 flex items-end gap-3 animate-in zoom-in-95 duration-200">
                         <div class="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div class="space-y-1">
                                 <InputLabel value="Red / Plataforma" class="text-[9px] font-black uppercase text-gray-400" />
@@ -374,19 +374,19 @@ const getRandomColor = (id) => {
                                 <TextInput v-model="l.url" @blur="normalizeUrl(l)" class="w-full text-xs font-medium rounded-lg" placeholder="https://..." />
                             </div>
                         </div>
-                        <button type="button" @click="removeLinkRow(idx)" class="p-2.5 bg-white text-red-500 rounded-xl shadow-sm border border-gray-100 hover:bg-red-50 transition-all"><TrashIcon class="w-4 h-4"/></button>
+                        <button type="button" @click="removeLinkRow(idx)" class="p-2.5 bg-white text-red-500 rounded-lg shadow-sm border border-gray-100 hover:bg-red-50 transition-all"><TrashIcon class="w-4 h-4"/></button>
                     </div>
                 </div>
             </div>
           </div>
 
           <!-- BOTONES DE ACCIÓN FINAL -->
-          <div class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-xl border border-indigo-100 dark:border-indigo-900/30 mt-12">
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white dark:bg-gray-800 p-5 rounded-lg shadow-sm border border-indigo-100 dark:border-indigo-900/30 mt-6">
             <Link :href="route('personas.show', persona.id)" class="order-2 sm:order-1 flex items-center justify-center gap-2 px-8 py-3 text-sm font-bold text-gray-500 hover:text-red-600 transition-all">
                 <XMarkIcon class="w-5 h-5" /> Descartar cambios
             </Link>
             <PrimaryButton 
-                class="order-1 sm:order-2 w-full sm:w-auto !bg-indigo-600 hover:!bg-indigo-700 !px-16 !py-4 !text-lg !font-black !rounded-2xl !shadow-2xl !shadow-indigo-200 dark:!shadow-none flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02]" 
+                class="order-1 sm:order-2 w-full sm:w-auto !bg-indigo-600 hover:!bg-indigo-700 !px-8 !py-3 !text-sm !font-black !rounded-lg !shadow-sm dark:!shadow-none flex items-center justify-center gap-3 transition-all" 
                 :disabled="form.processing"
             >
                 <CheckCircleIcon v-if="!form.processing" class="w-7 h-7" />

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\NotificacionCaso;
 use App\Models\Caso;
 use App\Models\User;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -22,6 +23,8 @@ use App\Models\ProcesoRadicado;
 
 class NotificacionController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request): Response
     {
         $user = Auth::user();
@@ -108,6 +111,8 @@ class NotificacionController extends Controller
         } else {
             $notificacion = NotificacionCaso::find($id);
             if ($notificacion) {
+                abort_unless($notificacion->user_id === $user->id || $user->tipo_usuario === 'admin', 403);
+
                 if (!$notificacion->leido) {
                     $notificacion->update(['leido' => true]);
                     NotificacionLeida::create(['user_id' => $user->id, 'notificacion_id' => $notificacion->id, 'leido_en' => now()]);
@@ -123,6 +128,9 @@ class NotificacionController extends Controller
         // Verificar primero en tabla personalizada
         $notificacion = NotificacionCaso::find($id);
         if ($notificacion) {
+            $user = Auth::user();
+            abort_unless($notificacion->user_id === $user->id || $user->tipo_usuario === 'admin', 403);
+
             if (!$notificacion->atendida_en) {
                 $notificacion->atendida_en = now();
                 $notificacion->save();
@@ -212,6 +220,8 @@ class NotificacionController extends Controller
 
     public function storeManual(Request $request, Caso $caso): RedirectResponse
     {
+         $this->authorize('update', $caso);
+
          if (!$caso->estaEnSeguimiento()) {
              return back()->with('error', 'No se pueden programar alertas para casos cerrados o finalizados.');
          }
@@ -223,10 +233,9 @@ class NotificacionController extends Controller
             'programado_para' => 'nullable|date', // Soporte para ambos nombres desde el frontend
          ]);
          
-         // Unificar el campo de fecha y forzar zona horaria de Bogotá
+         // Unificar el campo de fecha y evitar que una fecha sin hora caiga en medianoche.
          $fechaStr = $validated['fecha_programada'] ?? $validated['programado_para'] ?? null;
-         $tz = config('app.timezone', 'America/Bogota');
-         $fechaEnvio = $fechaStr ? Carbon::parse($fechaStr, $tz) : now($tz);
+         $fechaEnvio = $this->normalizarFechaProgramada($fechaStr);
 
          // 1. Recopilar todos los IDs de usuarios que deben recibir la notificación
          $userIds = collect();
@@ -256,6 +265,9 @@ class NotificacionController extends Controller
                 'mensaje' => $validated['mensaje'],
                 'fecha_envio' => $fechaEnvio, // Para mostrar en el listado histórico
                 'programado_en' => $fechaEnvio, // IMPORTANTE: Para que el Job ProcesarAlertasProgramadas lo tome
+                'programado_para' => $fechaEnvio,
+                'last_sent_at' => null,
+                'completed' => false,
                 'prioridad' => $validated['prioridad'] ?? 'media',
                 'leido' => false 
              ]);
@@ -266,6 +278,8 @@ class NotificacionController extends Controller
 
     public function storeManualProceso(Request $request, ProcesoRadicado $proceso): RedirectResponse
     {
+         $this->authorize('update', $proceso);
+
          if (!$proceso->estaEnSeguimiento()) {
              return back()->with('error', 'No se pueden programar alertas para radicados cerrados o finalizados.');
          }
@@ -278,8 +292,7 @@ class NotificacionController extends Controller
          ]);
          
          $fechaStr = $validated['fecha_programada'] ?? $validated['programado_para'] ?? null;
-         $tz = config('app.timezone', 'America/Bogota');
-         $fechaEnvio = $fechaStr ? Carbon::parse($fechaStr, $tz) : now($tz);
+         $fechaEnvio = $this->normalizarFechaProgramada($fechaStr);
 
          $userIds = collect();
          $userIds->push(Auth::id());
@@ -299,6 +312,9 @@ class NotificacionController extends Controller
                 'mensaje' => $validated['mensaje'],
                 'fecha_envio' => $fechaEnvio,
                 'programado_en' => $fechaEnvio,
+                'programado_para' => $fechaEnvio,
+                'last_sent_at' => null,
+                'completed' => false,
                 'prioridad' => $validated['prioridad'] ?? 'media',
                 'leido' => false 
              ]);
@@ -306,4 +322,28 @@ class NotificacionController extends Controller
 
          return back()->with('success', 'Alerta programada para los responsables del expediente.');
     }
+
+
+    private function normalizarFechaProgramada(?string $fechaStr): Carbon
+    {
+        $tz = config('app.timezone', 'America/Bogota');
+
+        if ($fechaStr === null || trim($fechaStr) === '') {
+            return now($tz)->seconds(0);
+        }
+
+        $fecha = Carbon::parse($fechaStr, $tz)->timezone($tz)->seconds(0);
+
+        if (!$this->tieneHoraExplicita($fechaStr)) {
+            $fecha->setTime(8, 0, 0);
+        }
+
+        return $fecha;
+    }
+
+    private function tieneHoraExplicita(string $fechaStr): bool
+    {
+        return preg_match('/(?:^|[ T])\d{1,2}:\d{2}(?::\d{2})?(?:\s?[AP]M)?/i', trim($fechaStr)) === 1;
+    }
+
 }

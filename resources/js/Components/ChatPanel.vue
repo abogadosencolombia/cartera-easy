@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, nextTick, watch, computed } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 

@@ -61,7 +61,7 @@ const NAV_ITEMS = [
         type: "dropdown",
         label: "Casos",
         icon: FolderIcon,
-        active: ["casos.*", "procesos.*", "revision.*"],
+        active: ["casos.*", "procesos.*"],
         roles: ["admin", "gestor", "abogado"],
         items: [
             {
@@ -74,13 +74,6 @@ const NAV_ITEMS = [
                 label: "Casos Abogados en Colombia",
                 href: route("procesos.index"),
                 active: "procesos.*",
-                roles: ["admin", "gestor", "abogado"],
-            },
-            { type: "divider", roles: ["admin", "gestor", "abogado"] },
-            {
-                label: "Revisión Diaria",
-                href: route("revision.index"),
-                active: "revision.*",
                 roles: ["admin", "gestor", "abogado"],
             },
         ],
@@ -132,10 +125,10 @@ const NAV_ITEMS = [
             "honorarios.contratos.*",
             "admin.gestores.*",
             "admin.tareas.*",
-            "plantillas.*",
             "requisitos.*",
             "admin.tasas.*",
             "admin.auditoria.*",
+            "admin.jornadas.*",
             "admin.reglas-alerta.*",
         ],
         roles: ["admin", "gestor", "abogado"],
@@ -167,12 +160,6 @@ const NAV_ITEMS = [
             },
             { type: "divider", roles: ["admin"] },
             {
-                label: "Plantillas de Documentos",
-                href: route("plantillas.index"),
-                active: "plantillas.*",
-                roles: ["admin"],
-            },
-            {
                 label: "Requisitos de Documentos",
                 href: route("requisitos.index"),
                 active: "requisitos.*",
@@ -195,6 +182,12 @@ const NAV_ITEMS = [
                 label: "Auditoría Global",
                 href: route("admin.auditoria.index"),
                 active: "admin.auditoria.index",
+                roles: ["admin"],
+            },
+            {
+                label: "Jornadas de Usuario",
+                href: route("admin.jornadas.index"),
+                active: "admin.jornadas.*",
                 roles: ["admin"],
             },
         ],
@@ -287,11 +280,22 @@ const activityEvents = [
     "click",
     "keydown",
     "mousemove",
+    "pointermove",
+    "wheel",
     "scroll",
     "touchstart",
+    "input",
     "focus",
 ];
 let idleLogoutTimer = null;
+let workSessionHeartbeatTimer = null;
+let lastTrackedAt = Date.now();
+let lastActivityAt = Date.now();
+let pendingActiveMs = 0;
+let pendingIdleMs = 0;
+let hasPendingActivity = false;
+const workSessionIdleThresholdMs = 5 * 60 * 1000;
+const workSessionHeartbeatMs = 60 * 1000;
 
 // 4. LÓGICA COMPUTADA ---------------------------------------------------------
 const visibleMenu = computed(() => {
@@ -356,10 +360,124 @@ const clearIdleLogoutTimer = () => {
     }
 };
 
-const logoutForInactivity = () => {
+const clearWorkSessionHeartbeatTimer = () => {
+    if (workSessionHeartbeatTimer) {
+        window.clearInterval(workSessionHeartbeatTimer);
+        workSessionHeartbeatTimer = null;
+    }
+};
+
+const accumulateWorkSessionDelta = () => {
+    const now = Date.now();
+
+    if (now <= lastTrackedAt) return;
+
+    const idleStartsAt = lastActivityAt + workSessionIdleThresholdMs;
+
+    if (now <= idleStartsAt) {
+        pendingActiveMs += now - lastTrackedAt;
+    } else if (lastTrackedAt >= idleStartsAt) {
+        pendingIdleMs += now - lastTrackedAt;
+    } else {
+        pendingActiveMs += idleStartsAt - lastTrackedAt;
+        pendingIdleMs += now - idleStartsAt;
+    }
+
+    lastTrackedAt = now;
+};
+
+const takePendingWorkSessionSeconds = () => {
+    const activeSeconds = Math.floor(pendingActiveMs / 1000);
+    const idleSeconds = Math.floor(pendingIdleMs / 1000);
+    const activityDetected = hasPendingActivity;
+
+    pendingActiveMs -= activeSeconds * 1000;
+    pendingIdleMs -= idleSeconds * 1000;
+    hasPendingActivity = false;
+
+    return { activeSeconds, idleSeconds, activityDetected };
+};
+
+const restorePendingWorkSessionSeconds = (activeSeconds, idleSeconds, activityDetected = false) => {
+    pendingActiveMs += activeSeconds * 1000;
+    pendingIdleMs += idleSeconds * 1000;
+    hasPendingActivity = hasPendingActivity || activityDetected;
+};
+
+const csrfToken = () =>
+    document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") ||
+    "";
+
+const hasHeartbeatRoute = () => {
+    try {
+        return typeof route === "function" &&
+            (typeof route().has !== "function" || route().has("jornadas.heartbeat"));
+    } catch (error) {
+        return false;
+    }
+};
+
+const sendWorkSessionHeartbeat = async ({ beacon = false } = {}) => {
+    if (!hasHeartbeatRoute()) return;
+
+    accumulateWorkSessionDelta();
+
+    const { activeSeconds, idleSeconds, activityDetected } = takePendingWorkSessionSeconds();
+
+    if (activeSeconds === 0 && idleSeconds === 0 && !activityDetected) return;
+
+    if (beacon && navigator.sendBeacon) {
+        const payload = new FormData();
+        payload.append("_token", csrfToken());
+        payload.append("active_seconds", String(activeSeconds));
+        payload.append("idle_seconds", String(idleSeconds));
+        payload.append("activity_detected", activityDetected ? "1" : "0");
+
+        const queued = navigator.sendBeacon(route("jornadas.heartbeat"), payload);
+
+        if (!queued) {
+            restorePendingWorkSessionSeconds(activeSeconds, idleSeconds, activityDetected);
+        }
+
+        return;
+    }
+
+    if (!window.axios) {
+        restorePendingWorkSessionSeconds(activeSeconds, idleSeconds, activityDetected);
+        return;
+    }
+
+    try {
+        await window.axios.post(route("jornadas.heartbeat"), {
+            active_seconds: activeSeconds,
+            idle_seconds: idleSeconds,
+            activity_detected: activityDetected,
+        });
+    } catch (error) {
+        restorePendingWorkSessionSeconds(activeSeconds, idleSeconds, activityDetected);
+    }
+};
+
+const markUserActivity = () => {
+    const now = Date.now();
+    const wasIdle = now - lastActivityAt >= workSessionIdleThresholdMs;
+
+    accumulateWorkSessionDelta();
+    lastActivityAt = now;
+    hasPendingActivity = true;
+    resetIdleLogoutTimer();
+
+    if (wasIdle) {
+        sendWorkSessionHeartbeat();
+    }
+};
+
+const closeSession = async (reason = "manual") => {
+    await sendWorkSessionHeartbeat();
+
     router.post(
         route("logout"),
-        {},
+        { reason },
         {
             preserveScroll: true,
             onError: () => {
@@ -367,6 +485,14 @@ const logoutForInactivity = () => {
             },
         },
     );
+};
+
+const finishTurnAndLogout = () => {
+    closeSession("finish_turn");
+};
+
+const logoutForInactivity = () => {
+    closeSession("inactivity");
 };
 
 const resetIdleLogoutTimer = () => {
@@ -381,23 +507,35 @@ const openGestionDiariaPanel = () => {
     showGestionPanel.value = true;
 };
 
+const flushWorkSessionWithBeacon = () => {
+    sendWorkSessionHeartbeat({ beacon: true });
+};
+
 // 6. CICLO DE VIDA ------------------------------------------------------------
 onMounted(() => {
     initPush().catch(() => {});
     window.addEventListener("open-gestion-diaria", openGestionDiariaPanel);
+    window.addEventListener("pagehide", flushWorkSessionWithBeacon);
     activityEvents.forEach((eventName) => {
-        window.addEventListener(eventName, resetIdleLogoutTimer, {
+        window.addEventListener(eventName, markUserActivity, {
             passive: true,
         });
     });
     resetIdleLogoutTimer();
+    workSessionHeartbeatTimer = window.setInterval(
+        () => sendWorkSessionHeartbeat(),
+        workSessionHeartbeatMs,
+    );
 });
 
 onBeforeUnmount(() => {
     clearIdleLogoutTimer();
+    clearWorkSessionHeartbeatTimer();
+    flushWorkSessionWithBeacon();
     window.removeEventListener("open-gestion-diaria", openGestionDiariaPanel);
+    window.removeEventListener("pagehide", flushWorkSessionWithBeacon);
     activityEvents.forEach((eventName) => {
-        window.removeEventListener(eventName, resetIdleLogoutTimer);
+        window.removeEventListener(eventName, markUserActivity);
     });
 });
 </script>
@@ -650,12 +788,20 @@ onBeforeUnmount(() => {
                                     <DropdownLink :href="route('profile.edit')"
                                         >Perfil</DropdownLink
                                     >
-                                    <DropdownLink
-                                        :href="route('logout')"
-                                        method="post"
-                                        as="button"
-                                        >Cerrar Sesión</DropdownLink
+                                    <button
+                                        type="button"
+                                        @click="finishTurnAndLogout"
+                                        class="block w-full px-4 py-2 text-start text-sm font-semibold leading-5 text-emerald-700 transition duration-150 ease-in-out hover:bg-emerald-50 focus:bg-emerald-50 focus:outline-none dark:text-emerald-300 dark:hover:bg-emerald-950/30"
                                     >
+                                        Finalizar turno
+                                    </button>
+                                    <button
+                                        type="button"
+                                        @click="closeSession()"
+                                        class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none dark:text-gray-200 dark:hover:bg-gray-700"
+                                    >
+                                        Cerrar sesión
+                                    </button>
                                 </template>
                             </Dropdown>
                         </div>
@@ -834,13 +980,20 @@ onBeforeUnmount(() => {
                         <ResponsiveNavLink :href="route('profile.edit')">
                             Perfil
                         </ResponsiveNavLink>
-                        <ResponsiveNavLink
-                            :href="route('logout')"
-                            method="post"
-                            as="button"
+                        <button
+                            type="button"
+                            @click="finishTurnAndLogout"
+                            class="block w-full border-l-4 border-transparent py-2 ps-3 pe-4 text-start text-base font-semibold text-emerald-700 transition duration-150 ease-in-out hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:text-emerald-300 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
                         >
-                            Cerrar Sesión
-                        </ResponsiveNavLink>
+                            Finalizar turno
+                        </button>
+                        <button
+                            type="button"
+                            @click="closeSession()"
+                            class="block w-full border-l-4 border-transparent py-2 ps-3 pe-4 text-start text-base font-medium text-gray-600 transition duration-150 ease-in-out hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                        >
+                            Cerrar sesión
+                        </button>
                     </div>
                 </div>
             </div>

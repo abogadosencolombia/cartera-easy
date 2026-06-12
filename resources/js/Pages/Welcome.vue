@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, computed, onUnmounted } from 'vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 
 // --- Lógica del Estado de la Página (Sin cambios) ---
 
@@ -11,6 +11,21 @@ defineProps({
     laravelVersion: String,
     phpVersion: String,
 });
+
+const page = usePage();
+const workSessionSummary = computed(() => page.props.flash?.workSessionSummary || null);
+
+const formatDateTime = (dateString) => {
+    if (!dateString) return '-';
+    return new Intl.DateTimeFormat('es-CO', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+    }).format(new Date(String(dateString).replace(' ', 'T')));
+};
 
 // Lógica para el banner de cookies
 const showCookieBanner = ref(false);
@@ -181,6 +196,31 @@ onUnmounted(() => {
                 </div>
             </div>
         </header>
+
+        <section v-if="workSessionSummary" class="border-b border-emerald-200 bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+            <div class="container mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+                <div class="grid gap-3 rounded-lg border border-emerald-200 bg-white p-4 shadow-sm dark:border-emerald-900/60 dark:bg-slate-900 md:grid-cols-[1.4fr_repeat(3,1fr)]">
+                    <div>
+                        <p class="text-xs font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300">Jornada finalizada</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                            {{ formatDateTime(workSessionSummary.started_at) }} - {{ formatDateTime(workSessionSummary.ended_at) }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Tiempo total</p>
+                        <p class="mt-1 text-lg font-black text-slate-900 dark:text-white">{{ workSessionSummary.total_human }}</p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Uso activo</p>
+                        <p class="mt-1 text-lg font-black text-blue-700 dark:text-blue-300">{{ workSessionSummary.active_human }}</p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Inactividad</p>
+                        <p class="mt-1 text-lg font-black text-amber-700 dark:text-amber-300">{{ workSessionSummary.idle_human }}</p>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         <!-- Main Content -->
         <main class="flex-grow">

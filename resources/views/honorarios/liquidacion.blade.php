@@ -1,176 +1,209 @@
 @php
-    // --- PREPARACIÓN DE DATOS PARA LA VISTA ---
-    // $cliente y $contrato son objetos Eloquent pasados desde el controlador
-    $clienteNombre = $cliente->nombre_completo ?? 'ID ' . $contrato->cliente_id;
+    use Illuminate\Support\Carbon;
 
-    // 1. Crear una colección unificada de todas las transacciones (pagos y cargos pagados)
-    //    Esto es solo para mostrar la tabla del historial cronológico.
+    $clienteNombre = $cliente->nombre_completo ?? 'ID ' . $contrato->cliente_id;
+    $money = fn ($value) => '$ ' . number_format((float) ($value ?? 0), 0, ',', '.');
+    $date = fn ($value) => $value ? Carbon::parse($value)->format('d/m/Y') : 'N/A';
+    $modalidad = str_replace('_', ' ', (string) ($contrato->modalidad ?? ''));
+    $estado = str_replace('_', ' ', (string) ($contrato->estado ?? ''));
+
     $transacciones = collect();
 
-    // 2. Añadir los pagos normales
     foreach ($pagos as $pago) {
+        if (!empty($pago->cargo_id)) {
+            continue;
+        }
+
         $transacciones->push([
-            'fecha' => \Illuminate\Support\Carbon::parse($pago->fecha),
-            'concepto' => $pago->cuota_id ? 'Pago Cuota #'.$pago->cuota_numero : 'Abono General',
+            'fecha' => Carbon::parse($pago->fecha),
+            'concepto' => $pago->cuota_id ? 'Pago cuota #' . $pago->cuota_numero : 'Abono general',
+            'detalle' => $pago->nota ?? null,
             'valor' => $pago->valor,
             'tipo' => 'PAGO',
         ]);
     }
 
-    // 3. Añadir los cargos que ya han sido pagados
     foreach ($cargosPagados as $cargo) {
-        $conceptoCargo = '';
-        $tipoCargo = '';
-        switch ($cargo->tipo) {
-            case 'LITIS':
-                $conceptoCargo = 'Honorarios por Resultado Litis';
-                $tipoCargo = 'LITIS';
-                break;
-            case 'GASTO':
-                $conceptoCargo = 'Reembolso Gasto: ' . $cargo->descripcion;
-                $tipoCargo = 'GASTO';
-                break;
-            default:
-                $conceptoCargo = 'Cargo Adicional: ' . $cargo->descripcion;
-                $tipoCargo = 'CARGO';
-                break;
-        }
+        $tipoCargo = match ($cargo->tipo) {
+            'LITIS' => 'LITIS',
+            'GASTO' => 'GASTO',
+            default => 'CARGO',
+        };
+
+        $conceptoCargo = match ($cargo->tipo) {
+            'LITIS' => 'Honorarios por resultado litis',
+            'GASTO' => 'Reembolso de gasto',
+            default => 'Cargo adicional',
+        };
 
         $transacciones->push([
-            'fecha' => \Illuminate\Support\Carbon::parse($cargo->fecha_pago_cargo),
-            'concepto' => $conceptoCargo,
-            'valor' => $cargo->monto,
+            'fecha' => Carbon::parse($cargo->fecha_pago_cargo),
+            'concepto' => trim($conceptoCargo . ': ' . ($cargo->descripcion ?? '')),
+            'detalle' => $cargo->nota_pago_cargo ?? null,
+            'valor' => $cargo->valor_pago_cargo ?? ((float) ($cargo->monto ?? 0) + (float) ($cargo->intereses_mora_acumulados ?? 0)),
             'tipo' => $tipoCargo,
         ]);
     }
 
-    // 4. Ordenar todas las transacciones por fecha para el historial
     $transacciones = $transacciones->sortBy('fecha');
-
-    // NOTA: Ya no calculamos totales aquí. Usamos las variables pasadas por el controlador:
-    // $totalCargosValor, $totalPagado, $saldoPendiente, $granTotal, $totalMora
+    $saldoPositivo = (float) ($saldoPendiente ?? 0) > 0;
 @endphp
 <!doctype html>
 <html lang="es">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Estado de Cuenta - Contrato #{{ $contrato->id }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Estado de cuenta - Contrato #{{ $contrato->id }}</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        /* Estilos adicionales para impresión si es necesario */
-        @media print {
-            body { -webkit-print-color-adjust: exact; }
-        }
+        @page { margin: 26px 30px; }
+        * { box-sizing: border-box; }
+        body { margin: 0; color: #111827; font-family: DejaVu Sans, Arial, sans-serif; font-size: 12px; line-height: 1.45; background: #ffffff; }
+        .document { width: 100%; }
+        .topbar { border-bottom: 3px solid #111827; padding-bottom: 16px; margin-bottom: 18px; }
+        .brand { width: 55%; vertical-align: top; }
+        .doc-meta { width: 45%; text-align: right; vertical-align: top; }
+        .brand-mark { display: inline-block; width: 34px; height: 34px; border-radius: 8px; background: #111827; color: #ffffff; text-align: center; line-height: 34px; font-weight: 800; font-size: 15px; margin-right: 10px; }
+        .brand-name { font-size: 18px; font-weight: 800; margin: 0; }
+        .muted { color: #6b7280; }
+        .label { color: #6b7280; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+        h1 { margin: 0; font-size: 25px; line-height: 1.1; }
+        h2 { margin: 0 0 9px; font-size: 14px; text-transform: uppercase; letter-spacing: .05em; }
+        .section { margin-top: 18px; page-break-inside: avoid; }
+        .panel { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+        .panel-head { background: #f9fafb; border-bottom: 1px solid #e5e7eb; padding: 10px 12px; }
+        .panel-body { padding: 12px; }
+        .info-table, .summary-table, .data-table { width: 100%; border-collapse: collapse; }
+        .info-table td { width: 25%; padding: 10px 12px; border: 1px solid #e5e7eb; vertical-align: top; }
+        .value { margin-top: 4px; font-size: 12px; font-weight: 800; color: #111827; }
+        .summary-table td { width: 16.66%; padding: 10px; border: 1px solid #d1d5db; vertical-align: top; }
+        .summary-table .amount { margin-top: 4px; font-size: 13px; font-weight: 800; }
+        .summary-total { background: #111827; color: #ffffff; }
+        .summary-total .label, .summary-total .amount { color: #ffffff; }
+        .summary-paid { background: #ecfdf5; }
+        .summary-paid .amount { color: #047857; }
+        .summary-balance { background: {{ $saldoPositivo ? '#fef2f2' : '#ecfdf5' }}; }
+        .summary-balance .amount { color: {{ $saldoPositivo ? '#b91c1c' : '#047857' }}; font-size: 16px; }
+        .data-table th { background: #f3f4f6; color: #374151; font-size: 9px; letter-spacing: .05em; text-transform: uppercase; padding: 8px; border-bottom: 1px solid #d1d5db; text-align: left; }
+        .data-table td { padding: 9px 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+        .data-table tr:last-child td { border-bottom: 0; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .strong { font-weight: 800; }
+        .danger { color: #b91c1c; }
+        .success { color: #047857; }
+        .badge { display: inline-block; border-radius: 999px; padding: 2px 7px; font-size: 8px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+        .badge-pago { background: #d1fae5; color: #047857; }
+        .badge-gasto { background: #dbeafe; color: #1d4ed8; }
+        .badge-litis { background: #ede9fe; color: #6d28d9; }
+        .badge-cargo { background: #e5e7eb; color: #374151; }
+        .empty { padding: 16px; border: 1px dashed #d1d5db; border-radius: 8px; color: #6b7280; text-align: center; }
+        .note { color: #4b5563; font-size: 11px; }
+        .footer { margin-top: 22px; border-top: 1px solid #e5e7eb; padding-top: 10px; color: #6b7280; font-size: 10px; text-align: center; }
     </style>
 </head>
-<body class="bg-gray-100 p-4 md:p-8">
+<body>
+    <div class="document">
+        <table class="topbar" width="100%">
+            <tr>
+                <td class="brand">
+                    <span class="brand-mark">AC</span>
+                    <span>
+                        <p class="brand-name">Abogados en Colombia S.A.S.</p>
+                        <p class="muted" style="margin: 2px 0 0;">Asesoria legal y financiera</p>
+                    </span>
+                </td>
+                <td class="doc-meta">
+                    <h1>Estado de cuenta</h1>
+                    <p class="muted" style="margin: 5px 0 0;">Contrato de honorarios #{{ $contrato->id }}</p>
+                    <p style="margin: 8px 0 0;"><span class="label">Emision</span><br>{{ Carbon::now()->format('d/m/Y') }}</p>
+                </td>
+            </tr>
+        </table>
 
-    <div class="max-w-4xl mx-auto bg-white p-8 md:p-12 rounded-lg shadow-md border border-gray-200">
-
-        <!-- SECCIÓN 1: Encabezado con Logo e Información del Documento -->
-        <header class="flex justify-between items-start pb-8 border-b border-gray-200">
-            <!-- Logo y Nombre de la Empresa -->
-            <div class="flex items-center gap-4">
-                <!-- SVG Placeholder Logo -->
-                <svg class="h-10 w-10 text-slate-800" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
-                </svg>
-                <div>
-                    <h2 class="text-xl font-bold text-slate-800">Abogados en Colombia</h2>
-                    <p class="text-sm text-gray-500">Asesoría Legal y Financiera</p>
-                </div>
-            </div>
-            <!-- Información del Estado de Cuenta -->
-            <div class="text-right">
-                <h1 class="text-3xl font-bold text-slate-900">Estado de Cuenta</h1>
-                <p class="text-sm text-gray-500 mt-1">Contrato de Honorarios #{{ $contrato->id }}</p>
-                <p class="text-sm text-gray-500 mt-2"><strong>Fecha de Emisión:</strong> {{ \Illuminate\Support\Carbon::now()->translatedFormat('d F Y') }}</p>
-            </div>
-        </header>
-
-        <!-- SECCIÓN 2: Información del Cliente y Contrato -->
-        <div class="flex flex-row gap-6 my-8">
-            <div class="flex-1 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <p class="text-xs text-gray-500 font-semibold uppercase">Cliente</p>
-                <p class="text-lg font-medium text-gray-800">{{ $clienteNombre }}</p>
-            </div>
-            <div class="flex-1 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <p class="text-xs text-gray-500 font-semibold uppercase">Modalidad del Contrato</p>
-                <p class="text-lg font-medium text-gray-800">{{ str_replace('_', ' ', $contrato->modalidad) }}</p>
-            </div>
+        <div class="section">
+            <table class="info-table">
+                <tr>
+                    <td><div class="label">Cliente</div><div class="value">{{ $clienteNombre }}</div></td>
+                    <td><div class="label">Modalidad</div><div class="value">{{ $modalidad ?: 'N/A' }}</div></td>
+                    <td><div class="label">Estado</div><div class="value">{{ $estado ?: 'N/A' }}</div></td>
+                    <td><div class="label">Inicio</div><div class="value">{{ $date($contrato->inicio ?? null) }}</div></td>
+                </tr>
+            </table>
         </div>
 
-        <!-- SECCIÓN 3: Historial de Transacciones Pagadas -->
-        <div class="mb-10">
-            <h2 class="text-lg font-semibold text-gray-800 mb-4">Historial de Transacciones Pagadas</h2>
-            <div class="overflow-x-auto border border-gray-200 rounded-lg">
-                <table class="min-w-full">
-                    <thead class="bg-gray-100">
-                        <tr>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider" style="width: 20%;">Fecha</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider" style="width: 55%;">Concepto</th>
-                            <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-gray-600 uppercase tracking-wider" style="width: 25%;">Valor</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        @forelse($transacciones as $item)
-                            <tr>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $item['fecha']->format('d/m/Y') }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-800">
-                                    <span>{{ $item['concepto'] }}</span>
-                                    <!-- Etiquetas de tipo de transacción -->
-                                    @if($item['tipo'] === 'PAGO')
-                                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">PAGO</span>
-                                    @elseif($item['tipo'] === 'GASTO')
-                                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">GASTO</span>
-                                    @elseif($item['tipo'] === 'LITIS')
-                                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">LITIS</span>
-                                    @else
-                                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">CARGO</span>
-                                    @endif
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 text-right">$ {{ number_format($item['valor'], 0, ',', '.') }}</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="3" class="px-6 py-10 text-center text-sm text-gray-500">No se han registrado transacciones pagadas hasta la fecha.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+        <div class="section">
+            <table class="summary-table">
+                <tr>
+                    <td><div class="label">Base contrato</div><div class="amount">{{ $money($contrato->monto_total) }}</div></td>
+                    <td><div class="label">Cargos</div><div class="amount">{{ $money($totalCargosValor) }}</div></td>
+                    <td><div class="label">Mora</div><div class="amount danger">{{ $money($totalMora ?? 0) }}</div></td>
+                    <td class="summary-total"><div class="label">Total cobrado</div><div class="amount">{{ $money($granTotal) }}</div></td>
+                    <td class="summary-paid"><div class="label">Pagado</div><div class="amount">{{ $money($totalPagado) }}</div></td>
+                    <td class="summary-balance"><div class="label">Saldo</div><div class="amount">{{ $money($saldoPendiente) }}</div></td>
+                </tr>
+            </table>
         </div>
 
-        <!-- SECCIÓN 4: Detalle de Cuotas Pendientes (Si existen) -->
-        @if(!$cuotasPendientes->isEmpty())
-            <div class="mb-12">
-                <h2 class="text-lg font-semibold text-gray-800 mb-4">Detalle de Cuotas Pendientes</h2>
-                <div class="overflow-x-auto border border-gray-200 rounded-lg">
-                    <table class="min-w-full">
-                        <thead class="bg-gray-100">
+        <div class="section panel">
+            <div class="panel-head"><h2>Movimientos pagados</h2></div>
+            <div class="panel-body" style="padding: 0;">
+                @if($transacciones->isEmpty())
+                    <div class="empty" style="margin: 12px;">No hay pagos registrados hasta la fecha.</div>
+                @else
+                    <table class="data-table">
+                        <thead>
                             <tr>
-                                <th scope="col" class="px-6 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">Cuota N°</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Fecha Venc.</th>
-                                <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-gray-600 uppercase tracking-wider">Valor Cuota</th>
-                                <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-gray-600 uppercase tracking-wider">Mora Acum.</th>
-                                <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-gray-600 uppercase tracking-wider">Total a Pagar</th>
+                                <th style="width: 16%;">Fecha</th>
+                                <th>Concepto</th>
+                                <th style="width: 16%;">Tipo</th>
+                                <th class="text-right" style="width: 20%;">Valor</th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
+                        <tbody>
+                            @foreach($transacciones as $item)
+                                <tr>
+                                    <td>{{ $item['fecha']->format('d/m/Y') }}</td>
+                                    <td>
+                                        <span class="strong">{{ $item['concepto'] }}</span>
+                                        @if(!empty($item['detalle']))
+                                            <br><span class="muted">{{ $item['detalle'] }}</span>
+                                        @endif
+                                    </td>
+                                    <td><span class="badge badge-{{ strtolower($item['tipo']) }}">{{ $item['tipo'] }}</span></td>
+                                    <td class="text-right strong">{{ $money($item['valor']) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
+            </div>
+        </div>
+
+        @if(!$cuotasPendientes->isEmpty())
+            <div class="section panel">
+                <div class="panel-head"><h2>Cuotas pendientes</h2></div>
+                <div class="panel-body" style="padding: 0;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="text-center" style="width: 12%;">Cuota</th>
+                                <th style="width: 18%;">Vencimiento</th>
+                                <th class="text-right">Valor</th>
+                                <th class="text-right">Mora</th>
+                                <th class="text-right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
                             @foreach($cuotasPendientes as $cuota)
                                 @php
-                                    $mora = $cuota->intereses_mora_acumulados ?? 0;
-                                    $totalCuota = $cuota->valor + $mora;
+                                    $moraCuota = (float) ($cuota->intereses_mora_acumulados ?? 0);
+                                    $totalCuota = (float) ($cuota->valor ?? 0) + $moraCuota;
                                 @endphp
                                 <tr>
-                                    <td class="px-6 py-5 whitespace-nowrap text-sm font-medium text-gray-800 text-center">{{ $cuota->numero }}</td>
-                                    <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-600">{{ \Illuminate\Support\Carbon::parse($cuota->fecha_vencimiento)->format('d/m/Y') }}</td>
-                                    <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-800 text-right">$ {{ number_format($cuota->valor, 0, ',', '.') }}</td>
-                                    <td class="px-6 py-5 whitespace-nowrap text-sm text-red-600 text-right">$ {{ number_format($mora, 0, ',', '.') }}</td>
-                                    <td class="px-6 py-5 whitespace-nowrap text-sm font-semibold text-gray-900 text-right">$ {{ number_format($totalCuota, 0, ',', '.') }}</td>
+                                    <td class="text-center strong">#{{ $cuota->numero }}</td>
+                                    <td>{{ $date($cuota->fecha_vencimiento) }}</td>
+                                    <td class="text-right">{{ $money($cuota->valor) }}</td>
+                                    <td class="text-right danger">{{ $money($moraCuota) }}</td>
+                                    <td class="text-right strong">{{ $money($totalCuota) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -179,57 +212,52 @@
             </div>
         @endif
 
-        <!-- SECCIÓN 5: Resumen Financiero General -->
-        <div class="mt-8 pt-8 border-t-2 border-dashed border-gray-300">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-                <!-- Columna para notas o información adicional (Opcional) -->
-                <div>
-                     <h3 class="text-base font-semibold text-gray-800">Notas Adicionales</h3>
-                     <p class="text-xs text-gray-500 mt-2">
-                         Este es un resumen del estado de su contrato a la fecha de emisión. Para cualquier consulta, no dude en contactarnos. Los pagos pueden tardar hasta 48 horas en verse reflejados.
-                     </p>
+        @if(!$cargosPendientes->isEmpty())
+            <div class="section panel">
+                <div class="panel-head"><h2>Cargos pendientes</h2></div>
+                <div class="panel-body" style="padding: 0;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 18%;">Fecha</th>
+                                <th>Descripcion</th>
+                                <th style="width: 16%;">Tipo</th>
+                                <th class="text-right">Valor</th>
+                                <th class="text-right">Mora</th>
+                                <th class="text-right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($cargosPendientes as $cargo)
+                                @php
+                                    $moraCargo = (float) ($cargo->intereses_mora_acumulados ?? 0);
+                                    $totalCargo = (float) ($cargo->monto ?? 0) + ($cargo->tipo === 'INTERES_MORA' ? 0 : $moraCargo);
+                                @endphp
+                                <tr>
+                                    <td>{{ $date($cargo->fecha_aplicado ?? null) }}</td>
+                                    <td class="strong">{{ $cargo->descripcion ?? 'Cargo pendiente' }}</td>
+                                    <td>{{ str_replace('_', ' ', $cargo->tipo ?? 'CARGO') }}</td>
+                                    <td class="text-right">{{ $money($cargo->monto) }}</td>
+                                    <td class="text-right danger">{{ $money($cargo->tipo === 'INTERES_MORA' ? 0 : $moraCargo) }}</td>
+                                    <td class="text-right strong">{{ $money($totalCargo) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
-                <!-- Columna para el resumen de totales -->
-                <div class="space-y-3">
-                    <div class="flex justify-between items-center text-sm">
-                        <span class="text-gray-600">Monto Base Contrato:</span>
-                        <span class="font-medium text-gray-900">$ {{ number_format($contrato->monto_total, 0, ',', '.') }}</span>
-                    </div>
-                    <div class="flex justify-between items-center text-sm">
-                        <span class="text-gray-600">(+) Total Cargos Adicionales:</span>
-                        <span class="font-medium text-gray-900">$ {{ number_format($totalCargosValor, 0, ',', '.') }}</span>
-                    </div>
-                    <!-- NUEVA LÍNEA DE MORA -->
-                    <div class="flex justify-between items-center text-sm">
-                        <span class="text-gray-600">(+) Intereses de Mora:</span>
-                        <span class="font-medium text-red-600">$ {{ number_format($totalMora ?? 0, 0, ',', '.') }}</span>
-                    </div>
+            </div>
+        @endif
 
-                     <div class="flex justify-between items-center text-sm pt-2 border-t border-gray-200">
-                        <span class="font-semibold text-gray-700">Deuda Total (Base + Cargos + Mora):</span>
-                        <!-- Usamos $granTotal calculado en el controlador -->
-                        <span class="font-bold text-gray-900">$ {{ number_format($granTotal, 0, ',', '.') }}</span>
-                    </div>
-                    <div class="flex justify-between items-center text-sm text-emerald-600">
-                        <span class="font-medium">(-) Total Pagado:</span>
-                        <!-- Usamos $totalPagado calculado en el controlador -->
-                        <span class="font-medium">-$ {{ number_format($totalPagado, 0, ',', '.') }}</span>
-                    </div>
-                    <!-- Saldo Pendiente Total - Más destacado -->
-                    <div class="flex justify-between items-center p-4 bg-red-50 border-red-200 border rounded-lg mt-4">
-                        <span class="text-lg font-bold text-red-700">Saldo Pendiente Total:</span>
-                        <!-- Usamos $saldoPendiente calculado en el controlador -->
-                        <span class="text-2xl font-bold text-red-700">$ {{ number_format($saldoPendiente, 0, ',', '.') }}</span>
-                    </div>
-                </div>
+        <div class="section panel">
+            <div class="panel-head"><h2>Observaciones</h2></div>
+            <div class="panel-body">
+                <p class="note" style="margin: 0;">Este documento resume el estado financiero del contrato a la fecha de emision. Los pagos recientes pueden requerir validacion administrativa antes de reflejarse definitivamente.</p>
             </div>
         </div>
 
-        <!-- SECCIÓN 6: Pie de Página -->
-        <footer class="text-center text-xs text-gray-400 mt-12 pt-6 border-t border-gray-200">
-            <p>Gracias por su confianza.</p>
-            <p>Abogados en Colombia S.A.S.| Calle 44A #68A - 106, Medellín | 315 281 9233 | abogadosencolombiasas@gmail.com</p>
-        </footer>
+        <div class="footer">
+            Abogados en Colombia S.A.S. | Calle 44A #68A - 106, Medellin | 315 281 9233 | abogadosencolombiasas@gmail.com
+        </div>
     </div>
 </body>
 </html>

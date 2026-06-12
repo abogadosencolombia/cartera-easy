@@ -48,12 +48,21 @@ Route::get('/health', fn () => [
 // --- RUTA DEL CHATBOT (para recibir notificaciones de n8n) ---
 // Esta ruta no necesita protección CSRF porque es una API externa la que la llama.
 Route::post('/chatbot/notify', function (Request $request) {
-    \Log::info('[Chatbot Notify] Datos recibidos de n8n:', $request->all());
-    
+    $expectedToken = config('services.chatbot.webhook_token');
+    abort_if(blank($expectedToken), 503, 'Chatbot webhook token is not configured.');
+
+    $providedToken = $request->bearerToken() ?: $request->header('X-Chatbot-Webhook-Token');
+    abort_unless(hash_equals((string) $expectedToken, (string) $providedToken), 401);
+
     $validated = $request->validate([
-        'message' => 'required_without:response|string',
-        'response' => 'required_without:message|string',
-        'userId' => 'required|integer',
+        'message' => 'required_without:response|string|max:8192',
+        'response' => 'required_without:message|string|max:8192',
+        'userId' => 'required|integer|exists:users,id',
+    ]);
+
+    \Log::info('[Chatbot Notify] Respuesta recibida de n8n.', [
+        'user_id' => $validated['userId'],
+        'body_length' => strlen((string) ($validated['response'] ?? $validated['message'] ?? '')),
     ]);
 
     // Acepta tanto 'message' como 'response'
@@ -68,7 +77,7 @@ Route::post('/chatbot/notify', function (Request $request) {
     \Log::info('[Chatbot Notify] Broadcasting mensaje:', [
         'message_id' => $botMessage->id,
         'user_id' => $validated['userId'],
-        'body' => $messageBody
+        'body_length' => strlen((string) $messageBody),
     ]);
 
     // ✅ Broadcast al usuario específico

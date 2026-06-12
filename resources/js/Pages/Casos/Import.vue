@@ -1,202 +1,321 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import PrimaryButton from '@/Components/PrimaryButton.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 import axios from 'axios';
-import { 
-    CloudArrowUpIcon, 
-    ArrowLeftIcon, 
-    TableCellsIcon, 
-    CheckCircleIcon, 
+import {
+    CloudArrowUpIcon,
+    ArrowLeftIcon,
+    TableCellsIcon,
+    CheckCircleIcon,
     ExclamationTriangleIcon,
     XMarkIcon,
     ArrowDownTrayIcon,
     InformationCircleIcon,
-    ArrowPathIcon
+    ArrowPathIcon,
+    ShieldCheckIcon,
+    ClipboardDocumentCheckIcon,
+    DocumentMagnifyingGlassIcon,
+    NoSymbolIcon,
 } from '@heroicons/vue/24/outline';
 import AppAlert from '@/Utils/appAlert';
 
 const props = defineProps({
-    // Recibiremos listas para que el usuario corrija IDs si fallan
     cooperativas: Array,
     juzgados: Array,
 });
 
 const file = ref(null);
 const fileInput = ref(null);
-const results = ref(null); // Aquí guardaremos la pre-visualización del servidor
+const results = ref(null);
 const processing = ref(false);
 const confirmed = ref(false);
+const safeMode = ref(true);
 
-const handleFileChange = (e) => {
-    file.value = e.target.files[0];
+const handleFileChange = (event) => {
+    file.value = event.target.files[0];
     confirmed.value = false;
     if (file.value) uploadFile();
 };
 
+const resetImport = () => {
+    file.value = null;
+    results.value = null;
+    confirmed.value = false;
+    if (fileInput.value) fileInput.value.value = '';
+};
+
 const uploadFile = () => {
+    if (!file.value) return;
+
     const formData = new FormData();
     formData.append('file', file.value);
-    
+
     processing.value = true;
-    // Llamamos a un endpoint de "validación" que no guarda nada todavía
     axios.post(route('casos.import.validate'), formData)
-        .then(res => {
-            results.value = res.data;
+        .then((response) => {
+            results.value = {
+                ...response.data,
+                rows: (response.data.rows || []).map(row => ({
+                    ...row,
+                    selected: row.selected ?? (row.status !== 'error' && row.action !== 'no_change'),
+                })),
+            };
         })
-        .catch(err => {
+        .catch(() => {
             AppAlert.fire('Error', 'El archivo no tiene el formato correcto o está corrupto.', 'error');
         })
-        .finally(() => processing.value = false);
+        .finally(() => { processing.value = false; });
+};
+
+const rows = computed(() => results.value?.rows || []);
+const selectedRows = computed(() => rows.value.filter(row => row.selected && row.status !== 'error'));
+const eligibleRows = computed(() => rows.value.filter(row => row.status !== 'error' && row.action !== 'no_change'));
+const hasErrors = computed(() => rows.value.some(row => row.status === 'error'));
+const canImport = computed(() => confirmed.value && selectedRows.value.length > 0 && !processing.value);
+
+const summary = computed(() => ({
+    total: rows.value.length,
+    selected: selectedRows.value.length,
+    create: rows.value.filter(row => row.action === 'create').length,
+    update: rows.value.filter(row => row.action === 'update').length,
+    unchanged: rows.value.filter(row => row.action === 'no_change').length,
+    errors: rows.value.filter(row => row.status === 'error').length,
+}));
+
+const selectActionableRows = () => {
+    rows.value.forEach((row) => {
+        row.selected = row.status !== 'error' && row.action !== 'no_change';
+    });
+};
+
+const clearSelection = () => {
+    rows.value.forEach((row) => { row.selected = false; });
 };
 
 const confirmImport = () => {
     if (!confirmed.value) {
-        AppAlert.fire('Atención', 'Debe marcar la casilla de revisión para continuar.', 'warning');
+        AppAlert.fire('Atención', 'Marca la confirmación final para procesar la carga.', 'warning');
         return;
     }
+
+    if (selectedRows.value.length === 0) {
+        AppAlert.fire('Sin filas seleccionadas', 'Selecciona al menos una fila válida para importar.', 'warning');
+        return;
+    }
+
     processing.value = true;
-    router.post(route('casos.import.store'), { data: results.value.rows }, {
+    router.post(route('casos.import.store'), {
+        data: rows.value,
+        safe_mode: safeMode.value,
+    }, {
+        preserveScroll: true,
         onSuccess: () => {
-            AppAlert.fire('¡Éxito!', 'Los casos han sido importados y actualizados correctamente.', 'success');
+            AppAlert.fire('Importación completada', 'Las filas seleccionadas fueron procesadas.', 'success');
         },
-        onFinish: () => processing.value = false
+        onFinish: () => { processing.value = false; },
     });
 };
 
-const getRowStatusClass = (status) => {
-    if (status === 'error') return 'bg-red-50 border-red-100 text-red-700';
-    if (status === 'warning') return 'bg-indigo-50 border-indigo-100 text-indigo-700 font-black';
-    return 'bg-emerald-50 border-emerald-100 text-emerald-700';
+const actionLabel = (row) => ({
+    create: 'Crear',
+    update: 'Actualizar',
+    no_change: 'Sin cambios',
+    error: 'Bloqueada',
+}[row.action] || 'Revisar');
+
+const actionClass = (row) => ({
+    create: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300',
+    update: 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-300',
+    no_change: 'border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300',
+    error: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300',
+}[row.action] || 'border-amber-200 bg-amber-50 text-amber-700');
+
+const statusIcon = (row) => {
+    if (row.status === 'error') return XMarkIcon;
+    if (row.status === 'warning') return ExclamationTriangleIcon;
+    if (row.action === 'no_change') return NoSymbolIcon;
+    return CheckCircleIcon;
+};
+
+const messageClass = (row) => {
+    if (row.status === 'error') return 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300';
+    if (row.status === 'warning') return 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200';
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300';
 };
 </script>
 
 <template>
-    <Head title="Importación Inteligente de Casos" />
+    <Head title="Carga asistida de casos" />
 
     <AuthenticatedLayout>
         <template #header>
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-4">
-                    <Link :href="route('casos.index')" class="p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-400 hover:text-indigo-600 transition-all shadow-sm">
-                        <ArrowLeftIcon class="w-6 h-6" />
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex min-w-0 items-center gap-3">
+                    <Link :href="route('casos.index')" class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:text-indigo-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                        <ArrowLeftIcon class="h-5 w-5" />
                     </Link>
-                    <div>
-                        <h2 class="font-black text-2xl text-gray-900 dark:text-white leading-tight">Auditoría e Importación</h2>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">Actualice masivamente sus expedientes mediante archivos Excel.</p>
+                    <div class="min-w-0">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Casos Cooperativas</p>
+                        <h2 class="mt-1 text-2xl font-black tracking-tight text-gray-950 dark:text-white">Carga asistida</h2>
+                        <p class="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">Valida, selecciona y confirma antes de modificar expedientes.</p>
                     </div>
                 </div>
-                <div class="flex gap-3">
-                    <a :href="route('casos.export')" class="inline-flex items-center px-5 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-black uppercase tracking-widest text-gray-600 dark:text-gray-300 hover:bg-gray-50 transition-all shadow-sm">
-                        <ArrowDownTrayIcon class="w-4 h-4 mr-2" /> Exportar Actuales
+                <div class="flex flex-col gap-2 sm:flex-row">
+                    <a :href="route('casos.export')" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-xs font-black uppercase tracking-widest text-gray-600 shadow-sm transition hover:border-emerald-200 hover:text-emerald-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                        <ArrowDownTrayIcon class="h-4 w-4" /> Exportar base
                     </a>
-                    <a :href="route('casos.import.template')" class="inline-flex items-center px-5 py-2.5 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-900/50 rounded-xl text-xs font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 transition-all shadow-sm">
-                        <TableCellsIcon class="w-4 h-4 mr-2" /> Plantilla Vacía
+                    <a :href="route('casos.import.template')" class="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-indigo-700 shadow-sm transition hover:bg-indigo-100 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-300">
+                        <TableCellsIcon class="h-4 w-4" /> Plantilla avanzada
                     </a>
                 </div>
             </div>
         </template>
 
-        <div class="py-12 bg-gray-50/50 dark:bg-gray-900/50 min-h-screen">
-            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
-                
-                <!-- ZONA DE CARGA (Si no hay resultados) -->
-                <div v-if="!results" class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm p-12 text-center">
-                    <div class="max-w-xl mx-auto space-y-6">
-                        <div class="p-6 bg-indigo-50 dark:bg-indigo-900/30 rounded-full inline-block">
-                            <CloudArrowUpIcon class="w-16 h-16 text-indigo-600" />
-                        </div>
-                        <h3 class="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Cargar Excel de Gestión</h3>
-                        <p class="text-gray-500 dark:text-gray-400 font-medium leading-relaxed">
-                            Puede subir la <b>Plantilla</b> o un archivo previamente <b>Exportado</b>. El sistema comparará automáticamente cada fila contra la base de datos para detectar cambios en montos, etapas o radicados.
-                        </p>
-                        
-                        <div @click="fileInput.click()" class="mt-8 cursor-pointer p-16 border-4 border-dashed border-indigo-100 dark:border-indigo-900/30 bg-indigo-50/30 dark:bg-indigo-900/10 rounded-[3rem] hover:border-indigo-400 transition-all group">
-                            <input ref="fileInput" type="file" @change="handleFileChange" class="hidden" accept=".xlsx, .xls" />
-                            <div class="flex flex-col items-center gap-4">
-                                <ArrowPathIcon v-if="processing" class="w-12 h-12 text-indigo-600 animate-spin" />
-                                <CloudArrowUpIcon v-else class="w-12 h-12 text-indigo-400 group-hover:scale-110 transition-transform" />
-                                <span class="text-sm font-black uppercase tracking-widest text-indigo-600">
-                                    {{ processing ? 'Analizando diferencias...' : 'Seleccionar Archivo' }}
-                                </span>
+        <div class="min-h-screen bg-gray-50/70 py-6 dark:bg-gray-950/40">
+            <div class="mx-auto max-w-[1600px] space-y-5 px-4 sm:px-6 lg:px-8">
+                <section class="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                    <article class="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200">
+                        <div class="flex items-start gap-3">
+                            <ShieldCheckIcon class="mt-0.5 h-5 w-5 shrink-0" />
+                            <div>
+                                <p class="text-xs font-black uppercase tracking-widest">Modo protegido activo</p>
+                                <p class="mt-1 text-sm font-semibold">Las celdas vacías no borran datos existentes cuando el expediente ya existe.</p>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </article>
+                    <article class="rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-indigo-800 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-200">
+                        <div class="flex items-start gap-3">
+                            <DocumentMagnifyingGlassIcon class="mt-0.5 h-5 w-5 shrink-0" />
+                            <div>
+                                <p class="text-xs font-black uppercase tracking-widest">Primero valida</p>
+                                <p class="mt-1 text-sm font-semibold">Subir el archivo solo analiza filas; nada se guarda hasta confirmar.</p>
+                            </div>
+                        </div>
+                    </article>
+                    <article class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                        <div class="flex items-start gap-3">
+                            <ClipboardDocumentCheckIcon class="mt-0.5 h-5 w-5 shrink-0" />
+                            <div>
+                                <p class="text-xs font-black uppercase tracking-widest">Fila por fila</p>
+                                <p class="mt-1 text-sm font-semibold">Puedes excluir filas antes de procesar la importación.</p>
+                            </div>
+                        </div>
+                    </article>
+                </section>
 
-                <!-- TABLA DE PRE-VISUALIZACIÓN (Si ya se subió) -->
-                <div v-else class="space-y-6 animate-in fade-in duration-500">
-                    <div class="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row items-center justify-between gap-8">
-                        <div class="flex items-center gap-6">
-                            <div class="flex flex-col">
-                                <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Excel</span>
-                                <span class="text-2xl font-black text-gray-900 dark:text-white">{{ results.total_rows }}</span>
+                <section v-if="!results" class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+                    <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:p-8">
+                        <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                            <div class="max-w-2xl">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-300">Paso 1</p>
+                                <h3 class="mt-1 text-xl font-black text-gray-950 dark:text-white">Carga el archivo para revisarlo</h3>
+                                <p class="mt-2 text-sm font-medium leading-6 text-gray-600 dark:text-gray-300">Usa la plantilla avanzada o un Excel exportado desde el sistema. La revisión previa detecta nuevos casos, actualizaciones, filas sin cambios y errores.</p>
                             </div>
-                            <div class="h-10 w-px bg-gray-100 dark:bg-gray-700"></div>
-                            <div class="flex flex-col">
-                                <span class="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Cambios Detectados</span>
-                                <span class="text-2xl font-black text-indigo-600">{{ results.warning_rows }}</span>
-                            </div>
-                            <div class="h-10 w-px bg-gray-100 dark:bg-gray-700"></div>
-                            <div class="flex flex-col">
-                                <span class="text-[10px] font-black text-red-500 uppercase tracking-widest">Errores de Integridad</span>
-                                <span class="text-2xl font-black text-red-600">{{ results.error_rows }}</span>
-                            </div>
-                        </div>
-
-                        <div class="flex-1 max-w-md bg-amber-50 dark:bg-amber-900/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-900/30">
-                            <label class="flex items-start gap-3 cursor-pointer">
-                                <input v-model="confirmed" type="checkbox" class="mt-1 rounded text-amber-600 focus:ring-amber-500 border-amber-300" />
-                                <span class="text-xs font-bold text-amber-900 dark:text-amber-300">
-                                    Confirmo que he revisado las advertencias de actualización y errores detectados. Entiendo que los datos en la base de datos serán reemplazados por los del Excel.
-                                </span>
+                            <label class="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+                                <input v-model="safeMode" type="checkbox" class="rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500" />
+                                <span class="text-xs font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300">Proteger datos existentes</span>
                             </label>
                         </div>
 
-                        <div class="flex gap-3">
-                            <button @click="results = null" class="px-6 py-2.5 bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300 rounded-xl font-bold text-xs uppercase tracking-widest">Cancelar</button>
-                            <PrimaryButton @click="confirmImport" :disabled="results.error_rows > 0 || processing || !confirmed" class="!bg-indigo-600 !rounded-xl !px-10 !font-white !shadow-xl !shadow-indigo-200 white:!shadow-none disabled:!bg-gray-300 disabled:!shadow-none">
-                                <span v-if="processing" class="animate-spin mr-2"><ArrowPathIcon class="w-4 h-4"/></span>
-                                Procesar Importación
-                            </PrimaryButton>
+                        <button type="button" @click="fileInput?.click()" class="mt-7 flex min-h-[18rem] w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-indigo-200 bg-indigo-50/50 p-8 text-center transition hover:border-indigo-400 hover:bg-indigo-50 dark:border-indigo-900/60 dark:bg-indigo-950/20 dark:hover:bg-indigo-950/30">
+                            <input ref="fileInput" type="file" @change="handleFileChange" class="hidden" accept=".xlsx,.xls" />
+                            <ArrowPathIcon v-if="processing" class="h-12 w-12 animate-spin text-indigo-600" />
+                            <CloudArrowUpIcon v-else class="h-12 w-12 text-indigo-500" />
+                            <span class="mt-4 text-sm font-black uppercase tracking-widest text-indigo-700 dark:text-indigo-300">{{ processing ? 'Analizando archivo...' : 'Seleccionar Excel' }}</span>
+                            <span class="mt-2 max-w-md text-xs font-semibold text-gray-500 dark:text-gray-400">Formatos permitidos: .xlsx y .xls</span>
+                        </button>
+                    </div>
+
+                    <aside class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                        <h3 class="text-sm font-black uppercase tracking-widest text-gray-950 dark:text-white">Lectura rápida</h3>
+                        <div class="mt-4 space-y-3">
+                            <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800/60">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Crear</p>
+                                <p class="mt-1 text-xs font-semibold text-gray-600 dark:text-gray-300">No existe un caso equivalente.</p>
+                            </div>
+                            <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800/60">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Actualizar</p>
+                                <p class="mt-1 text-xs font-semibold text-gray-600 dark:text-gray-300">El sistema encontró cambios frente a la base.</p>
+                            </div>
+                            <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800/60">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Bloqueada</p>
+                                <p class="mt-1 text-xs font-semibold text-gray-600 dark:text-gray-300">Hay un error que debe corregirse en el Excel.</p>
+                            </div>
+                        </div>
+                    </aside>
+                </section>
+
+                <section v-else class="space-y-5">
+                    <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:p-5">
+                        <div class="grid grid-cols-2 gap-3 lg:grid-cols-6">
+                            <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800/60"><p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Filas</p><p class="mt-1 text-2xl font-black text-gray-950 dark:text-white">{{ summary.total }}</p></div>
+                            <div class="rounded-lg bg-indigo-50 p-3 dark:bg-indigo-950/30"><p class="text-[10px] font-black uppercase tracking-widest text-indigo-700 dark:text-indigo-300">Seleccionadas</p><p class="mt-1 text-2xl font-black text-indigo-700 dark:text-indigo-300">{{ summary.selected }}</p></div>
+                            <div class="rounded-lg bg-emerald-50 p-3 dark:bg-emerald-950/30"><p class="text-[10px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300">Crear</p><p class="mt-1 text-2xl font-black text-emerald-700 dark:text-emerald-300">{{ summary.create }}</p></div>
+                            <div class="rounded-lg bg-amber-50 p-3 dark:bg-amber-950/30"><p class="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300">Actualizar</p><p class="mt-1 text-2xl font-black text-amber-700 dark:text-amber-300">{{ summary.update }}</p></div>
+                            <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800/60"><p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Sin cambios</p><p class="mt-1 text-2xl font-black text-gray-700 dark:text-gray-200">{{ summary.unchanged }}</p></div>
+                            <div class="rounded-lg bg-rose-50 p-3 dark:bg-rose-950/30"><p class="text-[10px] font-black uppercase tracking-widest text-rose-700 dark:text-rose-300">Errores</p><p class="mt-1 text-2xl font-black text-rose-700 dark:text-rose-300">{{ summary.errors }}</p></div>
                         </div>
                     </div>
 
-                    <div class="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-xl overflow-hidden">
+                    <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:p-5">
+                        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <button type="button" @click="selectActionableRows" class="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-300">Seleccionar válidas</button>
+                                <button type="button" @click="clearSelection" class="rounded-lg border border-gray-200 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">Quitar selección</button>
+                                <button type="button" @click="resetImport" class="rounded-lg border border-gray-200 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">Cambiar archivo</button>
+                            </div>
+                            <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
+                                <label class="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/60 dark:bg-amber-950/30">
+                                    <input v-model="confirmed" type="checkbox" class="mt-0.5 rounded border-amber-300 text-amber-600 focus:ring-amber-500" />
+                                    <span class="text-xs font-bold text-amber-800 dark:text-amber-200">Revisé el resumen y autorizo procesar solo las filas seleccionadas.</span>
+                                </label>
+                                <PrimaryButton @click="confirmImport" :disabled="!canImport" class="justify-center !rounded-lg !px-6 !py-3 !text-xs" :class="{ 'opacity-50': !canImport }">
+                                    <ArrowPathIcon v-if="processing" class="mr-2 h-4 w-4 animate-spin" />
+                                    Procesar {{ selectedRows.length }} fila(s)
+                                </PrimaryButton>
+                            </div>
+                        </div>
+                        <p v-if="hasErrors" class="mt-3 text-xs font-bold text-rose-600 dark:text-rose-300">Las filas bloqueadas no se guardarán. Corrige el Excel y vuelve a cargarlo si necesitas incluirlas.</p>
+                    </div>
+
+                    <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
                         <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
-                                <thead class="bg-gray-50/50 dark:bg-gray-800/50">
+                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead class="bg-gray-50 dark:bg-gray-800/70">
                                     <tr>
-                                        <th class="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase">Estado</th>
-                                        <th class="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase">Deudor / Cooperativa</th>
-                                        <th class="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase">Radicado / Ref</th>
-                                        <th class="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase">Análisis de Cambios</th>
+                                        <th class="w-12 px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Incluir</th>
+                                        <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Acción</th>
+                                        <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Deudor / empresa</th>
+                                        <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Radicado / pagaré</th>
+                                        <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Revisión</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
-                                    <tr v-for="(row, idx) in results.rows" :key="idx" :class="row.status === 'error' ? 'bg-red-50/30' : (row.status === 'warning' ? 'bg-indigo-50/10' : '')">
-                                        <td class="px-6 py-4">
-                                            <component :is="row.status === 'error' ? XMarkIcon : (row.status === 'warning' ? ExclamationTriangleIcon : CheckCircleIcon)" 
-                                                :class="row.status === 'error' ? 'text-red-500' : (row.status === 'warning' ? 'text-indigo-500' : 'text-emerald-500')"
-                                                class="w-6 h-6" />
+                                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                                    <tr v-for="(row, index) in rows" :key="index" class="align-top" :class="row.selected ? 'bg-indigo-50/30 dark:bg-indigo-950/10' : ''">
+                                        <td class="px-4 py-4">
+                                            <input v-model="row.selected" :disabled="row.status === 'error'" type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-30" />
                                         </td>
-                                        <td class="px-6 py-4">
-                                            <p class="text-sm font-black text-gray-900 dark:text-white">{{ row.nombre_deudor }}</p>
-                                            <div class="flex items-center gap-2 mt-1">
-                                                <span class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 text-[9px] font-black uppercase rounded">{{ row.documento_deudor }}</span>
-                                                <span class="text-[10px] font-bold text-gray-400">{{ row.cooperativa_nombre }}</span>
-                                            </div>
+                                        <td class="px-4 py-4">
+                                            <span class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest" :class="actionClass(row)">
+                                                <component :is="statusIcon(row)" class="h-3.5 w-3.5" />
+                                                {{ actionLabel(row) }}
+                                            </span>
                                         </td>
-                                        <td class="px-6 py-4">
-                                            <p class="text-xs font-mono font-bold text-gray-600 dark:text-gray-300">{{ row.radicado || 'SIN RADICADO' }}</p>
-                                            <p class="text-[10px] font-bold text-indigo-400 uppercase">{{ row.referencia_credito }}</p>
+                                        <td class="px-4 py-4">
+                                            <p class="text-sm font-black text-gray-950 dark:text-white">{{ row.nombre_deudor || 'Sin deudor' }}</p>
+                                            <p class="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">{{ row.documento_deudor || 'Sin documento' }}</p>
+                                            <p class="mt-1 text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-300">{{ row.cooperativa_nombre || 'Sin empresa' }}</p>
                                         </td>
-                                        <td class="px-6 py-4">
-                                            <div class="flex flex-col gap-1.5">
-                                                <span v-for="msg in row.messages" :key="msg" 
-                                                    class="px-3 py-1 rounded-lg text-[10px] border leading-relaxed"
-                                                    :class="getRowStatusClass(row.status)">
-                                                    {{ msg }}
+                                        <td class="px-4 py-4">
+                                            <p class="font-mono text-xs font-black text-gray-800 dark:text-gray-200">{{ row.radicado || 'SIN RADICADO' }}</p>
+                                            <p class="mt-1 text-xs font-bold text-gray-500 dark:text-gray-400">{{ row.referencia_credito || 'Sin pagaré' }}</p>
+                                        </td>
+                                        <td class="px-4 py-4">
+                                            <div class="flex max-w-xl flex-wrap gap-1.5">
+                                                <span v-for="message in row.messages" :key="message" class="rounded-lg border px-2.5 py-1 text-[10px] font-bold leading-5" :class="messageClass(row)">
+                                                    {{ message }}
                                                 </span>
                                             </div>
                                         </td>
@@ -205,8 +324,7 @@ const getRowStatusClass = (status) => {
                             </table>
                         </div>
                     </div>
-                </div>
-
+                </section>
             </div>
         </div>
     </AuthenticatedLayout>

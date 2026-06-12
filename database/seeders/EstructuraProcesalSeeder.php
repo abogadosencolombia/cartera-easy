@@ -25,7 +25,8 @@ class EstructuraProcesalSeeder extends Seeder
                 foreach ($tipos as $tipoNombre => $subtiposConDetalles) {
                     // --- Nivel 2: TIPO PROCESO ---
                     $tipoProceso = TipoProceso::updateOrCreate(
-                        ['nombre' => $tipoNombre, 'especialidad_juridica_id' => $especialidad->id]
+                        ['nombre' => $tipoNombre],
+                        ['especialidad_juridica_id' => $especialidad->id]
                     );
 
                     // --- Nivel 3: SUBTIPO PROCESO ---
@@ -62,6 +63,7 @@ class EstructuraProcesalSeeder extends Seeder
     {
         return [
             'CIVIL' => [
+                'COMPRAVENTA' => [],
                 'PROCESOS_DECLARATIVOS' => [
                     'VERBAL_MAYOR_Y_MENOR_CUANTIA' => [
                         'Resolución de contrato',

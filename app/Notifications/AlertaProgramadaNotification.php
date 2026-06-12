@@ -17,24 +17,33 @@ class AlertaProgramadaNotification extends Notification
         public bool $esFinal,
         public string $prioridad = 'media',
         public ?int $procesoId = null,
+        private ?array $channels = null,
     ) {
     }
 
-    public function via($notifiable): array {
-        $channels = [WebPushChannel::class];
-        
-        if (!empty($notifiable->email)) {
+    public function via($notifiable): array
+    {
+        if ($this->channels !== null) {
+            return $this->channels;
+        }
+
+        $channels = [];
+
+        if (!empty($notifiable->email) && (bool) data_get($notifiable->preferencias_notificacion, 'email', true)) {
             $channels[] = 'mail';
         }
-        
+
+        if ((bool) data_get($notifiable->preferencias_notificacion, 'in-app', true)) {
+            $channels[] = WebPushChannel::class;
+        }
+
         return $channels;
     }
 
     public function toMail($notifiable): \App\Mail\AlertaSistemaMailable
     {
-        $title = $this->esFinal ? 'Notificación Programada' : 'Recordatorio de Tarea';
-        
-        // Determinar URL y contexto de forma segura
+        $title = $this->esFinal ? 'Notificacion Programada' : 'Recordatorio de Tarea';
+
         if ($this->procesoId) {
             $url = route('procesos.show', $this->procesoId);
             $context = 'Esta es una alerta programada vinculada al expediente #' . $this->procesoId;
@@ -45,7 +54,7 @@ class AlertaProgramadaNotification extends Notification
             $url = route('dashboard');
             $context = 'Esta es una alerta general del sistema.';
         }
-        
+
         return (new \App\Mail\AlertaSistemaMailable(
             $notifiable->name,
             $title,
@@ -57,8 +66,8 @@ class AlertaProgramadaNotification extends Notification
 
     public function toWebPush($notifiable, $notification): WebPushMessage
     {
-        $title = $this->esFinal ? 'Notificación' : 'Recordatorio';
-        
+        $title = $this->esFinal ? 'Notificacion' : 'Recordatorio';
+
         if ($this->procesoId) {
             $url = route('procesos.show', $this->procesoId);
         } elseif ($this->casoId) {
@@ -74,7 +83,8 @@ class AlertaProgramadaNotification extends Notification
             ->data(['url' => $url, 'prioridad' => $this->prioridad]);
     }
 
-    public function viaQueues(): array {
-        return [ WebPushChannel::class => 'notifications' ];
+    public function viaQueues(): array
+    {
+        return [WebPushChannel::class => 'notifications'];
     }
 }

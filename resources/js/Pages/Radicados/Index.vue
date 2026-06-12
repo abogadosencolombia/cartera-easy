@@ -13,6 +13,9 @@ import Modal from '@/Components/Modal.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import Textarea from '@/Components/Textarea.vue';
+import InputLabel from '@/Components/InputLabel.vue';
+import PersonaCompletenessIndicator from '@/Components/PersonaCompletenessIndicator.vue';
+import { hasIncompletePersonaInfo } from '@/Utils/personaCompleteness';
 import { debounce } from 'lodash';
 import { useProcesos } from '@/composables/useProcesos';
 import AppAlert from '@/Utils/appAlert';
@@ -40,6 +43,7 @@ import {
     InboxIcon,
     CloudArrowUpIcon,
     UserIcon,
+    UserGroupIcon,
     BuildingOfficeIcon,
     PhoneIcon,
     EnvelopeIcon,
@@ -54,6 +58,7 @@ const props = defineProps({
     procesos: { type: Object, required: true },
     filtros: { type: Object, default: () => ({}) },
     juzgados: { type: Array, default: () => [] },
+    tiposProceso: { type: Array, default: () => [] },
     selectedJuzgado: { type: Object, default: null },
     stats: { type: Object, default: () => ({}) },
 });
@@ -113,7 +118,7 @@ const tiposEntidad = [
 
 // --- FILTROS ---
 const filterStorageKey = 'radicados.index.filters';
-const filterKeys = ['search', 'estado', 'juzgado_id', 'tipo_entidad', 'sin_radicado', 'solo_vencidos', 'cerrados', 'actualizados_hoy', 'integridad_baja'];
+const filterKeys = ['search', 'estado', 'juzgado_id', 'tipo_proceso_id', 'tipo_entidad', 'sin_radicado', 'solo_vencidos', 'cerrados', 'actualizados_hoy', 'integridad_baja'];
 const booleanFilterKeys = ['sin_radicado', 'solo_vencidos', 'cerrados', 'actualizados_hoy', 'integridad_baja'];
 
 const parseBooleanFilter = (value) => value === true || value === 'true' || value === 1 || value === '1';
@@ -166,6 +171,7 @@ const search = ref(initialFilterValue('search'));
 const estado = ref(initialFilterValue('estado') || 'TODOS');
 const juzgadoId = ref(initialFilterValue('juzgado_id'));
 const selectedJuzgado = ref(props.selectedJuzgado);
+const tipoProcesoId = ref(initialFilterValue('tipo_proceso_id'));
 const tipoEntidad = ref(initialFilterValue('tipo_entidad'));
 const sinRadicado = ref(parseBooleanFilter(initialFilterValue('sin_radicado', false)));
 const soloVencidos = ref(parseBooleanFilter(initialFilterValue('solo_vencidos', false)));
@@ -177,6 +183,7 @@ const currentFilterPayload = () => ({
     search: search.value,
     estado: estado.value === 'TODOS' ? '' : estado.value,
     juzgado_id: juzgadoId.value,
+    tipo_proceso_id: tipoProcesoId.value,
     tipo_entidad: tipoEntidad.value,
     sin_radicado: sinRadicado.value,
     solo_vencidos: soloVencidos.value,
@@ -237,7 +244,7 @@ const applyControlFilter = (filterKey) => {
 };
 
 const isDirty = computed(() => {
-    return search.value !== '' || estado.value !== 'TODOS' || juzgadoId.value !== '' || tipoEntidad.value !== '' || sinRadicado.value === true || soloVencidos.value === true || cerrados.value === true || actualizadosHoy.value === true || integridadBaja.value === true;
+    return search.value !== '' || estado.value !== 'TODOS' || juzgadoId.value !== '' || tipoProcesoId.value !== '' || tipoEntidad.value !== '' || sinRadicado.value === true || soloVencidos.value === true || cerrados.value === true || actualizadosHoy.value === true || integridadBaja.value === true;
 });
 
 const resetFilters = () => {
@@ -249,6 +256,7 @@ const resetFilters = () => {
     estado.value = 'TODOS';
     juzgadoId.value = '';
     selectedJuzgado.value = null;
+    tipoProcesoId.value = '';
     tipoEntidad.value = '';
     sinRadicado.value = false;
     soloVencidos.value = false;
@@ -264,7 +272,7 @@ const applyFilters = debounce(() => {
     router.get(route('procesos.index'), filters, { preserveState: true, replace: true });
 }, 300);
 
-watch([search, estado, juzgadoId, tipoEntidad, sinRadicado, soloVencidos, cerrados, actualizadosHoy, integridadBaja], applyFilters);
+watch([search, estado, juzgadoId, tipoProcesoId, tipoEntidad, sinRadicado, soloVencidos, cerrados, actualizadosHoy, integridadBaja], applyFilters);
 
 onMounted(() => {
     reapplyStoredFiltersIfNeeded();
@@ -413,6 +421,74 @@ const getVencimientoInfo = (proceso) => {
     return { text: `Vence en ${dias} días`, class: 'text-gray-500' };
 };
 
+const activeFilterCount = computed(() => filterKeys.reduce((count, key) => {
+    if (key === 'estado') {
+        return count + (estado.value !== 'TODOS' ? 1 : 0);
+    }
+
+    if (booleanFilterKeys.includes(key)) {
+        const refMap = {
+            sin_radicado: sinRadicado,
+            solo_vencidos: soloVencidos,
+            cerrados,
+            actualizados_hoy: actualizadosHoy,
+            integridad_baja: integridadBaja,
+        };
+        return count + (refMap[key]?.value ? 1 : 0);
+    }
+
+    const refMap = { search, juzgado_id: juzgadoId, tipo_proceso_id: tipoProcesoId, tipo_entidad: tipoEntidad };
+    return count + (String(refMap[key]?.value ?? '').trim() !== '' ? 1 : 0);
+}, 0));
+
+const resultRange = computed(() => {
+    const total = props.procesos?.total || 0;
+    if (!total) return '0 expedientes';
+
+    const from = props.procesos?.from || 1;
+    const to = props.procesos?.to || props.procesos?.data?.length || total;
+    return `${from}-${to} de ${total}`;
+});
+
+const summaryCards = computed(() => [
+    { key: 'total', label: 'Total expedientes', value: props.stats?.total ?? '...', description: 'En seguimiento', icon: ScaleIcon, iconClass: 'text-slate-500', filterKey: null },
+    { key: 'sin_radicado', label: 'Sin radicado', value: props.stats?.sin_radicado ?? '...', description: 'Pendientes de número', icon: ArchiveBoxXMarkIcon, iconClass: 'text-amber-500', filterKey: 'sin_radicado', ref: sinRadicado, activeClass: 'ring-2 ring-amber-300 border-amber-200 bg-amber-50/70 dark:border-amber-500/60 dark:bg-amber-900/10' },
+    { key: 'solo_vencidos', label: 'Revisión vencida', value: props.stats?.vencidos ?? '...', description: 'Acción requerida', icon: ExclamationTriangleIcon, iconClass: 'text-rose-500', filterKey: 'solo_vencidos', ref: soloVencidos, activeClass: 'ring-2 ring-rose-300 border-rose-200 bg-rose-50/70 dark:border-rose-500/60 dark:bg-rose-900/10' },
+    { key: 'revisar_hoy', label: 'Revisar hoy', value: props.stats?.revisar_hoy ?? '...', description: 'Agenda del día', icon: ClockIcon, iconClass: 'text-teal-500', filterKey: null },
+    { key: 'integridad_baja', label: 'Integridad baja', value: props.stats?.integridad_baja ?? '...', description: 'Datos por completar', icon: ExclamationTriangleIcon, iconClass: 'text-orange-500', filterKey: 'integridad_baja', ref: integridadBaja, activeClass: 'ring-2 ring-orange-300 border-orange-200 bg-orange-50/70 dark:border-orange-500/60 dark:bg-orange-900/10' },
+    { key: 'actualizados_hoy', label: 'Actualizados hoy', value: props.stats?.actualizados_hoy ?? '...', description: 'Movimientos recientes', icon: ArrowPathIcon, iconClass: 'text-indigo-500', filterKey: 'actualizados_hoy', ref: actualizadosHoy, activeClass: 'ring-2 ring-indigo-300 border-indigo-200 bg-indigo-50/70 dark:border-indigo-500/60 dark:bg-indigo-900/10' },
+]);
+
+const controlFilterItems = computed(() => [
+    { key: 'sin_radicado', label: 'Sin radicado', count: props.stats?.sin_radicado, ref: sinRadicado, icon: ArchiveBoxXMarkIcon, activeClass: 'bg-amber-600 text-white border-amber-600' },
+    { key: 'solo_vencidos', label: 'Revisión vencida', count: props.stats?.vencidos, ref: soloVencidos, icon: ExclamationTriangleIcon, activeClass: 'bg-rose-600 text-white border-rose-600' },
+    { key: 'integridad_baja', label: 'Integridad baja', count: props.stats?.integridad_baja, ref: integridadBaja, icon: ExclamationTriangleIcon, activeClass: 'bg-orange-600 text-white border-orange-600' },
+    { key: 'cerrados', label: 'Cerrados', count: props.stats?.cerrados, ref: cerrados, icon: CheckCircleIcon, activeClass: 'bg-emerald-600 text-white border-emerald-600' },
+    { key: 'actualizados_hoy', label: 'Actualizados hoy', count: props.stats?.actualizados_hoy, ref: actualizadosHoy, icon: ArrowPathIcon, activeClass: 'bg-indigo-600 text-white border-indigo-600' },
+]);
+
+const userInitials = (name) => {
+    if (!name) return 'SA';
+    return name.split(' ').filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase();
+};
+
+const firstName = (name) => name ? name.split(' ')[0] : 'Sin asignar';
+const primaryParty = (personas) => personas?.[0]?.nombre_completo || 'Sin registro';
+const extraPartiesCount = (personas) => Math.max((personas?.length || 0) - 1, 0);
+const firstIncompleteParty = (personas) => personas?.find(hasIncompletePersonaInfo) || null;
+const processTypeName = (proceso) => proceso.tipo_proceso?.nombre || 'General';
+const processOfficeName = (proceso) => proceso.entidad || proceso.juzgado?.nombre || 'Despacho por definir';
+const integrityScore = (proceso) => Number(proceso.integridad_score || 0);
+const integrityBarStyle = (proceso) => ({ width: `${Math.min(Math.max(integrityScore(proceso), 0), 100)}%` });
+const integrityTone = (proceso) => {
+    const score = integrityScore(proceso);
+    if (score >= 85) return 'bg-emerald-500';
+    if (score >= 60) return 'bg-amber-500';
+    return 'bg-rose-500';
+};
+const isInactiveProcess = (proceso) => getInactivityDays(proceso.updated_at) >= 30 && proceso.estado !== 'CERRADO';
+const isControlActive = (item) => Boolean(item.ref?.value);
+
 const copyLegalInfo = (proceso) => {
     const p = proceso || selectedProceso.value;
     if (!p) return;
@@ -453,461 +529,459 @@ const copyLegalInfo = (proceso) => {
     <Head title="Gestión de Radicados" />
 
     <AuthenticatedLayout>
-        <template #header>
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-                <div class="flex items-center gap-2">
-                    <h2 class="text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-                        <ScaleIcon class="w-8 h-8 text-indigo-500" />
-                        Expedientes Judiciales
-                    </h2>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        Gestión y seguimiento detallado de procesos radicados.
-                    </p>
-                </div>
-                <div class="flex items-center gap-3 w-full md:w-auto">
-                    <Link
-                        :href="route('procesos.import.show')"
-                        class="flex-1 md:flex-none inline-flex items-center justify-center px-4 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-lg font-bold text-sm transition-all shadow-sm hover:bg-gray-50"
-                    >
-                        <CloudArrowUpIcon class="w-5 h-5 mr-2" />
-                        Importar
-                    </Link>
-                    <button 
-                        @click="exportarExcel" 
-                        class="flex-1 md:flex-none inline-flex items-center justify-center px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-sm transition-all shadow-sm shadow-green-200 dark:shadow-none"
-                    >
-                        <ArrowDownTrayIcon class="w-5 h-5 mr-2" />
-                        Exportar Excel
-                    </button>
-                    <Link
-                        :href="route('procesos.create')"
-                        class="flex-1 md:flex-none inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-sm transition-all shadow-sm shadow-indigo-200 dark:shadow-none"
-                    >
-                        + Nuevo Radicado
-                    </Link>
-                </div>
-            </div>
-        </template>
-
-        <div class="py-8">
-            <div class="max-w-8xl mx-auto sm:px-6 lg:px-8 space-y-4">
-                
-                <!-- STATS / KPI CARDS -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
-                    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md">
-                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-indigo-600">
-                            <ScaleIcon class="w-16 h-16" />
+        <div class="py-6">
+            <div class="mx-auto max-w-[1600px] space-y-4 px-4 sm:px-6 lg:px-8">
+                <!-- Encabezado y Acciones Principales -->
+                <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div class="flex min-w-0 items-center gap-3">
+                            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300">
+                                <ScaleIcon class="h-6 w-6" />
+                            </div>
+                            <div class="min-w-0">
+                                <h2 class="text-xl font-black tracking-tight text-gray-950 dark:text-white sm:text-2xl">Expedientes Judiciales</h2>
+                                <p class="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">Radicados, partes, despacho y revisión procesal en una sola vista.</p>
+                            </div>
                         </div>
-                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Expedientes</p>
-                        <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.total }}</p>
-                        <p class="text-[9px] text-gray-500 font-bold mt-1 uppercase tracking-tighter">En gestión interna</p>
-                    </div>
 
-                    <button
-                        type="button"
-                        @click="applyControlFilter('sin_radicado')"
-                        :class="sinRadicado ? 'ring-2 ring-amber-400 border-amber-200 dark:border-amber-500/70' : ''"
-                        class="text-left w-full bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-amber-400"
-                    >
-                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-amber-600">
-                            <ArchiveBoxXMarkIcon class="w-16 h-16" />
-                        </div>
-                        <p class="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Sin Radicado</p>
-                        <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.sin_radicado }}</p>
-                        <p class="text-[9px] text-amber-500 font-bold mt-1 uppercase tracking-tighter">Pendientes de radicado</p>
-                    </button>
-
-                    <button
-                        type="button"
-                        @click="applyControlFilter('cerrados')"
-                        :class="cerrados ? 'ring-2 ring-red-400 border-red-200 dark:border-red-500/70' : ''"
-                        class="text-left w-full bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-400"
-                    >
-                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-red-600">
-                            <CheckCircleIcon class="w-16 h-16" />
-                        </div>
-                        <p class="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1">Cerrados</p>
-                        <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.cerrados }}</p>
-                        <p class="text-[9px] text-red-500 font-bold mt-1 uppercase tracking-tighter">Expedientes finalizados</p>
-                    </button>
-
-                    <button
-                        type="button"
-                        @click="applyControlFilter('actualizados_hoy')"
-                        :class="actualizadosHoy ? 'ring-2 ring-indigo-400 border-indigo-200 dark:border-indigo-500/70' : ''"
-                        class="text-left w-full bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                    >
-                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-indigo-600">
-                            <ArrowPathIcon class="w-16 h-16" />
-                        </div>
-                        <p class="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Actualizados Hoy</p>
-                        <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.actualizados_hoy }}</p>
-                        <p class="text-[9px] text-indigo-500 font-bold mt-1 uppercase tracking-tighter">Cambios del día</p>
-                    </button>
-
-                    <button
-                        type="button"
-                        @click="applyControlFilter('integridad_baja')"
-                        :class="integridadBaja ? 'ring-2 ring-rose-400 border-rose-200 dark:border-rose-500/70' : ''"
-                        class="text-left w-full bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-rose-400"
-                    >
-                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-rose-600">
-                            <ExclamationTriangleIcon class="w-16 h-16" />
-                        </div>
-                        <p class="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Integridad Baja</p>
-                        <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.integridad_baja }}</p>
-                        <p class="text-[9px] text-rose-500 font-bold mt-1 uppercase tracking-tighter">Expedientes por completar</p>
-                    </button>
-
-                    <button
-                        type="button"
-                        @click="applyControlFilter('solo_vencidos')"
-                        :class="soloVencidos ? 'ring-2 ring-red-400 border-red-200 dark:border-red-500/70' : ''"
-                        class="text-left w-full bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-400"
-                    >
-                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-red-600">
-                            <ExclamationTriangleIcon class="w-16 h-16" />
-                        </div>
-                        <p class="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1">Revisiones Vencidas</p>
-                        <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.vencidos }}</p>
-                        <p class="text-[9px] text-red-500 font-bold mt-1 uppercase tracking-tighter">Acción requerida urgente</p>
-                    </button>
-
-                    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md">
-                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-emerald-600">
-                            <ClockIcon class="w-16 h-16" />
-                        </div>
-                        <p class="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Revisar Hoy</p>
-                        <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.revisar_hoy }}</p>
-                        <p class="text-[9px] text-emerald-500 font-bold mt-1 uppercase tracking-tighter">Programados para el día</p>
-                    </div>
-                </div>
-
-        <!-- BARRA DE FILTROS AVANZADA -->
-        <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-6">
-            <div class="flex flex-col xl:flex-row gap-6">
-                <!-- Búsqueda Principal -->
-                <div class="relative flex-grow">
-                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Búsqueda General</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <MagnifyingGlassIcon class="h-4 w-4 text-gray-400" />
-                        </div>
-                        <input
-                            v-model="search"
-                            type="text"
-                            class="block w-full pl-10 pr-3 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white font-medium transition-all"
-                            placeholder="Radicado, nombres de las partes, asunto o documento..."
-                        />
-                    </div>
-                </div>
-
-                <!-- Selectores de Filtro -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 xl:w-1/2">
-                    <div>
-                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Tipo de Entidad</label>
-                        <SelectInput v-model="tipoEntidad" class="w-full py-3 rounded-xl">
-                            <option value="">Todas las Entidades</option>
-                            <option v-for="tipo in tiposEntidad" :key="tipo" :value="tipo">{{ tipo }}s</option>
-                        </SelectInput>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Estado</label>
-                        <SelectInput v-model="estado" class="w-full py-3 rounded-xl">
-                            <option value="TODOS">Todos los Estados</option>
-                            <option value="ACTIVO">Activos</option>
-                            <option value="CERRADO">Cerrados</option>
-                        </SelectInput>
-                    </div>
-                    <div class="sm:col-span-2 lg:col-span-1">
-                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Filtros Rápidos</label>
-                        <div class="flex items-center gap-2">
-                            <button 
-                                @click="applyControlFilter('sin_radicado')"
-                                :class="sinRadicado ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-50 text-gray-500 border-gray-200'"
-                                class="flex-1 px-3 py-3 rounded-xl border text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-1.5"
+                        <div class="grid w-full grid-cols-1 gap-2 sm:grid-cols-3 lg:w-auto">
+                            <Link
+                                :href="route('procesos.import.show')"
+                                class="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-indigo-700 shadow-sm transition-colors hover:border-indigo-300 hover:bg-indigo-100 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-300"
                             >
-                                <div :class="sinRadicado ? 'bg-white' : 'bg-gray-300'" class="w-1.5 h-1.5 rounded-full"></div>
-                                Sin Radicado
-                            </button>
-                            <button 
-                                @click="applyControlFilter('solo_vencidos')"
-                                :class="soloVencidos ? 'bg-red-600 text-white border-red-600' : 'bg-gray-50 text-gray-500 border-gray-200'"
-                                class="flex-1 px-3 py-3 rounded-xl border text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-1.5"
+                                <CloudArrowUpIcon class="h-4 w-4" />
+                                Carga asistida
+                            </Link>
+                            <button
+                                type="button"
+                                @click="exportarExcel"
+                                class="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-emerald-700"
                             >
-                                <div :class="soloVencidos ? 'bg-white' : 'bg-red-300'" class="w-1.5 h-1.5 rounded-full"></div>
-                                Vencidos
+                                <ArrowDownTrayIcon class="h-4 w-4" />
+                                Exportar
                             </button>
-                            <button 
-                                @click="applyControlFilter('integridad_baja')"
-                                :class="integridadBaja ? 'bg-rose-600 text-white border-rose-600' : 'bg-gray-50 text-gray-500 border-gray-200'"
-                                class="flex-1 px-3 py-3 rounded-xl border text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-1.5"
+                            <Link
+                                :href="route('procesos.create')"
+                                class="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-600 bg-indigo-600 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-indigo-700"
                             >
-                                <div :class="integridadBaja ? 'bg-white' : 'bg-rose-300'" class="w-1.5 h-1.5 rounded-full"></div>
-                                Integridad
-                            </button>
+                                <PlusIcon class="h-4 w-4" />
+                                Nuevo radicado
+                            </Link>
                         </div>
                     </div>
-                </div>
-            </div>
+                </section>
 
-            <!-- Fila Inferior: Juzgado y Botón Limpiar -->
-            <div class="flex flex-col lg:flex-row items-end gap-6 pt-6 border-t border-gray-50 dark:border-gray-700">
-                <div class="w-full lg:flex-grow">
-                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Filtrar por Despacho o Juzgado Específico</label>
-                    <AsyncSelect 
-                        v-model="selectedJuzgado"
-                        :endpoint="route('juzgados.search')"
-                        placeholder="Escriba para buscar el juzgado..."
-                        label-key="nombre"
-                        class="!min-h-[46px] !rounded-xl shadow-sm"
-                    />
-                </div>
-                <div class="flex items-center justify-between w-full lg:w-auto gap-8 pb-3">
-                    <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest whitespace-nowrap">
-                        Mostrando <span class="text-indigo-600 dark:text-indigo-400">{{ procesos.total }}</span> expedientes
-                    </div>
-                    <button 
-                        v-if="isDirty"
-                        @click="resetFilters"
-                        class="inline-flex items-center text-[10px] font-black text-red-500 hover:text-red-700 uppercase tracking-[0.2em] transition-colors whitespace-nowrap"
-                    >
-                        <XMarkIcon class="w-4 h-4 mr-1" />
-                        Limpiar Filtros
-                    </button>
-                </div>
-            </div>
-        </div>
+                <!-- Indicadores -->
+                <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                    <template v-for="card in summaryCards" :key="card.key">
+                        <button
+                            v-if="card.filterKey"
+                            type="button"
+                            @click="applyControlFilter(card.filterKey)"
+                            :class="isControlActive(card) ? card.activeClass : ''"
+                            class="rounded-lg border border-gray-200 bg-white p-4 text-left shadow-sm transition-all hover:border-indigo-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:border-gray-700 dark:bg-gray-800"
+                        >
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">{{ card.label }}</p>
+                                    <p class="mt-1 break-words text-2xl font-black text-gray-950 dark:text-white">{{ card.value }}</p>
+                                    <p class="mt-1 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ card.description }}</p>
+                                </div>
+                                <component :is="card.icon" class="h-5 w-5 shrink-0" :class="card.iconClass" />
+                            </div>
+                        </button>
+                        <div v-else class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">{{ card.label }}</p>
+                                    <p class="mt-1 break-words text-2xl font-black text-gray-950 dark:text-white">{{ card.value }}</p>
+                                    <p class="mt-1 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ card.description }}</p>
+                                </div>
+                                <component :is="card.icon" class="h-5 w-5 shrink-0" :class="card.iconClass" />
+                            </div>
+                        </div>
+                    </template>
+                </section>
 
-                <!-- Tabla de Datos (Desktop) -->
-                <div class="bg-white dark:bg-gray-800 shadow-xl rounded-xl border border-gray-100 dark:border-gray-700 overflow-visible hidden md:block">
-                    <div class="overflow-x-auto custom-scrollbar-horizontal">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead class="bg-gray-50/50 dark:bg-gray-700/50">
-                                <tr>
-                                    <th scope="col" class="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-wider">
-                                        Expediente / Asunto
-                                    </th>
-                                    <th scope="col" class="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-wider">
-                                        Partes Involucradas
-                                    </th>
-                                    <th scope="col" class="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-wider">
-                                        Responsables
-                                    </th>
-                                    <th scope="col" class="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-wider">
-                                        Seguimiento
-                                    </th>
-                                    <th scope="col" class="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-wider">
-                                        Etapa Actual
-                                    </th>
-                                    <th scope="col" class="sticky right-0 bg-gray-50 dark:bg-gray-700 px-6 py-4 text-right text-xs font-black text-gray-400 uppercase tracking-wider z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)]">
-                                        Acciones
-                                    </th>
-                                </tr>
-                            </thead>
-                            
-                            <tbody class="divide-y divide-gray-100 dark:divide-gray-700 bg-white dark:bg-gray-800">
-                                <tr v-if="procesos.data.length === 0">
-                                    <td colspan="6" class="px-6 py-20 text-center">
-                                        <div class="flex flex-col items-center">
-                                            <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-full mb-4">
-                                                <InboxIcon class="h-10 w-10 text-gray-400" />
-                                            </div>
-                                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">No se encontraron expedientes</h3>
-                                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-xs mx-auto">
-                                                No hay registros que coincidan con los criterios de búsqueda aplicados.
-                                            </p>
-                                            <button @click="resetFilters" class="mt-4 text-indigo-600 font-bold hover:underline">Limpiar filtros</button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                
-                                <tr v-else v-for="proceso in procesos.data" :key="proceso.id" class="hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10 transition-colors group cursor-pointer" :class="{'bg-indigo-50/50 dark:bg-indigo-900/20': proceso.is_pinned}" @click="openQuickView(proceso)">
-                                    <!-- Expediente / Asunto -->
-                                    <td class="px-6 py-4 min-w-[250px] relative">
-                                        <div v-if="proceso.is_pinned" class="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-r"></div>
-                                        <div class="flex flex-col">
-                                            <div class="flex items-center gap-2">
-                                                <Link @click.stop :href="route('procesos.show', proceso.id)" class="text-sm font-black text-indigo-600 dark:text-indigo-400 hover:underline">
-                                                    {{ proceso.radicado || 'SIN RADICADO' }}
-                                                </Link>
-                                                <span v-if="proceso.es_spoa_nunc" class="text-[7px] font-black bg-indigo-100 text-indigo-700 px-1 rounded uppercase tracking-tighter">SPOA/NUNC</span>
-                                                <span
-                                                    class="text-[9px] font-black px-1.5 py-0.5 rounded border"
-                                                    :class="(proceso.integridad_score || 0) >= 85 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : ((proceso.integridad_score || 0) >= 60 ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-rose-50 text-rose-700 border-rose-100')"
-                                                    :title="'Integridad del expediente: ' + (proceso.integridad_score || 0) + '%'"
-                                                >
-                                                    {{ proceso.integridad_score || 0 }}%
-                                                </span>
-                                                <button v-if="proceso.radicado" @click.stop="copyToClipboard(proceso.radicado)" class="text-gray-300 hover:text-indigo-500 transition-colors">
-                                                    <DocumentDuplicateIcon class="w-3.5 h-3.5" />
-                                                </button>
-                                                <span v-if="proceso.info_incompleta" class="text-[9px] font-black bg-red-100 text-red-700 px-1.5 py-0.5 rounded border border-red-200">FALTA INFO</span>
-                                            </div>
-                                            <p class="text-[11px] text-gray-500 dark:text-gray-400 font-medium line-clamp-2 mt-1" :title="proceso.asunto">
-                                                {{ proceso.asunto || 'Sin asunto registrado' }}
-                                            </p>
-                                            <div class="mt-2 flex items-center gap-2">
-                                                <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 dark:bg-gray-700 px-1.5 py-0.5 rounded">{{ proceso.tipo_proceso?.nombre || 'General' }}</span>
-                                            </div>
-                                        </div>
-                                    </td>
-
-                                    <!-- Partes -->
-                                    <td class="px-6 py-4">
-                                        <div class="space-y-2 max-w-[200px]">
-                                            <div class="flex items-start gap-2">
-                                                <span class="text-[9px] font-black text-blue-600 bg-blue-50 px-1 rounded border border-blue-100 shrink-0">DTE</span>
-                                                <span class="text-[11px] font-bold text-gray-700 dark:text-gray-300 truncate" :title="formatNames(proceso.demandantes)">{{ formatNames(proceso.demandantes) }}</span>
-                                            </div>
-                                            <div class="flex items-start gap-2">
-                                                <span class="text-[9px] font-black text-red-600 bg-red-50 px-1 rounded border border-red-100 shrink-0">DDO</span>
-                                                <span class="text-[11px] font-bold text-gray-700 dark:text-gray-300 truncate" :title="formatNames(proceso.demandados)">{{ formatNames(proceso.demandados) }}</span>
-                                            </div>
-                                        </div>
-                                    </td>
-
-                                    <!-- Responsables -->
-                                    <td class="px-6 py-4">
-                                        <div class="flex flex-col gap-1.5">
-                                            <div class="flex items-center gap-2">
-                                                <div class="w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center text-[9px] text-white font-black" :title="'Abogado: ' + proceso.abogado?.name">{{ (proceso.abogado?.name || 'S')[0] }}</div>
-                                                <span class="text-[11px] font-bold text-gray-600 dark:text-gray-400">{{ proceso.abogado?.name.split(' ')[0] || '—' }}</span>
-                                            </div>
-                                            <div class="flex items-center gap-2">
-                                                <div class="w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center text-[9px] text-white font-black" :title="'Revisor: ' + proceso.responsable_revision?.name">{{ (proceso.responsable_revision?.name || 'S')[0] }}</div>
-                                                <span class="text-[11px] font-bold text-gray-500 dark:text-gray-500">{{ proceso.responsable_revision?.name.split(' ')[0] || '—' }}</span>
-                                            </div>
-                                        </div>
-                                    </td>
-
-                                    <!-- Seguimiento -->
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="flex flex-col gap-2">
-                                            <div class="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
-                                                <ArrowPathIcon class="w-3 h-3" />
-                                                {{ formatDate(proceso.fecha_revision) || '--' }}
-                                            </div>
-                                            <div class="flex items-center gap-1.5 text-[10px] font-black px-2 py-1 rounded-lg w-fit border leading-none uppercase tracking-widest shadow-sm"
-                                                :class="getRevisionStatus(proceso.fecha_proxima_revision)?.classes || ''">
-                                                <CalendarDaysIcon class="h-3 w-3" />
-                                                {{ formatDate(proceso.fecha_proxima_revision) || 'Pendiente' }}
-                                            </div>
-                                            <div v-if="getInactivityDays(proceso.updated_at) >= 30 && proceso.estado !== 'CERRADO'" class="mt-1">
-                                                <span class="px-1.5 py-0.5 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[8px] font-black uppercase rounded border border-red-100 dark:border-red-800 animate-pulse">
-                                                    ⚠️ Inactivo {{ getInactivityDays(proceso.updated_at) }}d
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </td>
-
-                                    <!-- Etapa -->
-                                    <td class="px-6 py-4">
-                                        <div v-if="proceso.estado === 'CERRADO'" class="flex items-center gap-1.5">
-                                            <span class="px-2 py-1 inline-flex text-[10px] font-black rounded-lg bg-gray-100 text-gray-500 border border-gray-200 uppercase tracking-widest">
-                                                <CheckCircleIcon class="w-3 h-3 mr-1"/> Archivada
-                                            </span>
-                                        </div>
-                                        <div v-else class="flex flex-col gap-1.5 items-start">
-                                            <span class="px-2.5 py-1 text-[10px] font-black rounded-lg border leading-none uppercase tracking-wider shadow-sm" :class="getEtapaColor(proceso.etapa_actual?.riesgo)">
-                                                {{ proceso.etapa_actual?.nombre || 'EN TRÁMITE' }}
-                                            </span>
-                                            <div v-if="getVencimientoInfo(proceso)" class="flex items-center gap-1 text-[9px] font-black uppercase tracking-tighter">
-                                                <ClockIcon class="w-3 h-3" :class="getVencimientoInfo(proceso).class" />
-                                                <span :class="getVencimientoInfo(proceso).class">{{ getVencimientoInfo(proceso).text }}</span>
-                                            </div>
-                                        </div>
-                                    </td>
-
-                                    <!-- Acciones Sticky -->
-                                    <td class="sticky right-0 bg-white dark:bg-gray-800 group-hover:bg-indigo-50/50 dark:group-hover:bg-gray-700 px-6 py-4 whitespace-nowrap text-right z-10 group-hover:z-50 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] transition-colors" :class="{'!bg-indigo-50/50 dark:!bg-indigo-900/20': proceso.is_pinned}" @click.stop>
-                                        <div class="flex items-center justify-end gap-2">
-                                            <!-- BOTÓN REVISIÓN RÁPIDA -->
-                                            <button 
-                                                v-if="proceso.estado === 'ACTIVO'"
-                                                @click.stop="quickReview(proceso)"
-                                                class="p-2 text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
-                                                title="Marcar como revisado hoy"
-                                            >
-                                                <HandThumbUpIcon class="h-5 w-5" />
-                                            </button>
-
-                                            <button 
-                                                @click.stop="togglePin(proceso)"
-                                                class="p-2 rounded-lg transition-all shadow-sm"
-                                                :class="proceso.is_pinned ? 'text-white bg-indigo-600 hover:bg-indigo-700' : 'text-gray-400 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600'"
-                                                :title="proceso.is_pinned ? 'Desfijar' : 'Fijar al inicio'"
-                                            >
-                                                <PinIcon class="h-5 w-5" :class="{'rotate-45': !proceso.is_pinned}" />
-                                            </button>
-                                            <Link @click.stop :href="route('procesos.show', proceso.id)" class="p-2 text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
-                                                <EyeIcon class="w-5 h-5" />
-                                            </Link>
-                                            
-                                            <Dropdown align="right" width="48" teleport>
-                                                <template #trigger>
-                                                    <button class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">
-                                                        <EllipsisVerticalIcon class="w-5 h-5" />
-                                                    </button>
-                                                </template>
-                                                <template #content>
-                                                    <DropdownLink :href="route('procesos.edit', proceso.id)">
-                                                        <div class="flex items-center gap-2"><PencilSquareIcon class="w-4 h-4" /> Editar Información</div>
-                                                    </DropdownLink>
-                                                    <button v-if="proceso.estado === 'ACTIVO' && ['admin', 'abogado', 'gestor'].includes($page.props.auth.user.tipo_usuario)" @click="openCloseModal(proceso)" class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 font-bold border-t dark:border-gray-700 mt-1">
-                                                        <div class="flex items-center gap-2"><ArchiveBoxXMarkIcon class="w-4 h-4" /> Finalizar Proceso</div>
-                                                    </button>
-                                                    <button v-if="proceso.estado === 'CERRADO' && $page.props.auth.user.tipo_usuario === 'admin'" @click="openReopenModal(proceso)" class="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 font-bold border-t dark:border-gray-700 mt-1">
-                                                        <div class="flex items-center gap-2"><ArrowPathIcon class="w-4 h-4" /> Reactivar Caso</div>
-                                                    </button>
-                                                    <button v-if="$page.props.auth.user.tipo_usuario === 'admin'" @click="deleteProceso(proceso)" class="block w-full text-left px-4 py-2 text-sm bg-red-600 text-white hover:bg-red-700 font-black uppercase tracking-widest border-t border-red-700 mt-2 py-3 shadow-inner">
-                                                        <div class="flex items-center justify-center gap-2"><TrashIcon class="w-4 h-4" /> ¡ELIMINAR REGISTRO!</div>
-                                                    </button>
-                                                </template>
-                                            </Dropdown>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Móvil: Cards Modernas -->
-                <div class="md:hidden space-y-4">
-                    <div v-for="proceso in procesos.data" :key="'mob-'+proceso.id" @click="openQuickView(proceso)" class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden cursor-pointer">
-                        <div class="flex justify-between items-start mb-4">
+                <!-- Filtros -->
+                <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5">
+                    <div class="flex flex-col gap-3 border-b border-gray-100 pb-4 dark:border-gray-700 lg:flex-row lg:items-center lg:justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-50 text-gray-500 dark:bg-gray-900 dark:text-gray-300">
+                                <FunnelIcon class="h-5 w-5" />
+                            </div>
                             <div>
-                                <Link @click.stop :href="route('procesos.show', proceso.id)" class="text-lg font-black text-indigo-600 dark:text-indigo-400 block">{{ proceso.radicado || 'SIN RADICADO' }}</Link>
-                                <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">{{ proceso.tipo_proceso?.nombre || 'General' }}</span>
-                            </div>
-                            <span class="px-2 py-1 text-[9px] font-black rounded-lg border uppercase tracking-tighter shadow-sm" :class="getEtapaColor(proceso.etapa_actual?.riesgo)">
-                                {{ proceso.etapa_actual?.nombre || proceso.estado }}
-                            </span>
-                        </div>
-
-                        <div class="space-y-3 mb-6">
-                            <div class="flex items-start gap-2">
-                                <span class="text-[9px] font-black text-blue-600 bg-blue-50 px-1 rounded border border-blue-100 mt-0.5">DTE</span>
-                                <p class="text-xs font-bold text-gray-700 dark:text-gray-300 leading-tight">{{ formatNames(proceso.demandantes) }}</p>
-                            </div>
-                            <div class="flex items-start gap-2">
-                                <span class="text-[9px] font-black text-red-600 bg-red-50 px-1 rounded border border-red-100 mt-0.5">DDO</span>
-                                <p class="text-xs font-bold text-gray-700 dark:text-gray-300 leading-tight">{{ formatNames(proceso.demandados) }}</p>
+                                <h3 class="text-sm font-black uppercase tracking-tight text-gray-950 dark:text-white">Filtros de radicados</h3>
+                                <p class="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                                    {{ resultRange }}<span v-if="activeFilterCount"> · {{ activeFilterCount }} filtro{{ activeFilterCount === 1 ? '' : 's' }} activo{{ activeFilterCount === 1 ? '' : 's' }}</span>
+                                </p>
                             </div>
                         </div>
+                        <button
+                            v-if="isDirty"
+                            type="button"
+                            @click="resetFilters"
+                            class="inline-flex w-fit items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-900/10 dark:text-rose-300"
+                        >
+                            <XMarkIcon class="h-4 w-4" />
+                            Limpiar filtros
+                        </button>
+                    </div>
 
-                        <div class="grid grid-cols-2 gap-3 pt-4 border-t border-gray-50 dark:border-gray-700">
-                            <Link @click.stop :href="route('procesos.edit', proceso.id)" class="flex items-center justify-center py-2 bg-gray-50 dark:bg-gray-700 text-[10px] font-black uppercase rounded-xl text-gray-500">Editar</Link>
-                            <Link @click.stop :href="route('procesos.show', proceso.id)" class="flex items-center justify-center py-2 bg-indigo-600 text-[10px] font-black uppercase rounded-xl text-white shadow-lg shadow-indigo-100">Ver Ficha</Link>
+                    <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-12">
+                        <div class="lg:col-span-4">
+                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Búsqueda general</label>
+                            <div class="relative">
+                                <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                <input
+                                    v-model="search"
+                                    type="text"
+                                    class="block w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-3 text-sm font-semibold text-gray-800 transition-colors focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    placeholder="Radicado, asunto, demandante, demandado o documento"
+                                />
+                            </div>
+                        </div>
+
+                        <div class="lg:col-span-2">
+                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Estado</label>
+                            <SelectInput v-model="estado" class="w-full rounded-lg py-2.5 text-sm">
+                                <option value="TODOS">Todos</option>
+                                <option value="ACTIVO">Activos</option>
+                                <option value="CERRADO">Cerrados</option>
+                            </SelectInput>
+                        </div>
+
+                        <div class="lg:col-span-3">
+                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Tipo de proceso</label>
+                            <SelectInput v-model="tipoProcesoId" class="w-full rounded-lg py-2.5 text-sm">
+                                <option value="">Todos</option>
+                                <option v-for="tipo in tiposProceso" :key="tipo.id" :value="String(tipo.id)">{{ tipo.nombre }}</option>
+                            </SelectInput>
+                        </div>
+
+                        <div class="lg:col-span-2">
+                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Tipo de entidad</label>
+                            <SelectInput v-model="tipoEntidad" class="w-full rounded-lg py-2.5 text-sm">
+                                <option value="">Todas</option>
+                                <option v-for="tipo in tiposEntidad" :key="tipo" :value="tipo">{{ tipo }}</option>
+                            </SelectInput>
+                        </div>
+
+                        <div class="lg:col-span-12 xl:col-span-3">
+                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Despacho o juzgado</label>
+                            <AsyncSelect
+                                v-model="selectedJuzgado"
+                                :endpoint="route('juzgados.search')"
+                                placeholder="Buscar juzgado o despacho"
+                                label-key="nombre"
+                                class="!min-h-[42px] !rounded-lg"
+                            />
+                        </div>
+
+                        <div class="lg:col-span-12">
+                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Control rápido</label>
+                            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                                <button
+                                    v-for="item in controlFilterItems"
+                                    :key="item.key"
+                                    type="button"
+                                    @click="applyControlFilter(item.key)"
+                                    :class="isControlActive(item) ? item.activeClass : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-indigo-200 hover:text-indigo-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300'"
+                                    class="inline-flex min-h-10 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-[10px] font-black uppercase tracking-wider transition-colors"
+                                >
+                                    <span class="inline-flex min-w-0 items-center gap-2">
+                                        <component :is="item.icon" class="h-4 w-4 shrink-0" />
+                                        <span class="truncate">{{ item.label }}</span>
+                                    </span>
+                                    <span v-if="item.count !== null && item.count !== undefined" class="shrink-0 rounded bg-white/70 px-1.5 py-0.5 text-[9px] text-gray-700 dark:bg-black/20 dark:text-white">{{ item.count }}</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <!-- Paginación -->
-                <div v-if="procesos.links.length > 3" class="mt-8 flex justify-center bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
-                    <Pagination :links="procesos.links" />
-                </div>
+                <!-- Listado de Radicados -->
+                <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                    <div class="flex flex-col gap-3 border-b border-gray-100 p-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h3 class="text-sm font-black uppercase tracking-tight text-gray-950 dark:text-white">Listado de expedientes judiciales</h3>
+                            <p class="text-xs font-semibold text-gray-500 dark:text-gray-400">{{ resultRange }}</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                            <span class="rounded-lg border border-gray-200 px-2.5 py-1.5 dark:border-gray-700">Click para vista rápida</span>
+                            <span v-if="isDirty" class="rounded-lg bg-indigo-50 px-2.5 py-1.5 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300">Filtrado</span>
+                        </div>
+                    </div>
+
+                    <div v-if="procesos.data.length === 0" class="flex min-h-72 flex-col items-center justify-center p-8 text-center">
+                        <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-900">
+                            <InboxIcon class="h-8 w-8 text-gray-400" />
+                        </div>
+                        <h3 class="text-base font-black text-gray-950 dark:text-white">No se encontraron expedientes</h3>
+                        <p class="mt-1 max-w-sm text-sm font-medium text-gray-500 dark:text-gray-400">No hay registros que coincidan con los filtros aplicados.</p>
+                        <button v-if="isDirty" type="button" @click="resetFilters" class="mt-4 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-black uppercase tracking-widest text-indigo-700 hover:bg-indigo-100">
+                            Limpiar filtros
+                        </button>
+                    </div>
+
+                    <template v-else>
+                        <div class="hidden overflow-x-auto custom-scrollbar-horizontal md:block">
+                            <table class="min-w-[1220px] divide-y divide-gray-100 dark:divide-gray-700">
+                                <thead class="bg-gray-50 dark:bg-gray-900/40">
+                                    <tr>
+                                        <th scope="col" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Radicado y asunto</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Partes</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Despacho y tipo</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Revisión</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Responsables</th>
+                                        <th scope="col" class="sticky right-0 z-10 bg-gray-50 px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-gray-400 dark:bg-gray-900">Acciones</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody class="divide-y divide-gray-100 bg-white dark:divide-gray-700 dark:bg-gray-800">
+                                    <tr
+                                        v-for="proceso in procesos.data"
+                                        :key="proceso.id"
+                                        class="group cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-900/35"
+                                        :class="{ 'bg-indigo-50/50 dark:bg-indigo-900/10': proceso.is_pinned }"
+                                        @click="openQuickView(proceso)"
+                                    >
+                                        <td class="relative px-4 py-4 align-top">
+                                            <div v-if="proceso.is_pinned" class="absolute bottom-0 left-0 top-0 w-1 bg-indigo-500"></div>
+                                            <div class="min-w-0 space-y-2">
+                                                <div class="flex flex-wrap items-center gap-2">
+                                                    <Link @click.stop :href="route('procesos.show', proceso.id)" class="break-all text-sm font-black leading-5 text-indigo-700 hover:underline dark:text-indigo-300">
+                                                        {{ proceso.radicado || 'SIN RADICADO' }}
+                                                    </Link>
+                                                    <span v-if="proceso.is_pinned" class="rounded bg-indigo-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200">Fijado</span>
+                                                    <span v-if="proceso.es_spoa_nunc" class="rounded bg-indigo-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200">SPOA/NUNC</span>
+                                                    <button v-if="proceso.radicado" type="button" @click.stop="copyToClipboard(proceso.radicado)" class="rounded border border-gray-200 p-1 text-gray-400 hover:border-indigo-200 hover:text-indigo-600 dark:border-gray-700" title="Copiar radicado">
+                                                        <DocumentDuplicateIcon class="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+                                                <p class="line-clamp-2 max-w-md text-[11px] font-semibold leading-5 text-gray-500 dark:text-gray-400" :title="proceso.asunto">
+                                                    {{ proceso.asunto || 'Sin asunto registrado' }}
+                                                </p>
+                                                <div class="flex items-center gap-2">
+                                                    <div class="h-1.5 w-24 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
+                                                        <div class="h-full rounded-full" :class="integrityTone(proceso)" :style="integrityBarStyle(proceso)"></div>
+                                                    </div>
+                                                    <span class="text-[10px] font-black text-gray-500 dark:text-gray-400">{{ integrityScore(proceso) }}% integridad</span>
+                                                    <span v-if="proceso.info_incompleta" class="rounded border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[9px] font-black uppercase text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/10 dark:text-rose-300">Falta info</span>
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        <td class="px-4 py-4 align-top">
+                                            <div class="max-w-xs space-y-2">
+                                                <div class="flex items-start gap-2">
+                                                    <span class="mt-0.5 shrink-0 rounded border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[9px] font-black text-blue-700">DTE</span>
+                                                    <div class="min-w-0">
+                                                        <p class="truncate text-[11px] font-bold text-gray-800 dark:text-gray-200" :title="formatNames(proceso.demandantes)">{{ primaryParty(proceso.demandantes) }}</p>
+                                                        <p v-if="extraPartiesCount(proceso.demandantes)" class="text-[9px] font-bold uppercase text-gray-400">+{{ extraPartiesCount(proceso.demandantes) }} más</p>
+                                                        <PersonaCompletenessIndicator :persona="firstIncompleteParty(proceso.demandantes)" compact class="mt-1" />
+                                                    </div>
+                                                </div>
+                                                <div class="flex items-start gap-2">
+                                                    <span class="mt-0.5 shrink-0 rounded border border-rose-100 bg-rose-50 px-1.5 py-0.5 text-[9px] font-black text-rose-700">DDO</span>
+                                                    <div class="min-w-0">
+                                                        <p class="truncate text-[11px] font-bold text-gray-800 dark:text-gray-200" :title="formatNames(proceso.demandados)">{{ primaryParty(proceso.demandados) }}</p>
+                                                        <p v-if="extraPartiesCount(proceso.demandados)" class="text-[9px] font-bold uppercase text-gray-400">+{{ extraPartiesCount(proceso.demandados) }} más</p>
+                                                        <PersonaCompletenessIndicator :persona="firstIncompleteParty(proceso.demandados)" compact class="mt-1" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        <td class="px-4 py-4 align-top">
+                                            <div class="max-w-xs space-y-2">
+                                                <p class="line-clamp-2 text-xs font-black text-gray-900 dark:text-white" :title="processOfficeName(proceso)">{{ processOfficeName(proceso) }}</p>
+                                                <div class="flex flex-wrap gap-1.5">
+                                                    <span class="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-600 dark:bg-gray-700 dark:text-gray-300">{{ processTypeName(proceso) }}</span>
+                                                    <span v-if="proceso.clase_proceso" class="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-600 dark:bg-gray-700 dark:text-gray-300">{{ proceso.clase_proceso }}</span>
+                                                </div>
+                                                <div v-if="proceso.estado === 'CERRADO'" class="inline-flex rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/10 dark:text-emerald-300">Cerrado</div>
+                                                <div v-else class="flex flex-col items-start gap-1.5">
+                                                    <span class="rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase leading-4 tracking-wider" :class="getEtapaColor(proceso.etapa_actual?.riesgo)">
+                                                        {{ proceso.etapa_actual?.nombre || 'En trámite' }}
+                                                    </span>
+                                                    <span v-if="getVencimientoInfo(proceso)" class="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider" :class="getVencimientoInfo(proceso).class">
+                                                        <ClockIcon class="h-3 w-3" />
+                                                        {{ getVencimientoInfo(proceso).text }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        <td class="px-4 py-4 align-top">
+                                            <div class="space-y-2">
+                                                <div>
+                                                    <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Última revisión</p>
+                                                    <p class="text-[11px] font-bold text-gray-700 dark:text-gray-300">{{ formatDate(proceso.fecha_revision) || 'Sin registro' }}</p>
+                                                </div>
+                                                <div class="inline-flex max-w-full items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-black uppercase tracking-wider" :class="getRevisionStatus(proceso.fecha_proxima_revision)?.classes || 'border-gray-200 text-gray-500'">
+                                                    <CalendarDaysIcon class="h-3.5 w-3.5 shrink-0" />
+                                                    <span class="truncate">{{ formatDate(proceso.fecha_proxima_revision) || 'Pendiente' }}</span>
+                                                </div>
+                                                <span v-if="isInactiveProcess(proceso)" class="inline-flex rounded border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[9px] font-black uppercase text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/10 dark:text-rose-300">
+                                                    Inactivo {{ getInactivityDays(proceso.updated_at) }}d
+                                                </span>
+                                            </div>
+                                        </td>
+
+                                        <td class="px-4 py-4 align-top">
+                                            <div class="space-y-2">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-[9px] font-black uppercase text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200" :title="proceso.abogado?.name || 'Sin abogado'">
+                                                        {{ userInitials(proceso.abogado?.name) }}
+                                                    </div>
+                                                    <div class="min-w-0">
+                                                        <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Abogado</p>
+                                                        <p class="truncate text-[11px] font-bold text-gray-700 dark:text-gray-300">{{ firstName(proceso.abogado?.name) }}</p>
+                                                    </div>
+                                                </div>
+                                                <div class="flex items-center gap-2">
+                                                    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-50 text-[9px] font-black uppercase text-amber-700 dark:bg-amber-900/30 dark:text-amber-200" :title="proceso.responsable_revision?.name || 'Sin responsable'">
+                                                        {{ userInitials(proceso.responsable_revision?.name) }}
+                                                    </div>
+                                                    <div class="min-w-0">
+                                                        <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Revisión</p>
+                                                        <p class="truncate text-[11px] font-bold text-gray-700 dark:text-gray-300">{{ firstName(proceso.responsable_revision?.name) }}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        <td class="sticky right-0 z-10 bg-white px-4 py-4 text-right align-top shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] transition-colors group-hover:bg-gray-50 dark:bg-gray-800 dark:group-hover:bg-gray-900" :class="{ '!bg-indigo-50 dark:!bg-indigo-900/20': proceso.is_pinned }" @click.stop>
+                                            <div class="flex items-center justify-end gap-2">
+                                                <button
+                                                    v-if="proceso.estado === 'ACTIVO'"
+                                                    type="button"
+                                                    @click.stop="quickReview(proceso)"
+                                                    class="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white dark:border-emerald-900/40 dark:bg-emerald-900/10 dark:text-emerald-300"
+                                                    title="Marcar como revisado hoy"
+                                                >
+                                                    <HandThumbUpIcon class="h-4 w-4" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    @click.stop="togglePin(proceso)"
+                                                    class="rounded-lg border p-2 transition-colors"
+                                                    :class="proceso.is_pinned ? 'border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700' : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-indigo-200 hover:text-indigo-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300'"
+                                                    :title="proceso.is_pinned ? 'Desfijar' : 'Fijar al inicio'"
+                                                >
+                                                    <PinIcon class="h-4 w-4" :class="{ 'rotate-45': !proceso.is_pinned }" />
+                                                </button>
+                                                <Link @click.stop :href="route('procesos.show', proceso.id)" class="rounded-lg border border-indigo-200 bg-indigo-50 p-2 text-indigo-700 transition-colors hover:bg-indigo-600 hover:text-white dark:border-indigo-900/40 dark:bg-indigo-900/10 dark:text-indigo-300" title="Ver expediente">
+                                                    <EyeIcon class="h-4 w-4" />
+                                                </Link>
+
+                                                <Dropdown align="right" width="48" teleport>
+                                                    <template #trigger>
+                                                        <button type="button" class="rounded-lg border border-gray-200 bg-white p-2 text-gray-500 transition-colors hover:border-indigo-200 hover:text-indigo-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                                            <EllipsisVerticalIcon class="h-4 w-4" />
+                                                        </button>
+                                                    </template>
+                                                    <template #content>
+                                                        <DropdownLink :href="route('procesos.edit', proceso.id)">
+                                                            <div class="flex items-center gap-2"><PencilSquareIcon class="w-4 h-4" /> Editar información</div>
+                                                        </DropdownLink>
+                                                        <button v-if="proceso.estado === 'ACTIVO' && ['admin', 'abogado', 'gestor'].includes($page.props.auth.user.tipo_usuario)" type="button" @click="openCloseModal(proceso)" class="block w-full border-t px-4 py-2 text-left text-sm font-bold text-rose-700 hover:bg-rose-50 dark:border-gray-700 dark:hover:bg-rose-900/20">
+                                                            <div class="flex items-center gap-2"><ArchiveBoxXMarkIcon class="w-4 h-4" /> Finalizar proceso</div>
+                                                        </button>
+                                                        <button v-if="proceso.estado === 'CERRADO' && $page.props.auth.user.tipo_usuario === 'admin'" type="button" @click="openReopenModal(proceso)" class="block w-full border-t px-4 py-2 text-left text-sm font-bold text-emerald-700 hover:bg-emerald-50 dark:border-gray-700 dark:hover:bg-emerald-900/20">
+                                                            <div class="flex items-center gap-2"><ArrowPathIcon class="w-4 h-4" /> Reactivar caso</div>
+                                                        </button>
+                                                        <button v-if="$page.props.auth.user.tipo_usuario === 'admin'" type="button" @click="deleteProceso(proceso)" class="mt-1 block w-full border-t border-red-700 bg-red-600 px-4 py-3 text-left text-sm font-black uppercase tracking-widest text-white hover:bg-red-700">
+                                                            <div class="flex items-center justify-center gap-2"><TrashIcon class="w-4 h-4" /> Eliminar registro</div>
+                                                        </button>
+                                                    </template>
+                                                </Dropdown>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="divide-y divide-gray-100 dark:divide-gray-700 md:hidden">
+                            <article
+                                v-for="proceso in procesos.data"
+                                :key="'mobile-' + proceso.id"
+                                @click="openQuickView(proceso)"
+                                class="cursor-pointer bg-white p-4 transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-900/40"
+                                :class="{ 'border-l-4 border-indigo-500 bg-indigo-50/40 dark:bg-indigo-900/10': proceso.is_pinned }"
+                            >
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <Link @click.stop :href="route('procesos.show', proceso.id)" class="break-all text-base font-black leading-5 text-indigo-700 dark:text-indigo-300">
+                                            {{ proceso.radicado || 'SIN RADICADO' }}
+                                        </Link>
+                                        <p class="mt-1 line-clamp-2 text-[11px] font-semibold leading-5 text-gray-500 dark:text-gray-400">{{ proceso.asunto || 'Sin asunto registrado' }}</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        @click.stop="togglePin(proceso)"
+                                        class="shrink-0 rounded-lg border p-2"
+                                        :class="proceso.is_pinned ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-200 bg-gray-50 text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300'"
+                                        :title="proceso.is_pinned ? 'Desfijar' : 'Fijar al inicio'"
+                                    >
+                                        <PinIcon class="h-4 w-4" :class="{ 'rotate-45': !proceso.is_pinned }" />
+                                    </button>
+                                </div>
+
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    <span class="rounded-lg border px-2 py-1 text-[10px] font-black uppercase leading-4" :class="getEtapaColor(proceso.etapa_actual?.riesgo)">
+                                        {{ proceso.etapa_actual?.nombre || proceso.estado || 'En trámite' }}
+                                    </span>
+                                    <span v-if="proceso.estado === 'CERRADO'" class="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/10 dark:text-emerald-300">Cerrado</span>
+                                    <span v-if="isInactiveProcess(proceso)" class="rounded border border-rose-200 bg-rose-50 px-2 py-1 text-[9px] font-black uppercase text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/10 dark:text-rose-300">Inactivo {{ getInactivityDays(proceso.updated_at) }}d</span>
+                                </div>
+
+                                <dl class="mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
+                                    <div>
+                                        <dt class="text-[9px] font-black uppercase tracking-widest text-gray-400">Demandante</dt>
+                                        <dd class="mt-0.5 flex flex-wrap items-center gap-1.5 font-bold text-gray-800 dark:text-gray-200">
+                                            <span>{{ primaryParty(proceso.demandantes) }}</span>
+                                            <PersonaCompletenessIndicator :persona="firstIncompleteParty(proceso.demandantes)" compact />
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-[9px] font-black uppercase tracking-widest text-gray-400">Demandado</dt>
+                                        <dd class="mt-0.5 flex flex-wrap items-center gap-1.5 font-bold text-gray-800 dark:text-gray-200">
+                                            <span>{{ primaryParty(proceso.demandados) }}</span>
+                                            <PersonaCompletenessIndicator :persona="firstIncompleteParty(proceso.demandados)" compact />
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-[9px] font-black uppercase tracking-widest text-gray-400">Despacho</dt>
+                                        <dd class="mt-0.5 font-bold text-gray-800 dark:text-gray-200">{{ processOfficeName(proceso) }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-[9px] font-black uppercase tracking-widest text-gray-400">Próxima revisión</dt>
+                                        <dd class="mt-0.5 font-black text-gray-900 dark:text-white">{{ formatDate(proceso.fecha_proxima_revision) || 'Pendiente' }}</dd>
+                                    </div>
+                                </dl>
+
+                                <div class="mt-4 flex items-center justify-between gap-3 border-t border-gray-100 pt-3 dark:border-gray-700">
+                                    <div class="min-w-0">
+                                        <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Responsable</p>
+                                        <p class="text-[11px] font-bold text-gray-700 dark:text-gray-300">{{ firstName(proceso.abogado?.name) }} · {{ firstName(proceso.responsable_revision?.name) }}</p>
+                                    </div>
+                                    <div class="flex shrink-0 gap-2">
+                                        <button v-if="proceso.estado === 'ACTIVO'" type="button" @click.stop="quickReview(proceso)" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-black uppercase text-emerald-700">Revisar</button>
+                                        <Link @click.stop :href="route('procesos.show', proceso.id)" class="rounded-lg bg-indigo-600 px-3 py-2 text-[10px] font-black uppercase text-white">Ver</Link>
+                                    </div>
+                                </div>
+                            </article>
+                        </div>
+                    </template>
+
+                    <div v-if="procesos.links.length > 3" class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 p-4 dark:border-gray-700">
+                        <p class="text-xs font-bold text-gray-500 dark:text-gray-400">{{ resultRange }}</p>
+                        <Pagination :links="procesos.links" />
+                    </div>
+                </section>
             </div>
         </div>
 
@@ -948,169 +1022,247 @@ const copyLegalInfo = (proceso) => {
             </div>
         </Modal>
 
-        <!-- MODAL DE VISTA RÁPIDA (V5: Ficha Judicial Optimizada) -->
-        <Modal :show="showQuickViewModal" @close="closeQuickView" max-width="3xl" centered>
-            <div v-if="selectedProceso" class="overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-2xl transition-all border border-gray-100 dark:border-gray-800 flex flex-col h-[80vh] sm:h-[82vh]">
-                <!-- Header -->
-                <div class="px-4 py-3 sm:px-8 sm:py-5 bg-indigo-600 dark:bg-indigo-700 text-white flex justify-between items-center shrink-0 shadow-lg relative z-10 w-full">
-                    <div class="flex items-center gap-3 sm:gap-4 overflow-hidden min-w-0">
-                        <div class="hidden sm:flex h-10 w-10 bg-white/10 rounded-xl items-center justify-center border border-white/20 shrink-0">
-                            <ScaleIcon class="w-6 h-6" />
+        <!-- MODAL DE VISTA RAPIDA -->
+        <Modal :show="showQuickViewModal" @close="closeQuickView" max-width="5xl" centered>
+            <div v-if="selectedProceso" class="flex max-h-[88vh] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+                <div class="flex shrink-0 flex-col gap-3 border-b border-gray-200 bg-gray-950 px-4 py-4 text-white dark:border-gray-700 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="flex min-w-0 items-center gap-3">
+                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/10">
+                            <ScaleIcon class="h-5 w-5" />
                         </div>
-                        <div class="truncate min-w-0">
-                            <div class="flex items-center gap-2">
-                                <p class="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-indigo-100/70 truncate">Expediente #{{ selectedProceso.id }}</p>
-                                <span v-if="selectedProceso.a_favor_de" class="text-[8px] font-black px-1.5 py-0.5 rounded bg-white/20 text-white border border-white/10 uppercase tracking-tighter">
-                                    {{ selectedProceso.a_favor_de }}
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Expediente #{{ selectedProceso.id }}</p>
+                                <span class="rounded-md border px-2 py-0.5 text-[9px] font-black uppercase" :class="selectedProceso.estado === 'ACTIVO' ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100' : 'border-gray-400/40 bg-gray-500/15 text-gray-100'">
+                                    {{ selectedProceso.estado }}
                                 </span>
-                                <span v-if="selectedProceso.es_spoa_nunc" class="text-[8px] font-black px-1.5 py-0.5 rounded bg-white/20 text-white border border-white/10 uppercase tracking-tighter">SPOA/NUNC</span>
+                                <span v-if="selectedProceso.a_favor_de" class="rounded-md border border-white/10 bg-white/10 px-2 py-0.5 text-[9px] font-black uppercase text-gray-200">
+                                    A favor {{ selectedProceso.a_favor_de }}
+                                </span>
+                                <span v-if="selectedProceso.es_spoa_nunc" class="rounded-md border border-white/10 bg-white/10 px-2 py-0.5 text-[9px] font-black uppercase text-gray-200">SPOA/NUNC</span>
                             </div>
-                            <h2 class="text-base sm:text-lg font-black leading-tight truncate">{{ selectedProceso.radicado || 'SIN RADICADO' }}</h2>
+                            <h2 class="mt-1 truncate font-mono text-lg font-black tracking-tight text-white">
+                                {{ selectedProceso.radicado || 'SIN RADICADO' }}
+                            </h2>
+                            <p class="mt-0.5 truncate text-xs font-semibold text-gray-400">
+                                {{ processOfficeName(selectedProceso) }} · {{ processTypeName(selectedProceso) }}
+                            </p>
                         </div>
                     </div>
-                    <div class="flex items-center gap-2 sm:gap-4 shrink-0 ml-2">
-                        <button @click="copyLegalInfo()" class="hidden sm:flex items-center gap-1 px-3 py-1 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-[10px] font-black uppercase tracking-widest border border-white/20">
-                            <DocumentDuplicateIcon class="w-4 h-4" /> Copiar Info
+                    <div class="flex shrink-0 items-center justify-between gap-2 sm:justify-end">
+                        <button @click="copyLegalInfo()" class="hidden items-center gap-2 rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-white/15 sm:inline-flex">
+                            <DocumentDuplicateIcon class="h-4 w-4" /> Copiar
                         </button>
-                        <div class="flex bg-black/10 rounded-lg p-0.5">
-                            <button @click="prevProceso" :disabled="currentIndex === 0" class="p-1 sm:p-1.5 hover:bg-white/10 disabled:opacity-20 rounded-md transition-all active:scale-90"><ChevronDownIcon class="w-4 h-4 rotate-90" /></button>
-                            <div class="px-1.5 sm:px-3 flex items-center border-x border-white/5">
-                                <span class="text-[9px] sm:text-[10px] font-black tracking-widest">{{ currentIndex + 1 }}<span class="opacity-50 mx-0.5">/</span>{{ procesos.data.length }}</span>
-                            </div>
-                            <button @click="nextProceso" :disabled="currentIndex === procesos.data.length - 1" class="p-1 sm:p-1.5 hover:bg-white/10 disabled:opacity-20 rounded-md transition-all active:scale-90"><ChevronDownIcon class="w-4 h-4 -rotate-90" /></button>
+                        <div class="flex items-center rounded-lg bg-white/10 p-0.5">
+                            <button @click="prevProceso" :disabled="currentIndex === 0" class="rounded-md p-2 transition hover:bg-white/10 disabled:opacity-25" title="Anterior">
+                                <ChevronDownIcon class="h-4 w-4 rotate-90" />
+                            </button>
+                            <span class="border-x border-white/10 px-3 text-[10px] font-black tracking-widest">{{ currentIndex + 1 }}/{{ procesos.data.length }}</span>
+                            <button @click="nextProceso" :disabled="currentIndex === procesos.data.length - 1" class="rounded-md p-2 transition hover:bg-white/10 disabled:opacity-25" title="Siguiente">
+                                <ChevronDownIcon class="h-4 w-4 -rotate-90" />
+                            </button>
                         </div>
-                        <button @click="closeQuickView" class="p-1.5 sm:p-2 hover:bg-white/10 rounded-lg transition-colors"><XMarkIcon class="w-5 h-5" /></button>
+                        <button @click="closeQuickView" class="rounded-lg p-2 text-gray-300 transition hover:bg-white/10 hover:text-white" title="Cerrar">
+                            <XMarkIcon class="h-5 w-5" />
+                        </button>
                     </div>
                 </div>
 
-                <!-- Cuerpo -->
-                <div class="flex-grow overflow-y-auto p-4 sm:p-8 custom-scrollbar space-y-8 sm:space-y-10 bg-gray-50/30 dark:bg-gray-900/50 w-full">
-                    
-                    <!-- 1. PARTES PROCESALES -->
-                    <section class="space-y-4">
-                        <div class="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-2">
-                            <UserGroupIcon class="w-4 h-4 text-indigo-500" />
-                            <h3 class="text-[10px] sm:text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest">Sujetos Procesales</h3>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
-                            <div class="space-y-4 min-w-0">
-                                <div>
-                                    <p class="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Demandantes (DTE)</p>
-                                    <div class="space-y-2">
-                                        <div v-for="p in selectedProceso.demandantes" :key="p.id" class="flex items-start gap-2">
-                                            <div class="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0"></div>
-                                            <span class="text-xs font-bold text-gray-700 dark:text-gray-300 break-words">{{ p.nombre_completo }}</span>
-                                        </div>
-                                        <span v-if="!selectedProceso.demandantes?.length" class="text-xs italic text-gray-400">No registrados</span>
+                <div class="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto bg-gray-50 dark:bg-gray-950 lg:grid-cols-[20rem_minmax(0,1fr)]">
+                    <aside class="space-y-4 border-b border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 lg:border-b-0 lg:border-r sm:p-5">
+                        <section class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Radicado</p>
+                            <div class="mt-2 flex min-w-0 items-center gap-2">
+                                <p class="truncate font-mono text-sm font-black text-gray-950 dark:text-white">{{ selectedProceso.radicado || 'SIN ASIGNAR' }}</p>
+                                <button v-if="selectedProceso.radicado" @click.stop="copyToClipboard(selectedProceso.radicado)" class="shrink-0 text-gray-400 hover:text-indigo-600"><DocumentDuplicateIcon class="h-4 w-4" /></button>
+                            </div>
+                            <div class="mt-4 grid grid-cols-2 gap-2">
+                                <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800/60">
+                                    <p class="text-[9px] font-black uppercase text-gray-400">Demandantes</p>
+                                    <p class="mt-1 text-sm font-black text-gray-900 dark:text-white">{{ selectedProceso.demandantes?.length || 0 }}</p>
+                                </div>
+                                <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800/60">
+                                    <p class="text-[9px] font-black uppercase text-gray-400">Demandados</p>
+                                    <p class="mt-1 text-sm font-black text-gray-900 dark:text-white">{{ selectedProceso.demandados?.length || 0 }}</p>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Revisión</p>
+                            <div class="mt-3 space-y-3">
+                                <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800/60">
+                                    <p class="text-[9px] font-black uppercase text-gray-400">Última revisión</p>
+                                    <p class="mt-1 text-xs font-black text-gray-800 dark:text-gray-200">{{ formatDate(selectedProceso.fecha_revision) || 'Sin registro' }}</p>
+                                </div>
+                                <div class="rounded-lg border p-3" :class="getRevisionStatus(selectedProceso.fecha_proxima_revision)?.classes || 'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'">
+                                    <p class="text-[9px] font-black uppercase opacity-70">Próxima revisión</p>
+                                    <p class="mt-1 text-xs font-black">{{ formatDate(selectedProceso.fecha_proxima_revision) || 'Pendiente programar' }}</p>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Responsables</p>
+                            <div class="mt-3 space-y-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-black text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">{{ userInitials(selectedProceso.abogado?.name) }}</div>
+                                    <div class="min-w-0">
+                                        <p class="text-[9px] font-black uppercase text-gray-400">Abogado</p>
+                                        <p class="truncate text-xs font-black text-gray-800 dark:text-gray-200">{{ selectedProceso.abogado?.name || 'No asignado' }}</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-50 text-xs font-black text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">{{ userInitials(selectedProceso.responsable_revision?.name) }}</div>
+                                    <div class="min-w-0">
+                                        <p class="text-[9px] font-black uppercase text-gray-400">Revisión</p>
+                                        <p class="truncate text-xs font-black text-gray-800 dark:text-gray-200">{{ selectedProceso.responsable_revision?.name || 'No asignado' }}</p>
                                     </div>
                                 </div>
                             </div>
-                            <div class="space-y-4 pt-4 md:pt-0 border-t md:border-t-0 border-gray-100 dark:border-gray-700 min-w-0">
-                                <div>
-                                    <p class="text-[9px] font-black text-red-600 uppercase tracking-widest mb-1.5">Demandados (DDO)</p>
-                                    <div class="space-y-2">
-                                        <div v-for="p in selectedProceso.demandados" :key="p.id" class="flex items-start gap-2">
-                                            <div class="w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 shrink-0"></div>
-                                            <span class="text-xs font-bold text-gray-700 dark:text-gray-300 break-words">{{ p.nombre_completo }}</span>
+                        </section>
+                    </aside>
+
+                    <main class="min-w-0 space-y-4 p-4 sm:p-5">
+                        <section class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                            <div class="rounded-lg border border-blue-100 bg-blue-50/50 p-4 dark:border-blue-900/50 dark:bg-blue-950/20 sm:p-5">
+                                <div class="mb-3 flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                                    <UserGroupIcon class="h-4 w-4" />
+                                    <h3 class="text-xs font-black uppercase tracking-widest">Demandantes</h3>
+                                </div>
+                                <div v-if="selectedProceso.demandantes?.length" class="space-y-2">
+                                    <div v-for="p in selectedProceso.demandantes" :key="p.id" class="rounded-lg border border-blue-100 bg-white px-3 py-2 dark:border-blue-900/60 dark:bg-gray-900">
+                                        <div class="flex flex-wrap items-start justify-between gap-2">
+                                            <p class="min-w-0 text-xs font-black leading-5 text-gray-800 dark:text-gray-100">{{ p.nombre_completo }}</p>
+                                            <PersonaCompletenessIndicator :persona="p" compact />
                                         </div>
-                                        <span v-if="!selectedProceso.demandados?.length" class="text-xs italic text-gray-400">No registrados</span>
+                                        <p v-if="p.numero_documento" class="mt-0.5 text-[10px] font-bold text-gray-500 dark:text-gray-400">{{ p.tipo_documento || 'Doc.' }} {{ p.numero_documento }}</p>
+                                    </div>
+                                </div>
+                                <p v-else class="text-xs font-semibold text-gray-400">No registrados</p>
+                            </div>
+
+                            <div class="rounded-lg border border-rose-100 bg-rose-50/50 p-4 dark:border-rose-900/50 dark:bg-rose-950/20 sm:p-5">
+                                <div class="mb-3 flex items-center gap-2 text-rose-700 dark:text-rose-300">
+                                    <UserGroupIcon class="h-4 w-4" />
+                                    <h3 class="text-xs font-black uppercase tracking-widest">Demandados</h3>
+                                </div>
+                                <div v-if="selectedProceso.demandados?.length" class="space-y-2">
+                                    <div v-for="p in selectedProceso.demandados" :key="p.id" class="rounded-lg border border-rose-100 bg-white px-3 py-2 dark:border-rose-900/60 dark:bg-gray-900">
+                                        <div class="flex flex-wrap items-start justify-between gap-2">
+                                            <p class="min-w-0 text-xs font-black leading-5 text-gray-800 dark:text-gray-100">{{ p.nombre_completo }}</p>
+                                            <PersonaCompletenessIndicator :persona="p" compact />
+                                        </div>
+                                        <p v-if="p.numero_documento" class="mt-0.5 text-[10px] font-bold text-gray-500 dark:text-gray-400">{{ p.tipo_documento || 'Doc.' }} {{ p.numero_documento }}</p>
+                                    </div>
+                                </div>
+                                <p v-else class="text-xs font-semibold text-gray-400">No registrados</p>
+                            </div>
+                        </section>
+
+                        <section class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 sm:p-5">
+                            <div class="mb-4 flex items-center gap-2">
+                                <BuildingLibraryIcon class="h-4 w-4 text-indigo-500" />
+                                <h3 class="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white">Despacho y asunto</h3>
+                            </div>
+                            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                <div class="md:col-span-3 rounded-lg bg-indigo-50/60 p-4 dark:bg-indigo-950/20">
+                                    <p class="text-[10px] font-black uppercase tracking-widest text-indigo-700 dark:text-indigo-300">Asunto</p>
+                                    <p class="mt-1 text-sm font-bold leading-6 text-gray-800 dark:text-gray-100">{{ selectedProceso.asunto || 'Sin asunto registrado' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Tipo de proceso</p>
+                                    <p class="mt-1 text-xs font-black text-gray-800 dark:text-gray-200">{{ processTypeName(selectedProceso) }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Clase / subproceso</p>
+                                    <p class="mt-1 text-xs font-black uppercase text-gray-800 dark:text-gray-200">{{ selectedProceso.clase_proceso || 'N/A' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Etapa</p>
+                                    <span class="mt-1 inline-flex rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase" :class="getEtapaColor(selectedProceso.etapa_actual?.riesgo)">
+                                        {{ selectedProceso.etapa_actual?.nombre || selectedProceso.estado || 'En trámite' }}
+                                    </span>
+                                </div>
+                                <div class="md:col-span-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-800/60">
+                                    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Despacho judicial</p>
+                                    <p class="mt-1 flex items-start gap-2 text-sm font-bold leading-5 text-gray-800 dark:text-gray-200">
+                                        <BuildingOfficeIcon class="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                                        {{ processOfficeName(selectedProceso) }}
+                                    </p>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                            <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Fecha radicado</p>
+                                <p class="mt-1 text-xs font-black text-gray-800 dark:text-gray-200">{{ formatDate(selectedProceso.fecha_radicado) || 'Sin registro' }}</p>
+                            </div>
+                            <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Vencimiento</p>
+                                <p class="mt-1 text-xs font-black" :class="getVencimientoInfo(selectedProceso)?.class || 'text-gray-800 dark:text-gray-200'">{{ getVencimientoInfo(selectedProceso)?.text || 'Sin alerta' }}</p>
+                            </div>
+                            <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Integridad</p>
+                                <div class="mt-2 flex items-center gap-3">
+                                    <div class="h-2 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                                        <div class="h-full rounded-full" :class="integrityTone(selectedProceso)" :style="integrityBarStyle(selectedProceso)"></div>
+                                    </div>
+                                    <span class="text-xs font-black text-gray-700 dark:text-gray-200">{{ integrityScore(selectedProceso) }}%</span>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                            <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                                <div class="mb-3 flex items-center gap-2">
+                                    <EnvelopeIcon class="h-4 w-4 text-gray-500" />
+                                    <h3 class="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white">Comunicaciones</h3>
+                                </div>
+                                <div class="space-y-3">
+                                    <div>
+                                        <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Correo radicación</p>
+                                        <p class="mt-1 truncate text-xs font-bold text-gray-700 dark:text-gray-300">{{ selectedProceso.correo_radicacion || 'No registrado' }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Correos del juzgado</p>
+                                        <p class="mt-1 text-xs font-bold leading-5 text-gray-700 dark:text-gray-300">{{ selectedProceso.correos_juzgado || 'No registrados' }}</p>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </section>
 
-                    <!-- 2. DATOS DEL ASUNTO Y JUZGADO -->
-                    <section class="space-y-4">
-                        <div class="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-2">
-                            <BuildingLibraryIcon class="w-4 h-4 text-indigo-500" />
-                            <h3 class="text-[10px] sm:text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest">Información del Despacho</h3>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 px-1">
-                            <div class="sm:col-span-2 lg:col-span-3 space-y-1.5 bg-indigo-50/50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-100/50 dark:border-indigo-800/30">
-                                <p class="text-[9px] font-bold text-indigo-600 uppercase">Asunto del Proceso</p>
-                                <p class="text-xs font-black text-gray-800 dark:text-gray-200 leading-relaxed break-words">{{ selectedProceso.asunto || 'Sin asunto registrado' }}</p>
-                            </div>
-                            <div class="space-y-1">
-                                <p class="text-[9px] font-bold text-gray-400 uppercase">Tipo de Proceso</p>
-                                <p class="text-xs font-black text-gray-800 dark:text-gray-200">{{ selectedProceso.tipo_proceso?.nombre || 'General' }}</p>
-                            </div>
-                            <div class="space-y-1">
-                                <p class="text-[9px] font-bold text-gray-400 uppercase">Clase / Subproceso</p>
-                                <p class="text-xs font-black text-gray-800 dark:text-gray-200 uppercase">{{ selectedProceso.clase_proceso || 'N/A' }}</p>
-                            </div>
-                            <div class="space-y-1">
-                                <p class="text-[9px] font-bold text-gray-400 uppercase">Estado Actual</p>
-                                <p class="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase">{{ selectedProceso.estado }}</p>
-                            </div>
-                            <div class="sm:col-span-2 lg:col-span-3 space-y-1 bg-gray-50 dark:bg-gray-800/50 p-3.5 rounded-xl border border-gray-100 dark:border-gray-700">
-                                <p class="text-[9px] font-bold text-gray-400 uppercase">Despacho Judicial</p>
-                                <p class="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2 break-words">
-                                    <BuildingOfficeIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                    {{ selectedProceso.entidad || 'Por definir' }}
-                                </p>
-                            </div>
-                        </div>
-                    </section>
-
-                    <!-- 3. SEGUIMIENTO Y FECHAS -->
-                    <section class="space-y-4">
-                        <div class="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-2">
-                            <CalendarDaysIcon class="w-4 h-4 text-indigo-500" />
-                            <h3 class="text-[10px] sm:text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest">Cronograma de Revisión</h3>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div class="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4">
-                                <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl"><ClockIcon class="w-5 h-5 text-gray-400" /></div>
-                                <div>
-                                    <p class="text-[9px] font-black text-gray-400 uppercase mb-0.5">Última Revisión</p>
-                                    <p class="text-xs font-black text-gray-800 dark:text-gray-200">{{ formatDate(selectedProceso.fecha_revision) || 'Sin registro' }}</p>
+                            <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                                <div class="mb-3 flex items-center gap-2">
+                                    <ClipboardDocumentListIcon class="h-4 w-4 text-gray-500" />
+                                    <h3 class="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white">Observaciones y enlaces</h3>
+                                </div>
+                                <p class="text-xs font-semibold leading-5 text-gray-600 dark:text-gray-300">{{ selectedProceso.observaciones || 'Sin observaciones registradas.' }}</p>
+                                <div class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    <a v-if="selectedProceso.link_expediente" :href="selectedProceso.link_expediente" target="_blank" class="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-900 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-black dark:bg-white dark:text-gray-900">
+                                        <LinkIcon class="h-4 w-4" /> Expediente
+                                    </a>
+                                    <a v-if="selectedProceso.ubicacion_drive" :href="selectedProceso.ubicacion_drive" target="_blank" class="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-blue-700">
+                                        <CloudArrowUpIcon class="h-4 w-4" /> Drive
+                                    </a>
                                 </div>
                             </div>
-                            <div class="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4" :class="getRevisionStatus(selectedProceso.fecha_proxima_revision)?.classes">
-                                <div class="p-3 bg-white/20 rounded-xl"><CalendarDaysIcon class="w-5 h-5" /></div>
-                                <div>
-                                    <p class="text-[9px] font-black uppercase mb-0.5 opacity-70">Próxima Revisión</p>
-                                    <p class="text-xs font-black">{{ formatDate(selectedProceso.fecha_proxima_revision) || 'Pendiente programar' }}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <!-- 4. RESPONSABLES -->
-                    <section class="space-y-4">
-                        <div class="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-2">
-                            <ClipboardDocumentListIcon class="w-4 h-4 text-indigo-500" />
-                            <h3 class="text-[10px] sm:text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest">Responsables del Caso</h3>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 px-1">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/50 rounded-full flex items-center justify-center text-indigo-700 dark:text-indigo-300 font-black text-xs">{{ (selectedProceso.abogado?.name || 'S')[0] }}</div>
-                                <div>
-                                    <p class="text-[9px] font-bold text-gray-400 uppercase">Abogado Titular</p>
-                                    <p class="text-xs font-black text-gray-700 dark:text-gray-300">{{ selectedProceso.abogado?.name }}</p>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-amber-100 dark:bg-amber-900/50 rounded-full flex items-center justify-center text-amber-700 dark:text-amber-300 font-black text-xs">{{ (selectedProceso.responsable_revision?.name || 'S')[0] }}</div>
-                                <div>
-                                    <p class="text-[9px] font-bold text-gray-400 uppercase">Responsable Revisión</p>
-                                    <p class="text-xs font-black text-gray-700 dark:text-gray-300">{{ selectedProceso.responsable_revision?.name || 'No asignado' }}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
+                        </section>
+                    </main>
                 </div>
 
-                <!-- Footer -->
-                <div class="px-4 py-4 sm:px-8 sm:py-5 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.03)] relative z-10">
-                    <p class="text-[10px] font-bold text-gray-400 italic flex items-center gap-2">
-                        <ArrowPathIcon class="w-3.5 h-3.5" /> 
-                        Estado del expediente: <span class="font-black uppercase tracking-widest" :class="selectedProceso.estado === 'ACTIVO' ? 'text-green-500' : 'text-gray-500'">{{ selectedProceso.estado }}</span>
+                <div class="flex shrink-0 flex-col gap-3 border-t border-gray-200 bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                    <p class="text-[10px] font-bold text-gray-500 dark:text-gray-400">
+                        Estado del expediente: <span class="font-black uppercase tracking-widest" :class="selectedProceso.estado === 'ACTIVO' ? 'text-emerald-600 dark:text-emerald-300' : 'text-gray-500'">{{ selectedProceso.estado }}</span>
                     </p>
-                    <Link :href="route('procesos.show', selectedProceso.id)" class="w-full sm:w-auto px-8 py-3.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] transition-all hover:bg-black dark:hover:bg-gray-100 shadow-xl shadow-gray-200 dark:shadow-none active:scale-[0.98] text-center">
-                        Ingresar al Expediente Judicial &rarr;
-                    </Link>
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                        <Link :href="route('procesos.edit', selectedProceso.id)" class="inline-flex justify-center rounded-lg border border-gray-200 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
+                            Editar
+                        </Link>
+                        <Link :href="route('procesos.show', selectedProceso.id)" class="inline-flex justify-center rounded-lg bg-gray-950 px-5 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-black dark:bg-white dark:text-gray-900">
+                            Ingresar al expediente judicial &rarr;
+                        </Link>
+                    </div>
                 </div>
             </div>
         </Modal>

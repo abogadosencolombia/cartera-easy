@@ -281,7 +281,7 @@ class PersonaController extends Controller
             'criticidad' => 'media', 'direccion_ip' => $request->ip(), 'user_agent' => $request->userAgent(),
         ]);
 
-        return Excel::download(new PersonasExport($request->query()), 'listado_personas_' . now()->format('Ymd_His') . '.xlsx');
+        return Excel::download(new PersonasExport($request->query(), Auth::user()), 'listado_personas_' . now()->format('Ymd_His') . '.xlsx');
     }
 
     public function uploadDocument(Request $request, $personaId)

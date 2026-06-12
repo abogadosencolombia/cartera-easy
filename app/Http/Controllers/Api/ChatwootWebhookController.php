@@ -17,14 +17,27 @@ class ChatwootWebhookController extends Controller
      */
     public function handle(Request $request)
     {
+        $expectedToken = config('services.chatwoot.webhook_token');
+        abort_if(blank($expectedToken), 503, 'Chatwoot webhook token is not configured.');
+
+        $providedToken = $request->bearerToken() ?: $request->header('X-Chatwoot-Webhook-Token');
+        abort_unless(hash_equals((string) $expectedToken, (string) $providedToken), 401);
+
         $payload = $request->all();
         $event = $payload['event'] ?? null;
 
-        // Registrar en el log de integraciones externas
+        // Registrar metadatos, no el contenido completo de la conversación.
         IntegracionExternaLog::create([
             'servicio' => 'Chatwoot Webhook',
             'endpoint' => $request->path(),
-            'datos_enviados' => json_encode($payload),
+            'datos_enviados' => json_encode([
+                'event' => $event,
+                'account_id' => $payload['account']['id'] ?? null,
+                'conversation_id' => $payload['conversation']['id'] ?? ($payload['id'] ?? null),
+                'message_type' => $payload['message_type'] ?? null,
+                'sender_id' => $payload['sender']['id'] ?? null,
+                'content_length' => strlen((string) ($payload['content'] ?? '')),
+            ]),
             'fecha_solicitud' => now(),
         ]);
 
@@ -107,7 +120,11 @@ class ChatwootWebhookController extends Controller
             Log::info("[Chatwoot Webhook] Buscando usuario para identifier: {$identifier} (Phone: {$phone})");
         }
 
-        // Por defecto, si no encontramos, lo dejamos como null o buscamos el primer admin para notificar
-        return User::where('tipo_usuario', 'admin')->first()?->id;
+        Log::warning('[Chatwoot Webhook] No se pudo resolver un usuario local para el remitente.', [
+            'sender_id' => $sender['id'] ?? null,
+            'conversation_id' => $conversation['id'] ?? null,
+        ]);
+
+        return null;
     }
 }

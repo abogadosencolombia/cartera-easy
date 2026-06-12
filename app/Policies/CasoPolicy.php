@@ -30,7 +30,13 @@ class CasoPolicy
                 || $caso->users()->where('users.id', $user->id)->exists();
         }
         if ($user->tipo_usuario === 'cliente') {
-            return in_array($user->persona_id, [$caso->deudor_id, $caso->codeudor1_id, $caso->codeudor2_id]);
+            if ((int) $user->persona_id === (int) $caso->deudor_id) {
+                return true;
+            }
+
+            $documento = $user->persona?->numero_documento;
+            return filled($documento)
+                && $caso->codeudores()->where('numero_documento', $documento)->exists();
         }
         return false;
     }

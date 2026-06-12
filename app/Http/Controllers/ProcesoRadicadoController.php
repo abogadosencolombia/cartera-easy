@@ -49,6 +49,7 @@ class ProcesoRadicadoController extends Controller
 
         if ($request->filled('estado') && $request->estado !== 'TODOS') { $query->where('estado', $request->estado); }
         if ($request->filled('juzgado_id')) { $query->where('juzgado_id', $request->juzgado_id); }
+        if ($request->filled('tipo_proceso_id')) { $query->where('tipo_proceso_id', $request->input('tipo_proceso_id')); }
         if ($request->filled('tipo_entidad')) {
             $tipo = $request->input('tipo_entidad');
             $query->whereHas('juzgado', fn($q) => $q->where('nombre', 'ilike', "%{$tipo}%"));
@@ -87,14 +88,17 @@ class ProcesoRadicadoController extends Controller
             'filtros'  => $request->all(),
             'selectedJuzgado' => $request->filled('juzgado_id') ? Juzgado::find($request->juzgado_id, ['id', 'nombre']) : null,
             'juzgados' => [], // Enviamos vacío para evitar lentitud, el select ahora será asíncrono
+            'tiposProceso' => TipoProceso::orderBy('nombre')->get(['id', 'nombre']),
             'stats'    => $stats,
         ]);
     }
 
     public function exportarExcel(Request $request)
     {
+        $this->authorize('viewAny', ProcesoRadicado::class);
+
         $fecha = date('Y-m-d_H-i');
-        return Excel::download(new ProcesosExport($request->all()), "Export_Radicados_{$fecha}.xlsx");
+        return Excel::download(new ProcesosExport($request->all(), Auth::user()), "Export_Radicados_{$fecha}.xlsx");
     }
 
     public function togglePin(ProcesoRadicado $proceso)
@@ -162,6 +166,7 @@ class ProcesoRadicadoController extends Controller
         foreach ($rows as &$row) {
             $row['messages'] = [];
             $row['status'] = 'success';
+            $row['action'] = 'create';
 
             // 1. Identificación
             $existente = null;
@@ -188,13 +193,16 @@ class ProcesoRadicadoController extends Controller
                 $check('Estado', $row['estado'] ?? null, $existente->estado);
                 
                 if (!empty($diffs)) {
+                    $row['action'] = 'update';
                     $row['status'] = 'warning';
                     $row['messages'][] = "CAMBIOS DETECTADOS: " . implode(" | ", $diffs);
                 } else {
+                    $row['action'] = 'no_change';
                     $row['messages'][] = "DATOS IDÉNTICOS: No se realizará ningún cambio.";
                 }
 
             } else {
+                $row['action'] = 'create';
                 $row['messages'][] = "NUEVO: Se registrará un nuevo expediente.";
             }
 
@@ -209,13 +217,23 @@ class ProcesoRadicadoController extends Controller
                     $row['messages'][] = "AVISO: Este radicado ya está asignado al Exp #{$conflicto->id}. Se mantendrá el duplicado si procesa la carga.";
                 }
             }
+
+            if ($row['status'] === 'error') {
+                $row['action'] = 'error';
+            }
+
+            $row['selected'] = $row['status'] !== 'error' && $row['action'] !== 'no_change';
         }
         
         return response()->json([
             'rows' => $rows,
             'total_rows' => count($rows),
             'warning_rows' => collect($rows)->where('status', 'warning')->count(),
-            'error_rows' => collect($rows)->where('status', 'error')->count()
+            'error_rows' => collect($rows)->where('status', 'error')->count(),
+            'create_rows' => collect($rows)->where('action', 'create')->count(),
+            'update_rows' => collect($rows)->where('action', 'update')->count(),
+            'no_change_rows' => collect($rows)->where('action', 'no_change')->count(),
+            'selected_rows' => collect($rows)->where('selected', true)->count(),
         ]);
     }
 
@@ -224,9 +242,14 @@ class ProcesoRadicadoController extends Controller
         $this->authorize('create', ProcesoRadicado::class);
         $data = $request->input('data', []);
         $globalAbogadoId = $request->input('abogado_id', Auth::id());
+        $safeMode = $request->boolean('safe_mode', true);
 
-        DB::transaction(function () use ($data, $globalAbogadoId) {
+        DB::transaction(function () use ($data, $globalAbogadoId, $safeMode) {
             foreach ($data as $row) {
+                if (($row['status'] ?? 'success') === 'error' || ($row['selected'] ?? true) === false) {
+                    continue;
+                }
+
                 $existente = null;
                 if (!empty($row['id_interno'])) $existente = ProcesoRadicado::find($row['id_interno']);
                 if (!$existente && !empty($row['radicado'])) $existente = ProcesoRadicado::where('radicado', $row['radicado'])->first();
@@ -289,7 +312,11 @@ class ProcesoRadicadoController extends Controller
                 ];
 
                 if ($existente) {
-                    foreach (['link_expediente', 'ubicacion_drive', 'observaciones'] as $campo) {
+                    $camposProtegidos = $safeMode
+                        ? array_keys($procesoData)
+                        : ['link_expediente', 'ubicacion_drive', 'observaciones'];
+
+                    foreach ($camposProtegidos as $campo) {
                         if (($procesoData[$campo] ?? null) === null || trim((string) $procesoData[$campo]) === '') {
                             $procesoData[$campo] = $existente->{$campo};
                         }
@@ -763,7 +790,13 @@ class ProcesoRadicadoController extends Controller
 
     public function close(Request $request, ProcesoRadicado $proceso)
     {
-        $proceso->update(['estado' => 'CERRADO', 'nota_cierre' => $request->nota_cierre]);
+        $this->authorize('update', $proceso);
+
+        $validated = $request->validate([
+            'nota_cierre' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $proceso->update(['estado' => 'CERRADO', 'nota_cierre' => $validated['nota_cierre'] ?? null]);
         app(ExpedienteIntegrityService::class)->refresh($proceso->refresh());
 
         return back()->with('success', 'Cerrado.');
@@ -771,6 +804,8 @@ class ProcesoRadicadoController extends Controller
 
     public function reopen(ProcesoRadicado $proceso)
     {
+        $this->authorize('update', $proceso);
+
         $proceso->update(['estado' => 'ACTIVO', 'nota_cierre' => null]);
         app(ExpedienteIntegrityService::class)->refresh($proceso->refresh());
 

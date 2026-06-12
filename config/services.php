@@ -35,4 +35,18 @@ return [
         ],
     ],
 
+    'chatwoot' => [
+        'url' => env('CHATWOOT_URL', 'https://chatwoot.servilutioncrm.cloud'),
+        'account_id' => env('CHATWOOT_ACCOUNT_ID', '1'),
+        'api_token' => env('CHATWOOT_API_TOKEN'),
+        'inbox_id' => (int) env('CHATWOOT_INBOX_ID', 1),
+        'webhook_token' => env('CHATWOOT_WEBHOOK_TOKEN'),
+        'proxy_verify_tls' => env('CHATWOOT_PROXY_VERIFY_TLS', true),
+    ],
+
+    'chatbot' => [
+        'webhook_url' => env('CHATBOT_WEBHOOK_URL', 'https://cobrocartera-n8n.hrymiz.easypanel.host/webhook/messages-customers'),
+        'webhook_token' => env('CHATBOT_WEBHOOK_TOKEN'),
+    ],
+
 ];

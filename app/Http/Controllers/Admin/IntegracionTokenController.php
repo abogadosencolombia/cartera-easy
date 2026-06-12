@@ -15,10 +15,12 @@ class IntegracionTokenController extends Controller
      */
     public function index()
     {
-        $tokens = IntegracionToken::latest()->paginate(10);
-        
+        $tokens = IntegracionToken::latest()
+            ->paginate(10)
+            ->through(fn (IntegracionToken $token) => $this->safeTokenPayload($token));
+
         return Inertia::render('Admin/Tokens/Index', [
-            'tokens' => $tokens
+            'tokens' => $tokens,
         ]);
     }
 
@@ -47,7 +49,7 @@ class IntegracionTokenController extends Controller
     public function edit(IntegracionToken $token)
     {
         return Inertia::render('Admin/Tokens/Edit', [
-            'token' => $token
+            'token' => $this->safeTokenPayload($token),
         ]);
     }
 
@@ -56,7 +58,7 @@ class IntegracionTokenController extends Controller
      */
     public function update(UpdateIntegracionTokenRequest $request, IntegracionToken $token)
     {
-        $token->update($request->validated());
+        $token->update($this->withoutBlankSecrets($request->validated()));
 
         return redirect()->route('admin.tokens.index')
             ->with('success', 'Credencial actualizada exitosamente.');
@@ -71,5 +73,31 @@ class IntegracionTokenController extends Controller
 
         return redirect()->route('admin.tokens.index')
             ->with('success', 'Credencial eliminada exitosamente.');
+    }
+
+    private function safeTokenPayload(IntegracionToken $token): array
+    {
+        return [
+            'id' => $token->id,
+            'proveedor' => $token->proveedor,
+            'client_id' => $token->client_id,
+            'activo' => (bool) $token->activo,
+            'expira_en' => $token->expira_en,
+            'created_at' => $token->created_at?->toJSON(),
+            'updated_at' => $token->updated_at?->toJSON(),
+            'has_api_key' => filled($token->api_key),
+            'has_client_secret' => filled($token->client_secret),
+        ];
+    }
+
+    private function withoutBlankSecrets(array $data): array
+    {
+        foreach (['api_key', 'client_secret'] as $field) {
+            if (array_key_exists($field, $data) && blank($data[$field])) {
+                unset($data[$field]);
+            }
+        }
+
+        return $data;
     }
 }

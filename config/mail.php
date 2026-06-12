@@ -25,7 +25,7 @@ return [
             'encryption' => env('MAIL_ENCRYPTION', 'tls'),
             'username' => env('MAIL_USERNAME'), // Esto leerá 'soporte@...' de tu .env
             'password' => env('MAIL_PASSWORD'), // Esto leerá tu contraseña de tu .env
-            'timeout' => null,
+            'timeout' => env('MAIL_TIMEOUT', 15),
             'local_domain' => env('MAIL_EHLO_DOMAIN'),
         ],
 

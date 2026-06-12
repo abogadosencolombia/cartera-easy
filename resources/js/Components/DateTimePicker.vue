@@ -24,34 +24,66 @@ const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Juli
 const daysOfWeek = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
 
 // Estados
-const hours = ref('12');
+const hours = ref('08');
 const minutes = ref('00');
+const meridiem = ref('AM');
 const showHourDropdown = ref(false);
 const showMinuteDropdown = ref(false);
 
-const hourOptions = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
+const hourOptions = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 const minuteOptions = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
+const meridiemOptions = ['AM', 'PM'];
+
+const toTwelveHourParts = (hour24, minute = '00') => {
+    const numericHour = Number.parseInt(hour24, 10);
+    const safeHour = Number.isNaN(numericHour) ? 8 : numericHour;
+    const hour12 = safeHour % 12 || 12;
+
+    return {
+        hours: hour12.toString().padStart(2, '0'),
+        minutes: (minute || '00').padStart(2, '0'),
+        meridiem: safeHour >= 12 ? 'PM' : 'AM',
+    };
+};
+
+const toTwentyFourHour = () => {
+    const hour12 = Number.parseInt(hours.value, 10);
+    const safeHour = Number.isNaN(hour12) ? 8 : hour12;
+
+    if (meridiem.value === 'AM') {
+        return (safeHour === 12 ? 0 : safeHour).toString().padStart(2, '0');
+    }
+
+    return (safeHour === 12 ? 12 : safeHour + 12).toString().padStart(2, '0');
+};
 
 // Lógica de parseo
 const parseDateTime = (dateTimeStr) => {
-    if (!dateTimeStr) return { date: null, hours: '12', minutes: '00' };
-    const normalized = dateTimeStr.replace('T', ' ');
-    const [datePart, timePart] = normalized.split(' ');
+    if (!dateTimeStr) return { date: null, hours: '08', minutes: '00', meridiem: 'AM' };
+    const normalized = dateTimeStr.replace('T', ' ').trim();
+    const [datePart, timePart, meridiemPart] = normalized.split(/\s+/);
     const [year, month, day] = datePart.split('-').map(Number);
     const dateObj = new Date(year, month - 1, day);
-    let h = '12', m = '00';
+    let h = '08', m = '00';
     if (timePart) {
         const [hour, min] = timePart.split(':');
         h = hour.padStart(2, '0');
         m = min.padStart(2, '0');
     }
-    return { date: dateObj, hours: h, minutes: m };
+
+    const parsed = toTwelveHourParts(h, m);
+    if (['AM', 'PM'].includes((meridiemPart || '').toUpperCase())) {
+        parsed.meridiem = meridiemPart.toUpperCase();
+    }
+
+    return { date: dateObj, ...parsed };
 };
 
 const initial = parseDateTime(props.modelValue);
 const selectedDate = ref(initial.date);
 hours.value = initial.hours;
 minutes.value = initial.minutes;
+meridiem.value = initial.meridiem;
 
 const viewDate = ref(selectedDate.value || new Date());
 const currentMonth = computed(() => viewDate.value.getMonth());
@@ -62,6 +94,7 @@ watch(() => props.modelValue, (newVal) => {
     selectedDate.value = parsed.date;
     hours.value = parsed.hours;
     minutes.value = parsed.minutes;
+    meridiem.value = parsed.meridiem;
 });
 
 const emitValue = () => {
@@ -69,7 +102,7 @@ const emitValue = () => {
     const year = selectedDate.value.getFullYear();
     const month = (selectedDate.value.getMonth() + 1).toString().padStart(2, '0');
     const day = selectedDate.value.getDate().toString().padStart(2, '0');
-    emit('update:modelValue', `${year}-${month}-${day} ${hours.value}:${minutes.value}:00`);
+    emit('update:modelValue', `${year}-${month}-${day} ${toTwentyFourHour()}:${minutes.value}:00`);
 };
 
 // Generación de años
@@ -123,11 +156,12 @@ const updateViewDate = (part, value) => {
 
 const setHour = (h) => { hours.value = h; showHourDropdown.value = false; emitValue(); };
 const setMinute = (m) => { minutes.value = m; showMinuteDropdown.value = false; emitValue(); };
+const setMeridiem = (value) => { meridiem.value = value; emitValue(); };
 
 const displayValue = computed(() => {
     if (!selectedDate.value) return '';
     const dateStr = selectedDate.value.toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' });
-    return `${dateStr} - ${hours.value}:${minutes.value}`;
+    return `${dateStr} - ${hours.value}:${minutes.value} ${meridiem.value}`;
 });
 </script>
 
@@ -146,7 +180,7 @@ const displayValue = computed(() => {
         </div>
 
         <transition enter-active-class="transition duration-200 ease-out" enter-from-class="translate-y-1 opacity-0" enter-to-class="translate-y-0 opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="translate-y-0 opacity-100" leave-to-class="translate-y-1 opacity-0">
-            <PopoverPanel v-slot="{ close }" class="absolute z-[9999] mt-2 left-0 w-72 origin-top-left">
+            <PopoverPanel v-slot="{ close }" class="absolute z-[9999] mt-2 left-0 w-80 origin-top-left">
                 <div class="overflow-visible rounded-xl shadow-2xl ring-1 ring-black ring-opacity-5 bg-white dark:bg-gray-800 border dark:border-gray-700">
                     
                     <!-- Header con selectores mejorados -->
@@ -196,7 +230,7 @@ const displayValue = computed(() => {
 
                     <!-- Selector de Tiempo -->
                     <div class="px-4 py-3 border-t dark:border-gray-700 bg-indigo-50/30 dark:bg-indigo-900/10 relative">
-                        <div class="flex items-center justify-center gap-4">
+                        <div class="flex items-center justify-center gap-3">
                             <ClockIcon class="h-4 w-4 text-indigo-500 shrink-0" />
                             
                             <div class="flex items-center gap-2">
@@ -227,6 +261,19 @@ const displayValue = computed(() => {
                                         <button v-for="m in minuteOptions" :key="m" @click="setMinute(m)" class="w-full py-1.5 text-[10px] font-bold hover:bg-indigo-600 hover:text-white transition-colors border-b dark:border-gray-700 last:border-0" :class="minutes === m ? 'bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300'">{{ m }}</button>
                                     </div>
                                 </div>
+                            </div>
+
+                            <div class="flex overflow-hidden rounded-md border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+                                <button
+                                    v-for="option in meridiemOptions"
+                                    :key="option"
+                                    @click="setMeridiem(option)"
+                                    type="button"
+                                    class="w-10 py-1.5 text-[11px] font-black transition-colors"
+                                    :class="meridiem === option ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-indigo-50 dark:text-gray-300 dark:hover:bg-indigo-900/40'"
+                                >
+                                    {{ option }}
+                                </button>
                             </div>
                         </div>
                     </div>

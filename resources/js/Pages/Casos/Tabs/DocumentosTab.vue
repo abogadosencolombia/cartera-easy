@@ -2,36 +2,27 @@
 import Modal from '@/Components/Modal.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
-import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import SelectInput from '@/Components/SelectInput.vue';
-import Checkbox from '@/Components/Checkbox.vue';
-import Textarea from '@/Components/Textarea.vue';
-import { Link, useForm, router } from '@inertiajs/vue3';
+import { useForm } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 import {
-    LockClosedIcon,
-    DocumentDuplicateIcon,
-    ArrowDownTrayIcon,
-    UsersIcon,
     TrashIcon,
     DocumentArrowUpIcon,
     EyeIcon,
     DocumentTextIcon,
     CloudArrowUpIcon,
-    SparklesIcon,
     FolderPlusIcon,
-    ClockIcon,
     PlusIcon,
-    XMarkIcon
+    XMarkIcon,
+    ArrowPathIcon
 } from '@heroicons/vue/24/outline';
 import AppAlert from '@/Utils/appAlert';
 
 const props = defineProps({
     caso: Object,
-    plantillas: Array,
     puedeEditar: Boolean,
 });
 
@@ -41,7 +32,6 @@ const formatDate = (s) => {
     return date.toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
-const docsGenerados = computed(() => [...(props.caso.documentos_generados || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
 const adjuntos = computed(() => [...(props.caso.documentos || [])].sort((a, b) => new Date(b.fecha_carga) - new Date(a.fecha_carga)));
 
 const confirmingDocumentUpload = ref(false);
@@ -109,54 +99,10 @@ const deleteDocument = () => {
     });
 };
 
-const mostrandoModalGenerar = ref(false);
-const generarDocForm = useForm({ plantilla_id: null, caso_id: props.caso.id, es_confidencial: false, observaciones: '' });
-const submitGenerarDocumento = () => {
-    generarDocForm.post(route('documentos.generar'), {
-        preserveScroll: true,
-        onSuccess: () => { mostrandoModalGenerar.value = false; AppAlert.fire({ title: '¡Generando!', icon: 'info', timer: 2000, showConfirmButton: false }); },
-    });
-};
 </script>
 
 <template>
     <div class="space-y-10 animate-in fade-in duration-500">
-        
-        <!-- DOCUMENTOS INTELIGENTES -->
-        <section>
-            <div class="flex justify-between items-center mb-6">
-                <div class="flex items-center gap-2">
-                    <SparklesIcon class="w-5 h-5 text-indigo-500" />
-                    <h3 class="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-tight">Documentos del Sistema</h3>
-                </div>
-                <button v-if="puedeEditar" @click="mostrandoModalGenerar = true" class="text-[10px] font-bold bg-indigo-600 text-white px-3 py-1.5 rounded-lg uppercase tracking-wider hover:bg-indigo-700 transition-all shadow-sm">
-                    Generar
-                </button>
-            </div>
-
-            <div v-if="!docsGenerados.length" class="bg-gray-50 dark:bg-gray-900/30 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 py-10 text-center">
-                <DocumentTextIcon class="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Sin documentos generados</p>
-            </div>
-
-            <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div v-for="doc in docsGenerados" :key="doc.id" class="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:border-indigo-200 transition-all group relative">
-                    <div v-if="doc.es_confidencial" class="absolute top-2 right-2"><LockClosedIcon class="w-3 h-3 text-amber-500" /></div>
-                    <div class="flex items-start gap-3">
-                        <div class="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg text-indigo-600"><DocumentTextIcon class="w-6 h-6" /></div>
-                        <div class="flex-1 min-w-0">
-                            <h4 class="text-xs font-bold text-gray-900 dark:text-white truncate uppercase tracking-tight" :title="doc.nombre_base">{{ doc.nombre_base }}</h4>
-                            <p class="text-[9px] text-gray-400 font-bold mt-1 uppercase">v{{ doc.version_plantilla }} · {{ formatDate(doc.created_at) }}</p>
-                            <div class="mt-3 flex gap-2">
-                                <a :href="route('documentos.descargar.docx', doc.id)" class="text-[9px] font-black text-indigo-600 hover:underline uppercase">Word</a>
-                                <a :href="route('documentos.descargar.pdf', doc.id)" class="text-[9px] font-black text-indigo-600 hover:underline uppercase">PDF</a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
         <!-- REPOSITORIO DE SOPORTES -->
         <section>
             <div class="flex justify-between items-center mb-6">
@@ -196,33 +142,7 @@ const submitGenerarDocumento = () => {
             </div>
         </section>
 
-        <!-- MODALES (Compactos) -->
-        <Modal :show="mostrandoModalGenerar" @close="mostrandoModalGenerar = false" max-width="lg" centered>
-            <div class="p-6">
-                <h2 class="text-base font-bold text-gray-900 uppercase mb-6 border-b pb-3">Generar Documento</h2>
-                <form @submit.prevent="submitGenerarDocumento" class="space-y-4">
-                    <div>
-                        <InputLabel value="Plantilla *" class="text-[10px] uppercase font-bold text-gray-400" />
-                        <SelectInput v-model="generarDocForm.plantilla_id" required>
-                            <option v-for="p in plantillas" :key="p.id" :value="p.id">{{ p.nombre }} (v{{ p.version }})</option>
-                        </SelectInput>
-                    </div>
-                    <div>
-                        <InputLabel value="Observaciones" class="text-[10px] uppercase font-bold text-gray-400" />
-                        <Textarea v-model="generarDocForm.observaciones" rows="2" class="w-full rounded-lg border-gray-200 bg-gray-50 text-xs" />
-                    </div>
-                    <div class="flex items-center gap-3 p-3 bg-indigo-50 rounded-lg border border-indigo-100">
-                        <Checkbox v-model:checked="generarDocForm.es_confidencial" class="rounded h-4 w-4" />
-                        <span class="text-[10px] font-bold text-indigo-900 uppercase">Documento Confidencial</span>
-                    </div>
-                    <div class="flex justify-end gap-3 pt-4">
-                        <SecondaryButton @click="mostrandoModalGenerar = false" class="!rounded-lg !text-[10px]">Cancelar</SecondaryButton>
-                        <PrimaryButton class="!bg-indigo-600 !rounded-lg !text-[10px]" :disabled="generarDocForm.processing">Generar</PrimaryButton>
-                    </div>
-                </form>
-            </div>
-        </Modal>
-
+        <!-- MODAL CARGA -->
         <Modal :show="confirmingDocumentUpload" @close="closeUploadModal" max-width="2xl" centered>
             <div class="p-6 overflow-visible">
                 <h2 class="text-base font-bold text-gray-900 uppercase mb-6 border-b pb-3">Cargar Archivos</h2>

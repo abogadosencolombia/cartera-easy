@@ -35,7 +35,8 @@ import {
     ExclamationTriangleIcon,
     ClipboardDocumentListIcon,
     ScaleIcon,
-    PlusIcon
+    PlusIcon,
+    TrashIcon
 } from '@heroicons/vue/24/outline';
 import AppAlert from '@/Utils/appAlert';
 
@@ -258,10 +259,58 @@ const copyLegalInfo = () => {
 };
 
 const statusClasses = {
-    'ABIERTO': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
-    'CERRADO': 'bg-rose-50 text-rose-700 ring-rose-600/20',
-    'SUSPENDIDO': 'bg-amber-50 text-amber-700 ring-amber-600/20',
+    'ACTIVO': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-400/20',
+    'ABIERTO': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-400/20',
+    'CERRADO': 'bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-400/20',
+    'SUSPENDIDO': 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-400/20',
 };
+
+const estadoBadgeClass = computed(() => statusClasses[props.proceso.estado] || statusClasses['ABIERTO']);
+const revisionStatus = computed(() => getRevisionStatus(props.proceso.fecha_proxima_revision));
+const integridadScore = computed(() => props.proceso.integridad_score || props.proceso.integridad_resumen?.score || 0);
+
+const dashboardCards = computed(() => [
+    {
+        label: 'Etapa procesal',
+        value: props.proceso.etapa_actual?.nombre || 'No definida',
+        detail: props.proceso.juzgado?.nombre || 'Entidad sin registrar',
+        icon: ArrowPathIcon,
+        accentClass: 'border-indigo-100 bg-indigo-50 text-indigo-600 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-300',
+    },
+    {
+        label: 'Proxima revision',
+        value: revisionStatus.value.text,
+        detail: props.proceso.fecha_proxima_revision ? formatDate(props.proceso.fecha_proxima_revision) : 'Sin fecha programada',
+        icon: ClockIcon,
+        accentClass: 'border-amber-100 bg-amber-50 text-amber-600 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300',
+        valueClass: revisionStatus.value.classes,
+    },
+    {
+        label: 'Responsable',
+        value: props.proceso.responsable_revision?.name || 'Sin asignar',
+        detail: 'Seguimiento del expediente',
+        icon: ShieldCheckIcon,
+        accentClass: 'border-sky-100 bg-sky-50 text-sky-600 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-300',
+    },
+    {
+        label: 'Contrato',
+        value: tieneContrato.value ? `Activo #${props.proceso.contrato.id}` : 'Sin vincular',
+        detail: tieneContrato.value ? 'Honorarios registrados' : 'Pendiente de contrato',
+        icon: BriefcaseIcon,
+        accentClass: tieneContrato.value
+            ? 'border-emerald-100 bg-emerald-50 text-emerald-600 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300'
+            : 'border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-300',
+    },
+]);
+
+const tabItems = computed(() => [
+    { id: 'resumen', label: 'General', icon: InformationCircleIcon },
+    { id: 'integridad', label: 'Integridad', icon: CheckCircleIcon, badge: `${integridadScore.value}%` },
+    { id: 'partes', label: 'Partes', icon: UsersIcon },
+    { id: 'documentos', label: 'Soportes', icon: FolderOpenIcon },
+    { id: 'actuaciones', label: 'Actuaciones', icon: ClipboardDocumentListIcon },
+    { id: 'actividad', label: 'Historial', icon: ClockIcon },
+]);
 </script>
 
 <template>
@@ -269,55 +318,69 @@ const statusClasses = {
 
   <AuthenticatedLayout>
     <template #header>
-      <div class="flex flex-col md:flex-row items-center justify-between gap-4">
-        <div class="flex items-center gap-3 min-w-0 flex-1">
-          <Link :href="route('procesos.index')" class="p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 text-gray-400 hover:text-indigo-600 transition-all">
-            <ArrowLeftIcon class="h-4 w-4" />
-          </Link>
-          <div class="min-w-0">
-            <div class="flex items-center gap-2 flex-wrap">
-              <h2 class="font-bold text-xl text-gray-900 dark:text-white leading-tight truncate">Expediente <span class="text-indigo-600 dark:text-indigo-400">{{ proceso.radicado || '—' }}</span></h2>
-              <span class="px-2 py-0.5 text-[9px] font-bold uppercase rounded ring-1" :class="statusClasses[proceso.estado] || statusClasses['ABIERTO']">
-                {{ proceso.estado }}
-              </span>
-              <span v-if="proceso.a_favor_de" class="px-2 py-0.5 text-[9px] font-black uppercase rounded ring-1" :class="proceso.a_favor_de === 'DEMANDANTE' ? 'bg-blue-50 text-blue-700 ring-blue-600/20' : 'bg-red-50 text-red-700 ring-red-600/20'">
-                A FAVOR DEL {{ proceso.a_favor_de }}
-              </span>
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-start gap-3">
+            <Link :href="route('procesos.index')" class="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:border-indigo-300 hover:text-indigo-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:text-indigo-300">
+              <ArrowLeftIcon class="h-4 w-4" />
+            </Link>
+            <div class="min-w-0">
+              <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Radicado judicial</p>
+              <div class="mt-1 flex flex-wrap items-center gap-2">
+                <h2 class="truncate text-xl font-black leading-tight text-gray-950 dark:text-white sm:text-2xl">
+                  {{ proceso.radicado || 'Sin radicado' }}
+                </h2>
+                <span class="rounded-md px-2.5 py-1 text-[10px] font-black uppercase ring-1" :class="estadoBadgeClass">
+                  {{ proceso.estado || 'Sin estado' }}
+                </span>
+                <span
+                  v-if="proceso.a_favor_de"
+                  class="rounded-md px-2.5 py-1 text-[10px] font-black uppercase ring-1"
+                  :class="proceso.a_favor_de === 'DEMANDANTE'
+                    ? 'bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-950/40 dark:text-blue-300 dark:ring-blue-400/20'
+                    : 'bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-400/20'"
+                >
+                  A favor del {{ proceso.a_favor_de }}
+                </span>
+              </div>
+              <p class="mt-1 max-w-4xl truncate text-sm font-medium text-gray-600 dark:text-gray-300" :title="proceso.asunto">
+                {{ proceso.asunto || 'Sin descripcion registrada' }}
+              </p>
             </div>
-            <p class="text-xs text-gray-500 font-medium truncate" :title="proceso.asunto">{{ proceso.asunto || 'Sin descripción' }}</p>
           </div>
         </div>
 
-        <div class="flex items-center gap-2 flex-wrap justify-end">
-          <button @click="copyLegalInfo" class="inline-flex items-center px-3 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg font-bold text-[10px] text-gray-600 dark:text-gray-300 uppercase tracking-wider hover:bg-white transition-all shadow-sm">
-            <DocumentDuplicateIcon class="h-3.5 w-3.5 mr-1.5 text-gray-400" /> Copiar Info
+        <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+          <button @click="copyLegalInfo" class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-wider text-gray-700 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">
+            <DocumentDuplicateIcon class="mr-1.5 h-3.5 w-3.5 text-gray-500" /> Copiar info
           </button>
-          
-          <Link v-if="!proceso.contrato && !isClosed" :href="route('honorarios.contratos.create', { proceso_id: proceso.id })" class="inline-flex items-center px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-bold text-[10px] uppercase tracking-wider hover:bg-indigo-700 transition-all shadow-sm">
-            <BriefcaseIcon class="h-3.5 w-3.5 mr-1.5" /> Generar Contrato
+
+          <Link v-if="!proceso.contrato && !isClosed" :href="route('honorarios.contratos.create', { proceso_id: proceso.id })" class="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-indigo-700">
+            <BriefcaseIcon class="mr-1.5 h-3.5 w-3.5" /> Contrato
           </Link>
-          <Link v-else-if="proceso.contrato" :href="route('honorarios.contratos.show', proceso.contrato.id)" class="inline-flex items-center px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-bold text-[10px] uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-sm">
-            <CheckCircleIcon class="h-3.5 w-3.5 mr-1.5" /> Contrato #{{ proceso.contrato.id }}
+          <Link v-else-if="proceso.contrato" :href="route('honorarios.contratos.show', proceso.contrato.id)" class="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-emerald-700">
+            <CheckCircleIcon class="mr-1.5 h-3.5 w-3.5" /> Contrato #{{ proceso.contrato.id }}
           </Link>
 
-          <PrimaryButton @click="openEtapaModal" v-if="!isClosed" class="!py-1.5 !text-[10px]">
-            <ArrowPathIcon class="h-3.5 w-3.5 mr-1.5" /> Etapa
+          <PrimaryButton @click="openEtapaModal" v-if="!isClosed" class="!py-2 !text-[10px]">
+            <ArrowPathIcon class="mr-1.5 h-3.5 w-3.5" /> Etapa
           </PrimaryButton>
-          <Link :href="route('procesos.edit', proceso.id)">
-            <SecondaryButton v-if="!isClosed" class="!py-1.5 !text-[10px]">
-              <PencilSquareIcon class="h-3.5 w-3.5 mr-1.5" /> Editar
+          <Link :href="route('procesos.edit', proceso.id)" v-if="!isClosed">
+            <SecondaryButton class="!py-2 !text-[10px]">
+              <PencilSquareIcon class="mr-1.5 h-3.5 w-3.5" /> Editar
             </SecondaryButton>
           </Link>
-          
-          <button v-if="!isClosed && ['admin', 'abogado', 'gestor'].includes(user.tipo_usuario)" @click="openCloseModal" class="p-1.5 bg-rose-50 text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-100 transition-all" title="Finalizar Proceso"><ClockIcon class="h-4 w-4" /></button>
-          
+
+          <button v-if="!isClosed && ['admin', 'abogado', 'gestor'].includes(user.tipo_usuario)" @click="openCloseModal" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 transition hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300" title="Finalizar expediente">
+            <ClockIcon class="h-4 w-4" />
+          </button>
+
           <template v-if="user.tipo_usuario === 'admin'">
-            <button v-if="isClosed" @click="openReopenModal" class="p-1.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-all" title="Reabrir Caso"><LockOpenIcon class="h-4 w-4" /></button>
-            <button @click="askDelete" class="p-2 bg-red-600 text-white border-2 border-red-800 rounded-lg hover:bg-red-700 transition-all shadow-lg animate-pulse" title="¡PELIGRO: ELIMINAR REGISTRO!">
-                <div class="flex items-center gap-1">
-                    <TrashIcon class="h-4 w-4" />
-                    <span class="text-[9px] font-black uppercase">Eliminar</span>
-                </div>
+            <button v-if="isClosed" @click="openReopenModal" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-600 transition hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300" title="Reabrir expediente">
+              <LockOpenIcon class="h-4 w-4" />
+            </button>
+            <button @click="askDelete" class="inline-flex items-center rounded-lg border border-red-700 bg-red-600 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-red-700" title="Eliminar registro">
+              <TrashIcon class="mr-1.5 h-3.5 w-3.5" /> Eliminar
             </button>
           </template>
         </div>
@@ -325,120 +388,107 @@ const statusClasses = {
     </template>
 
     <div class="py-6">
-      <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+      <div class="mx-auto max-w-[1600px] space-y-5 px-4 sm:px-6 lg:px-8">
+        <section class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <article
+            v-for="item in dashboardCards"
+            :key="item.label"
+            class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">{{ item.label }}</p>
+                <span
+                  v-if="item.valueClass"
+                  class="mt-1 inline-flex max-w-full truncate rounded-md px-2 py-1 text-xs font-black"
+                  :class="item.valueClass"
+                  :title="item.value"
+                >
+                  {{ item.value }}
+                </span>
+                <p v-else class="mt-1 truncate text-sm font-black text-gray-950 dark:text-white" :title="item.value">
+                  {{ item.value }}
+                </p>
+                <p class="mt-1 truncate text-xs font-semibold text-gray-600 dark:text-gray-300" :title="item.detail">{{ item.detail }}</p>
+              </div>
+              <div class="rounded-lg border p-2" :class="item.accentClass">
+                <component :is="item.icon" class="h-5 w-5" />
+              </div>
+            </div>
+          </article>
+        </section>
 
-        <!-- DASHBOARD COMPACTO -->
-        <div class="bg-white dark:bg-gray-800 shadow-sm rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div class="grid grid-cols-1 lg:grid-cols-4">
-                <div class="p-5 bg-gray-50/50 dark:bg-gray-700/30 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-700">
-                    <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Etapa Procesal Actual</p>
-                    <div v-if="proceso.etapa_actual" class="flex items-center gap-2 mb-3">
-                        <span class="px-2.5 py-0.5 text-[10px] font-black uppercase rounded-md bg-blue-50 text-blue-700 ring-1 ring-blue-600/20">
-                            {{ proceso.etapa_actual.nombre }}
-                        </span>
-                    </div>
-                    <p v-else class="text-xs font-bold text-gray-400 italic">No definida</p>
-                    <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Entidad / Juzgado</p>
-                    <p class="text-xs font-bold text-gray-700 dark:text-gray-200 truncate">{{ proceso.juzgado?.nombre || '—' }}</p>
-                </div>
+        <div v-if="proceso.info_incompleta" class="rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/30">
+          <div class="flex items-start gap-3">
+            <ExclamationTriangleIcon class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-300" />
+            <div>
+              <p class="text-xs font-black uppercase tracking-widest text-amber-900 dark:text-amber-200">Informacion incompleta</p>
+              <p class="mt-1 text-sm font-medium text-amber-800 dark:text-amber-100">Este expediente requiere completar partes, datos de contacto o informacion clave antes de continuar el seguimiento.</p>
+            </div>
+          </div>
+        </div>
 
-                <div class="lg:col-span-3 p-5 grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div class="border-r border-gray-100 dark:border-gray-700 last:border-0 pr-4">
-                        <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1"><ClockIcon class="h-3 w-3" /> Próxima Revisión</p>
-                        <span class="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold" :class="getRevisionStatus(proceso.fecha_proxima_revision).classes">
-                            {{ getRevisionStatus(proceso.fecha_proxima_revision).text }}
-                        </span>
-                    </div>
-                    <div class="border-r border-gray-100 dark:border-gray-700 last:border-0 pr-4">
-                        <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1"><CalendarDaysIcon class="h-3 w-3" /> Radicación</p>
-                        <p class="text-xs font-bold text-gray-700 dark:text-gray-200">{{ formatDate(proceso.fecha_radicado) }}</p>
-                    </div>
-                    <div class="border-r border-gray-100 dark:border-gray-700 last:border-0 pr-4">
-                        <p class="text-[9px] font-bold text-indigo-500 uppercase tracking-widest mb-1 flex items-center gap-1"><ShieldCheckIcon class="h-3 w-3" /> Responsable</p>
-                        <p class="text-xs font-bold text-gray-700 dark:text-gray-200 truncate">{{ proceso.responsable_revision?.name || '—' }}</p>
+        <section class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div class="border-b border-gray-200 px-3 dark:border-gray-700">
+            <nav class="flex gap-2 overflow-x-auto py-3 scrollbar-hide" aria-label="Secciones del radicado">
+              <button
+                v-for="tab in tabItems"
+                :key="tab.id"
+                @click="setActiveTab(tab.id)"
+                :class="activeTab === tab.id
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-950 dark:text-gray-300 dark:hover:bg-gray-700/70 dark:hover:text-white'"
+                class="inline-flex shrink-0 items-center rounded-lg px-3 py-2 text-[11px] font-black uppercase tracking-wider transition"
+              >
+                <component :is="tab.icon" class="mr-2 h-4 w-4" :class="activeTab === tab.id ? 'text-white' : 'text-gray-400'" />
+                {{ tab.label }}
+                <span
+                  v-if="tab.badge"
+                  class="ml-2 rounded-full px-2 py-0.5 text-[9px] font-black"
+                  :class="activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200'"
+                >
+                  {{ tab.badge }}
+                </span>
+              </button>
+            </nav>
+          </div>
+
+          <div class="p-4 sm:p-5 lg:p-6">
+            <ResumenTab v-show="activeTab === 'resumen'" :proceso="proceso" :formatDate="formatDate">
+              <template #notificaciones>
+                <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-5 shadow-sm dark:border-indigo-900/60 dark:bg-indigo-950/30">
+                  <div class="mb-4 flex items-center gap-2">
+                    <div class="rounded-lg bg-white p-2 text-indigo-600 shadow-sm dark:bg-gray-900 dark:text-indigo-300">
+                      <BellIcon class="h-4 w-4" />
                     </div>
                     <div>
-                        <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1"><ScaleIcon class="h-3 w-3" /> Contrato</p>
-                        <span v-if="tieneContrato" class="text-[10px] font-black text-emerald-600 uppercase">Activo #{{ proceso.contrato.id }}</span>
-                        <span v-else class="text-[10px] font-black text-amber-500 uppercase">Sin Vincular</span>
+                      <p class="text-[10px] font-bold uppercase tracking-widest text-indigo-700 dark:text-indigo-300">Seguimiento</p>
+                      <h3 class="text-sm font-black text-gray-950 dark:text-white">Agendar recordatorio</h3>
                     </div>
+                  </div>
+
+                  <form @submit.prevent="submitNotification" class="space-y-3">
+                    <DateTimePicker v-model="notifForm.fecha_programada" class="!rounded-lg !border-indigo-200 !bg-white text-xs dark:!border-indigo-900/60 dark:!bg-gray-900" />
+                    <Textarea v-model="notifForm.mensaje" class="!rounded-lg !border-indigo-200 !bg-white text-sm text-gray-900 dark:!border-indigo-900/60 dark:!bg-gray-900 dark:text-white" rows="3" placeholder="Nota para el seguimiento..." required />
+                    <PrimaryButton :disabled="notifForm.processing" class="w-full justify-center !rounded-lg !py-2.5 !text-[10px] !font-black !uppercase !tracking-widest">
+                      <PlusIcon class="mr-1.5 h-3.5 w-3.5" /> Agendar
+                    </PrimaryButton>
+                  </form>
                 </div>
-            </div>
-        </div>
+              </template>
+            </ResumenTab>
 
-        <!-- ALERTAS -->
-        <div v-if="proceso.info_incompleta" class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 rounded-xl flex items-center gap-3">
-            <ExclamationTriangleIcon class="h-5 w-5 text-amber-500" />
-            <div>
-                <p class="text-[10px] font-black text-amber-800 dark:text-amber-200 uppercase tracking-widest leading-none mb-1">Información Incompleta</p>
-                <p class="text-[10px] text-amber-700 dark:text-amber-300">Este expediente requiere identificar partes o datos de contacto.</p>
-            </div>
-        </div>
+            <ExpedienteIntegrityPanel v-show="activeTab === 'integridad'" :summary="proceso.integridad_resumen" :edit-href="route('procesos.edit', proceso.id)" @go-tab="setActiveTab" />
 
-        <!-- NAVEGACIÓN POR PESTAÑAS -->
-        <div class="bg-white dark:bg-gray-800 shadow-sm rounded-2xl border border-gray-200 dark:border-gray-700 overflow-visible">
-            <div class="border-b border-gray-100 dark:border-gray-700 px-4">
-                <nav class="-mb-px flex space-x-6 overflow-x-auto scrollbar-hide">
-                    <button v-for="tab in [
-                        { id: 'resumen', label: 'General', icon: InformationCircleIcon },
-                        { id: 'integridad', label: 'Integridad', icon: CheckCircleIcon, badge: `${proceso.integridad_score || proceso.integridad_resumen?.score || 0}%` },
-                        { id: 'partes', label: 'Partes', icon: UsersIcon },
-                        { id: 'documentos', label: 'Soportes', icon: FolderOpenIcon },
-                        { id: 'actuaciones', label: 'Actuaciones', icon: ClipboardDocumentListIcon },
-                        { id: 'actividad', label: 'Historial', icon: ClockIcon },
-                    ]" :key="tab.id" @click="setActiveTab(tab.id)"
-                    :class="[ activeTab === tab.id ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300' ]"
-                    class="flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-bold text-[11px] uppercase tracking-wider transition-all group">
-                        <component :is="tab.icon" :class="[activeTab === tab.id ? 'text-indigo-600' : 'text-gray-300 group-hover:text-gray-400']" class="h-4 w-4 mr-2 transition-colors" />
-                        {{ tab.label }}
-                        <span
-                            v-if="tab.badge"
-                            class="ml-2 rounded-full px-2 py-0.5 text-[9px] font-black"
-                            :class="activeTab === tab.id ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'"
-                        >
-                            {{ tab.badge }}
-                        </span>
-                    </button>
-                </nav>
-            </div>
+            <PartesTab v-show="activeTab === 'partes'" :proceso="proceso" />
 
-            <div class="p-6">
-                <!-- TAB: RESUMEN -->
-                <ResumenTab v-show="activeTab === 'resumen'" :proceso="proceso" :formatDate="formatDate">
-                    <template #notificaciones>
-                        <div class="bg-indigo-900 p-6 rounded-xl shadow-lg relative overflow-visible group z-20">
-                            <div class="relative z-10 space-y-4">
-                                <h3 class="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
-                                    <BellIcon class="h-4 w-4 text-amber-400" /> Agendar Recordatorio
-                                </h3>
-                                <form @submit.prevent="submitNotification" class="space-y-3">
-                                    <DateTimePicker v-model="notifForm.fecha_programada" class="!bg-white/10 !border-white/10 !text-white !rounded-lg text-xs" />
-                                    <Textarea v-model="notifForm.mensaje" class="!bg-white/10 !border-white/10 !text-white !rounded-lg text-[11px]" rows="2" placeholder="Nota rápida..." required />
-                                    <PrimaryButton :disabled="notifForm.processing" class="w-full !bg-white !text-indigo-900 !rounded-lg !py-2.5 !text-[10px] !font-bold uppercase tracking-widest shadow-md">
-                                        <PlusIcon class="h-3 w-3 mr-1.5" /> Agendar
-                                    </PrimaryButton>
-                                </form>
-                            </div>
-                        </div>
-                    </template>
-                </ResumenTab>
+            <DocumentosTab v-show="activeTab === 'documentos'" ref="documentosTabRef" :proceso="proceso" :files="files" :isClosed="isClosed" :formatDate="formatDate" @upload="handleUpload" @delete="askDeleteDoc" />
 
-                <!-- TAB: INTEGRIDAD -->
-                <ExpedienteIntegrityPanel v-show="activeTab === 'integridad'" :summary="proceso.integridad_resumen" :edit-href="route('procesos.edit', proceso.id)" @go-tab="setActiveTab" />
+            <ActuacionesTab v-show="activeTab === 'actuaciones'" :proceso="proceso" :actuaciones="actuaciones" :isClosed="isClosed" :fmtDateTime="fmtDateTime" :fmtDateSimple="fmtDateSimple" @save="handleSaveActuacion" @edit="abrirModalEditar" @delete="eliminarActuacion" />
 
-                <!-- TAB: PARTES -->
-                <PartesTab v-show="activeTab === 'partes'" :proceso="proceso" />
-
-                <!-- TAB: DOCUMENTOS -->
-                <DocumentosTab v-show="activeTab === 'documentos'" ref="documentosTabRef" :proceso="proceso" :files="files" :isClosed="isClosed" :formatDate="formatDate" @upload="handleUpload" @delete="askDeleteDoc" />
-
-                <!-- TAB: ACTUACIONES -->
-                <ActuacionesTab v-show="activeTab === 'actuaciones'" :proceso="proceso" :actuaciones="actuaciones" :isClosed="isClosed" :fmtDateTime="fmtDateTime" :fmtDateSimple="fmtDateSimple" @save="handleSaveActuacion" @edit="abrirModalEditar" @delete="eliminarActuacion" />
-
-                <!-- TAB: ACTIVIDAD / AUDITORÍA -->
-                <ActividadTab v-show="activeTab === 'actividad'" :proceso="proceso" :auditoria="auditoria" />
-            </div>
-        </div>
+            <ActividadTab v-show="activeTab === 'actividad'" :proceso="proceso" :auditoria="auditoria" />
+          </div>
+        </section>
       </div>
     </div>
 

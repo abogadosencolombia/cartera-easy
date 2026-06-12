@@ -196,6 +196,11 @@ class UserController extends Controller
         if (!Auth::user()->isAdmin()) {
             abort(403);
         }
+
+        if ($user->id === auth()->id()) {
+            return to_route('admin.users.index')->with('error', 'No puede eliminar su propia cuenta.');
+        }
+
         $user->delete();
         return to_route('admin.users.index')->with('success', 'Usuario eliminado exitosamente.');
     }

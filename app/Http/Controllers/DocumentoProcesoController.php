@@ -4,10 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\ProcesoRadicado;
 use App\Models\DocumentoProceso;
-use App\Models\AuditoriaEvento; // ✅ Auditoría
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Auth; // ✅ Auth
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use App\Services\ExpedienteIntegrityService;
@@ -18,9 +17,11 @@ class DocumentoProcesoController extends Controller
 
     public function store(Request $request, ProcesoRadicado $proceso)
     {
+        $this->authorize('update', $proceso);
+
         $data = $request->validate([
             'documentos' => ['required', 'array', 'min:1'],
-            'documentos.*.archivo' => ['required', 'file', 'max:102400'], // 100MB
+            'documentos.*.archivo' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx,csv,txt', 'max:102400'],
             'documentos.*.nombre'  => ['required', 'string', 'max:255'],
             'documentos.*.nota'    => ['nullable', 'string', 'max:2000'],
             'fecha_proxima_revision' => ['required', 'date', 'after_or_equal:today'],
@@ -30,7 +31,7 @@ class DocumentoProcesoController extends Controller
             foreach ($data['documentos'] as $docData) {
                 $file = $docData['archivo'];
                 $dir  = "procesos/{$proceso->id}";
-                $path = $file->store($dir, 'public');
+                $path = $file->store($dir, 'private');
 
                 DocumentoProceso::create([
                     'proceso_radicado_id' => $proceso->id,
@@ -40,7 +41,6 @@ class DocumentoProcesoController extends Controller
                     'file_path'           => $path,
                 ]);
 
-                // ✅ AUDITORÍA POR CADA DOCUMENTO
                 $proceso->auditoria()->create([
                     'user_id' => Auth::id(),
                     'evento' => 'SUBIR_DOCUMENTO_PROCESO',
@@ -52,8 +52,7 @@ class DocumentoProcesoController extends Controller
             }
 
             $proceso->update(['fecha_proxima_revision' => $data['fecha_proxima_revision']]);
-            
-            // Auditoría del cambio de fecha
+
             $proceso->auditoria()->create([
                 'user_id' => Auth::id(),
                 'evento' => 'ACTUALIZAR_REVISION_PROCESO',
@@ -73,12 +72,14 @@ class DocumentoProcesoController extends Controller
     {
         $this->authorize('view', $documento->proceso);
 
-        if (!$documento->file_path || !Storage::disk('public')->exists($documento->file_path)) {
+        $disk = $this->resolveStorageDisk($documento);
+        if (! $disk) {
             abort(404);
         }
-        $mime = Storage::disk('public')->mimeType($documento->file_path) ?: 'application/octet-stream';
-        return response(Storage::disk('public')->get($documento->file_path), 200, [
-            'Content-Type'        => $mime,
+
+        $mime = Storage::disk($disk)->mimeType($documento->file_path) ?: 'application/octet-stream';
+        return response(Storage::disk($disk)->get($documento->file_path), 200, [
+            'Content-Type' => $mime,
             'Content-Disposition' => 'inline; filename="'.addslashes($documento->file_name ?: 'archivo').'"',
             'X-Content-Type-Options' => 'nosniff',
         ]);
@@ -88,10 +89,12 @@ class DocumentoProcesoController extends Controller
     {
         $this->authorize('view', $documento->proceso);
 
-        if (!$documento->file_path || !Storage::disk('public')->exists($documento->file_path)) {
+        $disk = $this->resolveStorageDisk($documento);
+        if (! $disk) {
             abort(404);
         }
-        return Storage::disk('public')->download($documento->file_path, $documento->file_name ?: 'archivo');
+
+        return Storage::disk($disk)->download($documento->file_path, $documento->file_name ?: 'archivo');
     }
 
     public function destroy(ProcesoRadicado $proceso, DocumentoProceso $documento)
@@ -102,14 +105,14 @@ class DocumentoProcesoController extends Controller
             abort(Response::HTTP_FORBIDDEN);
         }
 
-        $nombreDoc = $documento->file_name; // Guardar nombre para el log
+        $nombreDoc = $documento->file_name;
+        $disk = $this->resolveStorageDisk($documento);
 
-        if ($documento->file_path && Storage::disk('public')->exists($documento->file_path)) {
-            Storage::disk('public')->delete($documento->file_path);
+        if ($disk) {
+            Storage::disk($disk)->delete($documento->file_path);
         }
         $documento->delete();
 
-        // ✅ AUDITORÍA GLOBAL
         $proceso->auditoria()->create([
             'user_id' => Auth::id(),
             'evento' => 'ELIMINAR_DOCUMENTO_PROCESO',
@@ -122,5 +125,20 @@ class DocumentoProcesoController extends Controller
         app(ExpedienteIntegrityService::class)->refresh($proceso->refresh());
 
         return back()->with('success', 'Documento eliminado.');
+    }
+
+    private function resolveStorageDisk(DocumentoProceso $documento): ?string
+    {
+        if (! $documento->file_path) {
+            return null;
+        }
+
+        foreach (['private', 'public'] as $disk) {
+            if (Storage::disk($disk)->exists($documento->file_path)) {
+                return $disk;
+            }
+        }
+
+        return null;
     }
 }

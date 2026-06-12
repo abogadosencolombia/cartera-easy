@@ -17,15 +17,19 @@ use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
 {
     protected $filtros;
+    protected ?User $user;
 
-    public function __construct($filtros = [])
+    public function __construct($filtros = [], ?User $user = null)
     {
         $this->filtros = $filtros;
+        $this->user = $user;
     }
 
     public function query()
     {
         $query = Caso::query()->with(['deudor', 'cooperativa', 'juzgado', 'especialidad', 'users', 'codeudores']);
+
+        $this->applyVisibilityScope($query);
 
         if (!empty($this->filtros['search'])) {
             $search = $this->filtros['search'];
@@ -67,6 +71,34 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
         }
 
         return $query->latest('updated_at');
+    }
+
+    private function applyVisibilityScope($query): void
+    {
+        if (!$this->user) {
+            $query->whereRaw('1 = 0');
+            return;
+        }
+
+        if ($this->user->tipo_usuario === 'admin') {
+            return;
+        }
+
+        if (in_array($this->user->tipo_usuario, ['gestor', 'abogado'], true)) {
+            $cooperativaIds = $this->user->cooperativas()->pluck('cooperativas.id')->all();
+
+            $query->where(function ($q) use ($cooperativaIds) {
+                $q->where('user_id', $this->user->id)
+                    ->orWhereHas('users', fn ($uq) => $uq->where('users.id', $this->user->id));
+
+                if (!empty($cooperativaIds)) {
+                    $q->orWhereIn('cooperativa_id', $cooperativaIds);
+                }
+            });
+            return;
+        }
+
+        $query->whereRaw('1 = 0');
     }
 
     public function headings(): array

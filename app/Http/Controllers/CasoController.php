@@ -46,8 +46,8 @@ class CasoController extends Controller
 
         $query = Caso::with([
             'cooperativa', 
-            'deudor:id,nombre_completo,numero_documento,celular_1,correo_1,celular_2,correo_2', 
-            'codeudores:id,nombre_completo,numero_documento',
+            'deudor:id,nombre_completo,tipo_documento,numero_documento,dv,celular_1,correo_1,celular_2,correo_2,addresses',
+            'codeudores:id,nombre_completo,tipo_documento,numero_documento,celular,correo,addresses',
             'especialidad:id,nombre',
             'user', 
             'users', 
@@ -231,7 +231,7 @@ class CasoController extends Controller
             'user_agent' => $request->userAgent(),
         ]);
 
-        return Excel::download(new CasosExport($filtros), $nombreArchivo);
+        return Excel::download(new CasosExport($filtros, Auth::user()), $nombreArchivo);
     }
 
     public function importForm(): Response
@@ -259,7 +259,12 @@ class CasoController extends Controller
         $rows = $import->getProcessedRows();
         
         foreach ($rows as &$row) {
-            if ($row['status'] === 'error') continue;
+            $row['action'] = 'create';
+            if ($row['status'] === 'error') {
+                $row['action'] = 'error';
+                $row['selected'] = false;
+                continue;
+            }
 
             // 1. Mapear Cooperativa
             $coop = Cooperativa::where('nombre', 'ilike', trim($row['cooperativa_nombre']))->first();
@@ -335,28 +340,40 @@ class CasoController extends Controller
                 $row['id_sistema'] = $existente->id;
                 $cambios = [];
                 $sonIguales = fn($a, $b) => mb_strtolower(trim((string)$a)) === mb_strtolower(trim((string)$b));
+                $tieneValor = fn($value) => $value !== null && trim((string) $value) !== '';
                 
-                if (abs((float)$existente->monto_total - (float)$row['monto_total']) > 1) $cambios[] = "Monto Inicial";
-                if (!$sonIguales($existente->etapa_procesal, $row['etapa_procesal'])) $cambios[] = "Etapa";
+                if ($tieneValor($row['monto_total']) && abs((float)$existente->monto_total - (float)$row['monto_total']) > 1) $cambios[] = "Monto Inicial";
+                if ($tieneValor($row['etapa_procesal']) && !$sonIguales($existente->etapa_procesal, $row['etapa_procesal'])) $cambios[] = "Etapa";
                 
                 // Comparación de Referencia (Numérica si es posible)
                 $refExistente = trim((string)$existente->referencia_credito);
                 $refExcel = trim((string)$row['referencia_credito']);
-                if (is_numeric($refExistente) && is_numeric($refExcel)) {
-                    if (abs((float)$refExistente - (float)$refExcel) > 0.1) $cambios[] = "Referencia";
-                } elseif (!$sonIguales($refExistente, $refExcel)) {
-                    $cambios[] = "Referencia";
+                if ($tieneValor($refExcel)) {
+                    if (is_numeric($refExistente) && is_numeric($refExcel)) {
+                        if (abs((float)$refExistente - (float)$refExcel) > 0.1) $cambios[] = "Referencia";
+                    } elseif (!$sonIguales($refExistente, $refExcel)) {
+                        $cambios[] = "Referencia";
+                    }
                 }
 
                 if (!empty($cambios)) {
+                    $row['action'] = 'update';
                     $row['status'] = 'warning';
                     $row['messages'][] = "ACTUALIZACIÓN DETECTADA (ID #{$existente->id}): Se modificará " . implode(", ", $cambios);
                 } else {
+                    $row['action'] = 'no_change';
                     $row['messages'][] = "Sin cambios (Datos idénticos).";
                 }
             } else {
+                $row['action'] = 'create';
                 $row['messages'][] = "NUEVO CASO: Se creará un expediente desde cero.";
             }
+
+            if ($row['status'] === 'error') {
+                $row['action'] = 'error';
+            }
+
+            $row['selected'] = $row['status'] !== 'error' && $row['action'] !== 'no_change';
         }
         
         return response()->json([
@@ -365,6 +382,10 @@ class CasoController extends Controller
             'valid_rows' => collect($rows)->whereIn('status', ['success', 'warning'])->count(),
             'warning_rows' => collect($rows)->where('status', 'warning')->count(),
             'error_rows' => collect($rows)->where('status', 'error')->count(),
+            'create_rows' => collect($rows)->where('action', 'create')->count(),
+            'update_rows' => collect($rows)->where('action', 'update')->count(),
+            'no_change_rows' => collect($rows)->where('action', 'no_change')->count(),
+            'selected_rows' => collect($rows)->where('selected', true)->count(),
         ]);
     }
 
@@ -372,23 +393,32 @@ class CasoController extends Controller
     {
         $this->authorize('create', Caso::class);
         $data = $request->input('data', []);
+        $safeMode = $request->boolean('safe_mode', true);
 
-        DB::transaction(function () use ($data) {
+        DB::transaction(function () use ($data, $safeMode) {
             foreach ($data as $row) {
-                if (($row['status'] ?? 'success') === 'error') {
+                if (($row['status'] ?? 'success') === 'error' || ($row['selected'] ?? true) === false) {
                     continue;
                 }
 
                 // 1. Upsert Persona (Deudor)
                     $deudor = Persona::withTrashed()->where('numero_documento', trim($row['documento_deudor']))->first();
                     if ($deudor) {
-                        $deudor->update([
+                        $personaData = [
                             'nombre_completo' => trim($row['nombre_deudor']),
                             'tipo_documento' => $row['tipo_documento'] ?? 'CC',
                             'dv' => $row['dv'] ?? null,
                             'celular_1' => $row['celular_deudor'] ?? null,
                             'correo_1' => $row['correo_deudor'] ?? null,
-                        ]);
+                        ];
+
+                        if ($safeMode) {
+                            $personaData = array_filter($personaData, fn ($value) => !is_null($value) && trim((string) $value) !== '');
+                        }
+
+                        if (!empty($personaData)) {
+                            $deudor->update($personaData);
+                        }
                     } else {
                         $deudor = Persona::create([
                             'nombre_completo' => trim($row['nombre_deudor']),
@@ -409,7 +439,7 @@ class CasoController extends Controller
                 $defaultUserId = User::where('name', 'ilike', 'NUBIA AIDE GALLEGO')->value('id') ?? Auth::id();
                 
                 $casoData = [
-                    'user_id' => $defaultUserId, 
+                    'user_id' => null,
                     'deudor_id' => $deudor->id,
                     'cooperativa_id' => $row['cooperativa_id'],
                     'juzgado_id' => $row['juzgado_id'],
@@ -417,29 +447,29 @@ class CasoController extends Controller
                     'tipo_proceso' => $row['tipo_proceso'],
                     'subtipo_proceso' => $row['subtipo_proceso'],
                     'subproceso' => $row['subproceso'],
-                    'etapa_procesal' => !empty($row['etapa_procesal']) ? $row['etapa_procesal'] : 'INICIAL',
+                    'etapa_procesal' => $row['etapa_procesal'] ?? null,
                     'radicado' => $row['radicado'],
-                    'es_spoa_nunc' => $row['es_spoa_nunc'] ?? false,
+                    'es_spoa_nunc' => $row['es_spoa_nunc'] ?? null,
                     'referencia_credito' => $row['referencia_credito'],
-                    'monto_total' => $row['monto_total'] ?? 0,
-                    'monto_deuda_actual' => $row['monto_deuda_actual'] ?? 0,
-                    'monto_total_pagado' => $row['monto_total_pagado'] ?? 0,
-                    'tasa_interes_corriente' => 0,
-                    'fecha_inicio_credito' => $row['fecha_inicio_credito'] ?? now(),
-                    'fecha_apertura' => $row['fecha_apertura'] ?? now(),
+                    'monto_total' => $row['monto_total'] ?? null,
+                    'monto_deuda_actual' => $row['monto_deuda_actual'] ?? null,
+                    'monto_total_pagado' => $row['monto_total_pagado'] ?? null,
+                    'tasa_interes_corriente' => null,
+                    'fecha_inicio_credito' => $row['fecha_inicio_credito'] ?? null,
+                    'fecha_apertura' => $row['fecha_apertura'] ?? null,
                     'fecha_vencimiento' => $row['fecha_vencimiento'],
                     'fecha_ultimo_pago' => $row['fecha_ultimo_pago'],
                     'fecha_tasa_interes' => null,
-                    'tipo_garantia_asociada' => !empty($row['tipo_garantia_asociada']) ? $row['tipo_garantia_asociada'] : 'sin garantía',
-                    'origen_documental' => !empty($row['origen_documental']) ? $row['origen_documental'] : 'otro',
-                    'medio_contacto' => !empty($row['medio_contacto']) ? $row['medio_contacto'] : 'otro',
+                    'tipo_garantia_asociada' => $row['tipo_garantia_asociada'] ?? null,
+                    'origen_documental' => $row['origen_documental'] ?? null,
+                    'medio_contacto' => $row['medio_contacto'] ?? null,
                     'link_drive' => $row['link_drive'],
                     'link_expediente' => $row['link_expediente'],
                     'notas_legales' => $row['notas_legales'],
                     'nota_cierre' => $row['nota_cierre'],
-                    'bloqueado' => $row['bloqueado'] ?? false,
+                    'bloqueado' => $row['bloqueado'] ?? null,
                     'motivo_bloqueo' => $row['motivo_bloqueo'],
-                    'estado' => $row['estado'] ?? 'ACTIVO',
+                    'estado' => $row['estado'] ?? null,
                     'estado_proceso' => $row['estado_proceso'],
                 ];
 
@@ -450,12 +480,35 @@ class CasoController extends Controller
                     if ($uid) $casoData['user_id'] = $uid;
                 }
 
-                $preservarCamposVacios = function (Caso $caso) use (&$casoData) {
-                    foreach (['link_drive', 'link_expediente', 'notas_legales', 'nota_cierre'] as $campo) {
+                $preservarCamposVacios = function (Caso $caso) use (&$casoData, $safeMode) {
+                    $campos = $safeMode
+                        ? array_keys($casoData)
+                        : ['user_id', 'tasa_interes_corriente', 'fecha_tasa_interes', 'link_drive', 'link_expediente', 'notas_legales', 'nota_cierre'];
+
+                    foreach ($campos as $campo) {
                         if (($casoData[$campo] ?? null) === null || trim((string) $casoData[$campo]) === '') {
                             $casoData[$campo] = $caso->{$campo};
                         }
                     }
+                };
+
+                $crearCaso = function () use (&$casoData, $defaultUserId) {
+                    $casoData['user_id'] = $casoData['user_id'] ?: $defaultUserId;
+                    $casoData['etapa_procesal'] = $casoData['etapa_procesal'] ?: 'INICIAL';
+                    $casoData['es_spoa_nunc'] = $casoData['es_spoa_nunc'] ?? false;
+                    $casoData['monto_total'] = $casoData['monto_total'] ?? 0;
+                    $casoData['monto_deuda_actual'] = $casoData['monto_deuda_actual'] ?? 0;
+                    $casoData['monto_total_pagado'] = $casoData['monto_total_pagado'] ?? 0;
+                    $casoData['tasa_interes_corriente'] = $casoData['tasa_interes_corriente'] ?? 0;
+                    $casoData['fecha_inicio_credito'] = $casoData['fecha_inicio_credito'] ?? now();
+                    $casoData['fecha_apertura'] = $casoData['fecha_apertura'] ?? now();
+                    $casoData['tipo_garantia_asociada'] = $casoData['tipo_garantia_asociada'] ?: 'sin garantía';
+                    $casoData['origen_documental'] = $casoData['origen_documental'] ?: 'otro';
+                    $casoData['medio_contacto'] = $casoData['medio_contacto'] ?: 'otro';
+                    $casoData['bloqueado'] = $casoData['bloqueado'] ?? false;
+                    $casoData['estado'] = $casoData['estado'] ?: 'ACTIVO';
+
+                    return Caso::create($casoData);
                 };
 
                 $caso = null;
@@ -465,7 +518,7 @@ class CasoController extends Controller
                         $preservarCamposVacios($caso);
                         $caso->update($casoData);
                     } else {
-                        $caso = Caso::create($casoData);
+                        $caso = $crearCaso();
                     }
                 } elseif (!empty($row['radicado']) && strlen($row['radicado']) >= 14 && strlen($row['radicado']) <= 23) {
                     $caso = Caso::where('radicado', $row['radicado'])->first();
@@ -473,7 +526,7 @@ class CasoController extends Controller
                         $preservarCamposVacios($caso);
                         $caso->update($casoData);
                     } else {
-                        $caso = Caso::create($casoData);
+                        $caso = $crearCaso();
                     }
                 } elseif (!empty($row['referencia_credito'])) {
                     // Si no hay radicado ni ID, buscar por deudor y referencia para evitar duplicados
@@ -484,10 +537,10 @@ class CasoController extends Controller
                         $preservarCamposVacios($caso);
                         $caso->update($casoData);
                     } else {
-                        $caso = Caso::create($casoData);
+                        $caso = $crearCaso();
                     }
                 } else {
-                    $caso = Caso::create($casoData);
+                    $caso = $crearCaso();
                 }
 
                 // 4. Sincronizar Abogados desde el Excel (si se proporcionan nombres)
@@ -961,6 +1014,8 @@ class CasoController extends Controller
 
     public function storeActuacion(Request $request, Caso $caso)
     {
+        $this->authorize('update', $caso);
+
         $validated = $request->validate(['nota' => ['required', 'string'], 'fecha_actuacion' => ['required', 'date']]);
         $caso->actuaciones()->create(['nota' => $validated['nota'], 'fecha_actuacion' => $validated['fecha_actuacion'], 'user_id' => Auth::id()]);
         app(ExpedienteIntegrityService::class)->refresh($caso->refresh());
@@ -969,28 +1024,39 @@ class CasoController extends Controller
 
     public function updateActuacion(Request $request, Actuacion $actuacion)
     {
+        $caso = $actuacion->actuable;
+        if (!$caso instanceof Caso) {
+            abort(403);
+        }
+
+        $this->authorize('update', $caso);
+
         $validated = $request->validate(['nota' => ['required', 'string'], 'fecha_actuacion' => ['required', 'date']]);
         $actuacion->update($validated);
-        if ($actuacion->actuable instanceof Caso) {
-            app(ExpedienteIntegrityService::class)->refresh($actuacion->actuable->refresh());
-        }
+        app(ExpedienteIntegrityService::class)->refresh($caso->refresh());
+
         return back(303)->with('success', 'Actuación actualizada.');
     }
 
     public function destroyActuacion(Actuacion $actuacion)
     {
         $caso = $actuacion->actuable;
-        $actuacion->delete();
-
-        if ($caso instanceof Caso) {
-            app(ExpedienteIntegrityService::class)->refresh($caso->refresh());
+        if (!$caso instanceof Caso) {
+            abort(403);
         }
+
+        $this->authorize('update', $caso);
+
+        $actuacion->delete();
+        app(ExpedienteIntegrityService::class)->refresh($caso->refresh());
 
         return back(303)->with('success', 'Actuación eliminada.');
     }
 
     public function unlock(Request $request, Caso $caso): RedirectResponse
     {
+        $this->authorize('update', $caso);
+
         $caso->update(['bloqueado' => false, 'motivo_bloqueo' => null]);
         app(ExpedienteIntegrityService::class)->refresh($caso->refresh());
 
@@ -999,6 +1065,7 @@ class CasoController extends Controller
 
     public function clonar(Caso $caso): Response
     {
+        $this->authorize('view', $caso);
         $this->authorize('create', Caso::class);
         $caso->load('juzgado', 'codeudores', 'cooperativa', 'user', 'deudor');
         return Inertia::render('Casos/Create', [
@@ -1021,7 +1088,6 @@ class CasoController extends Controller
             $c = Codeudor::updateOrCreate(['numero_documento' => $numDoc], [
                 'nombre_completo' => trim($d['nombre_completo'] ?? 'SIN NOMBRE'),
                 'tipo_documento' => $d['tipo_documento'] ?? 'CC',
-                'dv' => $d['dv'] ?? null,
                 'celular' => $d['celular'] ?? null,
                 'correo' => $d['correo'] ?? null,
                 'addresses' => $d['addresses'] ?? null,

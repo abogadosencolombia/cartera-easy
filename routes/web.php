@@ -17,10 +17,10 @@ use App\Http\Controllers\IntegracionController;
 use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\PagoCasoController;
 use App\Http\Controllers\PersonaController;
-use App\Http\Controllers\PlantillaDocumentoController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RequisitoDocumentoController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\UserWorkSessionController;
 use App\Http\Controllers\ValidacionLegalController;
 use App\Http\Controllers\Admin\ReglaAlertaController;
 use App\Http\Controllers\Admin\TasasInteresController;
@@ -139,8 +139,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/archivo/{id}/view', [\App\Http\Controllers\Api\GestionDiariaController::class, 'viewArchivo'])->name('view-archivo');
     });
 
+    Route::post('/jornadas/heartbeat', [UserWorkSessionController::class, 'heartbeat'])->name('jornadas.heartbeat');
+
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
+    Route::get('/analytics', [AnalyticsController::class, 'index'])
+        ->middleware('role:admin,gestor,abogado')
+        ->name('analytics.index');
 
     // --- NOTIFICACIONES ---
     Route::get('/notificaciones', [NotificacionController::class, 'index'])->name('notificaciones.index');
@@ -171,7 +175,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ===== BLOQUE DE RUTAS PARA RADICADOS (PROCESOS) =================
     // =================================================================
     Route::get('procesos', [ProcesoRadicadoController::class, 'index'])->name('procesos.index');
-    Route::get('procesos/exportar', [ProcesoRadicadoController::class, 'exportarExcel'])->name('procesos.exportar');
+    Route::get('procesos/exportar', [ProcesoRadicadoController::class, 'exportarExcel'])
+        ->middleware('role:admin,gestor,abogado')
+        ->name('procesos.exportar');
     Route::get('procesos/importar', [ProcesoRadicadoController::class, 'importForm'])->name('procesos.import.show');
     Route::get('procesos/importar/template', [ProcesoRadicadoController::class, 'downloadTemplate'])->name('procesos.import.template');
     Route::post('procesos/importar/validate', [ProcesoRadicadoController::class, 'importValidate'])->name('procesos.import.validate');
@@ -188,10 +194,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     // --- NUEVA RUTA PARA CAMBIAR ETAPA (Show.vue) ---
     Route::patch('/procesos/{proceso}/etapa', [ProcesoRadicadoController::class, 'updateEtapa'])->name('procesos.update_etapa');
-    
-    // --- RUTAS PARA LA IMPORTACIÓN DE EXCEL DE PROCESOS ---
-    Route::get('procesos/import', [ProcesoRadicadoController::class, 'showImportForm'])->name('procesos.import');
-    Route::post('procesos/import', [ProcesoRadicadoController::class, 'handleImport'])->name('procesos.import.store');
     
     // --- Documentos para Radicados ---
     Route::post('procesos/{proceso}/documentos', [DocumentoProcesoController::class, 'store'])->name('procesos.documentos.store');
@@ -279,8 +281,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/personas/documentos/{documento}/ver', [PersonaController::class, 'viewDocument'])->name('personas.view_document');
         
         Route::resource('cooperativas', CooperativaController::class);
-        Route::resource('plantillas', PlantillaDocumentoController::class)->except(['show', 'edit', 'update']);
-        Route::post('/plantillas/{plantilla}/clonar', [PlantillaDocumentoController::class, 'clonar'])->name('plantillas.clonar');
         Route::get('casos/{caso}/clonar', [CasoController::class, 'clonar'])->name('casos.clonar');
         Route::post('casos/{caso}/documentos', [DocumentoCasoController::class, 'store'])->name('casos.documentos.store');
         Route::get('documentos-caso/{documento}/view', [DocumentoCasoController::class, 'view'])->name('documentos-caso.view');
@@ -342,6 +342,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('tokens', IntegracionTokenController::class);
         Route::resource('reglas-alerta', ReglaAlertaController::class)->only(['index', 'store', 'destroy']);
         Route::get('auditoria', [AuditoriaController::class, 'index'])->name('auditoria.index');
+        Route::get('/jornadas', [UserWorkSessionController::class, 'index'])->name('jornadas.index');
         Route::get('/analitica', AnaliticaController::class)->name('analitica.index');
         Route::get('juridico/indicadores', IndicadoresController::class)->name('juridico.indicadores');
         Route::get('incidentes-juridicos/exportar', [IncidenteJuridicoController::class, 'export'])->name('incidentes-juridicos.exportar');
@@ -395,7 +396,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
         
         try {
-            Http::post('https://cobrocartera-n8n.hrymiz.easypanel.host/webhook/messages-customers', [
+            Http::post(config('services.chatbot.webhook_url'), [
                 'message' => $userMessage->body,
                 'userId' => $user->id,
             ]);

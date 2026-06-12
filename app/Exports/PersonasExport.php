@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\Persona;
+use App\Models\User;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
@@ -22,10 +23,12 @@ class PersonasExport implements FromQuery, WithHeadings, WithMapping, ShouldAuto
     use Exportable;
 
     protected $filters;
+    protected ?User $user;
 
-    public function __construct(array $filters = [])
+    public function __construct(array $filters = [], ?User $user = null)
     {
         $this->filters = $filters;
+        $this->user = $user;
     }
 
     public function styles(Worksheet $sheet)
@@ -64,6 +67,8 @@ class PersonasExport implements FromQuery, WithHeadings, WithMapping, ShouldAuto
     {
         $filters = $this->filters;
         $query = Persona::query()->with(['cooperativas:id,nombre', 'abogados:id,name']);
+
+        $this->applyVisibilityScope($query);
 
         // 1. Estado
         if (isset($filters['status']) && $filters['status'] === 'suspended') {
@@ -129,6 +134,34 @@ class PersonasExport implements FromQuery, WithHeadings, WithMapping, ShouldAuto
         }
 
         return $query;
+    }
+
+    private function applyVisibilityScope(Builder $query): void
+    {
+        if (!$this->user) {
+            $query->whereRaw('1 = 0');
+            return;
+        }
+
+        if ($this->user->tipo_usuario === 'admin') {
+            return;
+        }
+
+        if (in_array($this->user->tipo_usuario, ['gestor', 'abogado'], true)) {
+            $cooperativaIds = $this->user->cooperativas()->pluck('cooperativas.id')->all();
+
+            $query->where(function ($q) use ($cooperativaIds) {
+                $q->where('sin_empresa_o_cooperativa', true)
+                    ->orWhereHas('abogados', fn ($aq) => $aq->where('users.id', $this->user->id));
+
+                if (!empty($cooperativaIds)) {
+                    $q->orWhereHas('cooperativas', fn ($cq) => $cq->whereIn('cooperativas.id', $cooperativaIds));
+                }
+            });
+            return;
+        }
+
+        $query->whereRaw('1 = 0');
     }
 
     public function headings(): array

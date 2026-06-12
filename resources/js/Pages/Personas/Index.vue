@@ -1,26 +1,35 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import SecondaryButton from '@/Components/SecondaryButton.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SelectInput from '@/Components/SelectInput.vue';
-import Dropdown from '@/Components/Dropdown.vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { reactive, watch, computed } from 'vue';
-import { 
-  MagnifyingGlassIcon, PlusIcon, ArrowDownTrayIcon, PencilSquareIcon, 
-  TrashIcon, EyeIcon, BuildingOfficeIcon, ArrowPathIcon, XMarkIcon, 
-  FunnelIcon, BarsArrowUpIcon, BarsArrowDownIcon, ChevronDownIcon,
-  UserGroupIcon, IdentificationIcon, InboxIcon, PhoneIcon, EnvelopeIcon,
-  UserIcon, ShieldCheckIcon
+import {
+  MagnifyingGlassIcon,
+  PlusIcon,
+  ArrowDownTrayIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  EyeIcon,
+  ArrowPathIcon,
+  XMarkIcon,
+  UserGroupIcon,
+  IdentificationIcon,
+  InboxIcon,
+  PhoneIcon,
+  EnvelopeIcon,
+  ShieldCheckIcon,
+  DocumentDuplicateIcon,
+  BuildingOfficeIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline';
 import { debounce } from 'lodash';
 import AppAlert from '@/Utils/appAlert';
 
 const props = defineProps({
-  personas: Object,      
-  filters: Object,       
-  cooperativas: Array,   
-  abogados: Array,       
+  personas: Object,
+  filters: Object,
+  cooperativas: Array,
+  abogados: Array,
 });
 
 const params = reactive({
@@ -28,47 +37,90 @@ const params = reactive({
   status: props.filters.status || 'active',
   cooperativa_id: props.filters.cooperativa_id || '',
   abogado_id: props.filters.abogado_id || '',
-  tipo_rol: props.filters.tipo_rol || '', // 'deudor', 'demandado'
+  tipo_rol: props.filters.tipo_rol || '',
   sort: props.filters.sort || 'updated_at',
   direction: props.filters.direction || 'desc',
 });
 
 const SIN_EMPRESA_FILTER = 'sin_empresa_o_cooperativa';
+const personasData = computed(() => props.personas?.data || []);
+
 const isSpecialNoCompanyCooperativa = (cooperativa) => {
     const nombre = cooperativa?.nombre || '';
     return Number(cooperativa?.id) === 9
         || /^(sin|si)\s+empresa|empresa\s+o\s+cooperativa/i.test(nombre);
 };
-const cooperativasFiltro = computed(() => props.cooperativas.filter(c => !isSpecialNoCompanyCooperativa(c)));
+const cooperativasFiltro = computed(() => (props.cooperativas || []).filter(c => !isSpecialNoCompanyCooperativa(c)));
 
 const sortOption = computed({
   get: () => `${params.sort}|${params.direction}`,
-  set: (val) => { 
-    const [field, dir] = val.split('|'); 
-    params.sort = field; 
-    params.direction = dir; 
+  set: (val) => {
+    const [field, dir] = val.split('|');
+    params.sort = field;
+    params.direction = dir;
   }
 });
 
 const isDirty = computed(() => {
-    return params.search !== '' || params.cooperativa_id !== '' || params.abogado_id !== '' || params.tipo_rol !== '' || params.status !== 'active' || params.sort !== 'updated_at' || params.direction !== 'desc';
+    return params.search !== ''
+        || params.cooperativa_id !== ''
+        || params.abogado_id !== ''
+        || params.tipo_rol !== ''
+        || params.status !== 'active'
+        || params.sort !== 'updated_at'
+        || params.direction !== 'desc';
 });
 
+const incompleteCount = computed(() => personasData.value.filter(checkIncompleta).length);
+const suspendedMode = computed(() => params.status === 'suspended');
+const activeFilterCount = computed(() => [params.search, params.cooperativa_id, params.abogado_id, params.tipo_rol, params.status !== 'active' ? params.status : '', sortOption.value !== 'updated_at|desc' ? sortOption.value : ''].filter(Boolean).length);
+
+const summaryCards = computed(() => [
+    {
+        label: 'Resultados',
+        value: props.personas?.total || 0,
+        detail: suspendedMode.value ? 'Registros en papelera' : 'Registros activos',
+        icon: UserGroupIcon,
+        class: 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-300',
+    },
+    {
+        label: 'En pantalla',
+        value: personasData.value.length,
+        detail: 'Pagina actual',
+        icon: IdentificationIcon,
+        class: 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-300',
+    },
+    {
+        label: 'Datos pendientes',
+        value: incompleteCount.value,
+        detail: 'Requieren revision',
+        icon: ExclamationTriangleIcon,
+        class: incompleteCount.value
+            ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300'
+            : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300',
+    },
+    {
+        label: 'Filtros',
+        value: activeFilterCount.value,
+        detail: activeFilterCount.value ? 'Aplicados' : 'Vista base',
+        icon: ShieldCheckIcon,
+        class: 'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-200',
+    },
+]);
+
 watch(params, debounce(() => {
-  // Limpiar el parámetro de página al cambiar cualquier filtro para volver a la pág 1
-  const searchParams = { ...params };
-  router.get(route('personas.index'), searchParams, { preserveState: true, preserveScroll: true, replace: true });
+  router.get(route('personas.index'), { ...params }, { preserveState: true, preserveScroll: true, replace: true });
 }, 300));
 
 const clearAllFilters = () => {
-  Object.assign(params, { 
-    search: '', 
-    cooperativa_id: '', 
-    abogado_id: '', 
-    tipo_rol: '', 
-    status: 'active', 
-    sort: 'updated_at', 
-    direction: 'desc' 
+  Object.assign(params, {
+    search: '',
+    cooperativa_id: '',
+    abogado_id: '',
+    tipo_rol: '',
+    status: 'active',
+    sort: 'updated_at',
+    direction: 'desc'
   });
 };
 
@@ -77,36 +129,35 @@ const exportExcel = () => {
 };
 
 const deletePersona = (id) => {
-  const persona = props.personas.data.find(p => p.id === id);
+  const persona = personasData.value.find(p => p.id === id);
   const nombre = persona ? persona.nombre_completo : 'esta persona';
 
   AppAlert.fire({
-    title: '¿Suspender Registro?',
+    title: '¿Suspender registro?',
     html: `
       <div class="text-left space-y-3">
-        <p class="text-sm text-gray-600 font-medium">Estás a punto de mover a <b>${nombre}</b> a la papelera.</p>
+        <p class="text-sm text-gray-600 font-medium">Vas a mover a <b>${nombre}</b> a la papelera.</p>
         <div class="p-3 bg-amber-50 border border-amber-100 rounded-lg">
-          <p class="text-[11px] text-amber-700 font-bold uppercase tracking-tight mb-1">⚠️ IMPORTANTE:</p>
+          <p class="text-[11px] text-amber-700 font-bold uppercase tracking-tight mb-1">Importante</p>
           <ul class="text-[10px] text-amber-600 space-y-1 list-disc pl-4 font-medium">
-            <li>No se borrarán sus datos, solo se ocultarán de la lista activa.</li>
-            <li>Seguirá vinculado a sus casos y procesos actuales.</li>
-            <li>Podrás restaurarlo en cualquier momento desde el filtro de "Papelera".</li>
+            <li>No se borraran sus datos.</li>
+            <li>Seguira vinculado a sus casos y procesos actuales.</li>
+            <li>Podras restaurarlo desde el filtro de papelera.</li>
           </ul>
         </div>
-        <p class="text-[11px] text-gray-400 italic text-center">Recomendado para registros duplicados o inactivos.</p>
       </div>
     `,
     icon: 'warning',
     showCancelButton: true,
     confirmButtonColor: '#4f46e5',
     cancelButtonColor: '#6b7280',
-    confirmButtonText: 'Sí, suspender registro',
+    confirmButtonText: 'Si, suspender',
     cancelButtonText: 'Cancelar',
     customClass: {
         confirmButton: 'rounded-xl font-black text-[10px] uppercase tracking-widest px-6 py-3',
         cancelButton: 'rounded-xl font-black text-[10px] uppercase tracking-widest px-6 py-3'
     }
-  }).then((res) => { 
+  }).then((res) => {
     if (res.isConfirmed) {
         router.delete(route('personas.destroy', id), {
             preserveScroll: true,
@@ -115,7 +166,7 @@ const deletePersona = (id) => {
                 if (!flash.error) {
                     AppAlert.fire({
                         title: 'Suspendido',
-                        text: 'El registro se movió a la papelera correctamente.',
+                        text: 'El registro se movio a la papelera correctamente.',
                         icon: 'success',
                         timer: 2000,
                         showConfirmButton: false
@@ -139,15 +190,26 @@ const restorePersona = (id) => {
 };
 
 const getRandomColor = (id) => {
-  const colors = ['bg-indigo-100 text-indigo-700', 'bg-emerald-100 text-emerald-700', 'bg-violet-100 text-violet-700', 'bg-amber-100 text-amber-700', 'bg-rose-100 text-red-700'];
+  const colors = ['bg-indigo-100 text-indigo-700', 'bg-emerald-100 text-emerald-700', 'bg-violet-100 text-violet-700', 'bg-amber-100 text-amber-700', 'bg-rose-100 text-rose-700'];
   return colors[id % colors.length];
 };
 
-const checkIncompleta = (p) => {
+function checkIncompleta(p) {
     const faltaContacto = !p.celular_1 && !p.correo_1;
     const faltaFechas = !p.fecha_nacimiento || !p.fecha_expedicion;
     const faltaAsignacion = (!p.sin_empresa_o_cooperativa && !p.cooperativas?.length) || !p.abogados?.length;
     return faltaContacto || faltaFechas || faltaAsignacion;
+}
+
+const roleLabel = (p) => p.es_demandado ? 'Demandado' : 'Deudor / Cliente';
+const roleClass = (p) => p.es_demandado
+    ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300'
+    : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300';
+
+const documentLabel = (p) => {
+    if (!p.numero_documento) return 'Sin identificacion';
+    const suffix = p.tipo_documento === 'NIT' && p.dv ? `-${p.dv}` : '';
+    return `${p.numero_documento}${suffix}`;
 };
 
 const copyToClipboard = (text) => {
@@ -160,209 +222,245 @@ const copyToClipboard = (text) => {
   <Head title="Directorio de Personas" />
   <AuthenticatedLayout>
     <template #header>
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-            <div>
-                <h2 class="text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-                    <UserGroupIcon class="w-8 h-8 text-indigo-500" />
-                    Directorio de Personas
-                </h2>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    Base de datos centralizada de Deudores, Clientes y Demandados.
-                </p>
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="min-w-0">
+                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Directorio</p>
+                <div class="mt-1 flex items-center gap-3">
+                    <div class="hidden rounded-lg border border-indigo-100 bg-indigo-50 p-2 text-indigo-600 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-300 sm:block">
+                        <UserGroupIcon class="h-6 w-6" />
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-black leading-tight text-gray-950 dark:text-white">Personas</h2>
+                        <p class="mt-1 text-sm font-medium text-gray-600 dark:text-gray-300">Clientes, deudores, demandados y contactos vinculados a expedientes.</p>
+                    </div>
+                </div>
             </div>
-            <div class="flex items-center gap-3 w-full md:w-auto">
-                <button 
-                    @click="exportExcel" 
-                    class="flex-1 md:flex-none inline-flex items-center justify-center px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-sm transition-all shadow-sm shadow-green-200 dark:shadow-none"
+            <div class="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
+                <button
+                    @click="exportExcel"
+                    class="inline-flex flex-1 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300 sm:flex-none"
                 >
-                    <ArrowDownTrayIcon class="w-5 h-5 mr-2" />
-                    Exportar Excel
+                    <ArrowDownTrayIcon class="mr-2 h-4 w-4" />
+                    Exportar
                 </button>
                 <Link
                     :href="route('personas.create')"
-                    class="flex-1 md:flex-none inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-sm transition-all shadow-sm shadow-indigo-200 dark:shadow-none"
+                    class="inline-flex flex-1 items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-indigo-700 sm:flex-none"
                 >
-                    + Nueva Persona
+                    <PlusIcon class="mr-2 h-4 w-4" />
+                    Nueva persona
                 </Link>
             </div>
         </div>
     </template>
 
-    <div class="py-8 bg-gray-50/50 dark:bg-gray-900/50 min-h-screen">
-      <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-4">
-        
-        <!-- BARRA DE FILTROS AVANZADA -->
-        <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
-            <div class="flex flex-col xl:flex-row gap-4">
-                <!-- Búsqueda Principal -->
-                <div class="relative flex-grow">
-                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1 ml-1">Búsqueda Maestra</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <MagnifyingGlassIcon class="h-4 w-4 text-gray-400" />
-                        </div>
-                        <input
-                            v-model="params.search"
-                            type="text"
-                            class="block w-full pl-10 pr-3 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white font-medium"
-                            placeholder="Nombre, número de identificación, alias..."
-                        />
+    <div class="min-h-screen bg-gray-50/60 py-6 dark:bg-gray-900/40">
+      <div class="mx-auto max-w-[1600px] space-y-5 px-4 sm:px-6 lg:px-8">
+        <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <article
+                v-for="item in summaryCards"
+                :key="item.label"
+                class="rounded-lg border bg-white p-4 shadow-sm dark:bg-gray-800"
+                :class="item.class"
+            >
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-widest opacity-80">{{ item.label }}</p>
+                        <p class="mt-1 text-2xl font-black">{{ item.value }}</p>
+                        <p class="mt-1 text-xs font-semibold opacity-90">{{ item.detail }}</p>
                     </div>
+                    <component :is="item.icon" class="h-5 w-5 opacity-80" />
                 </div>
+            </article>
+        </section>
 
-                <!-- Selectores de Filtro -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 xl:w-2/3">
-                    <div>
-                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1 ml-1">Estado</label>
-                        <SelectInput v-model="params.status" class="w-full py-2.5">
-                            <option value="active">Activos</option>
-                            <option value="suspended">Papelera</option>
-                        </SelectInput>
+        <section class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div class="border-b border-gray-200 p-4 dark:border-gray-700">
+                <div class="grid grid-cols-1 gap-3 xl:grid-cols-12">
+                    <div class="xl:col-span-4">
+                        <label class="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Busqueda</label>
+                        <div class="relative">
+                            <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                            <input
+                                v-model="params.search"
+                                type="text"
+                                class="block w-full rounded-lg border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm font-medium text-gray-900 focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                                placeholder="Nombre, identificacion, correo o telefono"
+                            />
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1 ml-1">Rol</label>
-                        <SelectInput v-model="params.tipo_rol" class="w-full py-2.5">
-                            <option value="">Todos los Roles</option>
-                            <option value="deudor">Deudores / Clientes</option>
-                            <option value="demandado">Demandados</option>
-                        </SelectInput>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1 ml-1">Empresa</label>
-                        <SelectInput v-model="params.cooperativa_id" class="w-full py-2.5">
-                            <option value="">Todas</option>
-                            <option :value="SIN_EMPRESA_FILTER">Sin empresa o cooperativa</option>
-                            <option v-for="c in cooperativasFiltro" :key="c.id" :value="c.id">{{ c.nombre }}</option>
-                        </SelectInput>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1 ml-1">Orden</label>
-                        <SelectInput v-model="sortOption" class="w-full py-2.5">
-                            <option value="updated_at|desc">Más Recientes</option>
-                            <option value="nombre_completo|asc">A - Z</option>
-                        </SelectInput>
+
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:col-span-8 xl:grid-cols-5">
+                        <div>
+                            <label class="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Estado</label>
+                            <SelectInput v-model="params.status" class="w-full !rounded-lg !py-2.5">
+                                <option value="active">Activos</option>
+                                <option value="suspended">Papelera</option>
+                            </SelectInput>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Rol</label>
+                            <SelectInput v-model="params.tipo_rol" class="w-full !rounded-lg !py-2.5">
+                                <option value="">Todos</option>
+                                <option value="deudor">Deudores / Clientes</option>
+                                <option value="demandado">Demandados</option>
+                            </SelectInput>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Empresa</label>
+                            <SelectInput v-model="params.cooperativa_id" class="w-full !rounded-lg !py-2.5">
+                                <option value="">Todas</option>
+                                <option :value="SIN_EMPRESA_FILTER">Sin empresa</option>
+                                <option v-for="c in cooperativasFiltro" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+                            </SelectInput>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Responsable</label>
+                            <SelectInput v-model="params.abogado_id" class="w-full !rounded-lg !py-2.5">
+                                <option value="">Todos</option>
+                                <option v-for="a in abogados" :key="a.id" :value="a.id">{{ a.name }}</option>
+                            </SelectInput>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Orden</label>
+                            <SelectInput v-model="sortOption" class="w-full !rounded-lg !py-2.5">
+                                <option value="updated_at|desc">Mas recientes</option>
+                                <option value="nombre_completo|asc">A - Z</option>
+                            </SelectInput>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Botón Limpiar y Resultados -->
-            <div class="flex justify-between items-center pt-2 border-t border-gray-50 dark:border-gray-700">
-                <div class="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest">
-                    <span class="text-indigo-600 dark:text-indigo-400">{{ personas.total }}</span> registros encontrados
-                </div>
-                <button 
+            <div class="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                    <span class="text-indigo-600 dark:text-indigo-300">{{ personas.total }}</span> registros encontrados
+                </p>
+                <button
                     v-if="isDirty"
                     @click="clearAllFilters"
-                    class="inline-flex items-center text-[10px] font-black text-red-500 hover:text-red-700 uppercase tracking-[0.2em] transition-colors"
+                    class="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-700 transition hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300"
                 >
-                    <XMarkIcon class="w-4 h-4 mr-1" />
-                    Limpiar Filtros
+                    <XMarkIcon class="mr-1.5 h-4 w-4" />
+                    Limpiar filtros
                 </button>
             </div>
-        </div>
+        </section>
 
-        <!-- TABLA DE PERSONAS -->
-        <div class="bg-white dark:bg-gray-800 shadow-xl rounded-[2rem] border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <div class="overflow-x-auto custom-scrollbar-horizontal">
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead class="bg-gray-50/50 dark:bg-gray-700/50">
-                <tr class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
-                  <th class="px-8 py-5 text-left">Persona / Rol</th>
-                  <th class="px-8 py-5 text-left">Identificación</th>
-                  <th class="px-8 py-5 text-left">Asignaciones</th>
-                  <th class="px-8 py-5 text-left">Contacto</th>
-                  <th class="sticky right-0 bg-gray-50 dark:bg-gray-700 px-8 py-5 text-right z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)]">Acciones</th>
+              <thead class="bg-gray-50 dark:bg-gray-900/50">
+                <tr class="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                  <th class="px-5 py-4 text-left">Persona</th>
+                  <th class="px-5 py-4 text-left">Identificacion</th>
+                  <th class="px-5 py-4 text-left">Contacto</th>
+                  <th class="px-5 py-4 text-left">Asignaciones</th>
+                  <th class="px-5 py-4 text-left">Estado de datos</th>
+                  <th class="sticky right-0 z-10 bg-gray-50 px-5 py-4 text-right dark:bg-gray-900">Acciones</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-100 dark:divide-gray-700 bg-white dark:bg-gray-800">
-                <tr v-if="personas.data.length === 0">
-                    <td colspan="5" class="px-6 py-32 text-center">
-                        <div class="flex flex-col items-center">
-                            <div class="p-6 bg-gray-50 dark:bg-gray-700 rounded-full mb-4">
-                                <InboxIcon class="h-12 w-12 text-gray-300" />
+              <tbody class="divide-y divide-gray-100 bg-white dark:divide-gray-700 dark:bg-gray-800">
+                <tr v-if="personasData.length === 0">
+                    <td colspan="6" class="px-6 py-24 text-center">
+                        <div class="mx-auto flex max-w-md flex-col items-center">
+                            <div class="mb-4 rounded-full bg-gray-50 p-5 dark:bg-gray-900">
+                                <InboxIcon class="h-10 w-10 text-gray-300" />
                             </div>
-                            <h3 class="text-xl font-black text-gray-900 dark:text-white uppercase tracking-wider">Directorio Vacío</h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-2 max-w-xs mx-auto font-medium leading-relaxed">
-                                No hay registros que coincidan con los filtros aplicados en este momento.
-                            </p>
-                            <button @click="clearAllFilters" class="mt-6 px-6 py-2 bg-indigo-50 text-indigo-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all">Resetear Búsqueda</button>
+                            <h3 class="text-lg font-black uppercase tracking-wider text-gray-950 dark:text-white">Sin resultados</h3>
+                            <p class="mt-2 text-sm font-medium leading-relaxed text-gray-500 dark:text-gray-400">No hay personas que coincidan con los filtros aplicados.</p>
+                            <button v-if="isDirty" @click="clearAllFilters" class="mt-5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-black uppercase tracking-wider text-white transition hover:bg-indigo-700">Restablecer busqueda</button>
                         </div>
                     </td>
                 </tr>
 
-                <tr v-else v-for="p in personas.data" :key="p.id" class="hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10 transition-all group">
-                  <td class="px-8 py-5">
-                    <div class="flex items-center gap-5">
-                      <div :class="`h-12 w-12 rounded-2xl flex items-center justify-center font-black text-lg transition-transform group-hover:scale-110 ${getRandomColor(p.id)} shadow-sm`">
-                          {{ p.nombre_completo[0] }}
+                <tr v-else v-for="p in personasData" :key="p.id" class="group transition hover:bg-gray-50 dark:hover:bg-gray-900/40">
+                  <td class="px-5 py-4">
+                    <div class="flex items-center gap-3">
+                      <div :class="`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-base font-black ${getRandomColor(p.id)}`">
+                          {{ p.nombre_completo?.[0] || '?' }}
                       </div>
                       <div class="min-w-0">
-                        <div class="flex items-center gap-2 mb-1">
-                            <Link :href="route('personas.show', p.id)" class="text-sm font-black text-gray-900 dark:text-gray-100 hover:text-indigo-600 transition-colors truncate block max-w-[200px]">
+                        <div class="flex max-w-sm flex-wrap items-center gap-2">
+                            <Link :href="route('personas.show', p.id)" class="truncate text-sm font-black text-gray-950 transition hover:text-indigo-600 dark:text-white">
                                 {{ p.nombre_completo }}
                             </Link>
-                            <span v-if="checkIncompleta(p)" class="inline-flex items-center px-1.5 py-0.5 rounded-md text-[8px] font-black bg-amber-50 text-amber-600 border border-amber-100 uppercase tracking-tighter" title="Faltan datos clave">FALTA INFO</span>
+                            <span class="rounded-md border px-2 py-0.5 text-[9px] font-black uppercase" :class="roleClass(p)">
+                                {{ roleLabel(p) }}
+                            </span>
+                            <span v-if="p.deleted_at" class="rounded-md border border-gray-300 bg-gray-100 px-2 py-0.5 text-[9px] font-black uppercase text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">Papelera</span>
                         </div>
-                        <div class="flex gap-2">
-                          <span v-if="p.es_demandado" class="text-[9px] font-black bg-red-50 text-red-600 px-2 py-0.5 rounded-lg border border-red-100 uppercase tracking-widest leading-none">Demandado</span>
-                          <span v-else class="text-[9px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-lg border border-emerald-100 uppercase tracking-widest leading-none">Deudor / Cliente</span>
-                        </div>
+                        <p class="mt-1 truncate text-xs font-medium text-gray-500 dark:text-gray-400">{{ p.empresa || p.cargo || 'Sin perfil laboral registrado' }}</p>
                       </div>
                     </div>
                   </td>
 
-                  <td class="px-8 py-5">
-                    <div class="flex flex-col">
-                        <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">{{ p.tipo_documento }}</span>
-                        <div class="flex items-center gap-1.5">
-                            <span class="text-xs font-mono font-bold text-gray-700 dark:text-gray-300">
-                                {{ p.numero_documento }}<template v-if="p.tipo_documento === 'NIT' && p.dv">-{{ p.dv }}</template>
-                            </span>
-                            <button @click="copyToClipboard(p.numero_documento)" class="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-indigo-500 transition-all">
-                                <DocumentDuplicateIcon class="w-3.5 h-3.5" />
+                  <td class="px-5 py-4">
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">{{ p.tipo_documento || 'Documento' }}</p>
+                        <div class="mt-1 flex items-center gap-2">
+                            <span class="font-mono text-sm font-bold text-gray-800 dark:text-gray-200">{{ documentLabel(p) }}</span>
+                            <button @click="copyToClipboard(p.numero_documento)" class="text-gray-300 opacity-0 transition hover:text-indigo-500 group-hover:opacity-100" title="Copiar identificacion">
+                                <DocumentDuplicateIcon class="h-4 w-4" />
                             </button>
                         </div>
                     </div>
                   </td>
 
-                  <td class="px-8 py-5">
-                    <div class="flex flex-wrap gap-1.5 max-w-[250px]">
-                      <span v-for="c in p.cooperativas" :key="c.id" class="text-[9px] font-black bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 px-2 py-1 rounded-lg border border-gray-100 dark:border-gray-600 truncate max-w-[120px]" :title="c.nombre">
-                          {{ c.nombre }}
-                      </span>
-                      <span v-if="p.sin_empresa_o_cooperativa && !p.cooperativas?.length" class="text-[9px] font-black bg-amber-50 text-amber-700 px-2 py-1 rounded-lg border border-amber-100">Sin empresa o cooperativa</span>
-                      <span v-else-if="!p.cooperativas?.length" class="text-[10px] font-bold text-gray-400 italic">Sin empresas</span>
-                    </div>
-                  </td>
-
-                  <td class="px-8 py-5">
-                      <div class="flex flex-col gap-1">
-                          <div class="flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-400" v-if="p.celular_1">
-                              <PhoneIcon class="w-3 h-3 text-gray-400" /> {{ p.celular_1 }}
+                  <td class="px-5 py-4">
+                      <div class="space-y-1">
+                          <div v-if="p.celular_1" class="flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-gray-300">
+                              <PhoneIcon class="h-3.5 w-3.5 text-emerald-500" /> {{ p.celular_1 }}
                           </div>
-                          <div class="flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-400 truncate max-w-[180px]" v-if="p.correo_1" :title="p.correo_1">
-                              <EnvelopeIcon class="w-3 h-3 text-gray-400" /> {{ p.correo_1 }}
+                          <div v-if="p.correo_1" class="flex max-w-[220px] items-center gap-2 truncate text-xs font-semibold text-gray-700 dark:text-gray-300" :title="p.correo_1">
+                              <EnvelopeIcon class="h-3.5 w-3.5 shrink-0 text-sky-500" /> <span class="truncate">{{ p.correo_1 }}</span>
                           </div>
-                          <span v-if="!p.celular_1 && !p.correo_1" class="text-[10px] text-gray-400 font-bold uppercase italic">Sin datos</span>
+                          <span v-if="!p.celular_1 && !p.correo_1" class="text-xs font-bold text-gray-400">Sin contacto principal</span>
                       </div>
                   </td>
 
-                  <td class="sticky right-0 bg-white dark:bg-gray-800 group-hover:bg-indigo-50/50 dark:group-hover:bg-gray-700 px-8 py-5 whitespace-nowrap text-right z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] transition-colors">
+                  <td class="px-5 py-4">
+                    <div class="max-w-xs space-y-2">
+                      <div class="flex flex-wrap gap-1.5">
+                        <span v-for="c in (p.cooperativas || []).slice(0, 2)" :key="c.id" class="max-w-[150px] truncate rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-bold text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300" :title="c.nombre">
+                            {{ c.nombre }}
+                        </span>
+                        <span v-if="(p.cooperativas || []).length > 2" class="rounded-md border border-gray-200 bg-white px-2 py-1 text-[10px] font-black text-gray-500 dark:border-gray-700 dark:bg-gray-800">+{{ p.cooperativas.length - 2 }}</span>
+                        <span v-if="p.sin_empresa_o_cooperativa && !p.cooperativas?.length" class="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-black text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">Sin empresa</span>
+                        <span v-else-if="!p.cooperativas?.length" class="text-xs font-semibold text-gray-400">Sin empresas</span>
+                      </div>
+                      <div class="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                        <ShieldCheckIcon class="h-3.5 w-3.5" />
+                        <span>{{ p.abogados?.[0]?.name || 'Sin responsable' }}</span>
+                        <span v-if="(p.abogados || []).length > 1">+{{ p.abogados.length - 1 }}</span>
+                      </div>
+                    </div>
+                  </td>
+
+                  <td class="px-5 py-4">
+                    <span
+                        class="inline-flex items-center rounded-md border px-2.5 py-1 text-[10px] font-black uppercase"
+                        :class="checkIncompleta(p)
+                            ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300'
+                            : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300'"
+                    >
+                        {{ checkIncompleta(p) ? 'Falta info' : 'Completo' }}
+                    </span>
+                  </td>
+
+                  <td class="sticky right-0 z-10 bg-white px-5 py-4 text-right transition group-hover:bg-gray-50 dark:bg-gray-800 dark:group-hover:bg-gray-900">
                     <div class="flex items-center justify-end gap-2">
-                      <Link :href="route('personas.show', p.id)" class="p-2.5 text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm" title="Ver Expediente Personal">
-                          <EyeIcon class="w-5 h-5"/>
+                      <Link :href="route('personas.show', p.id)" class="rounded-lg border border-indigo-200 bg-indigo-50 p-2 text-indigo-600 transition hover:bg-indigo-600 hover:text-white dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-300" title="Ver ficha">
+                          <EyeIcon class="h-4 w-4"/>
                       </Link>
-                      
-                      <Link :href="route('personas.edit', p.id)" class="p-2.5 text-blue-500 bg-blue-50 dark:bg-blue-900/30 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm" title="Editar Información">
-                          <PencilSquareIcon class="w-5 h-5"/>
+                      <Link :href="route('personas.edit', p.id)" class="rounded-lg border border-sky-200 bg-sky-50 p-2 text-sky-600 transition hover:bg-sky-600 hover:text-white dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-300" title="Editar">
+                          <PencilSquareIcon class="h-4 w-4"/>
                       </Link>
-                      
-                      <button v-if="p.deleted_at" @click="restorePersona(p.id)" class="p-2.5 text-green-600 bg-green-50 dark:bg-green-900/30 rounded-xl hover:bg-green-600 hover:text-white transition-all" title="Restaurar de Papelera">
-                          <ArrowPathIcon class="w-5 h-5"/>
+                      <button v-if="p.deleted_at" @click="restorePersona(p.id)" class="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-emerald-600 transition hover:bg-emerald-600 hover:text-white dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300" title="Restaurar">
+                          <ArrowPathIcon class="h-4 w-4"/>
                       </button>
-                      
-                      <button v-else @click="deletePersona(p.id)" class="p-2.5 text-red-500 bg-red-50 dark:bg-red-900/30 rounded-xl hover:bg-red-600 hover:text-white transition-all" title="Mover a Papelera">
-                          <TrashIcon class="w-5 h-5"/>
+                      <button v-else @click="deletePersona(p.id)" class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-rose-600 transition hover:bg-rose-600 hover:text-white dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300" title="Mover a papelera">
+                          <TrashIcon class="h-4 w-4"/>
                       </button>
                     </div>
                   </td>
@@ -371,15 +469,19 @@ const copyToClipboard = (text) => {
             </table>
           </div>
 
-          <!-- PAGINACIÓN -->
-          <div v-if="personas.links?.length > 3" class="p-8 border-t border-gray-50 dark:border-gray-700 flex justify-center bg-gray-50/30 dark:bg-gray-900/10">
-            <div class="flex items-center gap-1.5 p-1.5 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-              <Link v-for="(link, i) in personas.links" :key="i" :href="link.url || '#'" v-html="link.label" 
-                :class="[link.active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100 dark:shadow-none' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/50']" 
-                class="px-4 py-2 text-[11px] font-black uppercase rounded-xl transition-all" />
+          <div v-if="personas.links?.length > 3" class="border-t border-gray-200 bg-gray-50 px-4 py-4 dark:border-gray-700 dark:bg-gray-900/40">
+            <div class="flex flex-wrap justify-center gap-1.5">
+              <Link
+                v-for="(link, i) in personas.links"
+                :key="i"
+                :href="link.url || '#'"
+                v-html="link.label"
+                :class="link.active ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'"
+                class="rounded-lg border border-gray-200 px-3 py-2 text-[11px] font-black uppercase transition dark:border-gray-700"
+              />
             </div>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   </AuthenticatedLayout>
@@ -388,6 +490,6 @@ const copyToClipboard = (text) => {
 <style scoped>
 .custom-scrollbar-horizontal::-webkit-scrollbar { height: 6px; }
 .custom-scrollbar-horizontal::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar-horizontal::-webkit-scrollbar-thumb { background-color: rgba(79, 70, 229, 0.1); border-radius: 20px; }
+.custom-scrollbar-horizontal::-webkit-scrollbar-thumb { background-color: rgba(99, 102, 241, 0.25); border-radius: 999px; }
 .sticky { position: -webkit-sticky; position: sticky; }
 </style>

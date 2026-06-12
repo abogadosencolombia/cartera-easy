@@ -14,9 +14,10 @@ Schedule::command('tareas:check-vencidas')
     ->withoutOverlapping()
     ->name('check_tareas_vencidas');
 
-Schedule::job(new \App\Jobs\ProcesarAlertasProgramadas)
-    ->everyFiveMinutes()
-    ->withoutOverlapping(55)
+Schedule::command('alertas:procesar-programadas')
+    ->everyMinute()
+    ->timezone('America/Bogota')
+    ->withoutOverlapping(10)
     ->name('procesar_alertas_programadas');
 
 Schedule::command('gestion:procesar-alertas')

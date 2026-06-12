@@ -160,13 +160,6 @@ const actionCards = computed(() => [
         action: openGestionDiaria,
     },
     {
-        label: 'Revisión diaria',
-        description: 'Auditar expedientes y próximos vencimientos',
-        icon: CalendarDaysIcon,
-        tone: 'sky',
-        href: route('revision.index'),
-    },
-    {
         label: 'Nuevo caso',
         description: 'Registrar un proceso jurídico',
         icon: ScaleIcon,
@@ -480,9 +473,9 @@ const todayLabel = new Date().toLocaleDateString('es-CO', {
                             <div class="mb-5 flex items-center justify-between gap-3">
                                 <div>
                                     <h3 class="text-base font-semibold text-gray-950 dark:text-white">
-                                        {{ userRole === 'admin' ? 'Rendimiento del equipo' : 'Mi rendimiento' }}
+                                        {{ userRole === 'admin' ? 'Rendimiento del equipo' : 'Rendimiento visible' }}
                                     </h3>
-                                    <p class="text-sm text-gray-500 dark:text-gray-400">Recuperación por gestor.</p>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">Recuperación en la cartera visible.</p>
                                 </div>
                                 <TrophyIcon class="h-6 w-6 text-amber-500" />
                             </div>

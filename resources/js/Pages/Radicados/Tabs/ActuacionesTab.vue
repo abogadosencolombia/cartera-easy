@@ -1,20 +1,22 @@
 <script setup>
-import { 
-    PlusIcon, 
-    ClockIcon, 
-    CheckCircleIcon, 
-    UserIcon, 
-    PencilIcon, 
+import {
+    PlusIcon,
+    ClockIcon,
+    CheckCircleIcon,
+    UserIcon,
+    PencilIcon,
     TrashIcon,
     ChatBubbleBottomCenterTextIcon,
-    ArrowPathIcon,
-    SparklesIcon
+    SparklesIcon,
+    CalendarDaysIcon,
+    ScaleIcon,
+    ClipboardDocumentListIcon,
+    DocumentTextIcon,
 } from '@heroicons/vue/24/outline';
 import { useForm } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import DatePicker from '@/Components/DatePicker.vue';
 import Textarea from '@/Components/Textarea.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import InputError from '@/Components/InputError.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import AppAlert from '@/Utils/appAlert';
 
@@ -38,131 +40,231 @@ const quickTexts = [
     'Sentencia favorable ejecutoriada.',
 ];
 
-const appendQuickText = (text) => {
-    if (actuacionForm.nota) {
-        actuacionForm.nota += ' ' + text;
-    } else {
-        actuacionForm.nota = text;
-    }
-};
-
-const actuacionForm = useForm({ 
-    nota: '', 
-    fecha_actuacion: new Date().toISOString().slice(0, 10)
+const actuacionForm = useForm({
+    nota: '',
+    fecha_actuacion: new Date().toISOString().slice(0, 10),
 });
 
+const normalizeText = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const cleanValue = (value, fallback = 'N/A') => value ? String(value).trim() : fallback;
+const userInitial = (name) => (name || 'Sistema').trim().charAt(0).toUpperCase();
+const firstParty = (items) => items?.[0]?.nombre_completo || null;
+
+const actuacionesList = computed(() => props.actuaciones || []);
+const ultimaActuacion = computed(() => {
+    if (!actuacionesList.value.length) return null;
+    return [...actuacionesList.value].sort((a, b) => new Date(b.fecha_actuacion || b.created_at) - new Date(a.fecha_actuacion || a.created_at))[0];
+});
+
+const summaryCards = computed(() => [
+    {
+        label: 'Actuaciones',
+        value: actuacionesList.value.length,
+        subtext: actuacionesList.value.length === 1 ? 'hito procesal' : 'hitos procesales',
+        icon: ClipboardDocumentListIcon,
+        iconClass: 'text-indigo-500',
+    },
+    {
+        label: 'Último hito',
+        value: ultimaActuacion.value ? props.fmtDateSimple(ultimaActuacion.value.fecha_actuacion) : 'Sin registros',
+        subtext: ultimaActuacion.value ? `Por ${ultimaActuacion.value.user?.name || 'Sistema'}` : 'Cronología pendiente',
+        icon: CalendarDaysIcon,
+        iconClass: 'text-amber-500',
+    },
+    {
+        label: 'Etapa actual',
+        value: props.proceso.etapa_actual?.nombre || props.proceso.estado || 'N/A',
+        subtext: props.proceso.radicado || 'Sin radicado visible',
+        icon: ScaleIcon,
+        iconClass: 'text-sky-500',
+    },
+]);
+
+const appendQuickText = (text) => {
+    actuacionForm.nota = actuacionForm.nota ? `${actuacionForm.nota} ${text}` : text;
+};
+
 const generarNotaInteligente = () => {
-    const p = props.proceso;
-    const etapa = p.etapa_actual?.nombre || 'Trámite';
-    let texto = `En la fecha, se verifica el estado del proceso en la etapa de ${etapa}. `;
-    
-    if (etapa.includes('MANDAMIENTO')) {
-        texto += "Se observa que el despacho ha librado mandamiento de pago conforme a las pretensiones de la demanda. Se procede con el trámite de notificación.";
-    } else if (etapa.includes('DEMANDA')) {
-        texto += "Se confirma la radicación exitosa del libelo demandatorio. Se queda a la espera del auto admisorio.";
-    } else if (etapa.includes('AUDIENCIA')) {
-        texto += "Se asiste a la diligencia judicial programada, dejando constancia de los puntos tratados y las decisiones del juez.";
+    const p = props.proceso || {};
+    const etapa = cleanValue(p.etapa_actual?.nombre || p.estado, 'trámite sin etapa definida');
+    const etapaNormalizada = normalizeText(etapa);
+    const fechaActuacion = props.fmtDateSimple(actuacionForm.fecha_actuacion);
+    const radicado = cleanValue(p.radicado, null);
+    const despacho = cleanValue(p.juzgado?.nombre || p.entidad, null);
+    const demandante = cleanValue(firstParty(p.demandantes), null);
+    const demandado = cleanValue(firstParty(p.demandados), null);
+    const asunto = cleanValue(p.asunto, null);
+
+    const contexto = [
+        radicado ? `radicado ${radicado}` : null,
+        despacho ? `despacho ${despacho}` : null,
+        demandante ? `demandante ${demandante}` : null,
+        demandado ? `demandado ${demandado}` : null,
+        asunto ? `asunto: ${asunto}` : null,
+    ].filter(Boolean).join('; ');
+
+    const lineas = [
+        `El ${fechaActuacion}, en seguimiento al expediente${contexto ? ` (${contexto})` : ''}, se deja constancia de revisión en la etapa: ${etapa}.`,
+    ];
+
+    if (etapaNormalizada.includes('demanda') || etapaNormalizada.includes('radic')) {
+        lineas.push('Se verifica el estado de radicación y la suficiencia de soportes para continuar el impulso procesal ante el despacho.');
+    } else if (etapaNormalizada.includes('mandamiento')) {
+        lineas.push('Se recomienda revisar notificación, términos procesales, constancias y actuaciones posteriores al mandamiento.');
+    } else if (etapaNormalizada.includes('notifica')) {
+        lineas.push('Se deja seguimiento a la gestión de notificación, soportes enviados, constancias disponibles y términos pendientes.');
+    } else if (etapaNormalizada.includes('medida') || etapaNormalizada.includes('cautelar')) {
+        lineas.push('Se revisa el estado de medidas cautelares, oficios, respuestas de entidades y gestiones pendientes para su materialización.');
+    } else if (etapaNormalizada.includes('audiencia')) {
+        lineas.push('Se registra seguimiento a la audiencia, decisiones adoptadas, compromisos y tareas procesales derivadas.');
+    } else if (etapaNormalizada.includes('sentencia') || etapaNormalizada.includes('liquid') || etapaNormalizada.includes('termin')) {
+        lineas.push('Se verifica el estado posterior a la decisión, ejecutoria, liquidación, cumplimiento y actuaciones necesarias para cierre o continuidad.');
     } else {
-        texto += "Se realiza seguimiento de rutina al expediente digital, constatando que el proceso sigue su curso normal sin novedades extraordinarias.";
+        lineas.push('Se actualiza la trazabilidad del expediente y se recomienda validar actuaciones recientes, documentos, términos y próximo impulso requerido.');
     }
 
-    actuacionForm.nota = texto;
-    
+    lineas.push('Observación: ajustar esta nota con los hechos concretos verificados antes de guardar la actuación.');
+
+    const texto = lineas.join('\n');
+    const teniaContenido = Boolean(actuacionForm.nota?.trim());
+    actuacionForm.nota = teniaContenido ? `${actuacionForm.nota.trim()}\n\n${texto}` : texto;
+
     AppAlert.fire({
-        title: 'Nota Generada',
-        text: 'He redactado una nota profesional basada en la etapa actual. Puedes editarla antes de guardar.',
+        title: teniaContenido ? 'Nota añadida' : 'Nota generada',
+        text: teniaContenido ? 'Añadí una sugerencia sin borrar el texto existente.' : 'Generé una nota contextual para revisar antes de guardar.',
         icon: 'success',
         toast: true,
         position: 'top-end',
-        timer: 3000
+        timer: 3000,
     });
 };
 
 const handleSave = () => {
-    if (!actuacionForm.nota) return;
+    if (!actuacionForm.nota?.trim()) return;
     emit('save', { ...actuacionForm.data() });
-    // El padre limpia tras éxito
 };
 </script>
 
 <template>
-    <div class="space-y-12 animate-in fade-in duration-500">
-        
-        <!-- REGISTRO RÁPIDO -->
-        <div v-if="!isClosed" class="bg-indigo-50/50 dark:bg-indigo-900/10 p-8 rounded-3xl border border-indigo-100 dark:border-indigo-900/30">
-            <h3 class="text-sm font-black text-indigo-900 dark:text-indigo-300 uppercase tracking-widest mb-6 flex items-center justify-between">
-                <div class="flex items-center gap-2"><PlusIcon class="w-5 h-5" /> Nueva Actuación Procesal</div>
-                <button type="button" @click="generarNotaInteligente" class="text-[9px] bg-indigo-600 text-white px-3 py-1 rounded-lg flex items-center gap-1 hover:bg-indigo-700 transition-all shadow-md">
-                    <SparklesIcon class="w-3.5 h-3.5" /> Redacción Mágica
+    <div class="space-y-5 animate-in fade-in duration-500">
+        <section class="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div
+                v-for="item in summaryCards"
+                :key="item.label"
+                class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+            >
+                <div class="flex items-start gap-3">
+                    <div class="shrink-0 rounded-lg bg-gray-50 p-2 dark:bg-gray-900">
+                        <component :is="item.icon" class="h-5 w-5" :class="item.iconClass" />
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">{{ item.label }}</p>
+                        <p class="mt-1 break-words text-sm font-black leading-5 text-gray-900 dark:text-white">{{ item.value }}</p>
+                        <p class="mt-0.5 break-words text-[10px] font-semibold text-gray-500 dark:text-gray-400">{{ item.subtext }}</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section v-if="!isClosed" class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div class="flex flex-col gap-3 border-b border-gray-100 pb-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex items-center gap-3">
+                    <PlusIcon class="h-5 w-5 text-indigo-500" />
+                    <div>
+                        <h3 class="text-sm font-bold uppercase tracking-tight text-gray-900 dark:text-white">Nueva actuación procesal</h3>
+                        <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">Registro jurídico del avance del radicado</p>
+                    </div>
+                </div>
+                <button type="button" @click="generarNotaInteligente" class="inline-flex w-fit items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-indigo-700">
+                    <SparklesIcon class="h-3.5 w-3.5" />
+                    Autocompletar nota
                 </button>
-            </h3>
-            <form @submit.prevent="handleSave" class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div class="md:col-span-3 space-y-2">
-                    <div class="flex flex-wrap gap-1.5 mb-2">
-                        <button v-for="txt in quickTexts" :key="txt" type="button" @click="appendQuickText(txt)" class="text-[9px] font-bold bg-indigo-100/50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-1 rounded-md hover:bg-indigo-200 transition-colors border border-indigo-100 dark:border-indigo-800">
-                            + {{ txt.substring(0, 25) }}{{ txt.length > 25 ? '...' : '' }}
+            </div>
+
+            <form @submit.prevent="handleSave" class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-12">
+                <div class="space-y-3 xl:col-span-8">
+                    <Textarea v-model="actuacionForm.nota" rows="5" class="w-full rounded-lg border-gray-200 bg-gray-50 p-3 text-sm leading-6 dark:bg-gray-900/40" placeholder="Detalle claro de la actuación, gestión, decisión o revisión procesal..." required />
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <button v-for="txt in quickTexts" :key="txt" type="button" @click="appendQuickText(txt)" class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-[11px] font-bold text-gray-600 transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300">
+                            {{ txt }}
                         </button>
                     </div>
-                    <InputLabel value="Descripción de la Actuación *" class="font-bold text-[10px] uppercase ml-1" />
-                    <Textarea v-model="actuacionForm.nota" rows="2" class="w-full rounded-2xl border-gray-200 focus:ring-indigo-500 text-sm font-medium" placeholder="Describa el hito procesal..." required />
                 </div>
-                <div class="space-y-2">
-                    <InputLabel value="Fecha *" class="font-bold text-[10px] uppercase ml-1" />
-                    <DatePicker v-model="actuacionForm.fecha_actuacion" class="w-full" required />
-                    <PrimaryButton :disabled="actuacionForm.processing" class="w-full !mt-4 !py-3 !bg-indigo-600 !rounded-xl !text-[10px] !font-black uppercase tracking-widest shadow-lg shadow-indigo-100 dark:shadow-none">
-                        Registrar Hito
+                <div class="space-y-4 rounded-lg border border-gray-100 bg-gray-50/60 p-4 dark:border-gray-700 dark:bg-gray-900/30 xl:col-span-4">
+                    <div>
+                        <p class="mb-2 text-[10px] font-black uppercase tracking-widest text-gray-400">Fecha de actuación</p>
+                        <DatePicker v-model="actuacionForm.fecha_actuacion" class="w-full !text-xs" required />
+                    </div>
+                    <PrimaryButton :disabled="actuacionForm.processing" class="w-full !justify-center !rounded-lg !bg-indigo-600 !py-2.5 !text-[10px] !font-bold uppercase tracking-widest transition-all">
+                        <PlusIcon class="mr-1.5 h-3.5 w-3.5" />
+                        Registrar actuación
                     </PrimaryButton>
                 </div>
             </form>
-        </div>
+        </section>
 
-        <!-- TIMELINE -->
-        <div class="relative">
-            <div class="flex items-center justify-between mb-10">
-                <h3 class="text-xl font-black text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                    <ClockIcon class="w-6 h-6 text-indigo-500" /> Historial de Actuaciones
-                </h3>
-                <span class="px-4 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-full text-[10px] font-black text-gray-500 tracking-widest border border-gray-200 dark:border-gray-600 uppercase">
-                    {{ actuaciones.length }} Eventos
+        <section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div class="flex flex-col gap-3 border-b border-gray-100 pb-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex items-center gap-3">
+                    <ClockIcon class="h-5 w-5 text-indigo-500" />
+                    <div>
+                        <h3 class="text-sm font-bold uppercase tracking-tight text-gray-900 dark:text-white">Historial de actuaciones</h3>
+                        <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">Cronología jurídica del expediente</p>
+                    </div>
+                </div>
+                <span class="w-fit rounded-full bg-gray-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+                    {{ actuacionesList.length }} evento{{ actuacionesList.length !== 1 ? 's' : '' }}
                 </span>
             </div>
 
-            <div v-if="!actuaciones.length" class="bg-gray-50 dark:bg-gray-900/30 rounded-[3rem] border-2 border-dashed border-gray-200 dark:border-gray-700 py-32 text-center">
-                <ChatBubbleBottomCenterTextIcon class="w-16 h-16 text-gray-200 mx-auto mb-4" />
-                <p class="text-sm font-bold text-gray-400 uppercase tracking-[0.2em]">Sin actividad procesal registrada</p>
+            <div v-if="!actuacionesList.length" class="mt-5 flex min-h-64 flex-col items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50/60 text-center dark:border-gray-700 dark:bg-gray-900/30">
+                <ChatBubbleBottomCenterTextIcon class="mb-3 h-12 w-12 text-gray-300" />
+                <p class="text-[11px] font-black uppercase tracking-widest text-gray-400">Sin actividad procesal registrada</p>
             </div>
 
-            <div v-else class="relative space-y-8 before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-200 dark:before:via-gray-700 before:to-transparent">
-                
-                <div v-for="(act, idx) in actuaciones" :key="act.id" class="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group animate-in slide-in-from-bottom-4" :style="{animationDelay: (idx * 50) + 'ms'}">
-                    <!-- Icono Timeline -->
-                    <div class="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white dark:border-gray-900 bg-gray-50 dark:bg-gray-800 text-indigo-500 shadow-sm shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 transition-all group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white z-10">
-                        <CheckCircleIcon class="w-5 h-5" />
+            <ol v-else class="relative mt-5 space-y-4 before:absolute before:bottom-0 before:left-8 before:top-0 before:w-px before:bg-gray-100 dark:before:bg-gray-700">
+                <li v-for="act in actuacionesList" :key="act.id" class="relative grid grid-cols-[4rem_1fr] gap-4">
+                    <div class="relative z-10 flex h-16 w-16 flex-col items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-700 shadow-sm dark:border-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300">
+                        <CheckCircleIcon class="h-5 w-5" />
+                        <span class="mt-1 text-[9px] font-black uppercase tracking-widest">Hito</span>
                     </div>
 
-                    <!-- Contenido -->
-                    <div class="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm group-hover:shadow-md transition-all">
-                        <div class="flex items-center justify-between mb-3">
-                            <span class="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1 rounded-lg border border-indigo-100 dark:border-indigo-800">
-                                {{ fmtDateSimple(act.fecha_actuacion) }}
-                            </span>
-                            <div v-if="!isClosed" class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button @click="emit('edit', act)" class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><PencilIcon class="w-3.5 h-3.5" /></button>
-                                <button @click="emit('delete', act.id)" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><TrashIcon class="w-3.5 h-3.5" /></button>
+                    <article class="min-w-0 rounded-lg border border-gray-200 bg-gray-50/60 p-4 dark:border-gray-700 dark:bg-gray-900/30">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <p class="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-300">{{ fmtDateSimple(act.fecha_actuacion) }}</p>
+                                <p class="mt-1 text-[10px] font-semibold text-gray-500 dark:text-gray-400">Registrada: {{ fmtDateTime(act.created_at) }}</p>
+                            </div>
+                            <div v-if="!isClosed" class="flex shrink-0 gap-2">
+                                <button @click="emit('edit', act)" class="rounded-lg border border-gray-200 bg-white p-2 text-gray-500 transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-gray-700 dark:bg-gray-800" title="Editar actuación">
+                                    <PencilIcon class="h-4 w-4" />
+                                </button>
+                                <button @click="emit('delete', act.id)" class="rounded-lg border border-gray-200 bg-white p-2 text-gray-500 transition-colors hover:border-rose-300 hover:text-rose-600 dark:border-gray-700 dark:bg-gray-800" title="Eliminar actuación">
+                                    <TrashIcon class="h-4 w-4" />
+                                </button>
                             </div>
                         </div>
-                        <div class="text-gray-700 dark:text-gray-300 text-sm leading-relaxed whitespace-pre-wrap font-medium">
-                            {{ act.nota }}
-                        </div>
-                        <div class="mt-5 pt-4 border-t border-gray-50 dark:border-gray-700 flex items-center justify-between text-[9px] font-bold text-gray-400 uppercase tracking-[0.1em]">
-                            <span class="flex items-center gap-1.5"><UserIcon class="w-3 h-3" /> {{ act.user?.name || 'Sistema' }}</span>
-                            <span>REG: {{ fmtDateTime(act.created_at) }}</span>
-                        </div>
-                    </div>
-                </div>
 
-            </div>
-        </div>
+                        <p class="mt-3 whitespace-pre-wrap break-words text-sm font-medium leading-6 text-gray-800 dark:text-gray-200">{{ act.nota }}</p>
 
+                        <div class="mt-4 flex flex-col gap-2 border-t border-gray-100 pt-3 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="flex items-center gap-2">
+                                <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-[10px] font-black uppercase text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                    {{ userInitial(act.user?.name) }}
+                                </div>
+                                <div>
+                                    <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Responsable</p>
+                                    <p class="text-[11px] font-bold uppercase text-gray-700 dark:text-gray-300">{{ act.user?.name || 'Sistema' }}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500 dark:text-gray-400">
+                                <DocumentTextIcon class="h-3.5 w-3.5" />
+                                Actuación procesal
+                            </div>
+                        </div>
+                    </article>
+                </li>
+            </ol>
+        </section>
     </div>
 </template>

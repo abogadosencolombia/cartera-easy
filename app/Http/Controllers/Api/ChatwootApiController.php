@@ -28,7 +28,7 @@ class ChatwootApiController extends Controller
         ]);
 
         $user = Auth::user();
-        $conversationId = $validated['conversation_id'] ?? 16; // De prueba
+        $conversationId = $validated['conversation_id'] ?? null;
 
         // 1. Guardar localmente
         $localMessage = Message::create([
@@ -37,7 +37,7 @@ class ChatwootApiController extends Controller
         ]);
 
         // 2. Enviar a Chatwoot vía API
-        $response = $this->chatwoot->sendMessage($conversationId, $validated['message']);
+        $response = $this->chatwoot->sendMessage($conversationId, $validated['message'], $user);
 
         return response()->json([
             'status' => 'success',
@@ -51,6 +51,9 @@ class ChatwootApiController extends Controller
      */
     public function getHistory()
     {
-        return Message::orderBy('created_at', 'asc')->take(50)->get();
+        return Message::where('user_id', Auth::id())
+            ->orderBy('created_at', 'asc')
+            ->take(50)
+            ->get();
     }
 }

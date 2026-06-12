@@ -17,10 +17,12 @@ use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
 {
     protected $filtros;
+    protected ?User $user;
 
-    public function __construct($filtros = [])
+    public function __construct($filtros = [], ?User $user = null)
     {
         $this->filtros = $filtros;
+        $this->user = $user;
     }
 
     public function query()
@@ -28,6 +30,8 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
         $query = ProcesoRadicado::query()
             ->with(['juzgado', 'abogado', 'responsableRevision', 'demandantes', 'demandados', 'tipoProceso', 'etapaActual', 'creator'])
             ->select('proceso_radicados.*');
+
+        $this->applyVisibilityScope($query);
 
         if (!empty($this->filtros['search'])) {
             $search = $this->filtros['search'];
@@ -45,6 +49,10 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
 
         if (!empty($this->filtros['juzgado_id'])) {
             $query->where('juzgado_id', $this->filtros['juzgado_id']);
+        }
+
+        if (!empty($this->filtros['tipo_proceso_id'])) {
+            $query->where('tipo_proceso_id', $this->filtros['tipo_proceso_id']);
         }
 
         if (!empty($this->filtros['tipo_entidad'])) {
@@ -73,6 +81,29 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
         }
 
         return $query->latest('updated_at');
+    }
+
+    private function applyVisibilityScope($query): void
+    {
+        if (!$this->user) {
+            $query->whereRaw('1 = 0');
+            return;
+        }
+
+        if ($this->user->tipo_usuario === 'admin') {
+            return;
+        }
+
+        if (in_array($this->user->tipo_usuario, ['gestor', 'abogado'], true)) {
+            $query->where(function ($q) {
+                $q->where('abogado_id', $this->user->id)
+                    ->orWhere('responsable_revision_id', $this->user->id)
+                    ->orWhere('created_by', $this->user->id);
+            });
+            return;
+        }
+
+        $query->whereRaw('1 = 0');
     }
 
     public function headings(): array

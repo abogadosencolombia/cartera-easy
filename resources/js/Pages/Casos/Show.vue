@@ -37,7 +37,6 @@ import {
 const props = defineProps({
     caso: { type: Object, required: true },
     can: { type: Object, required: true },
-    plantillas: { type: Array, default: () => [] },
     actuaciones: { type: Array, default: () => [] },
     resumen_financiero: { type: Object, required: true },
     bitacoras: { type: Array, default: () => [] },
@@ -287,7 +286,7 @@ const confirmUnlockCase = () => {
                     <div class="p-6">
                         <ResumenTab v-show="activeTab === 'resumen'" :caso="caso" :resumen_financiero="resumen_financiero" :financial-status="financialStatus" :puede-editar="puedeEditar" :formatCurrency="formatCurrency" :formatDate="formatDate" :formatLabel="formatLabel" />
                         <ExpedienteIntegrityPanel v-show="activeTab === 'integridad'" :summary="caso.integridad_resumen" :edit-href="route('casos.edit', caso.id)" @go-tab="setActiveTab" />
-                        <DocumentosTab v-show="activeTab === 'documentos'" :caso="caso" :plantillas="plantillas" :puedeEditar="puedeEditar" />
+                        <DocumentosTab v-show="activeTab === 'documentos'" :caso="caso" :puedeEditar="puedeEditar" />
                         <FinancieroTab v-show="activeTab === 'financiero'" :caso="caso" :resumen_financiero="resumen_financiero" :financial-status="financialStatus" :puede-editar="puedeEditar" :contrato_id="caso.contrato?.id" :formatCurrency="formatCurrency" />
                         <ActuacionesTab v-show="activeTab === 'actuaciones'" :caso="caso" :actuaciones="actuaciones" :is-form-disabled="!puedeEditar" />
                         <ActividadTab v-show="activeTab === 'actividad'" :bitacoras="bitacoras" :auditoria="auditoria" />

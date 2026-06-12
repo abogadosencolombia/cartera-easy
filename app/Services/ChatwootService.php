@@ -4,38 +4,51 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use App\Models\IntegracionToken;
 
 class ChatwootService
 {
-    private $baseUrl = 'https://chatwoot.servilutioncrm.cloud/api/v1';
-    private $accountId = '1';
-    private $apiToken = 'rVDjuhVPWDUEVRaNzjnoQdhV';
+    private string $baseUrl;
+    private string $accountId;
+    private ?string $apiToken;
+    private int $inboxId;
+
+    public function __construct()
+    {
+        $this->baseUrl = rtrim((string) config('services.chatwoot.url'), '/') . '/api/v1';
+        $this->accountId = (string) config('services.chatwoot.account_id', '1');
+        $this->apiToken = config('services.chatwoot.api_token');
+        $this->inboxId = (int) config('services.chatwoot.inbox_id', 1);
+    }
 
     /**
      * Envía un mensaje. Si no hay conversationId, intenta crear uno para el usuario.
      */
     public function sendMessage($conversationId, $content, $user = null)
     {
-        if (!$conversationId && $user) {
+        if (! $this->apiToken) {
+            Log::warning('[Chatwoot API] CHATWOOT_API_TOKEN no está configurado.');
+            return null;
+        }
+
+        if (! $conversationId && $user) {
             $conversationId = $this->getOrCreateConversation($user);
         }
 
-        if (!$conversationId) return null;
+        if (! $conversationId) {
+            return null;
+        }
 
         $url = "{$this->baseUrl}/accounts/{$this->accountId}/conversations/{$conversationId}/messages";
-        
+
         try {
-            $response = Http::withHeaders([
-                'api_access_token' => $this->apiToken,
-            ])->post($url, [
+            $response = Http::withHeaders($this->authHeaders())->post($url, [
                 'content' => $content,
                 'message_type' => 'outgoing',
             ]);
 
             return $response->json();
         } catch (\Exception $e) {
-            Log::error("[Chatwoot API] Error enviando mensaje: " . $e->getMessage());
+            Log::error('[Chatwoot API] Error enviando mensaje: ' . $e->getMessage());
             return null;
         }
     }
@@ -45,37 +58,52 @@ class ChatwootService
      */
     public function getOrCreateConversation($user)
     {
+        if (! $this->apiToken) {
+            Log::warning('[Chatwoot API] CHATWOOT_API_TOKEN no está configurado.');
+            return null;
+        }
+
         try {
-            // 1. Crear o buscar contacto
             $contactUrl = "{$this->baseUrl}/accounts/{$this->accountId}/contacts";
-            $contactResponse = Http::withHeaders(['api_access_token' => $this->apiToken])->post($contactUrl, [
+            $contactResponse = Http::withHeaders($this->authHeaders())->post($contactUrl, [
                 'name' => $user->name,
                 'email' => $user->email,
-                'custom_attributes' => ['user_id' => $user->id]
+                'custom_attributes' => ['user_id' => $user->id],
             ]);
 
             $contactId = $contactResponse->json()['payload']['contact']['id'] ?? null;
 
-            if (!$contactId) {
-                // Si ya existe, lo buscamos
-                $searchUrl = "{$this->baseUrl}/accounts/{$this->accountId}/contacts/search?q={$user->email}";
-                $searchResponse = Http::withHeaders(['api_access_token' => $this->apiToken])->get($searchUrl);
+            if (! $contactId) {
+                $searchUrl = "{$this->baseUrl}/accounts/{$this->accountId}/contacts/search";
+                $searchResponse = Http::withHeaders($this->authHeaders())->get($searchUrl, [
+                    'q' => $user->email,
+                ]);
                 $contactId = $searchResponse->json()['payload'][0]['id'] ?? null;
             }
 
-            // 2. Crear conversación (usando el inbox tipo 'Website' o el primero disponible)
+            if (! $contactId) {
+                Log::warning('[Chatwoot API] No fue posible resolver contacto para usuario.', [
+                    'user_id' => $user->id,
+                ]);
+                return null;
+            }
+
             $convUrl = "{$this->baseUrl}/accounts/{$this->accountId}/conversations";
-            $convResponse = Http::withHeaders(['api_access_token' => $this->apiToken])->post($convUrl, [
+            $convResponse = Http::withHeaders($this->authHeaders())->post($convUrl, [
                 'source_id' => 'laravel-app-' . $user->id,
                 'contact_id' => $contactId,
-                'inbox_id' => 1 // Ajusta este ID según tus buzones en Chatwoot
+                'inbox_id' => $this->inboxId,
             ]);
 
             return $convResponse->json()['id'] ?? null;
-
         } catch (\Exception $e) {
-            Log::error("[Chatwoot API] Error creando conversación: " . $e->getMessage());
+            Log::error('[Chatwoot API] Error creando conversación: ' . $e->getMessage());
             return null;
         }
+    }
+
+    private function authHeaders(): array
+    {
+        return ['api_access_token' => $this->apiToken];
     }
 }

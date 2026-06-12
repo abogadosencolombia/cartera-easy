@@ -2,114 +2,232 @@
 
 namespace App\Jobs;
 
+use App\Models\IncidenteJuridico;
 use App\Models\NotificacionCaso;
+use App\Models\User;
 use App\Notifications\AlertaProgramadaNotification;
+use Carbon\CarbonInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
+use NotificationChannels\WebPush\WebPushChannel;
+use Throwable;
 
 class ProcesarAlertasProgramadas implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 1;
-    public int $timeout = 300;
+    private const MAX_FINALES_POR_EJECUCION = 200;
+    private const MAX_RECORDATORIOS_POR_EJECUCION = 25;
+
+    public int $tries = 3;
+    public int $timeout = 120;
 
     public function __construct()
     {
-        // Forzamos cola del job (evita redefinir la propiedad del trait)
         $this->onQueue('scheduler');
     }
 
-    public function handle(): void
+    public function handle(): array
     {
-        $tz  = config('app.timezone');
+        $tz = config('app.timezone', 'America/Bogota');
         $now = now($tz)->seconds(0);
 
-        NotificacionCaso::query()
+        $stats = [
+            'finales_enviadas' => 0,
+            'recordatorios_enviados' => 0,
+            'sin_destinatario' => 0,
+            'errores' => 0,
+        ];
+
+        $this->procesarAlertasVencidas($now, $stats);
+        $this->procesarRecordatoriosFuturos($now, $stats);
+
+        if ($stats['finales_enviadas'] > 0 || $stats['recordatorios_enviados'] > 0 || $stats['errores'] > 0) {
+            Log::info('Alertas programadas procesadas.', $stats);
+        }
+
+        return $stats;
+    }
+
+    private function consultaPendientes()
+    {
+        return NotificacionCaso::query()
             ->where('tipo', 'alerta_manual')
-            ->where('completed', false)
-            ->deExpedientesEnSeguimiento()
-            ->with('user')
+            ->where(function ($query) {
+                $query->where('completed', false)
+                    ->orWhereNull('completed');
+            })
+            ->deExpedientesEnSeguimiento();
+    }
+
+    private function procesarAlertasVencidas(CarbonInterface $now, array &$stats): void
+    {
+        $this->consultaPendientes()
+            ->where(function ($query) use ($now) {
+                $query->whereNull('programado_en')
+                    ->orWhere('programado_en', '<=', $now->toDateTimeString());
+            })
+            ->with(['user.pushSubscriptions'])
+            ->orderBy('programado_en')
             ->orderBy('id')
-            ->chunkById(5, function ($lote) use ($now, $tz) {
-                $enviados = 0;
-
-                foreach ($lote as $a) {
-                    if ($enviados >= 5) {
-                        return false;
+            ->limit(self::MAX_FINALES_POR_EJECUCION)
+            ->get()
+            ->each(function (NotificacionCaso $alerta) use ($now, &$stats) {
+                if ($this->entregar($alerta, true, $now, $stats)) {
+                    if ($alerta->prioridad === 'alta') {
+                        $this->crearIncidenteAltaPrioridad($alerta);
                     }
 
-                    $user = $a->user;
-                    if (!$user || empty($user->email)) {
-                        $a->forceFill(['completed' => true, 'last_sent_at' => $now])->save();
-                        continue;
-                    }
+                    $alerta->forceFill([
+                        'fecha_envio' => $now,
+                        'last_sent_at' => $now,
+                        'completed' => true,
+                    ])->save();
 
-                    // Inmediata (sin fecha)
-                    if (is_null($a->programado_en)) {
-                        $user->notify(new AlertaProgramadaNotification(
-                            $a->caso_id, $a->mensaje, true, $a->prioridad ?? 'media', $a->proceso_id
-                        ));
-                        $a->forceFill([
-                            'fecha_envio'  => $now,
-                            'last_sent_at' => $now,
-                            'completed'    => true,
-                        ])->save();
-                        $enviados++;
-                        sleep(10);
-                        continue;
-                    }
-
-                    // Asegurar que programado_en se trate como UTC antes de convertir a Bogotá
-                    $target = $a->programado_en->shiftTimezone('UTC')->timezone($tz)->seconds(0);
-                    $diff   = $now->diffInMinutes($target, false);
-
-                    if ($diff <= 0) {
-                        // Llegó o se pasó
-                        $user->notify(new AlertaProgramadaNotification(
-                            $a->caso_id, $a->mensaje, true, $a->prioridad ?? 'media', $a->proceso_id
-                        ));
-                        
-                        // ===== AUTOMATIZACIÓN JURÍDICA =====
-                        // Si la prioridad es ALTA y se venció, creamos un incidente automático.
-                        if ($a->prioridad === 'alta' && $a->user_id) {
-                            \App\Models\IncidenteJuridico::create([
-                                'usuario_responsable_id' => $a->user_id,
-                                'origen' => 'auditoria',
-                                'asunto' => '⚠️ Alerta de Alta Prioridad Vencida',
-                                'descripcion' => "Se ha generado un incidente automático porque una alerta de prioridad ALTA se ha vencido sin ser completada.\n\nMensaje de la alerta: {$a->mensaje}\nCaso ID: #{$a->caso_id}",
-                                'estado' => 'pendiente',
-                                'fecha_registro' => now(),
-                            ]);
-                        }
-                        // ===================================
-
-                        $a->forceFill([
-                            'fecha_envio'  => $now,
-                            'last_sent_at' => $now,
-                            'completed'    => true,
-                        ])->save();
-                        $enviados++;
-                        sleep(10);
-                        continue;
-                    }
-
-                    // Recordatorio diario solo si falta ≥ 60min o es otro día
-                    if (!$target->isSameDay($now) || $diff >= 60) {
-                        $ultimo = $a->last_sent_at?->timezone($tz);
-                        if (is_null($ultimo) || $ultimo->lt($now->copy()->startOfDay())) {
-                            $user->notify(new AlertaProgramadaNotification(
-                                $a->caso_id, $a->mensaje, false, $a->prioridad ?? 'media', $a->proceso_id
-                            ));
-                            $a->forceFill(['last_sent_at' => $now])->save();
-                            $enviados++;
-                            sleep(10);
-                        }
-                    }
+                    $stats['finales_enviadas']++;
                 }
             });
+    }
+
+    private function procesarRecordatoriosFuturos(CarbonInterface $now, array &$stats): void
+    {
+        $this->consultaPendientes()
+            ->whereNotNull('programado_en')
+            ->where('programado_en', '>', $now->copy()->addHour()->toDateTimeString())
+            ->where(function ($query) use ($now) {
+                $query->whereNull('last_sent_at')
+                    ->orWhere('last_sent_at', '<', $now->copy()->startOfDay()->toDateTimeString());
+            })
+            ->with(['user.pushSubscriptions'])
+            ->orderBy('programado_en')
+            ->orderBy('id')
+            ->limit(self::MAX_RECORDATORIOS_POR_EJECUCION)
+            ->get()
+            ->each(function (NotificacionCaso $alerta) use ($now, &$stats) {
+                if ($this->entregar($alerta, false, $now, $stats)) {
+                    $alerta->forceFill(['last_sent_at' => $now])->save();
+                    $stats['recordatorios_enviados']++;
+                }
+            });
+    }
+
+    private function entregar(NotificacionCaso $alerta, bool $esFinal, CarbonInterface $now, array &$stats): bool
+    {
+        $user = $alerta->user;
+
+        if (!$user) {
+            $alerta->forceFill([
+                'last_sent_at' => $now,
+                'completed' => $esFinal ? true : $alerta->completed,
+            ])->save();
+            $stats['sin_destinatario']++;
+            return true;
+        }
+
+        $emailEsperado = $this->quiereCorreo($user);
+        $pushEsperado = $this->quierePush($user);
+        $falloCorreo = false;
+        $falloPush = false;
+
+        if ($emailEsperado) {
+            try {
+                $user->notify(new AlertaProgramadaNotification(
+                    $alerta->caso_id,
+                    $alerta->mensaje,
+                    $esFinal,
+                    $alerta->prioridad ?? 'media',
+                    $alerta->proceso_id,
+                    ['mail']
+                ));
+            } catch (Throwable $exception) {
+                $falloCorreo = true;
+                $stats['errores']++;
+                $this->registrarFallo($alerta, $user, 'mail', $exception);
+            }
+        }
+
+        if ($pushEsperado) {
+            try {
+                $user->notify(new AlertaProgramadaNotification(
+                    $alerta->caso_id,
+                    $alerta->mensaje,
+                    $esFinal,
+                    $alerta->prioridad ?? 'media',
+                    $alerta->proceso_id,
+                    [WebPushChannel::class]
+                ));
+            } catch (Throwable $exception) {
+                $falloPush = true;
+                $stats['errores']++;
+                $this->registrarFallo($alerta, $user, 'webpush', $exception);
+            }
+        }
+
+        if (!$emailEsperado && !$pushEsperado) {
+            Log::info('Alerta programada sin canales externos habilitados.', [
+                'notificacion_id' => $alerta->id,
+                'user_id' => $user->id,
+            ]);
+            return true;
+        }
+
+        if ($emailEsperado && $falloCorreo) {
+            return false;
+        }
+
+        return !$pushEsperado || !$falloPush || $emailEsperado;
+    }
+
+    private function quiereCorreo(User $user): bool
+    {
+        return !empty($user->email)
+            && filter_var($user->email, FILTER_VALIDATE_EMAIL)
+            && (bool) data_get($user->preferencias_notificacion, 'email', true);
+    }
+
+    private function quierePush(User $user): bool
+    {
+        if (!(bool) data_get($user->preferencias_notificacion, 'in-app', true)) {
+            return false;
+        }
+
+        if ($user->relationLoaded('pushSubscriptions')) {
+            return $user->pushSubscriptions->isNotEmpty();
+        }
+
+        return $user->pushSubscriptions()->exists();
+    }
+
+    private function registrarFallo(NotificacionCaso $alerta, User $user, string $canal, Throwable $exception): void
+    {
+        Log::error('Fallo enviando alerta programada.', [
+            'notificacion_id' => $alerta->id,
+            'user_id' => $user->id,
+            'canal' => $canal,
+            'error' => $exception->getMessage(),
+        ]);
+    }
+
+    private function crearIncidenteAltaPrioridad(NotificacionCaso $alerta): void
+    {
+        try {
+            IncidenteJuridico::create([
+                'usuario_responsable_id' => $alerta->user_id,
+                'origen' => 'auditoria',
+                'asunto' => 'Alerta de Alta Prioridad Vencida',
+                'descripcion' => "Se genero un incidente automatico porque una alerta de prioridad ALTA se vencio sin ser completada.\n\nMensaje de la alerta: {$alerta->mensaje}\nCaso ID: #{$alerta->caso_id}\nProceso ID: #{$alerta->proceso_id}",
+                'estado' => 'pendiente',
+                'fecha_registro' => now(),
+            ]);
+        } catch (Throwable $exception) {
+            Log::error('No se pudo crear incidente por alerta de alta prioridad.', [
+                'notificacion_id' => $alerta->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 }

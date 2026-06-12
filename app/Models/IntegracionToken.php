@@ -9,6 +9,11 @@ class IntegracionToken extends Model
 {
     use HasFactory;
 
+    protected $hidden = [
+        'api_key',
+        'client_secret',
+    ];
+
     protected $fillable = [
         'proveedor',
         'api_key',

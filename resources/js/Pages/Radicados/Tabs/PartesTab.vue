@@ -1,123 +1,245 @@
 <script setup>
-import { 
-    UsersIcon, 
-    UserIcon, 
-    PhoneIcon, 
+import {
+    UsersIcon,
+    UserIcon,
+    PhoneIcon,
     EnvelopeIcon,
     IdentificationIcon,
-    ShieldCheckIcon
+    ShieldCheckIcon,
+    ExclamationTriangleIcon,
+    ClipboardDocumentListIcon,
+    UserGroupIcon,
 } from '@heroicons/vue/24/outline';
+import { computed } from 'vue';
+import PersonaCompletenessIndicator from '@/Components/PersonaCompletenessIndicator.vue';
+import { hasIncompletePersonaInfo } from '@/Utils/personaCompleteness';
 
 const props = defineProps({
     proceso: { type: Object, required: true },
 });
+
+const demandantes = computed(() => props.proceso.demandantes || []);
+const demandados = computed(() => props.proceso.demandados || []);
+const pendingCompletenessCount = computed(() => demandados.value.filter(hasIncompletePersonaInfo).length + demandantes.value.filter(hasIncompletePersonaInfo).length);
+
+function hasPendingIdentification(persona) {
+    return !persona?.numero_documento || String(persona.numero_documento).startsWith('TEMP-');
+}
+
+const documentLabel = (persona) => {
+    if (hasPendingIdentification(persona)) return 'Identificación pendiente';
+    return `${persona.tipo_documento || 'CC'} ${persona.numero_documento}`;
+};
+
+const primaryPhone = (persona) => persona.celular_1 || persona.celular_2 || persona.telefono || null;
+const primaryEmail = (persona) => persona.correo_1 || persona.correo_2 || persona.email || null;
+const initial = (name) => (name || 'S').trim().charAt(0).toUpperCase();
+
+const summaryCards = computed(() => [
+    {
+        label: 'Demandantes',
+        value: demandantes.value.length,
+        subtext: demandantes.value.length === 1 ? 'parte activa' : 'partes activas',
+        icon: UsersIcon,
+        iconClass: 'text-blue-500',
+    },
+    {
+        label: 'Demandados',
+        value: demandados.value.length,
+        subtext: demandados.value.length === 1 ? 'parte pasiva' : 'partes pasivas',
+        icon: UserGroupIcon,
+        iconClass: 'text-rose-500',
+    },
+    {
+        label: 'Datos pendientes',
+        value: pendingCompletenessCount.value,
+        subtext: pendingCompletenessCount.value === 1 ? 'persona por completar' : 'personas por completar',
+        icon: ExclamationTriangleIcon,
+        iconClass: pendingCompletenessCount.value ? 'text-amber-500' : 'text-emerald-500',
+    },
+]);
 </script>
 
 <template>
-    <div class="space-y-10 animate-in fade-in duration-500">
-        
-        <!-- DEMANDANTES / ACCIONANTES -->
-        <section>
-            <div class="flex items-center gap-2 mb-6">
-                <UsersIcon class="w-5 h-5 text-blue-500" />
-                <h3 class="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-tight">Demandantes / Accionantes</h3>
-            </div>
-
-            <div v-if="!proceso.demandantes?.length" class="bg-gray-50 dark:bg-gray-900/30 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 py-10 text-center">
-                <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Sin demandantes registrados</p>
-            </div>
-
-            <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div v-for="p in proceso.demandantes" :key="p.id" class="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:border-blue-200 transition-all">
-                    <div class="flex items-start gap-3">
-                        <div class="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-600">
-                            <UserIcon class="w-5 h-5" />
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h4 class="text-xs font-bold text-gray-900 dark:text-white uppercase truncate" :title="p.nombre_completo">{{ p.nombre_completo }}</h4>
-                            <p class="text-[10px] text-gray-500 font-mono mt-0.5">{{ p.tipo_documento || 'CC' }} {{ p.numero_documento || '—' }}</p>
-                        </div>
+    <div class="space-y-5 animate-in fade-in duration-500">
+        <section class="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div
+                v-for="item in summaryCards"
+                :key="item.label"
+                class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+            >
+                <div class="flex items-start gap-3">
+                    <div class="shrink-0 rounded-lg bg-gray-50 p-2 dark:bg-gray-900">
+                        <component :is="item.icon" class="h-5 w-5" :class="item.iconClass" />
                     </div>
-                    <div class="mt-4 pt-3 border-t border-gray-50 dark:border-gray-700 flex flex-col gap-1.5">
-                        <div v-if="p.celular_1" class="flex items-center gap-2 text-[10px] text-gray-600 dark:text-gray-400">
-                            <PhoneIcon class="w-3 h-3" /> {{ p.celular_1 }}
-                        </div>
-                        <div v-if="p.correo_1" class="flex items-center gap-2 text-[10px] text-gray-600 dark:text-gray-400 truncate">
-                            <EnvelopeIcon class="w-3 h-3" /> {{ p.correo_1 }}
-                        </div>
+                    <div class="min-w-0">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">{{ item.label }}</p>
+                        <p class="mt-1 break-words text-sm font-black leading-5 text-gray-900 dark:text-white">{{ item.value }}</p>
+                        <p class="mt-0.5 break-words text-[10px] font-semibold text-gray-600 dark:text-gray-400">{{ item.subtext }}</p>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- DEMANDADOS / ACCIONADOS -->
-        <section>
-            <div class="flex items-center gap-2 mb-6">
-                <UsersIcon class="w-5 h-5 text-rose-500" />
-                <h3 class="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-tight">Demandados / Accionados</h3>
-            </div>
-
-            <div v-if="!proceso.demandados?.length" class="bg-gray-50 dark:bg-gray-900/30 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 py-10 text-center">
-                <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Sin demandados registrados</p>
-            </div>
-
-            <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div v-for="p in proceso.demandados" :key="p.id" class="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:border-rose-200 transition-all relative overflow-hidden">
-                    <div v-if="!p.numero_documento || p.numero_documento.startsWith('TEMP-')" class="absolute top-0 right-0 bg-amber-500 text-white text-[7px] font-black uppercase px-2 py-0.5 rounded-bl-lg">Pendiente ID</div>
-                    
-                    <div class="flex items-start gap-3">
-                        <div class="p-2 bg-rose-50 dark:bg-rose-900/30 rounded-lg text-rose-600">
-                            <UserIcon class="w-5 h-5" />
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h4 class="text-xs font-bold text-gray-900 dark:text-white uppercase truncate" :title="p.nombre_completo">{{ p.nombre_completo }}</h4>
-                            <p class="text-[10px] text-gray-500 font-mono mt-0.5" v-if="p.numero_documento && !p.numero_documento.startsWith('TEMP-')">
-                                {{ p.tipo_documento || 'CC' }} {{ p.numero_documento }}
-                            </p>
-                            <p class="text-[9px] text-amber-600 font-bold uppercase mt-0.5" v-else>Identificación Pendiente</p>
-                        </div>
-                    </div>
-                    <div class="mt-4 pt-3 border-t border-gray-50 dark:border-gray-700 flex flex-col gap-1.5">
-                        <div v-if="p.celular_1" class="flex items-center gap-2 text-[10px] text-gray-600 dark:text-gray-400">
-                            <PhoneIcon class="w-3 h-3" /> {{ p.celular_1 }}
-                        </div>
-                        <div v-if="p.correo_1" class="flex items-center gap-2 text-[10px] text-gray-600 dark:text-gray-400 truncate">
-                            <EnvelopeIcon class="w-3 h-3" /> {{ p.correo_1 }}
-                        </div>
-                    </div>
+        <div v-if="pendingCompletenessCount" class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-900/10">
+            <div class="flex items-start gap-3">
+                <ExclamationTriangleIcon class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-300" />
+                <div>
+                    <p class="text-xs font-black uppercase tracking-widest text-amber-800 dark:text-amber-200">Datos de partes por completar</p>
+                    <p class="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">Hay {{ pendingCompletenessCount }} persona{{ pendingCompletenessCount !== 1 ? 's' : '' }} con datos básicos pendientes.</p>
                 </div>
             </div>
-        </section>
+        </div>
 
-        <!-- EQUIPO RESPONSABLE -->
-        <section>
-            <div class="flex items-center gap-2 mb-6">
-                <ShieldCheckIcon class="w-5 h-5 text-indigo-500" />
-                <h3 class="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-tight">Equipo Responsable</h3>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="flex items-center gap-4 p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                    <div class="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white text-sm font-black shadow-md">
-                        {{ (proceso.abogado?.name || 'S')[0] }}
+        <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
+            <section class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <div class="flex flex-col gap-3 border-b border-gray-100 p-5 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex items-center gap-3">
+                        <UsersIcon class="h-5 w-5 text-blue-500" />
+                        <div>
+                            <h3 class="text-sm font-bold uppercase tracking-tight text-gray-900 dark:text-white">Demandantes / Accionantes</h3>
+                            <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-600 dark:text-gray-400">Parte activa del proceso</p>
+                        </div>
                     </div>
+                    <span class="w-fit rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+                        {{ demandantes.length }} registro{{ demandantes.length !== 1 ? 's' : '' }}
+                    </span>
+                </div>
+
+                <div class="p-5">
+                    <div v-if="!demandantes.length" class="flex min-h-56 flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-white text-center dark:border-gray-700 dark:bg-gray-900/30">
+                        <UsersIcon class="mb-3 h-10 w-10 text-gray-400 dark:text-gray-500" />
+                        <p class="text-[11px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-400">Sin demandantes registrados</p>
+                    </div>
+
+                    <div v-else class="space-y-3">
+                        <article v-for="p in demandantes" :key="p.id" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/30">
+                            <div class="flex items-start gap-3">
+                                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-sm font-black uppercase text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                    {{ initial(p.nombre_completo) }}
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                        <div class="min-w-0">
+                                            <h4 class="break-words text-sm font-black uppercase leading-5 text-gray-900 dark:text-white" :title="p.nombre_completo">{{ p.nombre_completo || 'Sin nombre' }}</h4>
+                                            <p class="mt-1 inline-flex items-center gap-1.5 rounded bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                                <IdentificationIcon class="h-3.5 w-3.5" />
+                                                {{ documentLabel(p) }}
+                                            </p>
+                                        </div>
+                                        <PersonaCompletenessIndicator :persona="p" />
+                                    </div>
+
+                                    <div class="mt-4 grid grid-cols-1 gap-2 border-t border-gray-100 pt-3 dark:border-gray-700 sm:grid-cols-2">
+                                        <div class="flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                            <PhoneIcon class="h-4 w-4 shrink-0 text-gray-400" />
+                                            <span class="truncate">{{ primaryPhone(p) || 'Sin teléfono' }}</span>
+                                        </div>
+                                        <div class="flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                            <EnvelopeIcon class="h-4 w-4 shrink-0 text-gray-400" />
+                                            <span class="truncate">{{ primaryEmail(p) || 'Sin correo' }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
+            <section class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <div class="flex flex-col gap-3 border-b border-gray-100 p-5 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex items-center gap-3">
+                        <UserGroupIcon class="h-5 w-5 text-rose-500" />
+                        <div>
+                            <h3 class="text-sm font-bold uppercase tracking-tight text-gray-900 dark:text-white">Demandados / Accionados</h3>
+                            <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-600 dark:text-gray-400">Parte pasiva del proceso</p>
+                        </div>
+                    </div>
+                    <span class="w-fit rounded-full bg-rose-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">
+                        {{ demandados.length }} registro{{ demandados.length !== 1 ? 's' : '' }}
+                    </span>
+                </div>
+
+                <div class="p-5">
+                    <div v-if="!demandados.length" class="flex min-h-56 flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-white text-center dark:border-gray-700 dark:bg-gray-900/30">
+                        <UserGroupIcon class="mb-3 h-10 w-10 text-gray-400 dark:text-gray-500" />
+                        <p class="text-[11px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-400">Sin demandados registrados</p>
+                    </div>
+
+                    <div v-else class="space-y-3">
+                        <article v-for="p in demandados" :key="p.id" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/30">
+                            <div class="flex items-start gap-3">
+                                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-sm font-black uppercase text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">
+                                    {{ initial(p.nombre_completo) }}
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                        <div class="min-w-0">
+                                            <h4 class="break-words text-sm font-black uppercase leading-5 text-gray-900 dark:text-white" :title="p.nombre_completo">{{ p.nombre_completo || 'Sin nombre' }}</h4>
+                                            <p class="mt-1 inline-flex items-center gap-1.5 rounded bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                                <IdentificationIcon class="h-3.5 w-3.5" />
+                                                {{ documentLabel(p) }}
+                                            </p>
+                                        </div>
+                                        <PersonaCompletenessIndicator :persona="p" />
+                                    </div>
+
+                                    <div class="mt-4 grid grid-cols-1 gap-2 border-t border-gray-100 pt-3 dark:border-gray-700 sm:grid-cols-2">
+                                        <div class="flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                            <PhoneIcon class="h-4 w-4 shrink-0 text-gray-400" />
+                                            <span class="truncate">{{ primaryPhone(p) || 'Sin teléfono' }}</span>
+                                        </div>
+                                        <div class="flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                            <EnvelopeIcon class="h-4 w-4 shrink-0 text-gray-400" />
+                                            <span class="truncate">{{ primaryEmail(p) || 'Sin correo' }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <section class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div class="flex flex-col gap-3 border-b border-gray-100 p-5 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex items-center gap-3">
+                    <ShieldCheckIcon class="h-5 w-5 text-indigo-500" />
                     <div>
-                        <span class="text-[9px] font-bold text-indigo-500 uppercase tracking-widest block leading-none mb-1">Abogado Titular</span>
-                        <h4 class="text-xs font-black text-gray-900 dark:text-white uppercase">{{ proceso.abogado?.name || 'Sin asignar' }}</h4>
+                        <h3 class="text-sm font-bold uppercase tracking-tight text-gray-900 dark:text-white">Equipo responsable</h3>
+                        <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-600 dark:text-gray-400">Abogado titular y responsable de revisión</p>
+                    </div>
+                </div>
+                <ClipboardDocumentListIcon class="h-5 w-5 text-gray-400" />
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
+                <div class="rounded-lg border border-indigo-100 bg-indigo-50/50 p-4 dark:border-indigo-900/40 dark:bg-indigo-900/10">
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-sm font-black uppercase text-white">
+                            {{ initial(proceso.abogado?.name) }}
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-indigo-700 dark:text-indigo-300">Abogado titular</p>
+                            <p class="mt-1 break-words text-sm font-black uppercase text-gray-900 dark:text-white">{{ proceso.abogado?.name || 'Sin asignar' }}</p>
+                        </div>
                     </div>
                 </div>
 
-                <div class="flex items-center gap-4 p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                    <div class="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center text-white text-sm font-black shadow-md">
-                        {{ (proceso.responsable_revision?.name || 'S')[0] }}
-                    </div>
-                    <div>
-                        <span class="text-[9px] font-bold text-amber-600 uppercase tracking-widest block leading-none mb-1">Responsable Revisión</span>
-                        <h4 class="text-xs font-black text-gray-900 dark:text-white uppercase">{{ proceso.responsable_revision?.name || 'Sin asignar' }}</h4>
+                <div class="rounded-lg border border-amber-100 bg-amber-50/60 p-4 dark:border-amber-900/40 dark:bg-amber-900/10">
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-sm font-black uppercase text-white">
+                            {{ initial(proceso.responsable_revision?.name) }}
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300">Responsable revisión</p>
+                            <p class="mt-1 break-words text-sm font-black uppercase text-gray-900 dark:text-white">{{ proceso.responsable_revision?.name || 'Sin asignar' }}</p>
+                        </div>
                     </div>
                 </div>
             </div>
         </section>
-
     </div>
 </template>

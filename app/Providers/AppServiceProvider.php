@@ -25,6 +25,8 @@ use App\Policies\TareaPolicy;
 // --- 1. IMPORTAMOS LOS OBSERVERS ---
 use App\Observers\CasoObserver;
 use App\Observers\AuditoriaObserver;
+use App\Observers\PagoCasoObserver;
+use App\Observers\ValidacionLegalObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -62,7 +64,9 @@ class AppServiceProvider extends ServiceProvider
         // ===== 2. AQUÍ REGISTRAMOS NUESTROS OBSERVERS =====
         // Esta línea activa el motor que crea las validaciones automáticamente.
         Caso::observe(CasoObserver::class);
-        
+        \App\Models\PagoCaso::observe(PagoCasoObserver::class);
+        \App\Models\ValidacionLegal::observe(ValidacionLegalObserver::class);
+
         // Esta línea activa el vigilante de seguridad de auditoría.
         \App\Models\AuditoriaEvento::observe(AuditoriaObserver::class);
     }

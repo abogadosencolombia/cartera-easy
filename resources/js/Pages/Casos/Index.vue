@@ -10,6 +10,7 @@ import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import Textarea from '@/Components/Textarea.vue';
 import InputLabel from '@/Components/InputLabel.vue';
+import PersonaCompletenessIndicator from '@/Components/PersonaCompletenessIndicator.vue';
 
 // --- TIPOS DE ENTIDAD ---
 const tiposEntidad = [
@@ -277,6 +278,114 @@ const formatCurrency = (value) =>
 const financialStatusFor = (caso) => getCaseFinancialStatus(caso);
 const financialFieldFor = (caso, key) => financialStatusFor(caso).fields.find((field) => field.key === key);
 
+const activeFilterCount = computed(() => filterKeys.reduce((count, key) => {
+    if (booleanFilterKeys.includes(key)) {
+        return count + (filterForm[key] ? 1 : 0);
+    }
+
+    return count + (String(filterForm[key] ?? '').trim() !== '' ? 1 : 0);
+}, 0));
+
+const resultRange = computed(() => {
+    const total = props.casos?.total || 0;
+    if (!total) return '0 resultados';
+
+    const from = props.casos?.from || 1;
+    const to = props.casos?.to || props.casos?.data?.length || total;
+    return `${from}-${to} de ${total}`;
+});
+
+const summaryCards = computed(() => [
+    {
+        key: 'total',
+        label: 'Total casos',
+        value: props.stats?.total ?? '...',
+        description: 'Expedientes visibles',
+        icon: ArchiveBoxXMarkIcon,
+        iconClass: 'text-slate-500',
+        filterKey: null,
+    },
+    {
+        key: 'sin_radicado',
+        label: 'Sin radicado',
+        value: props.stats?.sin_radicado ?? '...',
+        description: 'Pendientes de radicar',
+        icon: ExclamationCircleIcon,
+        iconClass: 'text-amber-500',
+        filterKey: 'sin_radicado',
+        activeClass: 'ring-2 ring-amber-300 border-amber-200 bg-amber-50/70 dark:border-amber-500/60 dark:bg-amber-900/10',
+    },
+    {
+        key: 'integridad_baja',
+        label: 'Integridad baja',
+        value: props.stats?.integridad_baja ?? '...',
+        description: 'Expedientes incompletos',
+        icon: ExclamationTriangleIcon,
+        iconClass: 'text-rose-500',
+        filterKey: 'integridad_baja',
+        activeClass: 'ring-2 ring-rose-300 border-rose-200 bg-rose-50/70 dark:border-rose-500/60 dark:bg-rose-900/10',
+    },
+    {
+        key: 'cerrados',
+        label: 'Cerrados',
+        value: props.stats?.cerrados ?? '...',
+        description: 'Expedientes finalizados',
+        icon: CheckCircleIcon,
+        iconClass: 'text-emerald-500',
+        filterKey: 'cerrados',
+        activeClass: 'ring-2 ring-emerald-300 border-emerald-200 bg-emerald-50/70 dark:border-emerald-500/60 dark:bg-emerald-900/10',
+    },
+    {
+        key: 'saldo_total',
+        label: 'Saldo recuperable',
+        value: formatCurrency(props.stats?.saldo_total || 0),
+        description: 'Cartera pendiente',
+        icon: BanknotesIcon,
+        iconClass: 'text-teal-500',
+        filterKey: null,
+    },
+    {
+        key: 'actualizados_hoy',
+        label: 'Actualizados hoy',
+        value: props.stats?.actualizados_hoy ?? '...',
+        description: 'Gestión reciente',
+        icon: ArrowPathIcon,
+        iconClass: 'text-indigo-500',
+        filterKey: 'actualizados_hoy',
+        activeClass: 'ring-2 ring-indigo-300 border-indigo-200 bg-indigo-50/70 dark:border-indigo-500/60 dark:bg-indigo-900/10',
+    },
+]);
+
+const controlFilterItems = computed(() => [
+    { key: 'sin_radicado', label: 'Sin radicado', count: props.stats?.sin_radicado, icon: ExclamationCircleIcon, activeClass: 'bg-amber-600 text-white border-amber-600' },
+    { key: 'inactivo_20_dias', label: 'Inactivos +20d', count: null, icon: ClockIcon, activeClass: 'bg-orange-600 text-white border-orange-600' },
+    { key: 'integridad_baja', label: 'Integridad baja', count: props.stats?.integridad_baja, icon: ExclamationTriangleIcon, activeClass: 'bg-rose-600 text-white border-rose-600' },
+    { key: 'cerrados', label: 'Cerrados', count: props.stats?.cerrados, icon: CheckCircleIcon, activeClass: 'bg-emerald-600 text-white border-emerald-600' },
+    { key: 'actualizados_hoy', label: 'Actualizados hoy', count: props.stats?.actualizados_hoy, icon: ArrowPathIcon, activeClass: 'bg-indigo-600 text-white border-indigo-600' },
+]);
+
+const userInitials = (name) => {
+    if (!name) return 'SA';
+    return name.split(' ').filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase();
+};
+
+const responsibleNames = (caso) => caso.users?.length
+    ? caso.users.map(user => user.name).filter(Boolean).join(', ')
+    : 'Sin asignar';
+
+const primaryResponsible = (caso) => caso.users?.[0]?.name || 'Sin asignar';
+
+const integrityScore = (caso) => Number(caso.integridad_score || 0);
+const integrityBarStyle = (caso) => ({ width: `${Math.min(Math.max(integrityScore(caso), 0), 100)}%` });
+const integrityTone = (caso) => {
+    const score = integrityScore(caso);
+    if (score >= 85) return 'bg-emerald-500';
+    if (score >= 60) return 'bg-amber-500';
+    return 'bg-rose-500';
+};
+
+const isInactiveCase = (caso) => getInactivityDays(caso.updated_at) >= 30 && !caso.nota_cierre;
+
 // --- Lógica de Eliminación ---
 const confirmingCaseDeletion = ref(false);
 const caseToDelete = ref(null);
@@ -457,487 +566,510 @@ const copyLegalInfo = (caso) => {
     <Head title="Gestión de Casos" />
 
     <AuthenticatedLayout>
-        <div class="py-12">
-            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-4">
+        <div class="py-6">
+            <div class="mx-auto max-w-[1600px] space-y-4 px-4 sm:px-6 lg:px-8">
                 
                 <!-- Encabezado y Acciones Principales -->
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-                    <div>
-                        <h2 id="tour-casos-title" class="text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-                            <ArchiveBoxXMarkIcon class="w-8 h-8 text-indigo-500" />
-                            Gestión de Casos
-                        </h2>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            Administra y haz seguimiento a todos los procesos jurídicos.
-                        </p>
-                    </div>
-                    <div class="flex items-center gap-3 w-full md:w-auto">
-                        <Link
-                            id="tour-btn-importar"
-                            :href="route('casos.import.show')"
-                            class="flex-1 md:flex-none inline-flex items-center justify-center px-4 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-lg font-bold text-sm transition-all shadow-sm hover:bg-gray-50"
-                        >
-                            <CloudArrowUpIcon class="w-5 h-5 mr-2" />
-                            Importar
-                        </Link>
-                        <button 
-                            id="tour-btn-exportar"
-                            @click="exportarExcel" 
-                            class="flex-1 md:flex-none inline-flex items-center justify-center px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-sm transition-all shadow-sm shadow-green-200 dark:shadow-none"
-                        >
-                            <ArrowDownTrayIcon class="w-5 h-5 mr-2" />
-                            Exportar Excel
-                        </button>
-                        <Link
-                            :href="route('casos.create')"
-                            class="flex-1 md:flex-none inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-sm transition-all shadow-sm shadow-indigo-200 dark:shadow-none"
-                        >
-                            + Registrar Caso
-                        </Link>
-                    </div>
-                </div>
-
-                <!-- STATS / KPI CARDS -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-                    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md">
-                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform">
-                            <ArchiveBoxXMarkIcon class="w-16 h-16 text-indigo-600" />
-                        </div>
-                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Casos</p>
-                        <div v-if="!stats" class="h-8 w-16 bg-gray-100 dark:bg-gray-700 animate-pulse rounded"></div>
-                        <p v-else class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.total }}</p>
-                        <p class="text-[9px] text-gray-500 font-bold mt-1 uppercase tracking-tighter">En base de datos</p>
-                    </div>
-
-                    <button
-                        type="button"
-                        @click="applyControlFilter('sin_radicado')"
-                        :class="filterForm.sin_radicado ? 'ring-2 ring-amber-400 border-amber-200 dark:border-amber-500/70' : ''"
-                        class="text-left w-full bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-amber-400"
-                    >
-                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-amber-600">
-                            <ExclamationCircleIcon class="w-16 h-16" />
-                        </div>
-                        <p class="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Sin Radicado</p>
-                        <div v-if="!stats" class="h-8 w-16 bg-gray-100 dark:bg-gray-700 animate-pulse rounded"></div>
-                        <p v-else class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.sin_radicado }}</p>
-                        <p class="text-[9px] text-amber-500 font-bold mt-1 uppercase tracking-tighter">Pendientes de trámite</p>
-                    </button>
-
-                    <button
-                        type="button"
-                        @click="applyControlFilter('integridad_baja')"
-                        :class="filterForm.integridad_baja ? 'ring-2 ring-rose-400 border-rose-200 dark:border-rose-500/70' : ''"
-                        class="text-left w-full bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-rose-400"
-                    >
-                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-rose-600">
-                            <ExclamationTriangleIcon class="w-16 h-16" />
-                        </div>
-                        <p class="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Integridad Baja</p>
-                        <div v-if="!stats" class="h-8 w-16 bg-gray-100 dark:bg-gray-700 animate-pulse rounded"></div>
-                        <p v-else class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.integridad_baja }}</p>
-                        <p class="text-[9px] text-rose-500 font-bold mt-1 uppercase tracking-tighter">Expedientes por completar</p>
-                    </button>
-
-                    <button
-                        type="button"
-                        @click="applyControlFilter('cerrados')"
-                        :class="filterForm.cerrados ? 'ring-2 ring-red-400 border-red-200 dark:border-red-500/70' : ''"
-                        class="text-left w-full bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-400"
-                    >
-                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-red-600">
-                            <CheckCircleIcon class="w-16 h-16" />
-                        </div>
-                        <p class="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1">Casos Cerrados</p>
-                        <div v-if="!stats" class="h-8 w-16 bg-gray-100 dark:bg-gray-700 animate-pulse rounded"></div>
-                        <p v-else class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.cerrados }}</p>
-                        <p class="text-[9px] text-red-500 font-bold mt-1 uppercase tracking-tighter">Expedientes finalizados</p>
-                    </button>
-
-                    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md">
-                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-green-600">
-                            <BanknotesIcon class="w-16 h-16" />
-                        </div>
-                        <p class="text-[10px] font-black text-green-600 uppercase tracking-widest mb-1">Saldo Recuperable</p>
-                        <div v-if="!stats" class="h-8 w-32 bg-gray-100 dark:bg-gray-700 animate-pulse rounded"></div>
-                        <p v-else class="text-2xl font-black text-gray-900 dark:text-white">{{ formatCurrency(stats.saldo_total) }}</p>
-                        <p class="text-[9px] text-green-500 font-bold mt-1 uppercase tracking-tighter">Cartera total pendiente</p>
-                    </div>
-
-                    <button
-                        type="button"
-                        @click="applyControlFilter('actualizados_hoy')"
-                        :class="filterForm.actualizados_hoy ? 'ring-2 ring-indigo-400 border-indigo-200 dark:border-indigo-500/70' : ''"
-                        class="text-left w-full bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                    >
-                        <div class="absolute -right-2 -top-2 opacity-5 group-hover:scale-110 transition-transform text-indigo-600">
-                            <ArrowPathIcon class="w-16 h-16" />
-                        </div>
-                        <p class="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Actualizados Hoy</p>
-                        <div v-if="!stats" class="h-8 w-16 bg-gray-100 dark:bg-gray-700 animate-pulse rounded"></div>
-                        <p v-else class="text-2xl font-black text-gray-900 dark:text-white">{{ stats.actualizados_hoy }}</p>
-                        <p class="text-[9px] text-indigo-500 font-bold mt-1 uppercase tracking-tighter">Gestiones en las últimas 24h</p>
-                    </button>
-                </div>
-
-                <!-- BARRA DE FILTROS AVANZADA -->
-                <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-6">
-                    <div class="flex flex-col xl:flex-row gap-6">
-                        <!-- Búsqueda Principal -->
-                        <div class="relative flex-grow">
-                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Buscar</label>
-                            <div class="relative">
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <MagnifyingGlassIcon class="h-4 w-4 text-gray-400" />
+                <section class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 sm:p-5 shadow-sm">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-3">
+                                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300">
+                                    <ArchiveBoxXMarkIcon class="h-6 w-6" />
                                 </div>
+                                <div class="min-w-0">
+                                    <h2 id="tour-casos-title" class="text-xl font-black tracking-tight text-gray-950 dark:text-white sm:text-2xl">
+                                        Gestión de Casos
+                                    </h2>
+                                    <p class="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">
+                                        Seguimiento jurídico, estado financiero y responsables en una sola vista.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid w-full grid-cols-1 gap-2 sm:grid-cols-3 lg:w-auto">
+                            <Link
+                                id="tour-btn-importar"
+                                :href="route('casos.import.show')"
+                                class="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-indigo-700 shadow-sm transition-colors hover:border-indigo-300 hover:bg-indigo-100 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-300"
+                            >
+                                <CloudArrowUpIcon class="h-4 w-4" />
+                                Carga asistida
+                            </Link>
+                            <button
+                                id="tour-btn-exportar"
+                                type="button"
+                                @click="exportarExcel"
+                                class="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-emerald-700"
+                            >
+                                <ArrowDownTrayIcon class="h-4 w-4" />
+                                Exportar
+                            </button>
+                            <Link
+                                :href="route('casos.create')"
+                                class="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-600 bg-indigo-600 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-indigo-700"
+                            >
+                                <PlusIcon class="h-4 w-4" />
+                                Registrar
+                            </Link>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Indicadores -->
+                <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                    <template v-for="card in summaryCards" :key="card.key">
+                        <button
+                            v-if="card.filterKey"
+                            type="button"
+                            @click="applyControlFilter(card.filterKey)"
+                            :class="[filterForm[card.filterKey] ? card.activeClass : '']"
+                            class="group rounded-lg border border-gray-200 bg-white p-4 text-left shadow-sm transition-all hover:border-indigo-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:border-gray-700 dark:bg-gray-800"
+                        >
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">{{ card.label }}</p>
+                                    <p class="mt-1 break-words text-2xl font-black text-gray-950 dark:text-white">{{ card.value }}</p>
+                                    <p class="mt-1 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ card.description }}</p>
+                                </div>
+                                <component :is="card.icon" class="h-5 w-5 shrink-0" :class="card.iconClass" />
+                            </div>
+                        </button>
+                        <div
+                            v-else
+                            class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+                        >
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">{{ card.label }}</p>
+                                    <p class="mt-1 break-words text-2xl font-black text-gray-950 dark:text-white">{{ card.value }}</p>
+                                    <p class="mt-1 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ card.description }}</p>
+                                </div>
+                                <component :is="card.icon" class="h-5 w-5 shrink-0" :class="card.iconClass" />
+                            </div>
+                        </div>
+                    </template>
+                </section>
+
+                <!-- Filtros -->
+                <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5">
+                    <div class="flex flex-col gap-3 border-b border-gray-100 pb-4 dark:border-gray-700 lg:flex-row lg:items-center lg:justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-50 text-gray-500 dark:bg-gray-900 dark:text-gray-300">
+                                <FunnelIcon class="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-black uppercase tracking-tight text-gray-950 dark:text-white">Filtros de búsqueda</h3>
+                                <p class="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                                    {{ resultRange }}<span v-if="activeFilterCount"> · {{ activeFilterCount }} filtro{{ activeFilterCount === 1 ? '' : 's' }} activo{{ activeFilterCount === 1 ? '' : 's' }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            v-if="isDirty"
+                            type="button"
+                            @click="resetFilters"
+                            class="inline-flex w-fit items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-900/10 dark:text-rose-300"
+                        >
+                            <XMarkIcon class="h-4 w-4" />
+                            Limpiar filtros
+                        </button>
+                    </div>
+
+                    <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-12">
+                        <div class="lg:col-span-5">
+                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Búsqueda general</label>
+                            <div class="relative">
+                                <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                                 <input
                                     v-model="filterForm.search"
                                     type="text"
-                                    class="block w-full pl-10 pr-3 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:text-white font-medium transition-all"
-                                    placeholder="Nombre, cédula, radicado, cooperativa, juzgado..."
+                                    class="block w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-3 text-sm font-semibold text-gray-800 transition-colors focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    placeholder="Nombre, cédula, radicado, pagaré, cooperativa o juzgado"
                                 />
                             </div>
                         </div>
 
-                        <!-- Selectores de Filtro (Grid Compacto) -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 xl:w-2/3">
-                            <div>
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Cooperativa</label>
-                                <SelectInput v-model="filterForm.cooperativa_id" class="w-full py-3 rounded-xl">
-                                    <option value="">Todas</option>
-                                    <option v-for="c in cooperativas" :key="c.id" :value="c.id">{{ c.nombre }}</option>
-                                </SelectInput>
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Tipo de Entidad</label>
-                                <SelectInput v-model="filterForm.tipo_entidad" class="w-full py-3 rounded-xl">
-                                    <option value="">Todas</option>
-                                    <option v-for="tipo in tiposEntidad" :key="tipo" :value="tipo">{{ tipo }}s</option>
-                                </SelectInput>
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Responsable</label>
-                                <SelectInput v-model="filterForm.abogado_id" class="w-full py-3 rounded-xl">
-                                    <option value="">Todos</option>
-                                    <option v-for="a in abogados" :key="a.id" :value="a.id">{{ a.name }}</option>
-                                </SelectInput>
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Etapa Procesal</label>
-                                <SelectInput v-model="filterForm.etapa_procesal" class="w-full py-3 rounded-xl">
-                                    <option value="">Todas</option>
-                                    <option v-for="e in etapas_procesales" :key="e" :value="e">{{ e }}</option>
-                                </SelectInput>
-                            </div>
+                        <div class="lg:col-span-3">
+                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Cooperativa</label>
+                            <SelectInput v-model="filterForm.cooperativa_id" class="w-full rounded-lg py-2.5 text-sm">
+                                <option value="">Todas</option>
+                                <option v-for="c in cooperativas" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+                            </SelectInput>
                         </div>
-                    </div>
 
-                    <!-- Fila de Filtros Rápidos y Juzgado -->
-                    <div class="flex flex-col lg:flex-row items-end gap-6 pt-6 border-t border-gray-50 dark:border-gray-700">
-                        <div class="w-full lg:flex-grow">
-                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Despacho o Juzgado Específico</label>
-                            <AsyncSelect 
+                        <div class="lg:col-span-2">
+                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Responsable</label>
+                            <SelectInput v-model="filterForm.abogado_id" class="w-full rounded-lg py-2.5 text-sm">
+                                <option value="">Todos</option>
+                                <option v-for="a in abogados" :key="a.id" :value="a.id">{{ a.name }}</option>
+                            </SelectInput>
+                        </div>
+
+                        <div class="lg:col-span-2">
+                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Etapa</label>
+                            <SelectInput v-model="filterForm.etapa_procesal" class="w-full rounded-lg py-2.5 text-sm">
+                                <option value="">Todas</option>
+                                <option v-for="e in etapas_procesales" :key="e" :value="e">{{ e }}</option>
+                            </SelectInput>
+                        </div>
+
+                        <div class="lg:col-span-3">
+                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Tipo de entidad</label>
+                            <SelectInput v-model="filterForm.tipo_entidad" class="w-full rounded-lg py-2.5 text-sm">
+                                <option value="">Todas</option>
+                                <option v-for="tipo in tiposEntidad" :key="tipo" :value="tipo">{{ tipo }}</option>
+                            </SelectInput>
+                        </div>
+
+                        <div class="lg:col-span-5">
+                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Despacho o juzgado</label>
+                            <AsyncSelect
                                 v-model="selectedJuzgado"
                                 :endpoint="route('juzgados.search')"
-                                placeholder="Escriba para buscar el juzgado..."
+                                placeholder="Buscar juzgado o despacho"
                                 label-key="nombre"
-                                class="!min-h-[46px] !rounded-xl shadow-sm"
+                                class="!min-h-[42px] !rounded-lg"
                             />
                         </div>
 
-                        <div class="w-full lg:w-1/3">
-                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 ml-1">Filtros de Control</label>
-                            <div class="flex items-center gap-2">
-                                <button 
-                                    @click="applyControlFilter('sin_radicado')"
-                                    :class="filterForm.sin_radicado ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-50 text-gray-500 border-gray-200'"
-                                    class="flex-1 px-3 py-3 rounded-xl border text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-1.5"
+                        <div class="lg:col-span-4">
+                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Control rápido</label>
+                            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                                <button
+                                    v-for="item in controlFilterItems"
+                                    :key="item.key"
+                                    type="button"
+                                    @click="applyControlFilter(item.key)"
+                                    :class="filterForm[item.key] ? item.activeClass : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-indigo-200 hover:text-indigo-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300'"
+                                    class="inline-flex min-h-10 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-[10px] font-black uppercase tracking-wider transition-colors"
                                 >
-                                    <div :class="filterForm.sin_radicado ? 'bg-white' : 'bg-gray-300'" class="w-1.5 h-1.5 rounded-full"></div>
-                                    Sin Radicado
-                                </button>
-                                <button 
-                                    @click="applyControlFilter('inactivo_20_dias')"
-                                    :class="filterForm.inactivo_20_dias ? 'bg-amber-600 text-white border-amber-600' : 'bg-gray-50 text-gray-500 border-gray-200'"
-                                    class="flex-1 px-3 py-3 rounded-xl border text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-1.5"
-                                >
-                                    <div :class="filterForm.inactivo_20_dias ? 'bg-white' : 'bg-amber-300'" class="w-1.5 h-1.5 rounded-full"></div>
-                                    +20d Inactivo
-                                </button>
-                                <button 
-                                    @click="applyControlFilter('integridad_baja')"
-                                    :class="filterForm.integridad_baja ? 'bg-rose-600 text-white border-rose-600' : 'bg-gray-50 text-gray-500 border-gray-200'"
-                                    class="flex-1 px-3 py-3 rounded-xl border text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-1.5"
-                                >
-                                    <div :class="filterForm.integridad_baja ? 'bg-white' : 'bg-rose-300'" class="w-1.5 h-1.5 rounded-full"></div>
-                                    Integridad
+                                    <span class="inline-flex min-w-0 items-center gap-2">
+                                        <component :is="item.icon" class="h-4 w-4 shrink-0" />
+                                        <span class="truncate">{{ item.label }}</span>
+                                    </span>
+                                    <span v-if="item.count !== null && item.count !== undefined" class="shrink-0 rounded bg-white/70 px-1.5 py-0.5 text-[9px] text-gray-700 dark:bg-black/20 dark:text-white">{{ item.count }}</span>
                                 </button>
                             </div>
-                        </div>
-
-                        <div class="flex items-center justify-between w-full lg:w-auto gap-8 pb-3">
-                            <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest whitespace-nowrap">
-                                <span class="text-indigo-600 dark:text-indigo-400">{{ casos.total }}</span> resultados
-                            </div>
-                            <button 
-                                v-if="isDirty"
-                                @click="resetFilters"
-                                class="inline-flex items-center text-[10px] font-black text-red-500 hover:text-red-700 uppercase tracking-[0.2em] transition-colors whitespace-nowrap"
-                            >
-                                <XMarkIcon class="w-4 h-4 mr-1" />
-                                Limpiar
-                            </button>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <!-- Tabla de Casos -->
-                <div class="bg-white dark:bg-gray-800 shadow-xl rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
-                    <div class="overflow-x-auto custom-scrollbar-horizontal">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead class="bg-gray-50/50 dark:bg-gray-700/50">
-                                <tr>
-                                    <th scope="col" class="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-wider">
-                                        Deudor y Expediente
-                                    </th>
-                                    <th scope="col" class="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-wider">
-                                        Cooperativa
-                                    </th>
-                                    <th scope="col" class="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-wider">
-                                        Etapa Procesal
-                                    </th>
-                                    <th scope="col" class="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-wider">
-                                        Responsable
-                                    </th>
-                                    <th scope="col" class="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-wider">
-                                        Actualización
-                                    </th>
-                                    <th scope="col" class="sticky right-0 bg-gray-50 dark:bg-gray-700 px-6 py-4 text-right text-xs font-black text-gray-400 uppercase tracking-wider z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)]">
-                                        Acciones
-                                    </th>
-                                </tr>
-                            </thead>
-                            
-                            <tbody class="divide-y divide-gray-100 dark:divide-gray-700 bg-white dark:bg-gray-800">
-                                <tr v-if="casos.data.length === 0">
-                                    <td colspan="6" class="px-6 py-20 text-center">
-                                        <div class="flex flex-col items-center">
-                                            <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-full mb-4">
-                                                <InboxIcon class="h-10 w-10 text-gray-400" />
-                                            </div>
-                                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">No se encontraron casos</h3>
-                                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-xs mx-auto">
-                                                No hay registros que coincidan con los filtros aplicados.
-                                            </p>
-                                            <button @click="resetFilters" class="mt-4 text-indigo-600 font-bold hover:underline">Limpiar filtros</button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                
-                                <tr v-else v-for="caso in casos.data" :key="caso.id" class="hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10 transition-colors group cursor-pointer" :class="{'bg-indigo-50/50 dark:bg-indigo-900/20': caso.is_pinned}" @click="openQuickView(caso)">
-                                    <!-- Deudor / Expediente -->
-                                    <td class="px-6 py-4 relative">
-                                        <div v-if="caso.is_pinned" class="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-r"></div>
-                                        <div class="flex flex-col">
-                                            <Link @click.stop :href="route('casos.show', caso.id)" class="text-sm font-black text-indigo-600 dark:text-indigo-400 hover:underline">
-                                                {{ caso.deudor?.nombre_completo ?? 'Sin deudor' }}
-                                            </Link>
-                                            <div class="flex items-center gap-1.5 mt-1">
-                                                <span class="text-[10px] font-bold px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded">
-                                                    ID #{{ caso.id }}
-                                                </span>
-                                                <span
-                                                    class="text-[9px] font-black px-1.5 py-0.5 rounded border"
-                                                    :class="(caso.integridad_score || 0) >= 85 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : ((caso.integridad_score || 0) >= 60 ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-rose-50 text-rose-700 border-rose-100')"
-                                                    :title="'Integridad del expediente: ' + (caso.integridad_score || 0) + '%'"
-                                                >
-                                                    {{ caso.integridad_score || 0 }}%
-                                                </span>
-                                                <span
-                                                    v-if="financialStatusFor(caso).hasMissing"
-                                                    class="inline-flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-100"
-                                                    :title="financialStatusFor(caso).detail"
-                                                >
-                                                    <BanknotesIcon class="w-3 h-3" />
-                                                    Finanzas
-                                                </span>
-                                                <span v-if="caso.radicado" class="text-[10px] text-gray-400 flex items-center gap-1 group/rad">
-                                                    Rad: {{ caso.radicado }}
-                                                    <span v-if="caso.es_spoa_nunc" class="text-[7px] font-black bg-indigo-100 text-indigo-700 px-1 rounded uppercase tracking-tighter">SPOA/NUNC</span>
-                                                    <button @click.stop="copyToClipboard(caso.radicado)" class="opacity-0 group-hover/rad:opacity-100 transition-opacity">
-                                                        <DocumentDuplicateIcon class="w-3 h-3 hover:text-indigo-500" />
+                <!-- Listado de Casos -->
+                <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                    <div class="flex flex-col gap-3 border-b border-gray-100 p-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h3 class="text-sm font-black uppercase tracking-tight text-gray-950 dark:text-white">Listado de expedientes</h3>
+                            <p class="text-xs font-semibold text-gray-500 dark:text-gray-400">{{ resultRange }}</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                            <span class="rounded-lg border border-gray-200 px-2.5 py-1.5 dark:border-gray-700">Click para vista rápida</span>
+                            <span v-if="isDirty" class="rounded-lg bg-indigo-50 px-2.5 py-1.5 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300">Filtrado</span>
+                        </div>
+                    </div>
+
+                    <div v-if="casos.data.length === 0" class="flex min-h-72 flex-col items-center justify-center p-8 text-center">
+                        <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-900">
+                            <InboxIcon class="h-8 w-8 text-gray-400" />
+                        </div>
+                        <h3 class="text-base font-black text-gray-950 dark:text-white">No se encontraron casos</h3>
+                        <p class="mt-1 max-w-sm text-sm font-medium text-gray-500 dark:text-gray-400">
+                            No hay registros que coincidan con los filtros aplicados.
+                        </p>
+                        <button v-if="isDirty" type="button" @click="resetFilters" class="mt-4 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-black uppercase tracking-widest text-indigo-700 hover:bg-indigo-100">
+                            Limpiar filtros
+                        </button>
+                    </div>
+
+                    <template v-else>
+                        <div class="hidden overflow-x-auto custom-scrollbar-horizontal md:block">
+                            <table class="min-w-[1180px] divide-y divide-gray-100 dark:divide-gray-700">
+                                <thead class="bg-gray-50 dark:bg-gray-900/40">
+                                    <tr>
+                                        <th scope="col" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Expediente</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Entidad y despacho</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Estado procesal</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Responsable y actividad</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Finanzas</th>
+                                        <th scope="col" class="sticky right-0 z-10 bg-gray-50 px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-gray-400 dark:bg-gray-900">Acciones</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody class="divide-y divide-gray-100 bg-white dark:divide-gray-700 dark:bg-gray-800">
+                                    <tr
+                                        v-for="caso in casos.data"
+                                        :key="caso.id"
+                                        class="group cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-900/35"
+                                        :class="{ 'bg-indigo-50/50 dark:bg-indigo-900/10': caso.is_pinned }"
+                                        @click="openQuickView(caso)"
+                                    >
+                                        <td class="relative px-4 py-4 align-top">
+                                            <div v-if="caso.is_pinned" class="absolute bottom-0 left-0 top-0 w-1 bg-indigo-500"></div>
+                                            <div class="min-w-0 space-y-2">
+                                                <div class="flex items-start gap-2">
+                                                    <Link @click.stop :href="route('casos.show', caso.id)" class="break-words text-sm font-black leading-5 text-indigo-700 hover:underline dark:text-indigo-300">
+                                                        {{ caso.deudor?.nombre_completo ?? 'Sin deudor' }}
+                                                    </Link>
+                                                    <span v-if="caso.is_pinned" class="shrink-0 rounded bg-indigo-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200">Fijado</span>
+                                                    <PersonaCompletenessIndicator :persona="caso.deudor" compact />
+                                                </div>
+                                                <div class="flex flex-wrap items-center gap-1.5">
+                                                    <span class="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-black text-gray-600 dark:bg-gray-700 dark:text-gray-300">ID #{{ caso.id }}</span>
+                                                    <button
+                                                        v-if="caso.radicado"
+                                                        type="button"
+                                                        @click.stop="copyToClipboard(caso.radicado)"
+                                                        class="inline-flex items-center gap-1 rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-bold text-gray-600 hover:border-indigo-200 hover:text-indigo-600 dark:border-gray-700 dark:text-gray-300"
+                                                        title="Copiar radicado"
+                                                    >
+                                                        Rad. {{ caso.radicado }}
+                                                        <DocumentDuplicateIcon class="h-3 w-3" />
                                                     </button>
-                                                </span>
-                                                <span v-else class="text-[10px] font-bold text-amber-600 italic">Pendiente Radicado</span>
-                                            </div>
-                                        </div>
-                                    </td>
-
-                                    <!-- Cooperativa -->
-                                    <td class="px-6 py-4">
-                                        <span class="text-xs font-medium text-gray-600 dark:text-gray-300">
-                                            {{ caso.cooperativa?.nombre ?? 'N/A' }}
-                                        </span>
-                                    </td>
-
-                                    <!-- Etapa Procesal -->
-                                    <td class="px-6 py-4">
-                                        <div class="flex flex-col gap-1 items-start">
-                                            <span 
-                                                class="px-2.5 py-1 text-[10px] font-black rounded-lg border leading-none uppercase tracking-wider"
-                                                :class="getEtapaColor(caso.etapa_procesal || caso.estado_proceso)"
-                                            >
-                                                {{ caso.etapa_procesal || caso.estado_proceso || 'SIN ETAPA' }}
-                                            </span>
-                                            <span v-if="caso.nota_cierre" class="text-[9px] font-bold text-red-500 px-1 border border-red-200 rounded">CERRADO</span>
-                                        </div>
-                                    </td>
-
-                                    <!-- Responsable -->
-                                    <td class="px-6 py-4">
-                                        <div class="flex -space-x-2 overflow-hidden">
-                                            <template v-if="caso.users && caso.users.length > 0">
-                                                <div 
-                                                    v-for="u in caso.users" 
-                                                    :key="u.id" 
-                                                    @click.stop
-                                                    class="inline-flex items-center justify-center h-8 w-8 rounded-full ring-2 ring-white dark:ring-gray-800 bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 transition-transform hover:z-10 hover:scale-110 cursor-help"
-                                                    :title="u.name"
-                                                >
-                                                    <span class="text-[10px] font-black text-indigo-700 dark:text-indigo-300 uppercase">
-                                                        {{ u.name.split(' ').map(n => n[0]).join('').substring(0, 2) }}
+                                                    <span v-else class="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-black text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-300">Sin radicado</span>
+                                                </div>
+                                                <div class="flex items-center gap-2">
+                                                    <div class="h-1.5 w-24 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
+                                                        <div class="h-full rounded-full" :class="integrityTone(caso)" :style="integrityBarStyle(caso)"></div>
+                                                    </div>
+                                                    <span class="text-[10px] font-black text-gray-500 dark:text-gray-400">{{ integrityScore(caso) }}% integridad</span>
+                                                    <span
+                                                        v-if="financialStatusFor(caso).hasMissing"
+                                                        class="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-black uppercase text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-300"
+                                                        :title="financialStatusFor(caso).detail"
+                                                    >
+                                                        Finanzas por completar
                                                     </span>
                                                 </div>
-                                            </template>
-                                            <span v-else class="text-[10px] text-gray-400 font-bold italic">Sin asignar</span>
-                                        </div>
-                                    </td>
-
-                                    <!-- Actualización -->
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="flex flex-col">
-                                            <span class="text-xs font-bold text-gray-700 dark:text-gray-300">{{ formatDate(caso.updated_at) }}</span>
-                                            <span class="text-[10px] text-gray-400 italic">hace {{ formatTimeAgo(caso.updated_at) }}</span>
-                                            
-                                            <div v-if="getInactivityDays(caso.updated_at) >= 30 && !caso.nota_cierre" class="mt-1">
-                                                <span class="px-1.5 py-0.5 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[8px] font-black uppercase rounded border border-red-100 dark:border-red-800 animate-pulse">
-                                                    ⚠️ Inactivo {{ getInactivityDays(caso.updated_at) }}d
-                                                </span>
                                             </div>
-                                        </div>
-                                    </td>
+                                        </td>
 
-                                    <!-- Acciones Sticky -->
-                                    <td class="sticky right-0 bg-white dark:bg-gray-800 group-hover:bg-indigo-50/50 dark:group-hover:bg-gray-700 px-6 py-4 whitespace-nowrap text-right z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] transition-colors" :class="{'!bg-indigo-50/50 dark:!bg-indigo-900/20': caso.is_pinned}" @click.stop>
-                                        <div class="flex items-center justify-end gap-2">
-                                            <!-- BOTÓN FINALIZAR (Solo si no está cerrado) -->
-                                            <button 
-                                                v-if="!caso.nota_cierre && ['admin', 'abogado', 'gestor'].includes($page.props.auth.user.tipo_usuario)"
-                                                @click.stop="openCloseModal(caso)"
-                                                class="p-2 text-amber-600 bg-amber-50 dark:bg-amber-900/30 rounded-lg hover:bg-amber-600 hover:text-white transition-all shadow-sm"
-                                                title="Finalizar/Cerrar Proceso"
-                                            >
-                                                <ArchiveBoxXMarkIcon class="h-5 w-5" />
-                                            </button>
+                                        <td class="px-4 py-4 align-top">
+                                            <div class="max-w-xs space-y-2">
+                                                <p class="text-xs font-black text-gray-900 dark:text-white">{{ caso.cooperativa?.nombre ?? 'N/A' }}</p>
+                                                <p class="line-clamp-2 text-[11px] font-semibold leading-5 text-gray-500 dark:text-gray-400">
+                                                    {{ caso.juzgado?.nombre || 'Despacho por definir' }}
+                                                </p>
+                                                <div class="flex flex-wrap gap-1.5">
+                                                    <span v-if="caso.referencia_credito" class="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-600 dark:bg-gray-700 dark:text-gray-300">Pagaré {{ caso.referencia_credito }}</span>
+                                                    <span v-if="caso.tipo_proceso" class="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-600 dark:bg-gray-700 dark:text-gray-300">{{ caso.tipo_proceso }}</span>
+                                                </div>
+                                            </div>
+                                        </td>
 
-                                            <button 
-                                                @click.stop="togglePin(caso)"
-                                                class="p-2 rounded-lg transition-all shadow-sm"
-                                                :class="caso.is_pinned ? 'text-white bg-indigo-600 hover:bg-indigo-700' : 'text-gray-400 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600'"
-                                                :title="caso.is_pinned ? 'Desfijar' : 'Fijar al inicio'"
-                                            >
-                                                <PinIcon class="h-5 w-5" :class="{'rotate-45': !caso.is_pinned}" />
-                                            </button>
-                                            <Link
-                                                :href="route('casos.show', caso.id)"
-                                                class="p-2 text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
-                                                title="Ver detalle completo"
-                                            >
-                                                <EyeIcon class="h-5 w-5" />
+                                        <td class="px-4 py-4 align-top">
+                                            <div class="flex max-w-xs flex-col items-start gap-2">
+                                                <span class="rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase leading-4 tracking-wider" :class="getEtapaColor(caso.etapa_procesal || caso.estado_proceso)">
+                                                    {{ caso.etapa_procesal || caso.estado_proceso || 'Sin etapa' }}
+                                                </span>
+                                                <span v-if="caso.nota_cierre" class="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/10 dark:text-emerald-300">Cerrado</span>
+                                                <span v-if="caso.es_spoa_nunc" class="rounded border border-indigo-200 bg-indigo-50 px-2 py-1 text-[9px] font-black uppercase text-indigo-700 dark:border-indigo-900/40 dark:bg-indigo-900/10 dark:text-indigo-300">SPOA/NUNC</span>
+                                            </div>
+                                        </td>
+
+                                        <td class="px-4 py-4 align-top">
+                                            <div class="space-y-3">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="flex -space-x-2">
+                                                        <template v-if="caso.users && caso.users.length > 0">
+                                                            <div
+                                                                v-for="u in caso.users.slice(0, 3)"
+                                                                :key="u.id"
+                                                                class="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-indigo-50 text-[9px] font-black uppercase text-indigo-700 dark:border-gray-800 dark:bg-indigo-900/40 dark:text-indigo-200"
+                                                                :title="u.name"
+                                                            >
+                                                                {{ userInitials(u.name) }}
+                                                            </div>
+                                                            <div v-if="caso.users.length > 3" class="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-gray-100 text-[9px] font-black text-gray-600 dark:border-gray-800 dark:bg-gray-700 dark:text-gray-300">+{{ caso.users.length - 3 }}</div>
+                                                        </template>
+                                                        <div v-else class="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-[9px] font-black text-gray-500 dark:bg-gray-700 dark:text-gray-300">SA</div>
+                                                    </div>
+                                                    <p class="line-clamp-2 text-[11px] font-bold leading-4 text-gray-700 dark:text-gray-300" :title="responsibleNames(caso)">
+                                                        {{ primaryResponsible(caso) }}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p class="text-[11px] font-black text-gray-700 dark:text-gray-300">{{ formatDate(caso.updated_at) }}</p>
+                                                    <p class="text-[10px] font-semibold text-gray-400">Hace {{ formatTimeAgo(caso.updated_at) }}</p>
+                                                    <span v-if="isInactiveCase(caso)" class="mt-1 inline-flex rounded border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[9px] font-black uppercase text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/10 dark:text-rose-300">
+                                                        Inactivo {{ getInactivityDays(caso.updated_at) }}d
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        <td class="px-4 py-4 align-top">
+                                            <div class="space-y-2">
+                                                <div>
+                                                    <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Saldo actual</p>
+                                                    <p v-if="financialFieldFor(caso, 'monto_deuda_actual')?.missing" class="text-xs font-black uppercase text-amber-700 dark:text-amber-300">Por registrar</p>
+                                                    <p v-else class="text-sm font-black text-gray-900 dark:text-white">{{ formatCurrency(caso.monto_deuda_actual) }}</p>
+                                                </div>
+                                                <div class="flex flex-wrap gap-1.5">
+                                                    <span class="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-600 dark:bg-gray-700 dark:text-gray-300">Base {{ financialFieldFor(caso, 'monto_total')?.missing ? 'N/A' : formatCurrency(caso.monto_total) }}</span>
+                                                    <span class="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/10 dark:text-emerald-300">Pagado {{ financialFieldFor(caso, 'monto_total_pagado')?.missing ? 'N/A' : formatCurrency(caso.monto_total_pagado) }}</span>
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        <td class="sticky right-0 z-10 bg-white px-4 py-4 text-right align-top shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] transition-colors group-hover:bg-gray-50 dark:bg-gray-800 dark:group-hover:bg-gray-900" :class="{ '!bg-indigo-50 dark:!bg-indigo-900/20': caso.is_pinned }" @click.stop>
+                                            <div class="flex items-center justify-end gap-2">
+                                                <button
+                                                    v-if="!caso.nota_cierre && ['admin', 'abogado', 'gestor'].includes($page.props.auth.user.tipo_usuario)"
+                                                    type="button"
+                                                    @click.stop="openCloseModal(caso)"
+                                                    class="rounded-lg border border-amber-200 bg-amber-50 p-2 text-amber-700 transition-colors hover:bg-amber-600 hover:text-white dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-300"
+                                                    title="Finalizar/Cerrar proceso"
+                                                >
+                                                    <ArchiveBoxXMarkIcon class="h-4 w-4" />
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    @click.stop="togglePin(caso)"
+                                                    class="rounded-lg border p-2 transition-colors"
+                                                    :class="caso.is_pinned ? 'border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700' : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-indigo-200 hover:text-indigo-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300'"
+                                                    :title="caso.is_pinned ? 'Desfijar' : 'Fijar al inicio'"
+                                                >
+                                                    <PinIcon class="h-4 w-4" :class="{ 'rotate-45': !caso.is_pinned }" />
+                                                </button>
+
+                                                <Link
+                                                    :href="route('casos.show', caso.id)"
+                                                    class="rounded-lg border border-indigo-200 bg-indigo-50 p-2 text-indigo-700 transition-colors hover:bg-indigo-600 hover:text-white dark:border-indigo-900/40 dark:bg-indigo-900/10 dark:text-indigo-300"
+                                                    title="Ver expediente"
+                                                >
+                                                    <EyeIcon class="h-4 w-4" />
+                                                </Link>
+
+                                                <Dropdown align="right" width="48" teleport>
+                                                    <template #trigger>
+                                                        <button type="button" class="rounded-lg border border-gray-200 bg-white p-2 text-gray-500 transition-colors hover:border-indigo-200 hover:text-indigo-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                                            <EllipsisVerticalIcon class="h-4 w-4" />
+                                                        </button>
+                                                    </template>
+                                                    <template #content>
+                                                        <DropdownLink :href="route('casos.edit', caso.id)">
+                                                            <div class="flex items-center gap-2"><PencilSquareIcon class="w-4 h-4" /> Editar caso</div>
+                                                        </DropdownLink>
+                                                        <button
+                                                            v-if="!caso.nota_cierre && ['admin', 'abogado', 'gestor'].includes($page.props.auth.user.tipo_usuario)"
+                                                            type="button"
+                                                            @click="openCloseModal(caso)"
+                                                            class="block w-full border-t px-4 py-2 text-left text-sm font-bold text-amber-700 hover:bg-amber-50 dark:border-gray-700 dark:hover:bg-amber-900/20"
+                                                        >
+                                                            <div class="flex items-center gap-2"><ArchiveBoxXMarkIcon class="w-4 h-4" /> Finalizar proceso</div>
+                                                        </button>
+                                                        <button
+                                                            v-if="$page.props.auth.user.tipo_usuario === 'admin'"
+                                                            type="button"
+                                                            @click="confirmCaseDeletion(caso)"
+                                                            class="mt-1 block w-full border-t border-red-700 bg-red-600 px-4 py-3 text-left text-sm font-black uppercase tracking-widest text-white hover:bg-red-700"
+                                                        >
+                                                            <div class="flex items-center justify-center gap-2"><TrashIcon class="w-4 h-4" /> Eliminar registro</div>
+                                                        </button>
+                                                    </template>
+                                                </Dropdown>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="divide-y divide-gray-100 dark:divide-gray-700 md:hidden">
+                            <article
+                                v-for="caso in casos.data"
+                                :key="'mobile-' + caso.id"
+                                @click="openQuickView(caso)"
+                                class="cursor-pointer bg-white p-4 transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-900/40"
+                                :class="{ 'border-l-4 border-indigo-500 bg-indigo-50/40 dark:bg-indigo-900/10': caso.is_pinned }"
+                            >
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <div class="flex flex-wrap items-start gap-2">
+                                            <Link @click.stop :href="route('casos.show', caso.id)" class="break-words text-sm font-black leading-5 text-indigo-700 dark:text-indigo-300">
+                                                {{ caso.deudor?.nombre_completo ?? 'Sin deudor' }}
                                             </Link>
-                                            
-                                            <Dropdown align="right" width="48" teleport>
-                                                <template #trigger>
-                                                    <button class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">
-                                                        <EllipsisVerticalIcon class="w-5 h-5" />
-                                                    </button>
-                                                </template>
-                                                <template #content>
-                                                    <DropdownLink :href="route('casos.edit', caso.id)">
-                                                        <div class="flex items-center gap-2"><PencilSquareIcon class="w-4 h-4" /> Editar Caso</div>
-                                                    </DropdownLink>
-                                                    <button 
-                                                        v-if="!caso.nota_cierre && ['admin', 'abogado', 'gestor'].includes($page.props.auth.user.tipo_usuario)" 
-                                                        @click="openCloseModal(caso)" 
-                                                        class="block w-full text-left px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 font-bold border-t dark:border-gray-700 mt-1"
-                                                    >
-                                                        <div class="flex items-center gap-2"><ArchiveBoxXMarkIcon class="w-4 h-4" /> Finalizar Proceso</div>
-                                                    </button>
-                                                    <button 
-                                                        v-if="$page.props.auth.user.tipo_usuario === 'admin'" 
-                                                        @click="confirmCaseDeletion(caso)" 
-                                                        class="block w-full text-left px-4 py-2 text-sm bg-red-600 text-white hover:bg-red-700 font-black uppercase tracking-widest border-t border-red-700 mt-2 py-3 shadow-inner"
-                                                    >
-                                                        <div class="flex items-center justify-center gap-2"><TrashIcon class="w-4 h-4" /> ¡ELIMINAR REGISTRO!</div>
-                                                    </button>
-                                                </template>
-                                            </Dropdown>
+                                            <PersonaCompletenessIndicator :persona="caso.deudor" compact />
                                         </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- Paginación -->
-                    <div v-if="casos && casos.links?.length > 3" class="p-4 flex flex-wrap justify-center gap-2 border-t dark:border-gray-700">
-                        <Link
-                            v-for="(link, idx) in casos.links"
-                            :key="idx"
-                            :href="link.url || '#'"
-                            v-html="link.label"
-                            class="px-3 py-2 text-sm rounded-md border dark:border-gray-600"
-                            :class="{
-                                'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 pointer-events-none': !link.url,
-                                'bg-indigo-600 text-white border-indigo-600': link.active,
-                                'hover:bg-gray-100 dark:hover:bg-gray-600': link.url && !link.active
-                            }"
-                        />
-                    </div>
-                </div>
-
-                <!-- Móvil: Cards Modernas -->
-                <div class="md:hidden space-y-4">
-                    <div v-for="caso in casos.data" :key="'mob-'+caso.id" @click="openQuickView(caso)" class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden cursor-pointer">
-                        <div class="flex justify-between items-start mb-4">
-                            <div>
-                                <Link @click.stop :href="route('casos.show', caso.id)" class="text-sm font-black text-indigo-600 dark:text-indigo-400 hover:underline">
-                                    {{ caso.deudor?.nombre_completo ?? 'Sin deudor' }}
-                                </Link>
-                                <div class="flex items-center gap-1.5 mt-1">
-                                    <span class="text-[10px] font-bold px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded">
-                                        ID #{{ caso.id }}
-                                    </span>
+                                        <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                                            <span class="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-black text-gray-600 dark:bg-gray-700 dark:text-gray-300">ID #{{ caso.id }}</span>
+                                            <span v-if="caso.radicado" class="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-bold text-gray-600 dark:border-gray-700 dark:text-gray-300">Rad. {{ caso.radicado }}</span>
+                                            <span v-else class="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-black text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-300">Sin radicado</span>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        @click.stop="togglePin(caso)"
+                                        class="shrink-0 rounded-lg border p-2"
+                                        :class="caso.is_pinned ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-200 bg-gray-50 text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300'"
+                                        :title="caso.is_pinned ? 'Desfijar' : 'Fijar al inicio'"
+                                    >
+                                        <PinIcon class="h-4 w-4" :class="{ 'rotate-45': !caso.is_pinned }" />
+                                    </button>
                                 </div>
-                            </div>
-                            <span class="px-2 py-1 text-[9px] font-black rounded-lg border uppercase tracking-tighter shadow-sm" :class="getEtapaColor(caso.etapa_procesal || caso.estado_proceso)">
-                                {{ caso.etapa_procesal || caso.estado_proceso || 'SIN ETAPA' }}
-                            </span>
-                        </div>
 
-                        <div class="space-y-3 mb-6">
-                            <div class="flex items-start gap-2">
-                                <span class="text-[9px] font-black text-blue-600 bg-blue-50 px-1 rounded border border-blue-100 mt-0.5">EMP</span>
-                                <p class="text-xs font-bold text-gray-700 dark:text-gray-300 leading-tight">{{ caso.cooperativa?.nombre ?? 'N/A' }}</p>
-                            </div>
-                        </div>
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    <span class="rounded-lg border px-2 py-1 text-[10px] font-black uppercase leading-4" :class="getEtapaColor(caso.etapa_procesal || caso.estado_proceso)">
+                                        {{ caso.etapa_procesal || caso.estado_proceso || 'Sin etapa' }}
+                                    </span>
+                                    <span v-if="caso.nota_cierre" class="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/10 dark:text-emerald-300">Cerrado</span>
+                                    <span v-if="isInactiveCase(caso)" class="rounded border border-rose-200 bg-rose-50 px-2 py-1 text-[9px] font-black uppercase text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/10 dark:text-rose-300">Inactivo {{ getInactivityDays(caso.updated_at) }}d</span>
+                                </div>
 
-                        <div class="grid grid-cols-2 gap-3 pt-4 border-t border-gray-50 dark:border-gray-700">
-                            <Link @click.stop :href="route('casos.edit', caso.id)" class="flex items-center justify-center py-2 bg-gray-50 dark:bg-gray-700 text-[10px] font-black uppercase rounded-xl text-gray-500">Editar</Link>
-                            <Link @click.stop :href="route('casos.show', caso.id)" class="flex items-center justify-center py-2 bg-indigo-600 text-[10px] font-black uppercase rounded-xl text-white shadow-lg shadow-indigo-100">Ver Ficha</Link>
+                                <dl class="mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
+                                    <div>
+                                        <dt class="text-[9px] font-black uppercase tracking-widest text-gray-400">Cooperativa</dt>
+                                        <dd class="mt-0.5 font-bold text-gray-800 dark:text-gray-200">{{ caso.cooperativa?.nombre ?? 'N/A' }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-[9px] font-black uppercase tracking-widest text-gray-400">Responsable</dt>
+                                        <dd class="mt-0.5 font-bold text-gray-800 dark:text-gray-200">{{ primaryResponsible(caso) }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-[9px] font-black uppercase tracking-widest text-gray-400">Despacho</dt>
+                                        <dd class="mt-0.5 font-bold text-gray-800 dark:text-gray-200">{{ caso.juzgado?.nombre || 'Por definir' }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-[9px] font-black uppercase tracking-widest text-gray-400">Saldo actual</dt>
+                                        <dd v-if="financialFieldFor(caso, 'monto_deuda_actual')?.missing" class="mt-0.5 font-black uppercase text-amber-700 dark:text-amber-300">Por registrar</dd>
+                                        <dd v-else class="mt-0.5 font-black text-gray-900 dark:text-white">{{ formatCurrency(caso.monto_deuda_actual) }}</dd>
+                                    </div>
+                                </dl>
+
+                                <div class="mt-4 flex items-center justify-between gap-3 border-t border-gray-100 pt-3 dark:border-gray-700">
+                                    <div class="min-w-0">
+                                        <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Actualizado</p>
+                                        <p class="text-[11px] font-bold text-gray-700 dark:text-gray-300">{{ formatDate(caso.updated_at) }} · hace {{ formatTimeAgo(caso.updated_at) }}</p>
+                                    </div>
+                                    <div class="flex shrink-0 gap-2">
+                                        <Link @click.stop :href="route('casos.edit', caso.id)" class="rounded-lg border border-gray-200 px-3 py-2 text-[10px] font-black uppercase text-gray-600 dark:border-gray-700 dark:text-gray-300">Editar</Link>
+                                        <Link @click.stop :href="route('casos.show', caso.id)" class="rounded-lg bg-indigo-600 px-3 py-2 text-[10px] font-black uppercase text-white">Ver</Link>
+                                    </div>
+                                </div>
+                            </article>
+                        </div>
+                    </template>
+
+                    <div v-if="casos && casos.links?.length > 3" class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 p-4 dark:border-gray-700">
+                        <p class="text-xs font-bold text-gray-500 dark:text-gray-400">{{ resultRange }}</p>
+                        <div class="flex flex-wrap justify-end gap-2">
+                            <Link
+                                v-for="(link, idx) in casos.links"
+                                :key="idx"
+                                :href="link.url || '#'"
+                                v-html="link.label"
+                                class="rounded-lg border px-3 py-2 text-sm font-bold dark:border-gray-600"
+                                :class="{
+                                    'pointer-events-none bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500': !link.url,
+                                    'border-indigo-600 bg-indigo-600 text-white': link.active,
+                                    'hover:bg-gray-50 dark:hover:bg-gray-700': link.url && !link.active
+                                }"
+                            />
                         </div>
                     </div>
-                </div>
+                </section>
 
             </div>
         </div>
@@ -989,265 +1121,247 @@ const copyLegalInfo = (caso) => {
             </div>
         </Modal>
 
-        <!-- MODAL DE VISTA RÁPIDA (V5: Ficha Optimizada y Responsiva) -->
-        <Modal :show="showQuickViewModal" @close="closeQuickView" max-width="3xl" centered>
-            <div v-if="selectedCaso" class="overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-2xl transition-all border border-gray-100 dark:border-gray-800 flex flex-col h-[80vh] sm:h-[82vh]">
-                <!-- Header: Título y Navegación (Fijo) -->
-                <div class="px-4 py-3 sm:px-8 sm:py-5 bg-indigo-600 dark:bg-indigo-700 text-white flex justify-between items-center shrink-0 shadow-lg relative z-10 w-full">
-                    <div class="flex items-center gap-3 sm:gap-4 overflow-hidden min-w-0">
-                        <div class="hidden sm:flex h-10 w-10 bg-white/10 rounded-xl items-center justify-center border border-white/20 shrink-0">
-                            <ArchiveBoxXMarkIcon class="w-6 h-6" />
+        <!-- MODAL DE VISTA RAPIDA -->
+        <Modal :show="showQuickViewModal" @close="closeQuickView" max-width="5xl" centered>
+            <div v-if="selectedCaso" class="flex max-h-[88vh] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+                <div class="flex shrink-0 flex-col gap-3 border-b border-gray-200 bg-gray-950 px-4 py-4 text-white dark:border-gray-700 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="flex min-w-0 items-center gap-3">
+                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/10">
+                            <ArchiveBoxXMarkIcon class="h-5 w-5" />
                         </div>
-                        <div class="truncate min-w-0">
-                            <p class="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-indigo-100/70 truncate">Expediente #{{ selectedCaso.id }}</p>
-                            <h2 class="text-base sm:text-lg font-black leading-tight truncate">{{ selectedCaso.deudor?.nombre_completo }}</h2>
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Caso #{{ selectedCaso.id }}</p>
+                                <span class="rounded-md border px-2 py-0.5 text-[9px] font-black uppercase" :class="selectedCaso.nota_cierre ? 'border-rose-400/40 bg-rose-500/15 text-rose-100' : 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100'">
+                                    {{ selectedCaso.nota_cierre ? 'Cerrado' : 'Activo' }}
+                                </span>
+                                <span class="rounded-md border border-white/10 bg-white/10 px-2 py-0.5 text-[9px] font-black uppercase text-gray-200">
+                                    {{ integrityScore(selectedCaso) }}% integridad
+                                </span>
+                            </div>
+                            <div class="mt-1 flex min-w-0 flex-wrap items-center gap-2">
+                                <h2 class="truncate text-lg font-black tracking-tight text-white">
+                                    {{ selectedCaso.deudor?.nombre_completo || 'Sin deudor registrado' }}
+                                </h2>
+                                <PersonaCompletenessIndicator :persona="selectedCaso.deudor" compact />
+                            </div>
+                            <p class="mt-0.5 truncate text-xs font-semibold text-gray-400">
+                                {{ selectedCaso.cooperativa?.nombre || 'Sin empresa' }} · {{ selectedCaso.radicado || 'Sin radicado' }}
+                            </p>
                         </div>
                     </div>
-                    <div class="flex items-center gap-2 sm:gap-4 shrink-0 ml-2">
-                        <button @click="copyLegalInfo()" class="hidden sm:flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all text-[10px] font-black uppercase tracking-widest border border-white/30 shadow-inner active:scale-95">
-                            <DocumentDuplicateIcon class="w-4 h-4" /> Copiar Info Legal
+                    <div class="flex shrink-0 items-center justify-between gap-2 sm:justify-end">
+                        <button @click="copyLegalInfo()" class="hidden items-center gap-2 rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-white/15 sm:inline-flex">
+                            <DocumentDuplicateIcon class="h-4 w-4" /> Copiar
                         </button>
-                        <div class="flex bg-black/10 rounded-lg p-0.5">
-                            <button @click="prevCaso" :disabled="currentIndex === 0" class="p-1.5 sm:p-1.5 hover:bg-white/10 disabled:opacity-20 rounded-md transition-all active:scale-90" title="Anterior">
-                                <ChevronDownIcon class="w-4 h-4 rotate-90" />
+                        <div class="flex items-center rounded-lg bg-white/10 p-0.5">
+                            <button @click="prevCaso" :disabled="currentIndex === 0" class="rounded-md p-2 transition hover:bg-white/10 disabled:opacity-25" title="Anterior">
+                                <ChevronDownIcon class="h-4 w-4 rotate-90" />
                             </button>
-                            <div class="px-1.5 sm:px-3 flex items-center border-x border-white/5">
-                                <span class="text-[9px] sm:text-[10px] font-black tracking-widest">{{ currentIndex + 1 }}<span class="opacity-50 mx-0.5">/</span>{{ casos.data.length }}</span>
-                            </div>
-                            <button @click="nextCaso" :disabled="currentIndex === casos.data.length - 1" class="p-1.5 sm:p-1.5 hover:bg-white/10 disabled:opacity-20 rounded-md transition-all active:scale-90" title="Siguiente">
-                                <ChevronDownIcon class="w-4 h-4 -rotate-90" />
+                            <span class="border-x border-white/10 px-3 text-[10px] font-black tracking-widest">{{ currentIndex + 1 }}/{{ casos.data.length }}</span>
+                            <button @click="nextCaso" :disabled="currentIndex === casos.data.length - 1" class="rounded-md p-2 transition hover:bg-white/10 disabled:opacity-25" title="Siguiente">
+                                <ChevronDownIcon class="h-4 w-4 -rotate-90" />
                             </button>
                         </div>
-                        <button @click="closeQuickView" class="p-1.5 sm:p-2 hover:bg-white/10 rounded-lg transition-colors">
-                            <XMarkIcon class="w-5 h-5" />
+                        <button @click="closeQuickView" class="rounded-lg p-2 text-gray-300 transition hover:bg-white/10 hover:text-white" title="Cerrar">
+                            <XMarkIcon class="h-5 w-5" />
                         </button>
                     </div>
                 </div>
 
-                <!-- Cuerpo: Todos los detalles con Scroll Interno -->
-                <div class="flex-grow overflow-y-auto p-4 sm:p-8 custom-scrollbar space-y-8 sm:space-y-10 bg-gray-50/30 dark:bg-gray-900/50 w-full">
-                    
-                    <!-- 1. IDENTIFICACIÓN Y CONTACTO -->
-                    <section class="space-y-4">
-                        <div class="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-2">
-                            <UserIcon class="w-4 h-4 text-indigo-500" />
-                            <h3 class="text-[10px] sm:text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest">Partes Involucradas</h3>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
-                            <div class="space-y-3 min-w-0">
-                                <div class="group/item">
-                                    <p class="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Titular Principal</p>
-                                    <p class="text-sm font-black text-gray-900 dark:text-white group-hover/item:text-indigo-600 transition-colors break-words">{{ selectedCaso.deudor?.nombre_completo || 'No especificado' }}</p>
-                                </div>
-                                <div>
-                                    <p class="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Identificación</p>
-                                    <p class="text-xs font-bold text-gray-700 dark:text-gray-300">{{ selectedCaso.deudor?.numero_documento || 'Sin documento' }}</p>
-                                </div>
-                                <div>
-                                    <p class="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Cooperativa</p>
-                                    <p class="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded-md inline-block max-w-full truncate">{{ selectedCaso.cooperativa?.nombre || 'N/A' }}</p>
-                                </div>
-                            </div>
-                            <div class="space-y-3 pt-3 md:pt-0 border-t md:border-t-0 border-gray-100 dark:border-gray-700 min-w-0">
-                                <div>
-                                    <p class="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Celular / Teléfono</p>
-                                    <p class="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                                        <PhoneIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                        {{ selectedCaso.deudor?.celular_1 || 'No registrado' }}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p class="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Correo Electrónico</p>
-                                    <p class="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2 truncate">
-                                        <EnvelopeIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                        {{ selectedCaso.deudor?.correo_1 || 'Sin correo' }}
-                                    </p>
-                                </div>
-                                <div v-if="selectedCaso.codeudores?.length">
-                                    <p class="text-[9px] font-bold text-gray-400 uppercase mb-1.5">Codeudores ({{ selectedCaso.codeudores.length }})</p>
-                                    <div class="flex flex-wrap gap-1.5">
-                                        <span v-for="c in selectedCaso.codeudores" :key="c.id" class="text-[9px] font-black px-2 py-1 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg uppercase text-gray-600 dark:text-gray-400">
-                                            {{ c.nombre_completo.split(' ')[0] }}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <!-- 2. DETALLES JUDICIALES COMPLETOS -->
-                    <section class="space-y-4">
-                        <div class="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-2">
-                            <ScaleIcon class="w-4 h-4 text-indigo-500" />
-                            <h3 class="text-[10px] sm:text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest">Detalles del Proceso Judicial</h3>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 px-1">
-                            <div class="space-y-1 min-w-0">
-                                <p class="text-[9px] font-bold text-gray-400 uppercase">Radicado Judicial</p>
-                                <p class="text-xs font-black text-gray-800 dark:text-gray-200 flex items-center gap-2 break-all">
-                                    {{ selectedCaso.radicado || 'SIN ASIGNAR' }}
-                                    <span v-if="selectedCaso.es_spoa_nunc" class="text-[8px] font-black bg-indigo-100 text-indigo-700 px-1 rounded uppercase tracking-tighter">SPOA/NUNC</span>
-                                    <button v-if="selectedCaso.radicado" @click.stop="copyToClipboard(selectedCaso.radicado)" class="text-gray-400 hover:text-indigo-500 transition-colors shrink-0">
-                                        <DocumentDuplicateIcon class="w-3.5 h-3.5" />
-                                    </button>
+                <div class="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto bg-gray-50 dark:bg-gray-950 lg:grid-cols-[20rem_minmax(0,1fr)]">
+                    <aside class="space-y-4 border-b border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 lg:border-b-0 lg:border-r sm:p-5">
+                        <section class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Titular principal</p>
+                            <p class="mt-2 text-sm font-black leading-5 text-gray-950 dark:text-white">{{ selectedCaso.deudor?.nombre_completo || 'No especificado' }}</p>
+                            <PersonaCompletenessIndicator :persona="selectedCaso.deudor" class="mt-2" />
+                            <p class="mt-1 text-xs font-bold text-gray-500 dark:text-gray-400">{{ selectedCaso.deudor?.numero_documento || 'Sin documento' }}</p>
+                            <div class="mt-4 space-y-2">
+                                <p class="flex items-center gap-2 text-xs font-bold text-gray-700 dark:text-gray-300">
+                                    <PhoneIcon class="h-4 w-4 text-gray-400" /> {{ selectedCaso.deudor?.celular_1 || 'Teléfono no registrado' }}
+                                </p>
+                                <p class="flex min-w-0 items-center gap-2 text-xs font-bold text-gray-700 dark:text-gray-300">
+                                    <EnvelopeIcon class="h-4 w-4 shrink-0 text-gray-400" />
+                                    <span class="truncate">{{ selectedCaso.deudor?.correo_1 || 'Correo no registrado' }}</span>
                                 </p>
                             </div>
-                            <div class="space-y-1 min-w-0">
-                                <p class="text-[9px] font-bold text-gray-400 uppercase">Número de Pagaré</p>
-                                <p class="text-xs font-black text-gray-800 dark:text-gray-200 flex items-center gap-2 break-all">
-                                    {{ selectedCaso.referencia_credito || 'SIN ASIGNAR' }}
-                                    <button v-if="selectedCaso.referencia_credito" @click.stop="copyToClipboard(selectedCaso.referencia_credito)" class="text-gray-400 hover:text-indigo-500 transition-colors shrink-0">
-                                        <DocumentDuplicateIcon class="w-3.5 h-3.5" />
-                                    </button>
-                                </p>
-                            </div>
-                            <div class="space-y-1">
-                                <p class="text-[9px] font-bold text-gray-400 uppercase">Estado / Etapa</p>
-                                <p class="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase break-words">{{ selectedCaso.etapa_procesal || selectedCaso.estado_proceso || 'N/A' }}</p>
-                            </div>
-                            <div class="space-y-1">
-                                <p class="text-[9px] font-bold text-gray-400 uppercase">Especialidad</p>
-                                <p class="text-xs font-black text-gray-800 dark:text-gray-200 uppercase">{{ selectedCaso.especialidad?.nombre || 'CIVIL' }}</p>
-                            </div>
-                            <div class="sm:col-span-2 lg:col-span-3 space-y-1 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
-                                <p class="text-[9px] font-bold text-gray-400 uppercase">Juzgado</p>
-                                <p class="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2 break-words">
-                                    <BuildingOfficeIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                    {{ selectedCaso.juzgado?.nombre || 'POR DEFINIR DESPACHO' }}
-                                </p>
-                            </div>
-                            <div class="space-y-1">
-                                <p class="text-[9px] font-bold text-gray-400 uppercase">Tipo Proceso</p>
-                                <p class="text-xs font-bold text-gray-800 dark:text-gray-200">{{ selectedCaso.tipo_proceso || 'N/A' }}</p>
-                            </div>
-                            <div class="space-y-1">
-                                <p class="text-[9px] font-bold text-gray-400 uppercase">Subproceso</p>
-                                <p class="text-xs font-bold text-gray-800 dark:text-gray-200">{{ selectedCaso.subproceso || 'N/A' }}</p>
-                            </div>
-                            <div class="space-y-1">
-                                <p class="text-[9px] font-bold text-gray-400 uppercase">Etapa Actual</p>
-                                <p class="text-xs font-bold text-gray-800 dark:text-gray-200">{{ selectedCaso.etapa_actual || 'N/A' }}</p>
-                            </div>
-                        </div>
-                        <div class="p-4 bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-[9px] font-bold text-amber-600 uppercase mb-0.5">Garantía Asociada</p>
-                                <p class="text-xs font-black text-amber-800 dark:text-amber-400">{{ selectedCaso.tipo_garantia_asociada || 'Sin garantía registrada' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-[9px] font-bold text-amber-600 uppercase mb-0.5">Origen Documental</p>
-                                <p class="text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-tighter">{{ selectedCaso.origen_documental || 'N/A' }}</p>
-                            </div>
-                        </div>
-                    </section>
+                        </section>
 
-                    <!-- 3. RESUMEN FINANCIERO -->
-                    <section class="space-y-4">
-                        <div class="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-2">
-                            <BanknotesIcon class="w-4 h-4 text-indigo-500" />
-                            <h3 class="text-[10px] sm:text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest">Situación Económica</h3>
-                        </div>
-                        <div
-                            v-if="financialStatusFor(selectedCaso).hasMissing"
-                            class="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                        >
-                            <div>
-                                <p class="text-[10px] font-black text-amber-700 dark:text-amber-300 uppercase tracking-widest">Montos por completar</p>
-                                <p class="text-xs font-semibold text-amber-700 dark:text-amber-300 mt-1">{{ financialStatusFor(selectedCaso).detail }}</p>
+                        <section class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                            <div class="mb-3 flex items-center justify-between gap-3">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Responsables</p>
+                                <span class="rounded-md bg-gray-100 px-2 py-1 text-[10px] font-black text-gray-600 dark:bg-gray-800 dark:text-gray-300">{{ selectedCaso.users?.length || 0 }}</span>
                             </div>
-                            <Link
-                                :href="route('casos.edit', selectedCaso.id) + '?tab=info-principal'"
-                                class="inline-flex items-center justify-center px-3 py-2 bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-700 rounded-xl text-[10px] font-black uppercase text-amber-700 dark:text-amber-200 hover:border-amber-400 transition-colors shrink-0"
-                            >
-                                Editar
-                            </Link>
-                        </div>
-                        <div class="bg-gray-900 dark:bg-black p-5 sm:p-7 rounded-3xl text-white relative overflow-hidden shadow-xl w-full">
-                            <div class="absolute right-0 top-0 p-4 opacity-5 pointer-events-none">
-                                <BanknotesIcon class="w-32 h-32 rotate-12" />
+                            <div class="space-y-2">
+                                <div v-for="u in selectedCaso.users" :key="u.id" class="flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300">
+                                    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[10px] dark:bg-gray-900">{{ userInitials(u.name) }}</span>
+                                    <span class="truncate">{{ u.name }}</span>
+                                </div>
+                                <p v-if="!selectedCaso.users?.length" class="text-xs font-semibold text-gray-400">Sin abogados asignados</p>
                             </div>
-                            <div class="relative z-10">
-                                <p class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400 mb-2">Deuda Pendiente Actual</p>
-                                <h4 v-if="financialFieldFor(selectedCaso, 'monto_deuda_actual')?.missing" class="text-base sm:text-2xl font-black tracking-tight uppercase text-amber-200">Pendiente por registrar</h4>
-                                <h4 v-else class="text-xl sm:text-4xl font-black tracking-tight break-all">{{ formatCurrency(selectedCaso.monto_deuda_actual) }}</h4>
-                                
-                                <div class="grid grid-cols-1 xs:grid-cols-2 gap-4 sm:gap-8 mt-8 border-t border-white/10 pt-5">
-                                    <div class="min-w-0">
-                                        <p class="text-[9px] font-black text-gray-500 uppercase tracking-wider mb-1">Obligación Base</p>
-                                        <p v-if="financialFieldFor(selectedCaso, 'monto_total')?.missing" class="text-xs font-black text-amber-200 uppercase">Por registrar</p>
-                                        <p v-else class="text-sm font-black text-gray-200 truncate">{{ formatCurrency(selectedCaso.monto_total) }}</p>
+                        </section>
+
+                        <section class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                            <div class="mb-2 flex items-center justify-between gap-3">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Integridad</p>
+                                <span class="text-xs font-black text-gray-700 dark:text-gray-200">{{ integrityScore(selectedCaso) }}%</span>
+                            </div>
+                            <div class="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                                <div class="h-full rounded-full" :class="integrityTone(selectedCaso)" :style="integrityBarStyle(selectedCaso)"></div>
+                            </div>
+                            <p class="mt-3 text-xs font-semibold text-gray-500 dark:text-gray-400">{{ responsibleNames(selectedCaso) }}</p>
+                        </section>
+                    </aside>
+
+                    <main class="min-w-0 space-y-4 p-4 sm:p-5">
+                        <section class="grid grid-cols-1 gap-3 md:grid-cols-3">
+                            <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Radicado</p>
+                                <div class="mt-2 flex min-w-0 items-center gap-2">
+                                    <p class="truncate font-mono text-sm font-black text-gray-950 dark:text-white">{{ selectedCaso.radicado || 'SIN ASIGNAR' }}</p>
+                                    <button v-if="selectedCaso.radicado" @click.stop="copyToClipboard(selectedCaso.radicado)" class="shrink-0 text-gray-400 hover:text-indigo-600"><DocumentDuplicateIcon class="h-4 w-4" /></button>
+                                </div>
+                                <span v-if="selectedCaso.es_spoa_nunc" class="mt-2 inline-flex rounded-md bg-indigo-50 px-2 py-1 text-[9px] font-black uppercase text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">SPOA/NUNC</span>
+                            </div>
+                            <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Pagaré</p>
+                                <div class="mt-2 flex min-w-0 items-center gap-2">
+                                    <p class="truncate text-sm font-black text-gray-950 dark:text-white">{{ selectedCaso.referencia_credito || 'SIN ASIGNAR' }}</p>
+                                    <button v-if="selectedCaso.referencia_credito" @click.stop="copyToClipboard(selectedCaso.referencia_credito)" class="shrink-0 text-gray-400 hover:text-indigo-600"><DocumentDuplicateIcon class="h-4 w-4" /></button>
+                                </div>
+                            </div>
+                            <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Etapa</p>
+                                <p class="mt-2 text-sm font-black uppercase text-indigo-700 dark:text-indigo-300">{{ selectedCaso.etapa_procesal || selectedCaso.estado_proceso || 'N/A' }}</p>
+                            </div>
+                        </section>
+
+                        <section class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+                            <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 sm:p-5">
+                                <div class="mb-4 flex items-center gap-2">
+                                    <ScaleIcon class="h-4 w-4 text-indigo-500" />
+                                    <h3 class="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white">Proceso judicial</h3>
+                                </div>
+                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div class="sm:col-span-2 rounded-lg bg-gray-50 p-3 dark:bg-gray-800/60">
+                                        <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Juzgado</p>
+                                        <p class="mt-1 text-sm font-bold leading-5 text-gray-800 dark:text-gray-200">{{ selectedCaso.juzgado?.nombre || 'Por definir despacho' }}</p>
                                     </div>
-                                    <div class="min-w-0">
-                                        <p class="text-[9px] font-black text-green-500 uppercase tracking-wider mb-1">Total Recaudado</p>
-                                        <p v-if="financialFieldFor(selectedCaso, 'monto_total_pagado')?.missing" class="text-xs font-black text-amber-200 uppercase">Por registrar</p>
-                                        <p v-else-if="financialFieldFor(selectedCaso, 'monto_total_pagado')?.displayLabel" class="text-xs font-black text-green-300 uppercase">{{ financialFieldFor(selectedCaso, 'monto_total_pagado').displayLabel }}</p>
-                                        <p v-else class="text-sm font-black text-green-400 truncate">{{ formatCurrency(selectedCaso.monto_total_pagado) }}</p>
+                                    <div>
+                                        <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Especialidad</p>
+                                        <p class="mt-1 text-xs font-black uppercase text-gray-800 dark:text-gray-200">{{ selectedCaso.especialidad?.nombre || 'Civil' }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Tipo proceso</p>
+                                        <p class="mt-1 text-xs font-black text-gray-800 dark:text-gray-200">{{ selectedCaso.tipo_proceso || 'N/A' }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Subproceso</p>
+                                        <p class="mt-1 text-xs font-black text-gray-800 dark:text-gray-200">{{ selectedCaso.subproceso || 'N/A' }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Etapa actual</p>
+                                        <p class="mt-1 text-xs font-black text-gray-800 dark:text-gray-200">{{ selectedCaso.etapa_actual || 'N/A' }}</p>
+                                    </div>
+                                    <div class="rounded-lg border border-amber-100 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
+                                        <p class="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300">Garantía</p>
+                                        <p class="mt-1 text-xs font-black text-amber-900 dark:text-amber-200">{{ selectedCaso.tipo_garantia_asociada || 'Sin garantía registrada' }}</p>
+                                    </div>
+                                    <div class="rounded-lg border border-amber-100 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
+                                        <p class="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300">Origen documental</p>
+                                        <p class="mt-1 text-xs font-black uppercase text-amber-900 dark:text-amber-200">{{ selectedCaso.origen_documental || 'N/A' }}</p>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-4 px-1 pt-2">
-                            <div class="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
-                                <p class="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Apertura</p>
-                                <p class="text-xs font-black text-gray-800 dark:text-gray-200">{{ formatDate(selectedCaso.fecha_apertura) }}</p>
-                            </div>
-                            <div class="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
-                                <p class="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Vencimiento</p>
-                                <p class="text-xs font-black text-gray-800 dark:text-gray-200">{{ formatDate(selectedCaso.fecha_vencimiento) }}</p>
-                            </div>
-                            <div class="bg-red-50 dark:bg-red-900/10 p-3 rounded-xl border border-red-100 dark:border-red-900/20">
-                                <p class="text-[9px] font-black text-red-500 uppercase mb-0.5">Días en Mora</p>
-                                <p class="text-xs font-black text-red-600 dark:text-red-400">{{ selectedCaso.dias_en_mora || 0 }} días</p>
-                            </div>
-                        </div>
-                    </section>
 
-                    <!-- 4. GESTIÓN Y NOTAS LEGALES -->
-                    <section class="space-y-4">
-                        <div class="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-2">
-                            <ClipboardDocumentListIcon class="w-4 h-4 text-indigo-500" />
-                            <h3 class="text-[10px] sm:text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest">Gestión Técnica</h3>
-                        </div>
-                        <div class="space-y-6 px-1">
-                            <div>
-                                <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Abogados Asignados</p>
-                                <div class="flex flex-wrap gap-2">
-                                    <div v-for="u in selectedCaso.users" :key="u.id" class="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 text-[10px] font-black uppercase rounded-xl border border-indigo-100 dark:border-indigo-800">
-                                        <div class="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
-                                        {{ u.name }}
+                            <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 sm:p-5">
+                                <div class="mb-4 flex items-center gap-2">
+                                    <BanknotesIcon class="h-4 w-4 text-teal-500" />
+                                    <h3 class="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white">Cartera</h3>
+                                </div>
+                                <div v-if="financialStatusFor(selectedCaso).hasMissing" class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/60 dark:bg-amber-950/20">
+                                    <p class="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300">Montos por completar</p>
+                                    <p class="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">{{ financialStatusFor(selectedCaso).detail }}</p>
+                                </div>
+                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Deuda actual</p>
+                                <p v-if="financialFieldFor(selectedCaso, 'monto_deuda_actual')?.missing" class="mt-1 text-sm font-black uppercase text-amber-700 dark:text-amber-300">Pendiente</p>
+                                <p v-else class="mt-1 text-2xl font-black text-gray-950 dark:text-white">{{ formatCurrency(selectedCaso.monto_deuda_actual) }}</p>
+                                <div class="mt-5 grid grid-cols-1 gap-3">
+                                    <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800/60">
+                                        <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Obligación base</p>
+                                        <p v-if="financialFieldFor(selectedCaso, 'monto_total')?.missing" class="mt-1 text-xs font-black uppercase text-amber-700 dark:text-amber-300">Por registrar</p>
+                                        <p v-else class="mt-1 text-sm font-black text-gray-800 dark:text-gray-200">{{ formatCurrency(selectedCaso.monto_total) }}</p>
                                     </div>
-                                    <span v-if="!selectedCaso.users?.length" class="text-xs italic text-gray-400">Sin abogados asignados</span>
+                                    <div class="rounded-lg bg-emerald-50 p-3 dark:bg-emerald-950/20">
+                                        <p class="text-[10px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300">Total pagado</p>
+                                        <p v-if="financialFieldFor(selectedCaso, 'monto_total_pagado')?.missing" class="mt-1 text-xs font-black uppercase text-amber-700 dark:text-amber-300">Por registrar</p>
+                                        <p v-else-if="financialFieldFor(selectedCaso, 'monto_total_pagado')?.displayLabel" class="mt-1 text-xs font-black uppercase text-emerald-700 dark:text-emerald-300">{{ financialFieldFor(selectedCaso, 'monto_total_pagado').displayLabel }}</p>
+                                        <p v-else class="mt-1 text-sm font-black text-emerald-700 dark:text-emerald-300">{{ formatCurrency(selectedCaso.monto_total_pagado) }}</p>
+                                    </div>
                                 </div>
                             </div>
-                            
-                            <div v-if="selectedCaso.notas_legales">
-                                <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Observaciones de Proceso</p>
-                                <div class="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-indigo-500">
-                                    <p class="text-xs text-gray-600 dark:text-gray-400 italic leading-relaxed">{{ selectedCaso.notas_legales }}</p>
-                                </div>
-                            </div>
+                        </section>
 
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                                <a v-if="selectedCaso.link_drive" :href="selectedCaso.link_drive" target="_blank" class="flex items-center justify-center gap-2 p-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-200 dark:shadow-none active:scale-95">
-                                    <LinkIcon class="w-4 h-4" /> Carpeta Drive
-                                </a>
-                                <a v-if="selectedCaso.link_expediente" :href="selectedCaso.link_expediente" target="_blank" class="flex items-center justify-center gap-2 p-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-purple-200 dark:shadow-none active:scale-95">
-                                    <CloudArrowUpIcon class="w-4 h-4" /> Expediente Digital
-                                </a>
+                        <section class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                            <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Apertura</p>
+                                <p class="mt-1 text-xs font-black text-gray-800 dark:text-gray-200">{{ formatDate(selectedCaso.fecha_apertura) }}</p>
                             </div>
-                        </div>
-                    </section>
+                            <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Vencimiento</p>
+                                <p class="mt-1 text-xs font-black text-gray-800 dark:text-gray-200">{{ formatDate(selectedCaso.fecha_vencimiento) }}</p>
+                            </div>
+                            <div class="rounded-lg border border-rose-100 bg-rose-50 p-4 dark:border-rose-900/50 dark:bg-rose-950/20">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-rose-600 dark:text-rose-300">Mora</p>
+                                <p class="mt-1 text-xs font-black text-rose-700 dark:text-rose-300">{{ selectedCaso.dias_en_mora || 0 }} días</p>
+                            </div>
+                        </section>
+
+                        <section class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                            <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                                <div class="mb-3 flex items-center gap-2">
+                                    <UserGroupIcon class="h-4 w-4 text-gray-500" />
+                                    <h3 class="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white">Codeudores</h3>
+                                </div>
+                                <div v-if="selectedCaso.codeudores?.length" class="flex flex-wrap gap-2">
+                                    <div v-for="c in selectedCaso.codeudores" :key="c.id" class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[10px] font-black uppercase text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                                        <span>{{ c.nombre_completo }}</span>
+                                        <PersonaCompletenessIndicator :persona="c" :href="route('casos.edit', selectedCaso.id) + '?tab=codeudores'" compact class="mt-1" />
+                                    </div>
+                                </div>
+                                <p v-else class="text-xs font-semibold text-gray-400">Sin codeudores registrados</p>
+                            </div>
+                            <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                                <div class="mb-3 flex items-center gap-2">
+                                    <ClipboardDocumentListIcon class="h-4 w-4 text-gray-500" />
+                                    <h3 class="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white">Notas y enlaces</h3>
+                                </div>
+                                <p class="text-xs font-semibold leading-5 text-gray-600 dark:text-gray-300">{{ selectedCaso.notas_legales || 'Sin observaciones de proceso registradas.' }}</p>
+                                <div class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    <a v-if="selectedCaso.link_drive" :href="selectedCaso.link_drive" target="_blank" class="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-blue-700">
+                                        <LinkIcon class="h-4 w-4" /> Drive
+                                    </a>
+                                    <a v-if="selectedCaso.link_expediente" :href="selectedCaso.link_expediente" target="_blank" class="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-900 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-black dark:bg-white dark:text-gray-900">
+                                        <CloudArrowUpIcon class="h-4 w-4" /> Expediente
+                                    </a>
+                                </div>
+                            </div>
+                        </section>
+                    </main>
                 </div>
 
-                <!-- Footer: Acción de Ingreso Full (Fijo) -->
-                <div class="px-4 py-4 sm:px-8 sm:py-5 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.03)] relative z-10">
-                    <p class="text-[10px] font-bold text-gray-400 italic flex items-center gap-2">
-                        <ClockIcon class="w-3.5 h-3.5" /> 
-                        Última actualización: {{ formatDate(selectedCaso.updated_at) }} (hace {{ formatTimeAgo(selectedCaso.updated_at) }})
+                <div class="flex shrink-0 flex-col gap-3 border-t border-gray-200 bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                    <p class="text-[10px] font-bold text-gray-500 dark:text-gray-400">
+                        Actualizado {{ formatDate(selectedCaso.updated_at) }} · hace {{ formatTimeAgo(selectedCaso.updated_at) }}
                     </p>
-                    <Link :href="route('casos.show', selectedCaso.id)" class="w-full sm:w-auto px-8 py-3.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] transition-all hover:bg-black dark:hover:bg-gray-100 shadow-xl shadow-gray-200 dark:shadow-none active:scale-[0.98] text-center">
-                        Ver Expediente Completo &rarr;
-                    </Link>
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                        <Link :href="route('casos.edit', selectedCaso.id)" class="inline-flex justify-center rounded-lg border border-gray-200 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
+                            Editar
+                        </Link>
+                        <Link :href="route('casos.show', selectedCaso.id)" class="inline-flex justify-center rounded-lg bg-gray-950 px-5 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-black dark:bg-white dark:text-gray-900">
+                            Ver expediente completo &rarr;
+                        </Link>
+                    </div>
                 </div>
             </div>
         </Modal>

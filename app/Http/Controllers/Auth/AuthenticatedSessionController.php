@@ -15,6 +15,7 @@ use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use App\Events\UserLoggedIn;
+use App\Services\UserWorkSessionService;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -68,6 +69,8 @@ class AuthenticatedSessionController extends Controller
 
         $user->forceFill($loginAttributes)->save();
 
+        app(UserWorkSessionService::class)->start($user, $request);
+
         if (config('session.single_active', false)) {
             $this->deleteOtherDatabaseSessions((int) $user->id, $sessionId);
         }
@@ -88,6 +91,10 @@ class AuthenticatedSessionController extends Controller
     public function destroy(Request $request): RedirectResponse
     {
         $user = $request->user();
+        $shouldFinishTurn = $request->input('reason') === 'finish_turn';
+        $turnoResumen = $shouldFinishTurn
+            ? app(UserWorkSessionService::class)->finishCurrent($request, 'turno_finalizado')
+            : null;
         $sessionToken = $request->session()->get('active_session_token');
 
         if ($user) {
@@ -112,15 +119,13 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerateToken();
 
-        // =================================================================
-        // ===== INICIO: CORRECCIÓN ======================================
-        // =================================================================
-        // Cambiamos la redirección de vuelta a la raíz ('/') para que
-        // muestre tu nueva página de inicio al cerrar sesión.
-        return redirect('/');
-        // =================================================================
-        // ===== FIN DE LA CORRECCIÓN ====================================
-        // =================================================================
+        $redirect = redirect('/');
+
+        if ($turnoResumen) {
+            $redirect->with('workSessionSummary', $turnoResumen);
+        }
+
+        return $redirect;
     }
 
     private function deleteOtherDatabaseSessions(int $userId, string $currentSessionId): void

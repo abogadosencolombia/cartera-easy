@@ -14,7 +14,7 @@ class ProcesarNotificacionesGestion extends Command
      *
      * @var string
      */
-    protected $signature = 'gestion:procesar-alertas';
+    protected $signature = 'gestion:procesar-alertas-legacy';
 
     /**
      * The console command description.

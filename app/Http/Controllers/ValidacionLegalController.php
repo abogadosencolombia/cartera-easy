@@ -4,18 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Models\ValidacionLegal;
 use App\Services\ExpedienteIntegrityService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class ValidacionLegalController extends Controller
 {
+    use AuthorizesRequests;
+
     /**
      * Actualiza una validación legal, registrando una acción correctiva.
      */
     public function __invoke(Request $request, ValidacionLegal $validacion)
     {
-        // Opcional: Autorización para asegurar que solo usuarios permitidos puedan corregir.
-        // $this->authorize('corregir', $validacion);
+        abort_unless($validacion->caso, 404);
+        $this->authorize('update', $validacion->caso);
 
         $request->validate([
             'accion_correctiva' => 'required|string|min:10',

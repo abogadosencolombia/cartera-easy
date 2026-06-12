@@ -202,4 +202,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(Tarea::class, 'admin_id');
     }
+
+
+    public function workSessions(): HasMany
+    {
+        return $this->hasMany(UserWorkSession::class);
+    }
 }

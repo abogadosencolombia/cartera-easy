@@ -51,7 +51,7 @@ class ValidacionLegalService
                     'nivel_riesgo' => 'medio',
                 ]
             );
-            Log::info("--> Validación para '{$tipoValidacion}' procesada. Estado: " . ($documentoExiste ? 'CUMPLE' : 'INCUMPLE'));
+            Log::info("--> Validación para '{$nombreDocumento}' procesada. Estado: " . ($documentoExiste ? 'CUMPLE' : 'INCUMPLE'));
         }
         Log::info("--- [ValidacionLegalService] Finalizado para Caso ID: {$caso->id} ---");
     }

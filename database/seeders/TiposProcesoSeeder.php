@@ -20,7 +20,8 @@ class TiposProcesoSeeder extends Seeder
             'PERSONAL',
             'PROCESO VERBAL',
             'LIQUIDATORIO',
-        	'DECLARATIVO',
+            'DECLARATIVO',
+            'COMPRAVENTA',
         ];
 
         foreach ($tipos as $nombre) {
