@@ -11,6 +11,7 @@ import DropdownLink from '@/Components/DropdownLink.vue';
 import Textarea from '@/Components/Textarea.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PersonaCompletenessIndicator from '@/Components/PersonaCompletenessIndicator.vue';
+import DatePicker from '@/Components/DatePicker.vue';
 
 // --- TIPOS DE ENTIDAD ---
 const tiposEntidad = [
@@ -19,7 +20,7 @@ const tiposEntidad = [
 ];
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import { ref, watch, reactive, computed, onMounted } from 'vue';
-import { TrashIcon, MagnifyingGlassIcon, InboxIcon, EyeIcon, ArrowDownTrayIcon, FunnelIcon, ArchiveBoxXMarkIcon, ChevronDownIcon, XMarkIcon, DocumentDuplicateIcon, CloudArrowUpIcon, BanknotesIcon, ExclamationCircleIcon, ArrowPathIcon, CheckCircleIcon, UserGroupIcon, ScaleIcon, PhoneIcon, EnvelopeIcon, BuildingOfficeIcon, ClockIcon, ExclamationTriangleIcon, UserIcon, ClipboardDocumentListIcon, LinkIcon, MapPinIcon as PinIcon, EllipsisVerticalIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'; 
+import { TrashIcon, MagnifyingGlassIcon, InboxIcon, EyeIcon, ArrowDownTrayIcon, FunnelIcon, ArchiveBoxXMarkIcon, ChevronDownIcon, ChevronUpIcon, CheckIcon, XMarkIcon, DocumentDuplicateIcon, CloudArrowUpIcon, BanknotesIcon, ExclamationCircleIcon, ArrowPathIcon, CheckCircleIcon, UserGroupIcon, ScaleIcon, PhoneIcon, EnvelopeIcon, BuildingOfficeIcon, BuildingLibraryIcon, ClockIcon, ExclamationTriangleIcon, UserIcon, ClipboardDocumentListIcon, LinkIcon, MapPinIcon as PinIcon, EllipsisVerticalIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'; 
 import { getCaseFinancialStatus } from '@/Utils/caseFinancialStatus';
 
 const togglePin = (caso) => {
@@ -45,8 +46,74 @@ const props = defineProps({
 // --- Lógica de Búsqueda y Filtros Combinada ---
 const selectedJuzgado = ref(props.selectedJuzgado || null);
 const filterStorageKey = 'casos.index.filters';
-const filterKeys = ['search', 'abogado_id', 'cooperativa_id', 'juzgado_id', 'tipo_entidad', 'etapa_procesal', 'sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy', 'integridad_baja'];
+const filterKeys = ['search', 'abogado_id', 'cooperativa_id', 'juzgado_id', 'tipo_entidad', 'etapa_procesal', 'sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy', 'integridad_baja', 'fecha_inicio', 'fecha_fin'];
 const booleanFilterKeys = ['sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy', 'integridad_baja'];
+
+/**
+ * ESTADO DEL PANEL DE FILTROS COLAPSABLE
+ * Controla si la sección de filtros está expandida o contraída.
+ */
+const showFilters = ref(false);
+
+/**
+ * ESTADOS Y OPCIONES PARA DROPDOWNS PERSONALIZADOS
+ * Reemplazan los select nativos para una mejor estética y UX.
+ */
+const openCooperativaDropdown = ref(false);
+const openAbogadoDropdown = ref(false);
+const openEtapaDropdown = ref(false);
+const openEntidadDropdown = ref(false);
+
+// --- LÓGICA DE BÚSQUEDA INTERNA PARA DROPDOWNS ---
+const searchAbogado = ref('');
+const searchEtapa = ref('');
+
+const opcionesCooperativa = computed(() => [
+    { value: '', label: 'Todas las cooperativas' },
+    ...(props.cooperativas || []).map(c => ({ value: c.id, label: c.nombre }))
+]);
+
+// Lista de responsables filtrada por el buscador interno
+const opcionesAbogado = computed(() => {
+    const list = [
+        { value: '', label: 'Todos los responsables' },
+        ...(props.abogados || []).map(a => ({ value: a.id, label: a.name }))
+    ];
+    if (!searchAbogado.value) return list;
+    const term = searchAbogado.value.toLowerCase();
+    return list.filter(o => o.label.toLowerCase().includes(term));
+});
+
+// Lista de etapas filtrada por el buscador interno
+const opcionesEtapa = computed(() => {
+    const list = [
+        { value: '', label: 'Todas las etapas' },
+        ...(props.etapas_procesales || []).map(e => ({ value: e, label: e }))
+    ];
+    if (!searchEtapa.value) return list;
+    const term = searchEtapa.value.toLowerCase();
+    return list.filter(o => o.label.toLowerCase().includes(term));
+});
+
+const opcionesEntidad = computed(() => [
+    { value: '', label: 'Todas las entidades' },
+    ...tiposEntidad.map(t => ({ value: t, label: t }))
+]);
+
+const currentLabelCooperativa = computed(() => opcionesCooperativa.value.find(o => String(o.value) === String(filterForm.cooperativa_id))?.label || 'Cooperativas');
+
+// Los labels buscan en la lista completa de props para no perder el nombre al filtrar la lista visual
+const currentLabelAbogado = computed(() => {
+    const all = [{ value: '', label: 'Todos los responsables' }, ...(props.abogados || []).map(a => ({ value: a.id, label: a.name }))];
+    return all.find(o => String(o.value) === String(filterForm.abogado_id))?.label || 'Responsables';
+});
+
+const currentLabelEtapa = computed(() => {
+    const all = [{ value: '', label: 'Todas las etapas' }, ...(props.etapas_procesales || []).map(e => ({ value: e, label: e }))];
+    return all.find(o => String(o.value) === String(filterForm.etapa_procesal))?.label || 'Etapas';
+});
+
+const currentLabelEntidad = computed(() => opcionesEntidad.value.find(o => String(o.value) === String(filterForm.tipo_entidad))?.label || 'Entidades');
 
 const parseBooleanFilter = (value) => value === true || value === 'true' || value === 1 || value === '1';
 
@@ -93,6 +160,8 @@ const filterForm = reactive({
     juzgado_id: initialFilterValue('juzgado_id'),
     tipo_entidad: initialFilterValue('tipo_entidad'),
     etapa_procesal: initialFilterValue('etapa_procesal'),
+    fecha_inicio: initialFilterValue('fecha_inicio'),
+    fecha_fin: initialFilterValue('fecha_fin'),
     sin_radicado: parseBooleanFilter(initialFilterValue('sin_radicado', false)),
     inactivo_20_dias: parseBooleanFilter(initialFilterValue('inactivo_20_dias', false)),
     cerrados: parseBooleanFilter(initialFilterValue('cerrados', false)),
@@ -109,6 +178,8 @@ const currentFilterPayload = () => ({
     juzgado_id: filterForm.juzgado_id,
     tipo_entidad: filterForm.tipo_entidad,
     etapa_procesal: filterForm.etapa_procesal,
+    fecha_inicio: filterForm.fecha_inicio,
+    fecha_fin: filterForm.fecha_fin,
     sin_radicado: filterForm.sin_radicado,
     inactivo_20_dias: filterForm.inactivo_20_dias,
     cerrados: filterForm.cerrados,
@@ -161,6 +232,8 @@ const isDirty = computed(() => {
            filterForm.juzgado_id !== '' || 
            filterForm.tipo_entidad !== '' || 
            filterForm.etapa_procesal !== '' ||
+           filterForm.fecha_inicio !== '' ||
+           filterForm.fecha_fin !== '' ||
            filterForm.sin_radicado === true ||
            filterForm.inactivo_20_dias === true ||
            filterForm.cerrados === true ||
@@ -180,6 +253,8 @@ const resetFilters = () => {
     filterForm.tipo_entidad = '';
     selectedJuzgado.value = null;
     filterForm.etapa_procesal = '';
+    filterForm.fecha_inicio = '';
+    filterForm.fecha_fin = '';
     filterForm.sin_radicado = false;
     filterForm.inactivo_20_dias = false;
     filterForm.cerrados = false;
@@ -653,8 +728,9 @@ const copyLegalInfo = (caso) => {
                 </section>
 
                 <!-- Filtros -->
-                <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5">
-                    <div class="flex flex-col gap-3 border-b border-gray-100 pb-4 dark:border-gray-700 lg:flex-row lg:items-center lg:justify-between">
+                <section class="relative rounded-lg border border-gray-200 bg-white p-4 pb-8 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5 sm:pb-10">
+                    <!-- ENCABEZADO DE FILTROS: Siempre visible -->
+                    <div class="flex flex-col gap-3 border-b border-gray-200 pb-4 dark:border-gray-600 lg:flex-row lg:items-center lg:justify-between">
                         <div class="flex items-center gap-3">
                             <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-50 text-gray-500 dark:bg-gray-900 dark:text-gray-300">
                                 <FunnelIcon class="h-5 w-5" />
@@ -677,82 +753,259 @@ const copyLegalInfo = (caso) => {
                         </button>
                     </div>
 
-                    <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-12">
-                        <div class="lg:col-span-5">
-                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Búsqueda general</label>
-                            <div class="relative">
-                                <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                                <input
-                                    v-model="filterForm.search"
-                                    type="text"
-                                    class="block w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-3 text-sm font-semibold text-gray-800 transition-colors focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                    placeholder="Nombre, cédula, radicado, pagaré, cooperativa o juzgado"
+                    <!-- PANEL DE FILTROS COLAPSABLE -->
+                    <transition
+                        enter-active-class="transition duration-300 ease-out"
+                        enter-from-class="transform -translate-y-4 opacity-0"
+                        enter-to-class="transform translate-y-0 opacity-100"
+                        leave-active-class="transition duration-200 ease-in"
+                        leave-from-class="transform translate-y-0 opacity-100"
+                        leave-to-class="transform -translate-y-4 opacity-0"
+                    >
+                        <div v-show="showFilters" class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
+                            <!-- FILA 1: Control rápido de filtros predefinidos -->
+                            <div class="lg:col-span-12">
+                                <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Control rápido</label>
+                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                                    <button
+                                        v-for="item in controlFilterItems"
+                                        :key="item.key"
+                                        type="button"
+                                        @click="applyControlFilter(item.key)"
+                                        :class="filterForm[item.key] ? item.activeClass : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-indigo-200 hover:text-indigo-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300'"
+                                        class="inline-flex min-h-10 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-[10px] font-black uppercase tracking-wider transition-colors"
+                                    >
+                                        <span class="inline-flex min-w-0 items-center gap-2">
+                                            <component :is="item.icon" class="h-4 w-4 shrink-0" />
+                                            <span class="truncate">{{ item.label }}</span>
+                                        </span>
+                                        <span v-if="item.count !== null && item.count !== undefined" class="shrink-0 rounded bg-white/70 px-1.5 py-0.5 text-[9px] text-gray-700 dark:bg-black/20 dark:text-white">{{ item.count }}</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Línea separadora Fila 1 - Fila 2 -->
+                            <div class="col-span-1 py-1 lg:col-span-12">
+                                <div class="h-px w-full bg-gray-200 dark:bg-gray-700"></div>
+                            </div>
+
+                            <!-- FILA 2: Búsqueda de texto y Despacho judicial -->
+                            <div class="lg:col-span-6">
+                                <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Búsqueda general</label>
+                                <div class="relative">
+                                    <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                    <input
+                                        v-model="filterForm.search"
+                                        type="text"
+                                        class="block w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-3 text-sm font-semibold text-gray-800 transition-colors focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                        placeholder="Nombre, cédula, radicado, pagaré, cooperativa o juzgado"
+                                    />
+                                </div>
+                            </div>
+
+                            <div class="lg:col-span-6">
+                                <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Despacho o juzgado</label>
+                                <AsyncSelect
+                                    v-model="selectedJuzgado"
+                                    :endpoint="route('juzgados.search')"
+                                    placeholder="Buscar juzgado o despacho"
+                                    label-key="nombre"
+                                    class="!min-h-[42px] !rounded-lg"
                                 />
                             </div>
-                        </div>
 
-                        <div class="lg:col-span-3">
-                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Cooperativa</label>
-                            <SelectInput v-model="filterForm.cooperativa_id" class="w-full rounded-lg py-2.5 text-sm">
-                                <option value="">Todas</option>
-                                <option v-for="c in cooperativas" :key="c.id" :value="c.id">{{ c.nombre }}</option>
-                            </SelectInput>
-                        </div>
+                            <!-- Línea separadora Fila 2 - Fila 3 -->
+                            <div class="col-span-1 py-1 lg:col-span-12">
+                                <div class="h-px w-full bg-gray-200 dark:bg-gray-700"></div>
+                            </div>
 
-                        <div class="lg:col-span-2">
-                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Responsable</label>
-                            <SelectInput v-model="filterForm.abogado_id" class="w-full rounded-lg py-2.5 text-sm">
-                                <option value="">Todos</option>
-                                <option v-for="a in abogados" :key="a.id" :value="a.id">{{ a.name }}</option>
-                            </SelectInput>
-                        </div>
+                            <!-- FILA 3: Filtros técnicos personalizados -->
+                            <!-- Cooperativa -->
+                            <div class="lg:col-span-4">
+                                <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Cooperativa</label>
+                                <div class="relative">
+                                    <button type="button" @click="openCooperativaDropdown = !openCooperativaDropdown" class="flex min-h-[42px] w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm font-semibold text-gray-800 transition-all hover:border-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                                        <div class="flex items-center gap-2 truncate text-[13px]">
+                                            <BuildingOfficeIcon class="h-4 w-4 text-gray-400" />
+                                            <span class="truncate">{{ currentLabelCooperativa }}</span>
+                                        </div>
+                                        <ChevronDownIcon class="h-3 w-3 shrink-0 text-gray-400 transition-transform" :class="{ 'rotate-180': openCooperativaDropdown }" />
+                                    </button>
+                                    <div v-if="openCooperativaDropdown" class="fixed inset-0 z-40" @click="openCooperativaDropdown = false"></div>
+                                    <transition enter-active-class="transition duration-100 ease-out" enter-from-class="transform scale-95 opacity-0" enter-to-class="transform scale-100 opacity-100" leave-active-class="transition duration-75 ease-in" leave-from-class="transform scale-100 opacity-100" leave-to-class="transform scale-95 opacity-0">
+                                        <div v-show="openCooperativaDropdown" class="absolute left-0 right-0 z-50 mt-1 origin-top overflow-hidden rounded-xl border border-gray-200 bg-white p-1 shadow-xl dark:border-gray-700 dark:bg-gray-800">
+                                            <ul class="max-h-60 overflow-y-auto py-1 custom-scrollbar-horizontal">
+                                                <li v-for="opcion in opcionesCooperativa" :key="opcion.value">
+                                                    <button type="button" @click="filterForm.cooperativa_id = opcion.value; openCooperativaDropdown = false" class="group flex w-full items-center justify-between px-3 py-2.5 text-left text-sm font-bold transition-all" :class="String(filterForm.cooperativa_id) === String(opcion.value) ? 'border-l-4 border-indigo-600 bg-transparent text-indigo-600 dark:text-indigo-400' : 'border-l-4 border-transparent text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-white'">
+                                                        <span>{{ opcion.label }}</span>
+                                                        <CheckIcon v-if="String(filterForm.cooperativa_id) === String(opcion.value)" class="h-4 w-4 shrink-0 animate-in zoom-in-50" />
+                                                    </button>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </transition>
+                                </div>
+                            </div>
 
-                        <div class="lg:col-span-2">
-                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Etapa</label>
-                            <SelectInput v-model="filterForm.etapa_procesal" class="w-full rounded-lg py-2.5 text-sm">
-                                <option value="">Todas</option>
-                                <option v-for="e in etapas_procesales" :key="e" :value="e">{{ e }}</option>
-                            </SelectInput>
-                        </div>
+                            <!-- Responsable -->
+                            <div class="lg:col-span-4">
+                                <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Responsable</label>
+                                <div class="relative">
+                                    <button type="button" @click="openAbogadoDropdown = !openAbogadoDropdown" class="flex min-h-[42px] w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm font-semibold text-gray-800 transition-all hover:border-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                                        <div class="flex items-center gap-2 truncate text-[13px]">
+                                            <UserIcon class="h-4 w-4 text-gray-400" />
+                                            <span class="truncate">{{ currentLabelAbogado }}</span>
+                                        </div>
+                                        <ChevronDownIcon class="h-3 w-3 shrink-0 text-gray-400 transition-transform" :class="{ 'rotate-180': openAbogadoDropdown }" />
+                                    </button>
+                                    <!-- Overlay para cerrar el menú y limpiar búsqueda -->
+                                    <div v-if="openAbogadoDropdown" class="fixed inset-0 z-40" @click="openAbogadoDropdown = false; searchAbogado = ''"></div>
+                                    <transition enter-active-class="transition duration-100 ease-out" enter-from-class="transform scale-95 opacity-0" enter-to-class="transform scale-100 opacity-100" leave-active-class="transition duration-75 ease-in" leave-from-class="transform scale-100 opacity-100" leave-to-class="transform scale-95 opacity-0">
+                                        <div v-show="openAbogadoDropdown" class="absolute left-0 right-0 z-50 mt-1 origin-top overflow-hidden rounded-xl border border-gray-200 bg-white p-1 shadow-xl dark:border-gray-700 dark:bg-gray-800">
+                                            <!-- Buscador Interno -->
+                                            <div class="px-2 py-2 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
+                                                <div class="relative">
+                                                    <MagnifyingGlassIcon class="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                                                    <input 
+                                                        v-model="searchAbogado"
+                                                        type="text"
+                                                        class="w-full pl-8 pr-8 py-1.5 text-[11px] font-bold border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm"
+                                                        placeholder="Filtrar nombres..."
+                                                        @click.stop
+                                                    />
+                                                    <button v-if="searchAbogado" @click.stop="searchAbogado = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-500 transition-colors">
+                                                        <XMarkIcon class="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <ul class="max-h-60 overflow-y-auto py-1 custom-scrollbar-horizontal">
+                                                <li v-for="opcion in opcionesAbogado" :key="opcion.value">
+                                                    <button type="button" @click="filterForm.abogado_id = opcion.value; openAbogadoDropdown = false; searchAbogado = ''" class="group flex w-full items-center justify-between px-3 py-2.5 text-left text-sm font-bold transition-all" :class="String(filterForm.abogado_id) === String(opcion.value) ? 'border-l-4 border-indigo-600 bg-transparent text-indigo-600 dark:text-indigo-400' : 'border-l-4 border-transparent text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-white'">
+                                                        <span>{{ opcion.label }}</span>
+                                                        <CheckIcon v-if="String(filterForm.abogado_id) === String(opcion.value)" class="h-4 w-4 shrink-0 animate-in zoom-in-50" />
+                                                    </button>
+                                                </li>
+                                                <li v-if="opcionesAbogado.length === 0" class="p-4 text-center text-[10px] font-bold text-gray-400 uppercase italic">
+                                                    Sin resultados
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </transition>
+                                </div>
+                            </div>
 
-                        <div class="lg:col-span-3">
-                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Tipo de entidad</label>
-                            <SelectInput v-model="filterForm.tipo_entidad" class="w-full rounded-lg py-2.5 text-sm">
-                                <option value="">Todas</option>
-                                <option v-for="tipo in tiposEntidad" :key="tipo" :value="tipo">{{ tipo }}</option>
-                            </SelectInput>
-                        </div>
+                            <!-- Etapa -->
+                            <div class="lg:col-span-4">
+                                <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Etapa</label>
+                                <div class="relative">
+                                    <button type="button" @click="openEtapaDropdown = !openEtapaDropdown" class="flex min-h-[42px] w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm font-semibold text-gray-800 transition-all hover:border-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                                        <div class="flex items-center gap-2 truncate text-[13px]">
+                                            <CheckCircleIcon class="h-4 w-4 text-gray-400" />
+                                            <span class="truncate">{{ currentLabelEtapa }}</span>
+                                        </div>
+                                        <ChevronDownIcon class="h-3 w-3 shrink-0 text-gray-400 transition-transform" :class="{ 'rotate-180': openEtapaDropdown }" />
+                                    </button>
+                                    <!-- Overlay para cerrar el menú y limpiar búsqueda -->
+                                    <div v-if="openEtapaDropdown" class="fixed inset-0 z-40" @click="openEtapaDropdown = false; searchEtapa = ''"></div>
+                                    <transition enter-active-class="transition duration-100 ease-out" enter-from-class="transform scale-95 opacity-0" enter-to-class="transform scale-100 opacity-100" leave-active-class="transition duration-75 ease-in" leave-from-class="transform scale-100 opacity-100" leave-to-class="transform scale-95 opacity-0">
+                                        <div v-show="openEtapaDropdown" class="absolute left-0 right-0 z-50 mt-1 origin-top overflow-hidden rounded-xl border border-gray-200 bg-white p-1 shadow-xl dark:border-gray-700 dark:bg-gray-800">
+                                            <!-- Buscador Interno -->
+                                            <div class="px-2 py-2 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
+                                                <div class="relative">
+                                                    <MagnifyingGlassIcon class="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                                                    <input 
+                                                        v-model="searchEtapa"
+                                                        type="text"
+                                                        class="w-full pl-8 pr-8 py-1.5 text-[11px] font-bold border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm"
+                                                        placeholder="Filtrar etapas..."
+                                                        @click.stop
+                                                    />
+                                                    <button v-if="searchEtapa" @click.stop="searchEtapa = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-500 transition-colors">
+                                                        <XMarkIcon class="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <ul class="max-h-60 overflow-y-auto py-1 custom-scrollbar-horizontal">
+                                                <li v-for="opcion in opcionesEtapa" :key="opcion.value">
+                                                    <button type="button" @click="filterForm.etapa_procesal = opcion.value; openEtapaDropdown = false; searchEtapa = ''" class="group flex w-full items-center justify-between px-3 py-2.5 text-left text-sm font-bold transition-all" :class="String(filterForm.etapa_procesal) === String(opcion.value) ? 'border-l-4 border-indigo-600 bg-transparent text-indigo-600 dark:text-indigo-400' : 'border-l-4 border-transparent text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-white'">
+                                                        <span>{{ opcion.label }}</span>
+                                                        <CheckIcon v-if="String(filterForm.etapa_procesal) === String(opcion.value)" class="h-4 w-4 shrink-0 animate-in zoom-in-50" />
+                                                    </button>
+                                                </li>
+                                                <li v-if="opcionesEtapa.length === 0" class="p-4 text-center text-[10px] font-bold text-gray-400 uppercase italic">
+                                                    Sin resultados
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </transition>
+                                </div>
+                            </div>
 
-                        <div class="lg:col-span-5">
-                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Despacho o juzgado</label>
-                            <AsyncSelect
-                                v-model="selectedJuzgado"
-                                :endpoint="route('juzgados.search')"
-                                placeholder="Buscar juzgado o despacho"
-                                label-key="nombre"
-                                class="!min-h-[42px] !rounded-lg"
-                            />
-                        </div>
+                            <!-- Línea separadora Fila 3 - Fila 4 -->
+                            <div class="col-span-1 py-1 lg:col-span-12">
+                                <div class="h-px w-full bg-gray-200 dark:bg-gray-700"></div>
+                            </div>
 
-                        <div class="lg:col-span-4">
-                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Control rápido</label>
-                            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                                <button
-                                    v-for="item in controlFilterItems"
-                                    :key="item.key"
-                                    type="button"
-                                    @click="applyControlFilter(item.key)"
-                                    :class="filterForm[item.key] ? item.activeClass : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-indigo-200 hover:text-indigo-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300'"
-                                    class="inline-flex min-h-10 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-[10px] font-black uppercase tracking-wider transition-colors"
-                                >
-                                    <span class="inline-flex min-w-0 items-center gap-2">
-                                        <component :is="item.icon" class="h-4 w-4 shrink-0" />
-                                        <span class="truncate">{{ item.label }}</span>
-                                    </span>
-                                    <span v-if="item.count !== null && item.count !== undefined" class="shrink-0 rounded bg-white/70 px-1.5 py-0.5 text-[9px] text-gray-700 dark:bg-black/20 dark:text-white">{{ item.count }}</span>
-                                </button>
+                            <!-- FILA 4: Entidad y Fechas -->
+                            <!-- Entidad -->
+                            <div class="lg:col-span-6">
+                                <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Tipo de entidad</label>
+                                <div class="relative">
+                                    <button type="button" @click="openEntidadDropdown = !openEntidadDropdown" class="flex min-h-[42px] w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm font-semibold text-gray-800 transition-all hover:border-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                                        <div class="flex items-center gap-2 truncate text-[13px]">
+                                            <BuildingLibraryIcon class="h-4 w-4 text-gray-400" />
+                                            <span class="truncate">{{ currentLabelEntidad }}</span>
+                                        </div>
+                                        <ChevronDownIcon class="h-3 w-3 shrink-0 text-gray-400 transition-transform" :class="{ 'rotate-180': openEntidadDropdown }" />
+                                    </button>
+                                    <div v-if="openEntidadDropdown" class="fixed inset-0 z-40" @click="openEntidadDropdown = false"></div>
+                                    <transition enter-active-class="transition duration-100 ease-out" enter-from-class="transform scale-95 opacity-0" enter-to-class="transform scale-100 opacity-100" leave-active-class="transition duration-75 ease-in" leave-from-class="transform scale-100 opacity-100" leave-to-class="transform scale-95 opacity-0">
+                                        <div v-show="openEntidadDropdown" class="absolute left-0 right-0 z-50 mt-1 origin-top overflow-hidden rounded-xl border border-gray-200 bg-white p-1 shadow-xl dark:border-gray-700 dark:bg-gray-800">
+                                            <ul class="max-h-60 overflow-y-auto py-1 custom-scrollbar-horizontal">
+                                                <li v-for="opcion in opcionesEntidad" :key="opcion.value">
+                                                    <button type="button" @click="filterForm.tipo_entidad = opcion.value; openEntidadDropdown = false" class="group flex w-full items-center justify-between px-3 py-2.5 text-left text-sm font-bold transition-all" :class="String(filterForm.tipo_entidad) === String(opcion.value) ? 'border-l-4 border-indigo-600 bg-transparent text-indigo-600 dark:text-indigo-400' : 'border-l-4 border-transparent text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-white'">
+                                                        <span>{{ opcion.label }}</span>
+                                                        <CheckIcon v-if="String(filterForm.tipo_entidad) === String(opcion.value)" class="h-4 w-4 shrink-0 animate-in zoom-in-50" />
+                                                    </button>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </transition>
+                                </div>
+                            </div>
+
+                            <!-- Filtro de Fechas de Registro -->
+                            <div class="lg:col-span-6">
+                                <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Fecha de registro (Desde - Hasta)</label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <DatePicker 
+                                        v-model="filterForm.fecha_inicio" 
+                                        placeholder="Desde" 
+                                        class="!bg-gray-50 dark:!bg-gray-900" 
+                                    />
+                                    <DatePicker 
+                                        v-model="filterForm.fecha_fin" 
+                                        placeholder="Hasta" 
+                                        class="!bg-gray-50 dark:!bg-gray-900" 
+                                    />
+                                </div>
                             </div>
                         </div>
+                    </transition>
+
+                    <!-- BOTÓN DE CONTROL (TOGGLE): Pestaña central en el borde inferior -->
+                    <div class="absolute -bottom-3.5 left-0 right-0 flex justify-center z-10">
+                        <button
+                            type="button"
+                            @click="showFilters = !showFilters"
+                            class="group flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-gray-600 shadow-md transition-all hover:border-indigo-300 hover:text-indigo-600 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400 dark:hover:text-indigo-400"
+                        >
+                            <span v-if="showFilters">Ocultar filtros</span>
+                            <span v-else>Mostrar filtros</span>
+                            
+                            <ChevronUpIcon v-if="showFilters" class="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5" />
+                            <ChevronDownIcon v-else class="h-3.5 w-3.5 transition-transform group-hover:translate-y-0.5" />
+                        </button>
                     </div>
                 </section>
 

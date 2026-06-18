@@ -566,39 +566,52 @@ const tabItems = computed(() => [
         </div>
     </Modal>
 
-    <!-- MODAL CAMBIO DE ETAPA -->
+    <!-- MODAL CAMBIO DE ETAPA (Rediseñado para mejor UI/UX) -->
     <Modal :show="showEtapaModal" @close="showEtapaModal = false" centered>
         <div class="p-8 overflow-visible">
-            <h2 class="text-xl font-black uppercase tracking-tight text-gray-900 mb-6">Avanzar Etapa</h2>
+            <!-- Encabezado con identidad visual -->
+            <div class="flex items-center gap-3 mb-6 text-indigo-600">
+                <div class="p-3 bg-indigo-50 rounded-2xl dark:bg-indigo-950/40">
+                    <ArrowPathIcon class="h-8 w-8" />
+                </div>
+                <div>
+                    <h2 class="text-xl font-black uppercase tracking-tight leading-none text-gray-900 dark:text-white">Avanzar<br/>Etapa</h2>
+                </div>
+            </div>
+
             <div class="space-y-6 overflow-visible">
                 <div class="relative z-50">
-                    <InputLabel for="nueva_etapa" value="Nueva Etapa Procesal *" class="text-[10px] font-black uppercase text-gray-400" />
-                    <Dropdown align="left" width="full">
+                    <InputLabel for="nueva_etapa" value="Nueva Etapa Procesal *" class="text-[10px] font-black uppercase text-gray-500 mb-1 tracking-widest" />
+                    <!-- Se usa teleport para evitar que el contenedor del modal corte el dropdown -->
+                    <Dropdown align="left" width="full" teleport>
                         <template #trigger>
-                            <button type="button" class="mt-1 flex w-full items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold shadow-sm hover:border-indigo-500 transition-all cursor-pointer">
+                            <button type="button" class="flex w-full items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm font-bold shadow-sm hover:border-indigo-500 transition-all cursor-pointer dark:border-gray-700 dark:bg-gray-900/50 dark:text-white">
                                 <span>{{ etapaForm.etapa_procesal_id ? etapas.find(e => e.id === etapaForm.etapa_procesal_id)?.nombre : 'Seleccione una etapa...' }}</span>
                                 <ChevronDownIcon class="h-4 w-4 text-gray-400" />
                             </button>
                         </template>
                         <template #content>
-                            <div class="p-2 border-b border-gray-100 sticky top-0 bg-white z-10">
-                                <TextInput v-model="searchEtapa" placeholder="Filtrar etapas..." class="w-full text-xs h-8" @click.stop />
+                            <div class="p-2 border-b border-gray-100 sticky top-0 bg-white z-10 dark:bg-gray-800 dark:border-gray-700">
+                                <TextInput v-model="searchEtapa" placeholder="Filtrar etapas..." class="w-full text-xs h-9 !rounded-lg" @click.stop />
                             </div>
                             <div class="py-1 max-h-60 overflow-y-auto">
-                                <button v-for="etapa in filteredEtapas" :key="etapa.id" @click="etapaForm.etapa_procesal_id = etapa.id" class="block w-full text-left px-4 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-50" :class="{ 'bg-indigo-50 text-indigo-700': etapaForm.etapa_procesal_id === etapa.id }">
-                                    {{ etapa.nombre }} <span class="text-[9px] font-normal opacity-50 ml-1">({{ etapa.riesgo }})</span>
+                                <!-- Se eliminó la visualización del (riesgo) al lado del nombre por solicitud de usuario -->
+                                <button v-for="etapa in filteredEtapas" :key="etapa.id" @click="etapaForm.etapa_procesal_id = etapa.id" class="block w-full text-left px-4 py-3 text-xs font-bold text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700" :class="{ 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300': etapaForm.etapa_procesal_id === etapa.id }">
+                                    {{ etapa.nombre }}
                                 </button>
                             </div>
                         </template>
                     </Dropdown>
                 </div>
                 <div>
-                    <InputLabel for="obs_etapa" value="Observación del Cambio" class="text-[10px] font-black uppercase text-gray-400" />
-                    <Textarea id="obs_etapa" v-model="etapaForm.observacion" class="w-full mt-1 rounded-xl border-gray-200 bg-gray-50 text-xs" rows="3" placeholder="Contexto sobre el avance..." />
+                    <InputLabel for="obs_etapa" value="Observación del Cambio" class="text-[10px] font-black uppercase text-gray-500 mb-1 tracking-widest" />
+                    <Textarea id="obs_etapa" v-model="etapaForm.observacion" class="w-full rounded-xl border-gray-200 bg-gray-50 text-sm shadow-sm focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900/50 dark:text-white" rows="3" placeholder="Contexto sobre el avance o decisión tomada..." />
                 </div>
-                <div class="flex items-center justify-end gap-3 pt-4 border-t">
-                    <SecondaryButton @click="showEtapaModal = false">Cancelar</SecondaryButton>
-                    <PrimaryButton @click="submitEtapa" :disabled="etapaForm.processing || !etapaForm.etapa_procesal_id">Actualizar Etapa</PrimaryButton>
+                <div class="flex flex-col gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
+                    <PrimaryButton @click="submitEtapa" :disabled="etapaForm.processing || !etapaForm.etapa_procesal_id" class="w-full justify-center !py-4 !text-xs !font-black !uppercase !tracking-widest shadow-lg shadow-indigo-100 dark:shadow-none">
+                        Actualizar Etapa del Proceso
+                    </PrimaryButton>
+                    <SecondaryButton @click="showEtapaModal = false" class="w-full justify-center !py-3 !text-[10px] !font-bold">Cancelar</SecondaryButton>
                 </div>
             </div>
         </div>

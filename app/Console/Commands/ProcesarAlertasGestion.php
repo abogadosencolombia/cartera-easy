@@ -13,7 +13,7 @@ class ProcesarAlertasGestion extends Command
     protected $signature = "gestion:procesar-alertas";
     protected $description = "Procesa las notificaciones de la Hoja de Ruta Diaria (vencimientos).";
 
-    public function handle()
+    public function handle(): int
     {
         $this->info("--> Iniciando escaneo de Hoja de Ruta Diaria...");
 
@@ -22,7 +22,7 @@ class ProcesarAlertasGestion extends Command
             ->get();
 
         $enviadosEnEstaRonda = 0;
-        $maximoCorreosPorRonda = 5; // Límite conservador para Hostinger
+        $maximoCorreosPorRonda = $this->mailBurstLimit();
 
         foreach ($notas as $nota) {
             if ($enviadosEnEstaRonda >= $maximoCorreosPorRonda) {
@@ -57,8 +57,7 @@ class ProcesarAlertasGestion extends Command
 
                 if ($notificado) {
                     $enviadosEnEstaRonda++;
-                    $this->info("Pausa de 10s para SMTP...");
-                    sleep(10);
+                    $this->pauseForSmtp();
                 }
             } catch (\Exception $e) {
                 $errorMessage = $e->getMessage();
@@ -66,17 +65,19 @@ class ProcesarAlertasGestion extends Command
                 $this->error("FAIL: No se pudo enviar a {$nota->user->name}. " . $errorMessage);
 
                 // CIRCUIT BREAKER: Detenemos si es Rate Limit
-                if (str_contains($errorMessage, 'Ratelimit') || str_contains($errorMessage, '451')) {
+                if ($this->isSmtpRateLimited($errorMessage)) {
                     $this->error("ALERTA: Rate Limit detectado en Hostinger. Abortando ejecución.");
-                    return;
+                    return self::FAILURE;
                 }
                 
                 // Aun en error no crítico, pausamos para no saturar SMTP.
-                sleep(10);
+                $this->pauseForSmtp();
             }
         }
 
         $this->info("--> Escaneo finalizado. Enviados: $enviadosEnEstaRonda");
+
+        return self::SUCCESS;
     }
 
     private function yaNotificadoRecientemente($userId, $notaId, $estado, $horas = 1)
@@ -87,5 +88,25 @@ class ProcesarAlertasGestion extends Command
             ->where("data", "like", "%\"estado\":\"$estado\"%")
             ->where("created_at", ">=", now()->subHours($horas))
             ->exists();
+    }
+
+    private function mailBurstLimit(): int
+    {
+        return max(1, (int) config('mail.alerts.burst_limit', 2));
+    }
+
+    private function pauseForSmtp(): void
+    {
+        $seconds = max(0, (int) config('mail.alerts.pause_seconds', 30));
+
+        if ($seconds > 0) {
+            $this->info("Pausa de {$seconds}s para SMTP...");
+            sleep($seconds);
+        }
+    }
+
+    private function isSmtpRateLimited(string $message): bool
+    {
+        return str_contains($message, 'Ratelimit') || str_contains($message, '451');
     }
 }

@@ -78,4 +78,9 @@ return [
 
     'admin_address' => env('MAIL_TO_ADMIN_ADDRESS'),
 
+    'alerts' => [
+        'burst_limit' => (int) env('MAIL_ALERT_BURST_LIMIT', 2),
+        'pause_seconds' => (int) env('MAIL_ALERT_PAUSE_SECONDS', 30),
+    ],
+
 ];

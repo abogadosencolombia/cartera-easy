@@ -60,6 +60,20 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
             $query->whereHas('juzgado', fn($q) => $q->where('nombre', 'ilike', "%{$tipo}%"));
         }
 
+        /**
+         * FILTRADO POR RANGO DE REGISTRO (CREACIÓN) EN EXPORTACIÓN
+         * Asegura que el reporte de Excel coincida con el rango visualizado en pantalla.
+         * Utiliza whereDate sobre la columna 'created_at'.
+         */
+        if (!empty($this->filtros['fecha_inicio']) && !empty($this->filtros['fecha_fin'])) {
+            $query->whereDate('created_at', '>=', $this->filtros['fecha_inicio'])
+                  ->whereDate('created_at', '<=', $this->filtros['fecha_fin']);
+        } elseif (!empty($this->filtros['fecha_inicio'])) {
+            $query->whereDate('created_at', '>=', $this->filtros['fecha_inicio']);
+        } elseif (!empty($this->filtros['fecha_fin'])) {
+            $query->whereDate('created_at', '<=', $this->filtros['fecha_fin']);
+        }
+
         $sinRadicado = filter_var($this->filtros['sin_radicado'] ?? false, FILTER_VALIDATE_BOOLEAN);
         if ($sinRadicado) {
             $query->where(function($q) { $q->whereNull('radicado')->orWhere('radicado', ''); });
@@ -80,6 +94,11 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
             $query->whereBetween('updated_at', [now()->startOfDay(), now()->endOfDay()]);
         }
 
+        $integridadBaja = filter_var($this->filtros['integridad_baja'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        if ($integridadBaja) {
+            $query->where('integridad_score', '<', 80)->paraSeguimiento();
+        }
+
         return $query->latest('updated_at');
     }
 
@@ -95,11 +114,15 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
         }
 
         if (in_array($this->user->tipo_usuario, ['gestor', 'abogado'], true)) {
-            $query->where(function ($q) {
-                $q->where('abogado_id', $this->user->id)
-                    ->orWhere('responsable_revision_id', $this->user->id)
-                    ->orWhere('created_by', $this->user->id);
-            });
+            $hasRadicadosAccess = $this->user->cooperativas()
+                ->where('cooperativas.id', 1)
+                ->exists();
+
+            if ($hasRadicadosAccess) {
+                return;
+            }
+
+            $query->whereRaw('1 = 0');
             return;
         }
 

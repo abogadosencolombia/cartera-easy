@@ -33,8 +33,23 @@ class UpdateCasoRequest extends FormRequest
             'referencia_credito' => [
                 'nullable', 
                 'string', 
-                'max:255', 
-                Rule::unique('casos', 'referencia_credito')->ignore($this->route('caso'))->whereNull('deleted_at')
+                'max:255',
+                'regex:/^[0-9]+$/',
+                Rule::unique('casos', 'referencia_credito')->ignore($this->route('caso'))->whereNull('deleted_at'),
+                function ($attribute, $value, $fail) {
+                    if (!$value) return;
+
+                    $caso = $this->route('caso');
+                    $casoId = $caso instanceof \App\Models\Caso ? $caso->id : $caso;
+                    $conflict = \App\Models\Caso::whereNull('deleted_at')
+                        ->where('id', '!=', $casoId)
+                        ->whereRaw("regexp_replace(referencia_credito, '[^0-9]', '', 'g') = ?", [$value])
+                        ->first(['id']);
+
+                    if ($conflict) {
+                        $fail("El número de pagaré ya está registrado en el caso #{$conflict->id}.");
+                    }
+                }
             ],
             'radicado' => [
                 'nullable', 
@@ -42,6 +57,20 @@ class UpdateCasoRequest extends FormRequest
                 'max:23',
                 'regex:/^[0-9]+$/',
                 Rule::unique('casos', 'radicado')->ignore($this->route('caso'))->whereNull('deleted_at'),
+                function ($attribute, $value, $fail) {
+                    if (!$value) return;
+
+                    $caso = $this->route('caso');
+                    $casoId = $caso instanceof \App\Models\Caso ? $caso->id : $caso;
+                    $conflict = \App\Models\Caso::whereNull('deleted_at')
+                        ->where('id', '!=', $casoId)
+                        ->whereRaw("regexp_replace(radicado, '[^0-9]', '', 'g') = ?", [$value])
+                        ->first(['id']);
+
+                    if ($conflict) {
+                        $fail("El número de radicado ya está registrado en el caso #{$conflict->id}.");
+                    }
+                },
                 function ($attribute, $value, $fail) {
                     if (!empty($value) && strlen($value) < 14) {
                         $caso = $this->route('caso');
@@ -110,6 +139,10 @@ class UpdateCasoRequest extends FormRequest
             'monto_total.required' => 'El monto del crédito es obligatorio.',
             'user_id.required' => 'Debe asignar al menos un responsable.',
             'cooperativa_id.required' => 'Debe seleccionar la cooperativa o empresa del caso.',
+            'referencia_credito.regex' => 'El número de pagaré solo puede contener dígitos. No use puntos, guiones, espacios ni comas.',
+            'referencia_credito.unique' => 'El número de pagaré ya está registrado en otro caso activo.',
+            'radicado.regex' => 'El número de radicado solo puede contener dígitos. No use puntos, guiones, espacios ni comas.',
+            'radicado.unique' => 'El número de radicado ya está registrado en otro caso activo.',
         ];
     }
 }

@@ -23,7 +23,12 @@ const props = defineProps({
 const open = ref(false);
 const triggerRef = ref(null);
 const menuRef = ref(null);
-const floatingStyles = ref({});
+
+// Inicializamos con opacidad 0 para evitar el "salto" visual en el primer renderizado
+const floatingStyles = ref({
+    opacity: 0,
+    pointerEvents: 'none'
+});
 
 const closeOnEscape = (e) => {
     if (open.value && e.key === 'Escape') {
@@ -57,35 +62,58 @@ const widthPixels = computed(() => {
     }[props.width.toString()] || 192;
 });
 
+/**
+ * Versión optimizada de posicionamiento que ignora las dimensiones del menú en transición.
+ * Usamos widthPixels (calculado) y el rect del trigger para evitar que animaciones
+ * como 'scale-95' rompan el cálculo de posición.
+ */
 const updateFloatingPosition = async () => {
     if (!props.teleport || !open.value || !triggerRef.value) return;
 
     await nextTick();
-
     const rect = triggerRef.value.getBoundingClientRect();
-    const menuWidth = menuRef.value?.offsetWidth || widthPixels.value;
-    const menuHeight = menuRef.value?.offsetHeight || 0;
-    const gap = 8;
-    const viewportPadding = 8;
+    
+    // Verificación de seguridad para el renderizado inicial
+    if (rect.width === 0 && rect.height === 0) {
+        requestAnimationFrame(updateFloatingPosition);
+        return;
+    }
 
+    const gap = 4;
+    const viewportPadding = 16;
+    
+    // IMPORTANTE: Usamos widthPixels o el ancho del trigger directamente.
+    // No leemos menuRef.value.offsetWidth porque durante la animación de entrada
+    // el valor es menor (debido a scale-95) y desplazaría el menú erróneamente.
+    const menuWidth = props.width === 'full' ? rect.width : widthPixels.value;
+
+    // Cálculo horizontal basado en el trigger
     let left = rect.left;
     if (props.align === 'right') {
         left = rect.right - menuWidth;
-    } else if (props.align !== 'left') {
+    } else if (props.align === 'center') {
         left = rect.left + (rect.width / 2) - (menuWidth / 2);
     }
 
+    // Ajuste de seguridad para el viewport
     left = Math.max(viewportPadding, Math.min(left, window.innerWidth - menuWidth - viewportPadding));
-
+    
+    // Posición vertical fija debajo del botón para evitar saltos por animación de altura
     let top = rect.bottom + gap;
-    if (menuHeight && top + menuHeight > window.innerHeight - viewportPadding) {
-        top = Math.max(viewportPadding, rect.top - menuHeight - gap);
-    }
 
-    floatingStyles.value = {
-        left: `${left}px`,
+    const styles = {
         top: `${top}px`,
+        left: `${left}px`,
+        position: 'fixed',
+        zIndex: '10051',
+        opacity: '1',
+        pointerEvents: 'auto'
     };
+
+    // Aplicamos el ancho exacto para asegurar consistencia
+    styles.width = `${menuWidth}px`;
+
+    floatingStyles.value = styles;
 };
 
 const toggleOpen = async () => {
@@ -113,6 +141,11 @@ watch(open, async (isOpen) => {
         await updateFloatingPosition();
     } else {
         removeFloatingListeners();
+        // Reseteamos el estado visual al cerrar para el próximo clic
+        floatingStyles.value = {
+            opacity: 0,
+            pointerEvents: 'none'
+        };
     }
 });
 
@@ -137,10 +170,16 @@ onUnmounted(() => {
             @click="open = false"
         ></div>
 
+        <!-- 
+            *Contenedor del menú principal. 
+            Al usar el teleport, usamos z-[10051] para mantenerlo por encima de los Modales (z-[10000]).
+            También usamos 'fixed' en lugar de 'absolute' para un posicionamiento correcto sobre el body.
+            Capa de superposición (overlay) en Teleport para cerrar el menú desplegable al hacer clic afuera, cuando se teletransporta al body
+         -->
         <Teleport v-if="teleport" to="body">
             <div
                 v-show="open"
-                class="fixed inset-0 z-[9998]"
+                class="fixed inset-0 z-[10050]" 
                 @click="open = false"
             ></div>
         </Teleport>
@@ -154,11 +193,16 @@ onUnmounted(() => {
                 leave-from-class="opacity-100 scale-100"
                 leave-to-class="opacity-0 scale-95"
             >
+                <!-- 
+                    Contenedor del menú principal.
+                    Al usar el teleport (teletransportar), usamos z-[10051] para mantenerlo por encima de los Modales (z-[10000]).
+                    También usamos 'fixed' en lugar de 'absolute' para un posicionamiento correcto sobre el body.
+                -->
                 <div
                     v-show="open"
                     ref="menuRef"
                     class="rounded-md shadow-lg"
-                    :class="[widthClass, teleport ? 'fixed z-[9999]' : ['absolute z-50 mt-2', alignmentClasses]]"
+                    :class="[widthClass, teleport ? 'fixed z-[10051]' : ['absolute z-50 mt-2', alignmentClasses]]"
                     :style="teleport ? floatingStyles : undefined"
                     @click="open = false"
                 >

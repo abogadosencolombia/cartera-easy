@@ -32,15 +32,45 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
         $this->applyVisibilityScope($query);
 
         if (!empty($this->filtros['search'])) {
-            $search = $this->filtros['search'];
-            $query->where(function ($q) use ($search) {
-                $q->where('radicado', 'ilike', "%{$search}%")
-                  ->orWhere('referencia_credito', 'ilike', "%{$search}%")
-                  ->orWhereHas('deudor', fn($sq) => $sq->where('nombre_completo', 'ilike', "%{$search}%"));
-            });
+            $words = array_filter(explode(' ', trim($this->filtros['search'])));
+
+            foreach ($words as $word) {
+                $cleanWord = preg_replace('/[^0-9]/', '', $word);
+
+                $query->where(function ($q) use ($word, $cleanWord) {
+                    $q->where('tipo_proceso', 'ilike', "%{$word}%")
+                        ->orWhere('referencia_credito', 'ilike', "%{$word}%")
+                        ->orWhere('radicado', 'ilike', "%{$word}%")
+                        ->orWhere('subtipo_proceso', 'ilike', "%{$word}%")
+                        ->orWhere('subproceso', 'ilike', "%{$word}%")
+                        ->orWhere('etapa_procesal', 'ilike', "%{$word}%");
+
+                    if ($cleanWord) {
+                        $q->orWhereRaw("regexp_replace(radicado, '[^0-9]', '', 'g') ILIKE ?", ["%{$cleanWord}%"])
+                            ->orWhere('referencia_credito', 'ilike', "%{$cleanWord}%");
+                    }
+
+                    $q->orWhereHas('deudor', function ($deudorQuery) use ($word, $cleanWord) {
+                            $deudorQuery->where('nombre_completo', 'ilike', "%{$word}%");
+                            if ($cleanWord) {
+                                $deudorQuery->orWhere('numero_documento', 'ilike', "%{$cleanWord}%");
+                            }
+                        })
+                        ->orWhereHas('codeudores', function ($codeudorQuery) use ($word, $cleanWord) {
+                            $codeudorQuery->where('nombre_completo', 'ilike', "%{$word}%");
+                            if ($cleanWord) {
+                                $codeudorQuery->orWhere('numero_documento', 'ilike', "%{$cleanWord}%");
+                            }
+                        })
+                        ->orWhereHas('juzgado', fn ($juzgadoQuery) => $juzgadoQuery->where('nombre', 'ilike', "%{$word}%"))
+                        ->orWhereHas('cooperativa', fn ($coopQuery) => $coopQuery->where('nombre', 'ilike', "%{$word}%"));
+                });
+            }
         }
         
-        if (!empty($this->filtros['abogado_id'])) $query->where('user_id', $this->filtros['abogado_id']);
+        if (!empty($this->filtros['abogado_id'])) {
+            $query->whereHas('users', fn ($uq) => $uq->where('users.id', $this->filtros['abogado_id']));
+        }
         if (!empty($this->filtros['cooperativa_id'])) $query->where('cooperativa_id', $this->filtros['cooperativa_id']);
         if (!empty($this->filtros['juzgado_id'])) $query->where('juzgado_id', $this->filtros['juzgado_id']);
         if (!empty($this->filtros['tipo_entidad'])) {
@@ -48,6 +78,15 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
             $query->whereHas('juzgado', fn($jq) => $jq->where('nombre', 'ilike', "%{$tipo}%"));
         }
         if (!empty($this->filtros['etapa_procesal'])) $query->where('etapa_procesal', $this->filtros['etapa_procesal']);
+
+        if (!empty($this->filtros['fecha_inicio']) && !empty($this->filtros['fecha_fin'])) {
+            $query->whereDate('created_at', '>=', $this->filtros['fecha_inicio'])
+                  ->whereDate('created_at', '<=', $this->filtros['fecha_fin']);
+        } elseif (!empty($this->filtros['fecha_inicio'])) {
+            $query->whereDate('created_at', '>=', $this->filtros['fecha_inicio']);
+        } elseif (!empty($this->filtros['fecha_fin'])) {
+            $query->whereDate('created_at', '<=', $this->filtros['fecha_fin']);
+        }
         
         $sinRadicado = filter_var($this->filtros['sin_radicado'] ?? false, FILTER_VALIDATE_BOOLEAN);
         if ($sinRadicado) {
@@ -67,6 +106,12 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
         $inactivo20 = filter_var($this->filtros['inactivo_20_dias'] ?? false, FILTER_VALIDATE_BOOLEAN);
         if ($inactivo20) {
             $query->where('updated_at', '<', now()->subDays(20))
+                  ->paraSeguimiento();
+        }
+
+        $integridadBaja = filter_var($this->filtros['integridad_baja'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        if ($integridadBaja) {
+            $query->where('integridad_score', '<', 80)
                   ->paraSeguimiento();
         }
 

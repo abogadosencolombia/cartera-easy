@@ -200,6 +200,12 @@ const handleRadicadoInput = (e) => {
     e.target.value = formatted;
 };
 
+const handleReferenciaInput = (e) => {
+    const formatted = String(e.target.value || '').replace(/\D/g, '');
+    form.referencia_credito = formatted;
+    e.target.value = formatted;
+};
+
 const addDays = (field, days) => {
     form[field] = addDaysToDate(form[field], days);
 };
@@ -528,7 +534,13 @@ const submit = () => {
                                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                             <ClipboardDocumentCheckIcon class="h-4 w-4 text-gray-400" />
                                         </div>
-                                        <TextInput v-model="form.referencia_credito" class="pl-10 block w-full bg-gray-50/50 focus:bg-white transition-all" />
+                                        <TextInput
+                                            v-model="form.referencia_credito"
+                                            inputmode="numeric"
+                                            pattern="[0-9]*"
+                                            @input="handleReferenciaInput"
+                                            class="pl-10 block w-full bg-gray-50/50 focus:bg-white transition-all"
+                                        />
                                     </div>
                                     <InputError :message="form.errors.referencia_credito" class="mt-2" />
                                 </div>
@@ -546,6 +558,8 @@ const submit = () => {
                                         </div>
                                         <TextInput 
                                             v-model="form.radicado" 
+                                            inputmode="numeric"
+                                            pattern="[0-9]*"
                                             @input="handleRadicadoInput"
                                             class="pl-10 block w-full font-mono bg-gray-50/50 focus:bg-white transition-all" 
                                             :placeholder="form.es_spoa_nunc ? '21 dígitos (Sistema Penal)' : '23 dígitos numéricos (Sin puntos ni guiones)'"

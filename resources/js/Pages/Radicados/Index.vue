@@ -19,6 +19,8 @@ import { hasIncompletePersonaInfo } from '@/Utils/personaCompleteness';
 import { debounce } from 'lodash';
 import { useProcesos } from '@/composables/useProcesos';
 import AppAlert from '@/Utils/appAlert';
+// Se utiliza el componente estándar del proyecto para el manejo de fechas
+import DatePicker from '@/Components/DatePicker.vue';
 import { 
     MagnifyingGlassIcon, 
     FunnelIcon, 
@@ -30,10 +32,12 @@ import {
     MapPinIcon,
     ExclamationTriangleIcon,
     CheckCircleIcon,
+    CheckIcon,
     ClockIcon,
     ArrowPathIcon,
     BuildingLibraryIcon,
     ChevronDownIcon,
+    ChevronUpIcon, // Importación de libreria de Node
     XMarkIcon,
     DocumentDuplicateIcon,
     EyeIcon,
@@ -118,7 +122,13 @@ const tiposEntidad = [
 
 // --- FILTROS ---
 const filterStorageKey = 'radicados.index.filters';
-const filterKeys = ['search', 'estado', 'juzgado_id', 'tipo_proceso_id', 'tipo_entidad', 'sin_radicado', 'solo_vencidos', 'cerrados', 'actualizados_hoy', 'integridad_baja'];
+
+/**
+ * CONFIGURACIÓN DE FILTROS
+ * Se definen las llaves permitidas para el filtrado. 
+ * 'fecha_inicio' y 'fecha_fin' permiten realizar búsquedas por rango de REGISTRO EN EL SISTEMA.
+ */
+const filterKeys = ['search', 'estado', 'juzgado_id', 'tipo_proceso_id', 'tipo_entidad', 'sin_radicado', 'solo_vencidos', 'cerrados', 'actualizados_hoy', 'integridad_baja', 'fecha_inicio', 'fecha_fin'];
 const booleanFilterKeys = ['sin_radicado', 'solo_vencidos', 'cerrados', 'actualizados_hoy', 'integridad_baja'];
 
 const parseBooleanFilter = (value) => value === true || value === 'true' || value === 1 || value === '1';
@@ -172,7 +182,19 @@ const estado = ref(initialFilterValue('estado') || 'TODOS');
 const juzgadoId = ref(initialFilterValue('juzgado_id'));
 const selectedJuzgado = ref(props.selectedJuzgado);
 const tipoProcesoId = ref(initialFilterValue('tipo_proceso_id'));
+const selectedTipoProceso = ref(
+    props.tiposProceso.find(t => String(t.id) === String(initialFilterValue('tipo_proceso_id'))) || null
+);
 const tipoEntidad = ref(initialFilterValue('tipo_entidad'));
+
+/** 
+ * REFERENCIAS REACTIVAS PARA RANGO DE FECHAS
+ * Se utilizan variables independientes para el inicio y fin del rango.
+ * Estas variables se sincronizan con los componentes DatePicker locales.
+ */
+const fechaInicio = ref(initialFilterValue('fecha_inicio'));
+const fechaFin = ref(initialFilterValue('fecha_fin'));
+
 const sinRadicado = ref(parseBooleanFilter(initialFilterValue('sin_radicado', false)));
 const soloVencidos = ref(parseBooleanFilter(initialFilterValue('solo_vencidos', false)));
 const cerrados = ref(parseBooleanFilter(initialFilterValue('cerrados', false)));
@@ -185,14 +207,47 @@ const currentFilterPayload = () => ({
     juzgado_id: juzgadoId.value,
     tipo_proceso_id: tipoProcesoId.value,
     tipo_entidad: tipoEntidad.value,
+    // Se envían ambos extremos del rango al servidor para el filtrado por fecha de creación (created_at)
+    fecha_inicio: fechaInicio.value, 
+    fecha_fin: fechaFin.value,
     sin_radicado: sinRadicado.value,
     solo_vencidos: soloVencidos.value,
     cerrados: cerrados.value,
     actualizados_hoy: actualizadosHoy.value,
     integridad_baja: integridadBaja.value,
 });
+/**
+ * ESTADO DEL PANEL DE FILTROS (COLLAPSIBLE)
+ * showFilters: false (Inicia cerrado por defecto para optimizar espacio).
+ * Controla la visibilidad del bloque <transition> en el template.
+ */
+const showFilters = ref(false);
+
+/**
+ * LÓGICA DE DROPDOWNS PERSONALIZADOS (ESTADO Y ENTIDAD)
+ * Se utilizan en lugar de <SelectInput> para un diseño más limpio y moderno.
+ * Proporcionan indicadores visuales (CheckIcon) y bordes de acento para la opción activa.
+ */
+const openEstadoDropdown = ref(false);
+const openEntidadDropdown = ref(false);
+
+const opcionesEstado = [
+    { value: 'TODOS', label: 'Todos los estados' },
+    { value: 'ACTIVO', label: 'Expedientes activos' },
+    { value: 'CERRADO', label: 'Expedientes cerrados' },
+];
+
+const opcionesEntidad = computed(() => [
+    { value: '', label: 'Todas las entidades' },
+    ...tiposEntidad.map(t => ({ value: t, label: t }))
+]);
+
+// Obtienen dinámicamente la etiqueta a mostrar en el botón basándose en el valor actual
+const currentLabelEstado = computed(() => opcionesEstado.find(o => o.value === estado.value)?.label || 'Estados');
+const currentLabelEntidad = computed(() => opcionesEntidad.value.find(o => o.value === tipoEntidad.value)?.label || 'Entidades');
 
 const persistFilters = (filters) => {
+
     if (typeof window === 'undefined') return;
 
     if (hasUsefulFilterValue(filters)) {
@@ -216,6 +271,11 @@ const reapplyStoredFiltersIfNeeded = () => {
 
 watch(selectedJuzgado, (val) => {
     juzgadoId.value = val?.id || '';
+});
+
+// Sincroniza tipoProcesoId con el id del tipo de proceso seleccionado.
+watch(selectedTipoProceso, (val) => {
+    tipoProcesoId.value = val?.id ? String(val.id) : '';
 });
 
 const clearControlFilters = () => {
@@ -243,10 +303,15 @@ const applyControlFilter = (filterKey) => {
     target.value = nextValue;
 };
 
+// Se actualiza isDirty para detectar cambios en el rango de fechas y activar el botón de limpiar
 const isDirty = computed(() => {
-    return search.value !== '' || estado.value !== 'TODOS' || juzgadoId.value !== '' || tipoProcesoId.value !== '' || tipoEntidad.value !== '' || sinRadicado.value === true || soloVencidos.value === true || cerrados.value === true || actualizadosHoy.value === true || integridadBaja.value === true;
+    return search.value !== '' || estado.value !== 'TODOS' || juzgadoId.value !== '' || tipoProcesoId.value !== '' || tipoEntidad.value !== '' || sinRadicado.value === true || soloVencidos.value === true || cerrados.value === true || actualizadosHoy.value === true || integridadBaja.value === true || fechaInicio.value !== '' || fechaFin.value !== '';
 });
 
+/*
+ * REINICIO DE FILTROS (RESET)
+ * Limpia todas las referencias reactivas a su estado inicial, incluyendo el nuevo rango de fechas.
+*/
 const resetFilters = () => {
     if (typeof window !== 'undefined') {
         sessionStorage.removeItem(filterStorageKey);
@@ -257,7 +322,10 @@ const resetFilters = () => {
     juzgadoId.value = '';
     selectedJuzgado.value = null;
     tipoProcesoId.value = '';
+    selectedTipoProceso.value = null; 
     tipoEntidad.value = '';
+    fechaInicio.value = ''; // Limpieza del rango de fechas
+    fechaFin.value = '';
     sinRadicado.value = false;
     soloVencidos.value = false;
     cerrados.value = false;
@@ -269,10 +337,16 @@ const applyFilters = debounce(() => {
     const filters = currentFilterPayload();
     persistFilters(filters);
 
+    // Ejecuta la petición vía Inertia con los filtros actualizados para recargar la lista
     router.get(route('procesos.index'), filters, { preserveState: true, replace: true });
 }, 300);
 
-watch([search, estado, juzgadoId, tipoProcesoId, tipoEntidad, sinRadicado, soloVencidos, cerrados, actualizadosHoy, integridadBaja], applyFilters);
+/**
+ * WATCHER GLOBAL DE FILTROS
+ * Dispara el proceso de filtrado cada vez que cualquier referencia reactiva cambia.
+ * Incluye el nuevo rango de fechas (fechaInicio y fechaFin).
+ */
+watch([search, estado, juzgadoId, tipoProcesoId, tipoEntidad, fechaInicio, fechaFin, sinRadicado, soloVencidos, cerrados, actualizadosHoy, integridadBaja], applyFilters);
 
 onMounted(() => {
     reapplyStoredFiltersIfNeeded();
@@ -437,7 +511,8 @@ const activeFilterCount = computed(() => filterKeys.reduce((count, key) => {
         return count + (refMap[key]?.value ? 1 : 0);
     }
 
-    const refMap = { search, juzgado_id: juzgadoId, tipo_proceso_id: tipoProcesoId, tipo_entidad: tipoEntidad };
+    // Se añade el rango al mapeo para contar los filtros activos
+    const refMap = { search, juzgado_id: juzgadoId, tipo_proceso_id: tipoProcesoId, tipo_entidad: tipoEntidad, fecha_inicio: fechaInicio, fecha_fin: fechaFin };
     return count + (String(refMap[key]?.value ?? '').trim() !== '' ? 1 : 0);
 }, 0));
 
@@ -530,7 +605,7 @@ const copyLegalInfo = (proceso) => {
 
     <AuthenticatedLayout>
         <div class="py-6">
-            <div class="mx-auto max-w-[1600px] space-y-4 px-4 sm:px-6 lg:px-8">
+            <div class="mx-auto max-w-[1600px] space-y-6 px-4 sm:px-6 lg:px-8">
                 <!-- Encabezado y Acciones Principales -->
                 <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5">
                     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -604,8 +679,10 @@ const copyLegalInfo = (proceso) => {
                 </section>
 
                 <!-- Filtros -->
-                <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5">
-                    <div class="flex flex-col gap-3 border-b border-gray-100 pb-4 dark:border-gray-700 lg:flex-row lg:items-center lg:justify-between">
+                <section class="relative rounded-lg border border-gray-200 bg-white p-4 pb-8 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5 sm:pb-10">
+
+                    <!-- ENCABEZADO DE FILTROS: Siempre visible -->
+                    <div class="flex flex-col gap-3 border-b border-gray-200 pb-4 dark:border-gray-600 lg:flex-row lg:items-center lg:justify-between">
                         <div class="flex items-center gap-3">
                             <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-50 text-gray-500 dark:bg-gray-900 dark:text-gray-300">
                                 <FunnelIcon class="h-5 w-5" />
@@ -628,75 +705,223 @@ const copyLegalInfo = (proceso) => {
                         </button>
                     </div>
 
-                    <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-12">
-                        <div class="lg:col-span-4">
-                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Búsqueda general</label>
-                            <div class="relative">
-                                <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                                <input
-                                    v-model="search"
-                                    type="text"
-                                    class="block w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-3 text-sm font-semibold text-gray-800 transition-colors focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                    placeholder="Radicado, asunto, demandante, demandado o documento"
+                    <!-- 
+                         PANEL DE FILTROS COLAPSABLE 
+                         Utiliza la variable showFilters y una transición de Vue para suavidad.
+                    -->
+                    <transition
+                        enter-active-class="transition duration-300 ease-out"
+                        enter-from-class="transform -translate-y-4 opacity-0"
+                        enter-to-class="transform translate-y-0 opacity-100"
+                        leave-active-class="transition duration-200 ease-in"
+                        leave-from-class="transform translate-y-0 opacity-100"
+                        leave-to-class="transform -translate-y-4 opacity-0"
+                    >
+                        <div v-show="showFilters" class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
+                            <!-- FILA 1: Control rápido de filtros predefinidos -->
+                            <div class="lg:col-span-12">
+                                <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Control rápido</label>
+                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                                    <button
+                                        v-for="item in controlFilterItems"
+                                        :key="item.key"
+                                        type="button"
+                                        @click="applyControlFilter(item.key)"
+                                        :class="isControlActive(item) ? item.activeClass : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-indigo-200 hover:text-indigo-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300'"
+                                        class="inline-flex min-h-10 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-[10px] font-black uppercase tracking-wider transition-colors"
+                                    >
+                                        <span class="inline-flex min-w-0 items-center gap-2">
+                                            <component :is="item.icon" class="h-4 w-4 shrink-0" />
+                                            <span class="truncate">{{ item.label }}</span>
+                                        </span>
+                                        <span v-if="item.count !== null && item.count !== undefined" class="shrink-0 rounded bg-white/70 px-1.5 py-0.5 text-[9px] text-gray-700 dark:bg-black/20 dark:text-white">{{ item.count }}</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Línea separadora Fila 1 - Fila 2 -->
+                            <div class="col-span-1 py-1 lg:col-span-12">
+                                <div class="h-px w-full bg-gray-200 dark:bg-gray-700"></div>
+                            </div>
+
+                            <!-- FILA 2: Búsqueda de texto y Despacho judicial -->
+                            <div class="lg:col-span-6">
+                                <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Búsqueda general</label>
+                                <div class="relative">
+                                    <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                    <input
+                                        v-model="search"
+                                        type="text"
+                                        class="block w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-3 text-sm font-semibold text-gray-800 transition-colors focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                        placeholder="Radicado, asunto, demandante, demandado o documento"
+                                    />
+                                </div>
+                            </div>
+
+                            <div class="lg:col-span-6">
+                                <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Despacho o juzgado</label>
+                                <AsyncSelect
+                                    v-model="selectedJuzgado"
+                                    :endpoint="route('juzgados.search')"
+                                    placeholder="Buscar juzgado o despacho"
+                                    label-key="nombre"
+                                    class="!min-h-[42px] !rounded-lg"
                                 />
                             </div>
-                        </div>
 
-                        <div class="lg:col-span-2">
-                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Estado</label>
-                            <SelectInput v-model="estado" class="w-full rounded-lg py-2.5 text-sm">
-                                <option value="TODOS">Todos</option>
-                                <option value="ACTIVO">Activos</option>
-                                <option value="CERRADO">Cerrados</option>
-                            </SelectInput>
-                        </div>
+                            <!-- Línea separadora Fila 2 - Fila 3 -->
+                            <div class="col-span-1 py-1 lg:col-span-12">
+                                <div class="h-px w-full bg-gray-200 dark:bg-gray-700"></div>
+                            </div>
 
-                        <div class="lg:col-span-3">
-                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Tipo de proceso</label>
-                            <SelectInput v-model="tipoProcesoId" class="w-full rounded-lg py-2.5 text-sm">
-                                <option value="">Todos</option>
-                                <option v-for="tipo in tiposProceso" :key="tipo.id" :value="String(tipo.id)">{{ tipo.nombre }}</option>
-                            </SelectInput>
-                        </div>
+                            <!-- FILA 3: Filtros técnicos y nueva búsqueda por fecha -->
+                            <div class="lg:col-span-3">
+                                <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Estado</label>
+                                <div class="relative">
+                                    <!-- DISPARADOR DEL DROPDOWN PERSONALIZADO (ESTADO) -->
+                                    <button
+                                        type="button"
+                                        @click="openEstadoDropdown = !openEstadoDropdown"
+                                        class="flex min-h-[42px] w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm font-semibold text-gray-800 transition-all hover:border-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    >
+                                        <div class="flex items-center gap-2 truncate text-[13px]">
+                                            <CheckCircleIcon class="h-4 w-4 text-gray-400" />
+                                            <span class="truncate">{{ currentLabelEstado }}</span>
+                                        </div>
+                                        <ChevronDownIcon class="h-3 w-3 shrink-0 text-gray-400 transition-transform" :class="{ 'rotate-180': openEstadoDropdown }" />
+                                    </button>
 
-                        <div class="lg:col-span-2">
-                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Tipo de entidad</label>
-                            <SelectInput v-model="tipoEntidad" class="w-full rounded-lg py-2.5 text-sm">
-                                <option value="">Todas</option>
-                                <option v-for="tipo in tiposEntidad" :key="tipo" :value="tipo">{{ tipo }}</option>
-                            </SelectInput>
-                        </div>
+                                    <!-- Overlay para cerrar el menú al hacer click fuera -->
+                                    <div v-if="openEstadoDropdown" class="fixed inset-0 z-40" @click="openEstadoDropdown = false"></div>
 
-                        <div class="lg:col-span-12 xl:col-span-3">
-                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Despacho o juzgado</label>
-                            <AsyncSelect
-                                v-model="selectedJuzgado"
-                                :endpoint="route('juzgados.search')"
-                                placeholder="Buscar juzgado o despacho"
-                                label-key="nombre"
-                                class="!min-h-[42px] !rounded-lg"
-                            />
-                        </div>
+                                    <!-- MENÚ FLOTANTE CON DISEÑO PREMIUM -->
+                                    <transition
+                                        enter-active-class="transition duration-100 ease-out"
+                                        enter-from-class="transform scale-95 opacity-0"
+                                        enter-to-class="transform scale-100 opacity-100"
+                                        leave-active-class="transition duration-75 ease-in"
+                                        leave-from-class="transform scale-100 opacity-100"
+                                        leave-to-class="transform scale-95 opacity-0"
+                                    >
+                                        <div v-show="openEstadoDropdown" class="absolute left-0 right-0 z-50 mt-1 origin-top overflow-hidden rounded-xl border border-gray-200 bg-white p-1 shadow-xl dark:border-gray-700 dark:bg-gray-800">
+                                            <ul class="max-h-60 overflow-y-auto py-1 custom-scrollbar-horizontal">
+                                                <li v-for="opcion in opcionesEstado" :key="opcion.value">
+                                                    <button
+                                                        type="button"
+                                                        @click="estado = opcion.value; openEstadoDropdown = false"
+                                                        class="group flex w-full items-center justify-between px-3 py-2.5 text-left text-sm font-bold transition-all"
+                                                        :class="estado === opcion.value 
+                                                            ? 'border-l-4 border-indigo-600 bg-transparent text-indigo-600 dark:text-indigo-400' 
+                                                            : 'border-l-4 border-transparent text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-white'"
+                                                    >
+                                                        <span>{{ opcion.label }}</span>
+                                                        <CheckIcon v-if="estado === opcion.value" class="h-4 w-4 shrink-0 animate-in zoom-in-50" />
+                                                    </button>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </transition>
+                                </div>
+                            </div>
 
-                        <div class="lg:col-span-12">
-                            <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Control rápido</label>
-                            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
-                                <button
-                                    v-for="item in controlFilterItems"
-                                    :key="item.key"
-                                    type="button"
-                                    @click="applyControlFilter(item.key)"
-                                    :class="isControlActive(item) ? item.activeClass : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-indigo-200 hover:text-indigo-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300'"
-                                    class="inline-flex min-h-10 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-[10px] font-black uppercase tracking-wider transition-colors"
-                                >
-                                    <span class="inline-flex min-w-0 items-center gap-2">
-                                        <component :is="item.icon" class="h-4 w-4 shrink-0" />
-                                        <span class="truncate">{{ item.label }}</span>
-                                    </span>
-                                    <span v-if="item.count !== null && item.count !== undefined" class="shrink-0 rounded bg-white/70 px-1.5 py-0.5 text-[9px] text-gray-700 dark:bg-black/20 dark:text-white">{{ item.count }}</span>
-                                </button>
+                            <div class="lg:col-span-3">
+                                <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Tipo de proceso</label>
+                                <AsyncSelect
+                                    v-model="selectedTipoProceso"
+                                    :endpoint="route('tipos-proceso.search')"
+                                    placeholder="Buscar tipo de proceso"
+                                    label-key="nombre"
+                                    class="!min-h-[42px] !rounded-lg"
+                                />
+                            </div>
+
+                            <div class="lg:col-span-3">
+                                <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Tipo de entidad</label>
+                                <div class="relative">
+                                    <!-- DISPARADOR DEL DROPDOWN PERSONALIZADO (ENTIDAD) -->
+                                    <button
+                                        type="button"
+                                        @click="openEntidadDropdown = !openEntidadDropdown"
+                                        class="flex min-h-[42px] w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm font-semibold text-gray-800 transition-all hover:border-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    >
+                                        <div class="flex items-center gap-2 truncate text-[13px]">
+                                            <BuildingOfficeIcon class="h-4 w-4 text-gray-400" />
+                                            <span class="truncate">{{ currentLabelEntidad }}</span>
+                                        </div>
+                                        <ChevronDownIcon class="h-3 w-3 shrink-0 text-gray-400 transition-transform" :class="{ 'rotate-180': openEntidadDropdown }" />
+                                    </button>
+
+                                    <!-- Overlay para cerrar el menú al hacer click fuera -->
+                                    <div v-if="openEntidadDropdown" class="fixed inset-0 z-40" @click="openEntidadDropdown = false"></div>
+
+                                    <!-- MENÚ FLOTANTE CON DISEÑO PREMIUM -->
+                                    <transition
+                                        enter-active-class="transition duration-100 ease-out"
+                                        enter-from-class="transform scale-95 opacity-0"
+                                        enter-to-class="transform scale-100 opacity-100"
+                                        leave-active-class="transition duration-75 ease-in"
+                                        leave-from-class="transform scale-100 opacity-100"
+                                        leave-to-class="transform scale-95 opacity-0"
+                                    >
+                                        <div v-show="openEntidadDropdown" class="absolute left-0 right-0 z-50 mt-1 origin-top overflow-hidden rounded-xl border border-gray-200 bg-white p-1 shadow-xl dark:border-gray-700 dark:bg-gray-800">
+                                            <ul class="max-h-60 overflow-y-auto py-1 custom-scrollbar-horizontal">
+                                                <li v-for="opcion in opcionesEntidad" :key="opcion.value">
+                                                    <button
+                                                        type="button"
+                                                        @click="tipoEntidad = opcion.value; openEntidadDropdown = false"
+                                                        class="group flex w-full items-center justify-between px-3 py-2.5 text-left text-sm font-bold transition-all"
+                                                        :class="tipoEntidad === opcion.value 
+                                                            ? 'border-l-4 border-indigo-600 bg-transparent text-indigo-600 dark:text-indigo-400' 
+                                                            : 'border-l-4 border-transparent text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-white'"
+                                                    >
+                                                        <span>{{ opcion.label }}</span>
+                                                        <CheckIcon v-if="tipoEntidad === opcion.value" class="h-4 w-4 shrink-0 animate-in zoom-in-50" />
+                                                    </button>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </transition>
+                                </div>
+                            </div>
+
+                            <div class="lg:col-span-3">
+                                <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Fecha de registro (Desde - Hasta)</label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <!-- 
+                                         Componentes DatePicker estándar del proyecto.
+                                         Se utilizan para filtrar por el día en que se CREÓ el registro en el sistema.
+                                    -->
+                                    <DatePicker 
+                                        v-model="fechaInicio" 
+                                        placeholder="Desde" 
+                                        class="!bg-gray-50 dark:!bg-gray-900" 
+                                    />
+                                    <DatePicker 
+                                        v-model="fechaFin" 
+                                        placeholder="Hasta" 
+                                        class="!bg-gray-50 dark:!bg-gray-900" 
+                                    />
+                                </div>
                             </div>
                         </div>
+                    </transition>
+
+                    <!-- 
+                         BOTÓN DE CONTROL (TOGGLE): Pestaña central en el borde inferior.
+                         Permite expandir o contraer la sección detallada de filtros.
+                    -->
+                    <div class="absolute -bottom-3.5 left-0 right-0 flex justify-center">
+                        <button
+                            type="button"
+                            @click="showFilters = !showFilters"
+                            class="group flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-gray-600 shadow-md transition-all hover:border-indigo-300 hover:text-indigo-600 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400 dark:hover:text-indigo-400"
+                        >
+                            <span v-if="showFilters">Ocultar filtros</span>
+                            <span v-else>Mostrar filtros</span>
+                            
+                            <ChevronUpIcon v-if="showFilters" class="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5" />
+                            <ChevronDownIcon v-else class="h-3.5 w-3.5 transition-transform group-hover:translate-y-0.5" />
+                        </button>
                     </div>
                 </section>
 
@@ -1272,6 +1497,7 @@ const copyLegalInfo = (proceso) => {
 
 <style scoped>
 .custom-scrollbar-horizontal::-webkit-scrollbar { height: 6px; }
+.custom-scrollbar-horizontal::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar-horizontal::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar-horizontal::-webkit-scrollbar-thumb { background-color: rgba(79, 70, 229, 0.1); border-radius: 20px; }
 .sticky { position: -webkit-sticky; position: sticky; }

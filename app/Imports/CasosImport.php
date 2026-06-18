@@ -36,6 +36,8 @@ class CasosImport implements ToCollection, WithHeadingRow
             $docDeudor = preg_replace('/[^0-9]/', '', trim((string) $get('documento_deudor', '')));
             $idSistemaRaw = $get(['id_sistema_no_modificar', 'id_sistema']);
             $idSistema = !empty($idSistemaRaw) ? (int) $idSistemaRaw : null;
+            $radicadoRaw = trim((string) $get('radicado_23_digitos', ''));
+            $referenciaRaw = trim((string) $get('referencia_credito_pagare', ''));
 
             if (empty($nombreDeudor) && empty($docDeudor) && empty($idSistema)) {
                 continue;
@@ -53,9 +55,11 @@ class CasosImport implements ToCollection, WithHeadingRow
                 'status' => 'success',
                 'messages' => [],
                 'id_sistema' => $idSistema,
-                'radicado' => preg_replace('/[^0-9]/', '', trim((string) $get('radicado_23_digitos', ''))),
+                'radicado' => preg_replace('/[^0-9]/', '', $radicadoRaw),
+                'radicado_raw' => $radicadoRaw,
                 'es_spoa_nunc' => $siNo(['es_spoa_nunc_sino', 'spoanunc', 'spoa_nunc']),
-                'referencia_credito' => trim((string) $get('referencia_credito_pagare', '')),
+                'referencia_credito' => preg_replace('/[^0-9]/', '', $referenciaRaw),
+                'referencia_credito_raw' => $referenciaRaw,
                 'nombre_deudor' => $nombreDeudor,
                 'documento_deudor' => $docDeudor,
                 'tipo_documento' => strtoupper((string) $get(['tipo_documento', 'tipo_doc'], 'CC')),

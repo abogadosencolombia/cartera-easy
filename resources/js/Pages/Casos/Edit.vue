@@ -258,6 +258,12 @@ const handleRadicadoInput = (e) => {
     e.target.value = formatted;
 };
 
+const handleReferenciaInput = (e) => {
+    const formatted = String(e.target.value || '').replace(/\D/g, '');
+    form.referencia_credito = formatted;
+    e.target.value = formatted;
+};
+
 const addDays = (field, days) => {
     form[field] = addDaysToDate(form[field], days);
 };
@@ -573,7 +579,7 @@ const submit = () => {
                                     </div>
 
                                     <div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-                                        <div><InputLabel value="Número De Pagaré" /><TextInput v-model="form.referencia_credito" class="w-full" /><InputError :message="form.errors.referencia_credito" /></div>
+                                        <div><InputLabel value="Número De Pagaré" /><TextInput v-model="form.referencia_credito" inputmode="numeric" pattern="[0-9]*" @input="handleReferenciaInput" class="w-full" /><InputError :message="form.errors.referencia_credito" /></div>
                                         <div><InputLabel value="Monto de Crédito *" /><TextInput v-model="form.monto_total" type="number" step="0.01" class="w-full" /><InputError :message="form.errors.monto_total" /></div>
                                         <div><InputLabel value="Monto Deuda Actual" /><TextInput v-model="form.monto_deuda_actual" type="number" step="0.01" class="w-full" /><InputError :message="form.errors.monto_deuda_actual" /></div>
                                         <div><InputLabel value="Total Pagado" /><TextInput v-model="form.monto_total_pagado" type="number" step="0.01" class="w-full" /><InputError :message="form.errors.monto_total_pagado" /></div>
@@ -615,6 +621,8 @@ const submit = () => {
                                         </div>
                                         <TextInput 
                                             v-model="form.radicado" 
+                                            inputmode="numeric"
+                                            pattern="[0-9]*"
                                             @input="handleRadicadoInput"
                                             class="w-full font-mono" 
                                             :placeholder="form.es_spoa_nunc ? '21 dígitos (Sistema Penal)' : '23 dígitos numéricos (Sin puntos ni guiones)'"

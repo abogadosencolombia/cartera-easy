@@ -34,15 +34,38 @@ class StoreCasoRequest extends FormRequest
             'referencia_credito' => [
                 'nullable', 
                 'string', 
-                'max:255', 
-                Rule::unique('casos', 'referencia_credito')->whereNull('deleted_at')
+                'max:255',
+                'regex:/^[0-9]+$/',
+                Rule::unique('casos', 'referencia_credito')->whereNull('deleted_at'),
+                function ($attribute, $value, $fail) {
+                    if (!$value) return;
+
+                    $conflict = \App\Models\Caso::whereNull('deleted_at')
+                        ->whereRaw("regexp_replace(referencia_credito, '[^0-9]', '', 'g') = ?", [$value])
+                        ->first(['id']);
+
+                    if ($conflict) {
+                        $fail("El número de pagaré ya está registrado en el caso #{$conflict->id}.");
+                    }
+                }
             ],
             'radicado' => [
                 'nullable', 
                 'string', 
                 'max:23', 
                 'regex:/^[0-9]{14,23}$/',
-                Rule::unique('casos', 'radicado')->whereNull('deleted_at')
+                Rule::unique('casos', 'radicado')->whereNull('deleted_at'),
+                function ($attribute, $value, $fail) {
+                    if (!$value) return;
+
+                    $conflict = \App\Models\Caso::whereNull('deleted_at')
+                        ->whereRaw("regexp_replace(radicado, '[^0-9]', '', 'g') = ?", [$value])
+                        ->first(['id']);
+
+                    if ($conflict) {
+                        $fail("El número de radicado ya está registrado en el caso #{$conflict->id}.");
+                    }
+                }
             ],
             'especialidad_id' => ['nullable', 'integer', 'exists:especialidades_juridicas,id'],
             'tipo_proceso' => [
@@ -115,6 +138,10 @@ class StoreCasoRequest extends FormRequest
             'monto_total.required' => 'El monto del crédito es obligatorio.',
             'user_id.required' => 'Debe asignar al menos un abogado responsable.',
             'cooperativa_id.required' => 'Debe seleccionar la cooperativa o empresa del caso.',
+            'referencia_credito.regex' => 'El número de pagaré solo puede contener dígitos. No use puntos, guiones, espacios ni comas.',
+            'referencia_credito.unique' => 'El número de pagaré ya está registrado en otro caso activo.',
+            'radicado.regex' => 'El número de radicado debe tener entre 14 y 23 dígitos. No use puntos, guiones, espacios ni comas.',
+            'radicado.unique' => 'El número de radicado ya está registrado en otro caso activo.',
         ];
     }
 }

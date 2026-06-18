@@ -34,7 +34,13 @@ class ProcesoRadicadoController extends Controller
 
     public function index(Request $request): Response
     {
+        /**
+         * FILTRADO DE EXPEDIENTES JUDICIALES
+         * Soporta: Búsqueda general, Estado, Juzgado, Tipo de Proceso y Entidad.
+         * Nuevo: Rango de fechas basado en la creación interna del registro (created_at).
+         */
         $this->authorize('viewAny', ProcesoRadicado::class);
+        
         $integrityService = app(ExpedienteIntegrityService::class);
         $integridadDisponible = $integrityService->supportsPersistence('proceso_radicados');
         $query = ProcesoRadicado::with(['abogado:id,name', 'responsableRevision:id,name', 'juzgado:id,nombre', 'tipoProceso:id,nombre', 'demandantes', 'demandados', 'etapaActual:id,nombre,riesgo']);
@@ -53,6 +59,20 @@ class ProcesoRadicadoController extends Controller
         if ($request->filled('tipo_entidad')) {
             $tipo = $request->input('tipo_entidad');
             $query->whereHas('juzgado', fn($q) => $q->where('nombre', 'ilike', "%{$tipo}%"));
+        }
+
+        /**
+         * FILTRO POR RANGO DE FECHAS (CREACIÓN)
+         * Se utiliza whereDate para comparar solo el componente de fecha de la columna 'created_at'.
+         * Inclusivo para los extremos seleccionados.
+         */
+        if ($request->filled('fecha_inicio') && $request->filled('fecha_fin')) {
+            $query->whereDate('created_at', '>=', $request->input('fecha_inicio'))
+                  ->whereDate('created_at', '<=', $request->input('fecha_fin'));
+        } elseif ($request->filled('fecha_inicio')) {
+            $query->whereDate('created_at', '>=', $request->input('fecha_inicio'));
+        } elseif ($request->filled('fecha_fin')) {
+            $query->whereDate('created_at', '<=', $request->input('fecha_fin'));
         }
 
         $inicioHoy = now()->startOfDay();

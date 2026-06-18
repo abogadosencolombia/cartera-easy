@@ -24,6 +24,7 @@ class GenerarAlertasCron extends Command
     public function handle()
     {
         $this->info('--> Iniciando escaneo de vencimientos (Hora Col: ' . now()->format('h:i A') . ')...');
+        $maximoCorreosPorRonda = $this->mailBurstLimit();
         
         $admins = User::where('tipo_usuario', 'admin')->where('estado_activo', true)->get();
 
@@ -91,8 +92,8 @@ class GenerarAlertasCron extends Command
 
                         if (!$yaNotificado) {
                             // Límite de ráfaga conservador para evitar saturación de Hostinger.
-                            if ($countProcesos >= 5) {
-                                $this->warn("Límite de ráfaga (5) alcanzado en procesos. El resto se enviará en la próxima ejecución.");
+                            if ($countProcesos >= $maximoCorreosPorRonda) {
+                                $this->warn("Límite de ráfaga ({$maximoCorreosPorRonda}) alcanzado en procesos. El resto se enviará en la próxima ejecución.");
                                 break;
                             }
 
@@ -100,8 +101,7 @@ class GenerarAlertasCron extends Command
                             $countProcesos++;
                             $this->info("Notificación enviada para Proceso #{$proceso->id}");
                             
-                            // Pausa obligatoria para estabilizar la conexión SMTP.
-                            sleep(10);
+                            $this->pauseForSmtp();
                         }
                     }
                 }
@@ -111,7 +111,7 @@ class GenerarAlertasCron extends Command
                 \Log::error("Error procesando alerta para Proceso #{$proceso->id}: " . $errorMessage);
                 
                 // CIRCUIT BREAKER: Si es un error de Rate Limit, detenemos todo el proceso
-                if (str_contains($errorMessage, 'Ratelimit') || str_contains($errorMessage, '451')) {
+                if ($this->isSmtpRateLimited($errorMessage)) {
                     $this->error("ALERTA: Se ha detectado un Rate Limit en Hostinger. Deteniendo envíos para evitar bloqueos permanentes.");
                     break;
                 }
@@ -138,8 +138,8 @@ class GenerarAlertasCron extends Command
 
             foreach ($cuotas as $cuota) {
                 // Límite de ráfaga para pagos.
-                if ($countPagos >= 5) {
-                    $this->warn("Límite de ráfaga (5) alcanzado en pagos. El resto se procesará luego.");
+                if ($countPagos >= $maximoCorreosPorRonda) {
+                    $this->warn("Límite de ráfaga ({$maximoCorreosPorRonda}) alcanzado en pagos. El resto se procesará luego.");
                     break;
                 }
 
@@ -176,17 +176,16 @@ class GenerarAlertasCron extends Command
                         $enviado = $this->crearNotificacionPago($cuota, $admins, 'mora', $mensajePago, $tituloPago);
                         if ($enviado) {
                             $countPagos++;
-                            // Pausa de seguridad obligatoria.
-                            sleep(10);
+                            $this->pauseForSmtp();
                         }
                     } catch (\Exception $e) {
                         $msg = $e->getMessage();
                         \Log::error("Error en pago cuota #{$cuota->id}: " . $msg);
-                        if (str_contains($msg, 'Ratelimit') || str_contains($msg, '451')) {
+                        if ($this->isSmtpRateLimited($msg)) {
                             $this->error("Rate Limit detectado en pagos. Abortando.");
                             break;
                         }
-                        sleep(10);
+                        $this->pauseForSmtp();
                     }
                 }
             }
@@ -209,19 +208,17 @@ class GenerarAlertasCron extends Command
                     $user->name, $titulo, $mensaje, $link, $detalles
                 ));
                 $this->info("Correo enviado a {$user->email}");
-                // Pausa obligatoria para Hostinger.
-                sleep(10);
+                $this->pauseForSmtp();
             } 
         } catch (\Exception $e) {
             $msg = $e->getMessage();
             \Log::error("Error enviando correo a User #{$userId}: " . $msg);
             
-            // CIRCUIT BREAKER
-            if (str_contains($msg, 'Ratelimit') || str_contains($msg, '451')) {
+            if ($this->isSmtpRateLimited($msg)) {
                 $this->error("Rate Limit detectado en enviarCorreo. Deteniendo proceso.");
-                die(); // En un helper privado que se usa en bucles, die() es lo más seguro
+                throw $e;
             }
-            sleep(10);
+            $this->pauseForSmtp();
         }
     }
 
@@ -328,5 +325,24 @@ class GenerarAlertasCron extends Command
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function mailBurstLimit(): int
+    {
+        return max(1, (int) config('mail.alerts.burst_limit', 2));
+    }
+
+    private function pauseForSmtp(): void
+    {
+        $seconds = max(0, (int) config('mail.alerts.pause_seconds', 30));
+
+        if ($seconds > 0) {
+            sleep($seconds);
+        }
+    }
+
+    private function isSmtpRateLimited(string $message): bool
+    {
+        return str_contains($message, 'Ratelimit') || str_contains($message, '451');
     }
 }

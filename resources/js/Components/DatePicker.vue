@@ -8,17 +8,25 @@ import { isHoliday } from '@/Utils/holidays';
 const props = defineProps({
     modelValue: { type: [String, null], default: null },
     placeholder: { type: String, default: 'Seleccionar fecha' },
-    yearRange: { type: Number, default: 100 }
+    yearRange: { type: Number, default: 100 },
+    teleport: { type: [String, Boolean, Object], default: 'body' }
 });
 
 const emit = defineEmits(['update:modelValue']);
 const container = ref(null);
 
+// --- LÓGICA DE POSICIONAMIENTO DINÁMICO (FIX Z-INDEX/MODALES) ---
+// Obtenemos las coordenadas del input y el tamaño de la ventana para calcular la posición del calendario
 const { bottom, left, top } = useElementBounding(container);
 const { height: windowHeight } = useWindowSize();
 
+/**
+ * Calcula la posición del panel flotante.
+ * Si no hay espacio debajo, se despliega hacia arriba.
+ * Se usa con posicionamiento 'fixed' para ignorar restricciones de overflow de padres.
+ */
 const floatingStyles = computed(() => {
-    const dropdownHeight = 380; // Aproximado para el calendario
+    const dropdownHeight = 380; // Altura estimada del calendario
     const spaceBelow = windowHeight.value - bottom.value;
     const showAbove = spaceBelow < dropdownHeight && top.value > dropdownHeight;
 
@@ -132,12 +140,25 @@ const updateViewDate = (part, value) => {
                     </div>
                 </button>
             </PopoverButton>
-            <button v-if="modelValue" @click.stop="emit('update:modelValue', '')" type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-red-500 z-10"><XMarkIcon class="h-4 w-4" /></button>
+            <button v-if="modelValue" @click.stop="emit('update:modelValue', '')" type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-red-500 z-10">
+                <XMarkIcon class="h-4 w-4" />
+            </button>
         </div>
 
-        <Teleport to="body">
-            <transition enter-active-class="transition duration-200 ease-out" enter-from-class="translate-y-1 opacity-0" enter-to-class="translate-y-0 opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="translate-y-0 opacity-100" leave-to-class="translate-y-1 opacity-0">
-                <PopoverPanel v-slot="{ close }" class="fixed z-[9999] mt-2 w-72 origin-top-left" :style="floatingStyles">
+        <!-- 
+            TELEPORT: Renderiza el calendario en el body para evitar que el modal (overflow-hidden) lo corte.
+            Z-INDEX: Se usa 11000 para estar por encima del z-index del Modal (10000).
+        -->
+        <Teleport :to="teleport" v-if="teleport">
+            <transition 
+                enter-active-class="transition duration-200 ease-out" 
+                enter-from-class="translate-y-1 opacity-0" 
+                enter-to-class="translate-y-0 opacity-100" 
+                leave-active-class="transition duration-150 ease-in" 
+                leave-from-class="translate-y-0 opacity-100" 
+                leave-to-class="translate-y-1 opacity-0"
+            >
+                <PopoverPanel v-slot="{ close }" class="fixed z-[11000] mt-2 w-72 origin-top-left" :style="floatingStyles">
                     <div class="overflow-hidden rounded-xl bg-white dark:bg-gray-800 border dark:border-gray-700 shadow-2xl ring-1 ring-black ring-opacity-5">
                         <!-- Header con selectores de mes y año mejorados -->
                         <div class="px-3 py-3 border-b dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center gap-2">
@@ -171,16 +192,25 @@ const updateViewDate = (part, value) => {
                                 <div v-for="day in daysOfWeek" :key="day" class="text-center text-[10px] font-black text-gray-400 uppercase">{{ day }}</div>
                             </div>
                             <div class="grid grid-cols-7 gap-1">
-                                <button v-for="(item, idx) in days" :key="idx" @click="selectDate(item.date, close)" type="button" class="h-8 w-8 flex flex-col items-center justify-center rounded-lg text-xs transition-all relative" :title="item.holiday || ''" :class="[
-                                    item.current ? 'text-gray-700 dark:text-gray-200' : 'text-gray-300 dark:text-gray-600 opacity-50', 
-                                    (modelValue && item.date.toDateString() === selectedDate?.toDateString()) ? 'bg-indigo-600 text-white font-bold' : 'hover:bg-indigo-50 dark:hover:bg-indigo-900/30',
-                                    item.holiday ? 'text-red-600 dark:text-red-400 font-bold' : ''
-                                ]">
+                                <button 
+                                    v-for="(item, idx) in days" 
+                                    :key="idx" 
+                                    @click="selectDate(item.date, close)" 
+                                    type="button" 
+                                    class="h-8 w-8 flex flex-col items-center justify-center rounded-lg text-xs transition-all relative" 
+                                    :title="item.holiday || ''" 
+                                    :class="[
+                                        item.current ? 'text-gray-700 dark:text-gray-200' : 'text-gray-300 dark:text-gray-600 opacity-50', 
+                                        (modelValue && item.date.toDateString() === selectedDate?.toDateString()) ? 'bg-indigo-600 text-white font-bold' : 'hover:bg-indigo-50 dark:hover:bg-indigo-900/30',
+                                        item.holiday ? 'text-red-600 dark:text-red-400 font-bold' : ''
+                                    ]"
+                                >
                                     {{ item.date.getDate() }}
                                     <span v-if="item.holiday" class="absolute bottom-0.5 w-1 h-1 bg-red-500 rounded-full"></span>
                                 </button>
                             </div>
                         </div>
+                        
                         <div class="px-4 py-2 border-t dark:border-gray-700 flex justify-between bg-gray-50 dark:bg-gray-800/50">
                             <button @click="viewDate = new Date();" type="button" class="text-[10px] font-bold text-indigo-600 uppercase hover:underline transition-all">Hoy</button>
                             <button @click="emit('update:modelValue', ''); close();" type="button" class="text-[10px] font-bold text-gray-500 uppercase hover:underline transition-all">Limpiar</button>

@@ -145,6 +145,16 @@ class CasoController extends Controller
             });
         });
 
+        // --- 8. Filtro por Fecha de Registro (created_at) ---
+        if ($request->filled('fecha_inicio') && $request->filled('fecha_fin')) {
+            $query->whereDate('created_at', '>=', $request->input('fecha_inicio'))
+                  ->whereDate('created_at', '<=', $request->input('fecha_fin'));
+        } elseif ($request->filled('fecha_inicio')) {
+            $query->whereDate('created_at', '>=', $request->input('fecha_inicio'));
+        } elseif ($request->filled('fecha_fin')) {
+            $query->whereDate('created_at', '<=', $request->input('fecha_fin'));
+        }
+
         $inicioHoy = now()->startOfDay();
         $finHoy = now()->endOfDay();
         $aplicarActualizadosHoy = fn ($q) => $q->whereBetween('updated_at', [$inicioHoy, $finHoy]);
@@ -291,6 +301,21 @@ class CasoController extends Controller
                 $row['messages'][] = "Deudor vinculado: {$deudor->nombre_completo}";
             }
 
+            if (!empty($row['referencia_credito_raw']) && preg_match('/\D/', $row['referencia_credito_raw'])) {
+                $row['status'] = 'error';
+                $row['messages'][] = "ERROR: El Pagaré '{$row['referencia_credito_raw']}' solo puede contener números. No use puntos, guiones, espacios ni comas.";
+            }
+
+            if (!empty($row['radicado_raw']) && preg_match('/\D/', $row['radicado_raw'])) {
+                $row['status'] = 'error';
+                $row['messages'][] = "ERROR: El Radicado '{$row['radicado_raw']}' solo puede contener números. No use puntos, guiones, espacios ni comas.";
+            }
+
+            if (!empty($row['radicado']) && (strlen($row['radicado']) < 14 || strlen($row['radicado']) > 23)) {
+                $row['status'] = 'error';
+                $row['messages'][] = "ERROR: El Radicado debe tener entre 14 y 23 dígitos.";
+            }
+
             // 4. Buscar Caso Existente para comparar
             $existente = null;
             if (!empty($row['id_sistema'])) {
@@ -301,7 +326,7 @@ class CasoController extends Controller
             
             // Validar Referencia de Crédito (Pagaré) Único
             if (!empty($row['referencia_credito'])) {
-                $conflictoRef = Caso::where('referencia_credito', 'ilike', trim($row['referencia_credito']))
+                $conflictoRef = Caso::whereRaw("regexp_replace(referencia_credito, '[^0-9]', '', 'g') = ?", [$row['referencia_credito']])
                     ->when($existente, fn($q) => $q->where('id', '!=', $existente->id))
                     ->first();
                 
@@ -313,7 +338,7 @@ class CasoController extends Controller
 
             // Validar Radicado Único
             if (!empty($row['radicado']) && strlen($row['radicado']) === 23) {
-                $conflictoRad = Caso::where('radicado', $row['radicado'])
+                $conflictoRad = Caso::whereRaw("regexp_replace(radicado, '[^0-9]', '', 'g') = ?", [$row['radicado']])
                     ->when($existente, fn($q) => $q->where('id', '!=', $existente->id ?? 0))
                     ->first();
                 
@@ -326,11 +351,11 @@ class CasoController extends Controller
             if (!$existente && $row['status'] !== 'error') {
                 // Si no hay ID de sistema, intentar emparejar por Radicado o Pagaré para evitar duplicados si no se marcó el error antes
                 if (!empty($row['radicado'])) {
-                    $existente = Caso::where('radicado', $row['radicado'])->first();
+                    $existente = Caso::whereRaw("regexp_replace(radicado, '[^0-9]', '', 'g') = ?", [$row['radicado']])->first();
                 }
                 if (!$existente && $deudor && !empty($row['referencia_credito'])) {
                     $existente = Caso::where('deudor_id', $deudor->id)
-                                     ->where('referencia_credito', 'ilike', trim($row['referencia_credito']))
+                                     ->whereRaw("regexp_replace(referencia_credito, '[^0-9]', '', 'g') = ?", [$row['referencia_credito']])
                                      ->first();
                 }
             }
@@ -521,7 +546,7 @@ class CasoController extends Controller
                         $caso = $crearCaso();
                     }
                 } elseif (!empty($row['radicado']) && strlen($row['radicado']) >= 14 && strlen($row['radicado']) <= 23) {
-                    $caso = Caso::where('radicado', $row['radicado'])->first();
+                    $caso = Caso::whereRaw("regexp_replace(radicado, '[^0-9]', '', 'g') = ?", [$row['radicado']])->first();
                     if ($caso) {
                         $preservarCamposVacios($caso);
                         $caso->update($casoData);
@@ -531,7 +556,7 @@ class CasoController extends Controller
                 } elseif (!empty($row['referencia_credito'])) {
                     // Si no hay radicado ni ID, buscar por deudor y referencia para evitar duplicados
                     $caso = Caso::where('deudor_id', $deudor->id)
-                        ->where('referencia_credito', $row['referencia_credito'])
+                        ->whereRaw("regexp_replace(referencia_credito, '[^0-9]', '', 'g') = ?", [$row['referencia_credito']])
                         ->first();
                     if ($caso) {
                         $preservarCamposVacios($caso);
@@ -593,8 +618,8 @@ class CasoController extends Controller
 
     public function verificarDuplicados(Request $request)
     {
-        $radicado = trim($request->input('radicado', ''));
-        $referencia = trim($request->input('referencia_credito', ''));
+        $radicado = preg_replace('/[^0-9]/', '', trim($request->input('radicado', '')));
+        $referencia = preg_replace('/[^0-9]/', '', trim($request->input('referencia_credito', '')));
         $ignoreId = $request->input('ignore_id');
 
         if (empty($radicado) && empty($referencia)) {
@@ -604,16 +629,16 @@ class CasoController extends Controller
         $query = Caso::query();
 
         $query->where(function($q) use ($radicado, $referencia) {
+            $hasCondition = false;
+
             if ($radicado) {
-                $cleanRad = preg_replace('/[^0-9]/', '', $radicado);
-                $q->where('radicado', 'ilike', "%{$radicado}%");
-                if ($cleanRad) {
-                    $q->orWhereRaw("regexp_replace(radicado, '[^0-9]', '', 'g') = ?", [$cleanRad]);
-                }
+                $q->whereRaw("regexp_replace(radicado, '[^0-9]', '', 'g') = ?", [$radicado]);
+                $hasCondition = true;
             }
 
             if ($referencia) {
-                $q->orWhere('referencia_credito', 'ilike', $referencia);
+                $method = $hasCondition ? 'orWhereRaw' : 'whereRaw';
+                $q->{$method}("regexp_replace(referencia_credito, '[^0-9]', '', 'g') = ?", [$referencia]);
             }
         });
 

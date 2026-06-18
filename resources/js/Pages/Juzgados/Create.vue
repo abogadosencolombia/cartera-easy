@@ -40,24 +40,33 @@ const submit = () => {
 
     <AuthenticatedLayout>
         <template #header>
-            <div class="flex items-center justify-between bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-                <div class="flex items-center gap-4">
-                    <div class="p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl">
-                        <BuildingOffice2Icon class="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
+            <div class="sticky top-0 z-10 backdrop-blur-xl bg-white/70 dark:bg-gray-800/70 p-6 rounded-[2rem] shadow-xl shadow-gray-200/50 dark:shadow-none border border-white/20 dark:border-gray-700/50 mb-8 transition-all duration-500">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div class="flex items-center gap-5">
+                        <div class="p-4 bg-gradient-to-br from-indigo-600 to-violet-700 rounded-2xl shadow-lg shadow-indigo-200 dark:shadow-none transform transition-transform hover:scale-105 duration-300">
+                            <BuildingOffice2Icon class="h-8 w-8 text-white" />
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-3">
+                                <h2 class="font-black text-3xl text-gray-900 dark:text-white leading-tight tracking-tight">
+                                    Registrar Despacho
+                                </h2>
+                                <span class="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 uppercase tracking-wider">
+                                    Nuevo
+                                </span>
+                            </div>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 font-medium italic">Configuración de nueva entidad judicial en el sistema</p>
+                        </div>
                     </div>
-                    <div>
-                        <h2 class="font-black text-2xl text-gray-900 dark:text-white leading-tight">
-                            Registrar Nuevo Despacho
-                        </h2>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Complete los datos para añadir una nueva entidad judicial</p>
-                    </div>
+                    <Link :href="route('juzgados.index')" class="group">
+                        <SecondaryButton class="!rounded-full !py-3 !px-6 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-300">
+                            <div class="flex items-center gap-2">
+                                <ArrowLeftIcon class="h-4 w-4 transform group-hover:-translate-x-1 transition-transform duration-300" />
+                                <span class="font-bold">Volver al Directorio</span>
+                            </div>
+                        </SecondaryButton>
+                    </Link>
                 </div>
-                <Link :href="route('juzgados.index')">
-                    <SecondaryButton class="flex items-center gap-2">
-                        <ArrowLeftIcon class="h-4 w-4" />
-                        <span class="hidden md:inline">Volver al Directorio</span>
-                    </SecondaryButton>
-                </Link>
             </div>
         </template>
 
@@ -66,10 +75,11 @@ const submit = () => {
                 <form @submit.prevent="submit" class="space-y-8">
                     
                     <!-- Sección 1: Información General -->
-                    <div class="bg-white dark:bg-gray-800 shadow-sm rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
-                        <div class="p-6 border-b border-gray-50 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/30 flex items-center gap-2">
-                            <IdentificationIcon class="h-5 w-5 text-indigo-500" />
-                            <h3 class="font-bold text-gray-900 dark:text-white">Identificación del Despacho</h3>
+                    <div class="bg-white dark:bg-gray-800 shadow-xl shadow-gray-200/40 dark:shadow-none rounded-[2.5rem] border border-gray-100 dark:border-gray-700 overflow-hidden group transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl hover:border-indigo-200 dark:hover:border-indigo-800 relative">
+                        <div class="absolute top-0 left-0 w-1.5 h-full bg-indigo-500"></div>
+                        <div class="p-6 border-b border-gray-50 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-700/30 flex items-center gap-2">
+                            <IdentificationIcon class="h-6 w-6 text-indigo-500 group-hover:scale-125 group-hover:rotate-6 transition-all duration-300 ml-2" />
+                            <h3 class="font-black text-gray-900 dark:text-white tracking-tight">Identificación del Despacho</h3>
                         </div>
                         <div class="p-8 space-y-6">
                             <div>
@@ -81,7 +91,7 @@ const submit = () => {
                                     <TextInput 
                                         id="nombre" 
                                         type="text" 
-                                        class="mt-1 block w-full pl-10 !rounded-xl !border-gray-200 focus:!ring-indigo-500" 
+                                        class="mt-1 block w-full pl-10 !rounded-xl !border-gray-200 transition-all duration-200 hover:border-indigo-300 dark:hover:border-indigo-600 hover:shadow-sm focus:!ring-indigo-500 transition-all duration-200 hover:border-indigo-300 dark:hover:border-indigo-600 hover:shadow-sm" 
                                         v-model="form.nombre" 
                                         required 
                                         autofocus 
@@ -100,7 +110,7 @@ const submit = () => {
                                     <TextInput 
                                         id="distrito" 
                                         type="text" 
-                                        class="mt-1 block w-full pl-10 !rounded-xl !border-gray-200 focus:!ring-indigo-500" 
+                                        class="mt-1 block w-full pl-10 !rounded-xl !border-gray-200 transition-all duration-200 hover:border-indigo-300 dark:hover:border-indigo-600 hover:shadow-sm focus:!ring-indigo-500 transition-all duration-200 hover:border-indigo-300 dark:hover:border-indigo-600 hover:shadow-sm" 
                                         v-model="form.distrito" 
                                         placeholder="Ej: Distrito Judicial de Bogotá"
                                     />
@@ -113,30 +123,32 @@ const submit = () => {
                     <!-- Sección 2: Ubicación y Contacto -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <!-- Ubicación -->
-                        <div class="bg-white dark:bg-gray-800 shadow-sm rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
-                            <div class="p-6 border-b border-gray-50 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/30 flex items-center gap-2">
-                                <MapPinIcon class="h-5 w-5 text-red-500" />
-                                <h3 class="font-bold text-gray-900 dark:text-white">Ubicación Geográfica</h3>
+                        <div class="bg-white dark:bg-gray-800 shadow-xl shadow-gray-200/40 dark:shadow-none rounded-[2.5rem] border border-gray-100 dark:border-gray-700 overflow-hidden group transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl hover:border-red-100 dark:hover:border-red-900/30 relative">
+                            <div class="absolute top-0 left-0 w-1.5 h-full bg-red-500"></div>
+                            <div class="p-6 border-b border-gray-50 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-700/30 flex items-center gap-2">
+                                <MapPinIcon class="h-6 w-6 text-red-500 group-hover:scale-125 group-hover:rotate-6 transition-all duration-300 ml-2" />
+                                <h3 class="font-black text-gray-900 dark:text-white tracking-tight">Ubicación</h3>
                             </div>
                             <div class="p-8 space-y-6">
                                 <div>
                                     <InputLabel for="municipio" value="Municipio / Ciudad" class="!text-xs !font-bold !uppercase !tracking-wider !text-gray-500 mb-1" />
-                                    <TextInput id="municipio" type="text" class="mt-1 block w-full !rounded-xl !border-gray-200" v-model="form.municipio" />
+                                    <TextInput id="municipio" type="text" class="mt-1 block w-full !rounded-xl !border-gray-200 transition-all duration-200 hover:border-indigo-300 dark:hover:border-indigo-600 hover:shadow-sm" v-model="form.municipio" />
                                     <InputError class="mt-2" :message="form.errors.municipio" />
                                 </div>
                                 <div>
                                     <InputLabel for="departamento" value="Departamento" class="!text-xs !font-bold !uppercase !tracking-wider !text-gray-500 mb-1" />
-                                    <TextInput id="departamento" type="text" class="mt-1 block w-full !rounded-xl !border-gray-200" v-model="form.departamento" />
+                                    <TextInput id="departamento" type="text" class="mt-1 block w-full !rounded-xl !border-gray-200 transition-all duration-200 hover:border-indigo-300 dark:hover:border-indigo-600 hover:shadow-sm" v-model="form.departamento" />
                                     <InputError class="mt-2" :message="form.errors.departamento" />
                                 </div>
                             </div>
                         </div>
 
                         <!-- Contacto -->
-                        <div class="bg-white dark:bg-gray-800 shadow-sm rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
-                            <div class="p-6 border-b border-gray-50 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/30 flex items-center gap-2">
-                                <EnvelopeIcon class="h-5 w-5 text-blue-500" />
-                                <h3 class="font-bold text-gray-900 dark:text-white">Medios de Contacto</h3>
+                        <div class="bg-white dark:bg-gray-800 shadow-xl shadow-gray-200/40 dark:shadow-none rounded-[2.5rem] border border-gray-100 dark:border-gray-700 overflow-hidden group transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl hover:border-blue-100 dark:hover:border-blue-900/30 relative">
+                            <div class="absolute top-0 left-0 w-1.5 h-full bg-blue-500"></div>
+                            <div class="p-6 border-b border-gray-50 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-700/30 flex items-center gap-2">
+                                <EnvelopeIcon class="h-6 w-6 text-blue-500 group-hover:scale-125 group-hover:rotate-6 transition-all duration-300 ml-2" />
+                                <h3 class="font-black text-gray-900 dark:text-white tracking-tight">Contacto</h3>
                             </div>
                             <div class="p-8 space-y-6">
                                 <div>
@@ -148,7 +160,7 @@ const submit = () => {
                                         <TextInput 
                                             id="email" 
                                             type="email" 
-                                            class="mt-1 block w-full pl-10 !rounded-xl !border-gray-200" 
+                                            class="mt-1 block w-full pl-10 !rounded-xl !border-gray-200 transition-all duration-200 hover:border-indigo-300 dark:hover:border-indigo-600 hover:shadow-sm" 
                                             v-model="form.email" 
                                             placeholder="correo@cendoj.ramajudicial.gov.co" 
                                         />
@@ -164,7 +176,7 @@ const submit = () => {
                                         <TextInput 
                                             id="telefono" 
                                             type="text" 
-                                            class="mt-1 block w-full pl-10 !rounded-xl !border-gray-200" 
+                                            class="mt-1 block w-full pl-10 !rounded-xl !border-gray-200 transition-all duration-200 hover:border-indigo-300 dark:hover:border-indigo-600 hover:shadow-sm" 
                                             v-model="form.telefono" 
                                         />
                                     </div>
@@ -175,19 +187,19 @@ const submit = () => {
                     </div>
 
                     <!-- Botones de Acción -->
-                    <div class="flex items-center justify-end gap-4 bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                    <div class="flex items-center justify-end gap-5 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm p-8 rounded-[2.5rem] shadow-xl shadow-gray-200/30 dark:shadow-none border border-gray-100 dark:border-gray-700">
                         <Link :href="route('juzgados.index')">
-                            <SecondaryButton type="button" class="!px-8 !py-3">
+                            <SecondaryButton type="button" class="!px-8 !py-3 !rounded-full hover:!bg-gray-100 dark:hover:!bg-gray-700 transition-all duration-300">
                                 Cancelar
                             </SecondaryButton>
                         </Link>
                         <PrimaryButton 
-                            class="!px-10 !py-3 !bg-indigo-600 hover:!bg-indigo-700 !text-sm flex items-center gap-2" 
+                            class="!px-12 !py-4 !rounded-full !bg-gradient-to-r !from-indigo-600 !to-violet-600 hover:!from-indigo-700 hover:!to-violet-700 !text-sm font-bold flex items-center gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-indigo-500/40 active:scale-95 shadow-lg shadow-indigo-500/20" 
                             :disabled="form.processing"
                         >
                             <span v-if="form.processing">Procesando...</span>
                             <template v-else>
-                                <BuildingOffice2Icon class="h-4 w-4" />
+                                <BuildingOffice2Icon class="h-5 w-5" />
                                 Guardar Despacho
                             </template>
                         </PrimaryButton>
