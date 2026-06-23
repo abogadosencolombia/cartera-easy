@@ -48,6 +48,7 @@ const form = useForm(`EditPersona:${props.persona.id}`, {
   cargo: props.persona.cargo,
   observaciones: props.persona.observaciones,
   es_demandado: props.persona.es_demandado ? '1' : '0',
+  estado_cartera: props.persona.estado_cartera || 'NO APLICA',
   sin_empresa_o_cooperativa: props.persona.sin_empresa_o_cooperativa ?? hasSpecialCooperativa(props.persona.cooperativas || []),
   addresses: Array.isArray(props.persona.addresses) ? props.persona.addresses.map(a => ({ ...a })) : [],
   social_links: Array.isArray(props.persona.social_links) ? props.persona.social_links.map(l => ({ ...l })) : [],
@@ -196,6 +197,15 @@ const getRandomColor = (id) => {
                         <option value="1">Demandado</option>
                     </SelectInput>
                     <InputError :message="form.errors.es_demandado" />
+                </div>
+                <div class="space-y-2">
+                    <InputLabel value="Estado de cartera" class="font-bold text-xs uppercase" />
+                    <SelectInput v-model="form.estado_cartera" class="w-full">
+                        <option value="NO APLICA">NO APLICA</option>
+                        <option value="ACTIVO">ACTIVO</option>
+                        <option value="CASTIGADO">CASTIGADO</option>
+                    </SelectInput>
+                    <InputError :message="form.errors.estado_cartera" />
                 </div>
                 <div class="space-y-2">
                     <InputLabel value="Fecha de Expedición" class="font-bold text-xs uppercase" />

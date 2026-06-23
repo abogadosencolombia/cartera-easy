@@ -16,8 +16,16 @@ class UpdatePersonaRequest extends FormRequest
     {
         $this->merge([
             'es_demandado' => $this->normalizeBooleanInput($this->input('es_demandado')),
+            'estado_cartera' => $this->normalizeEstadoCartera($this->input('estado_cartera')),
             'sin_empresa_o_cooperativa' => $this->normalizeBooleanInput($this->input('sin_empresa_o_cooperativa')),
         ]);
+    }
+
+    private function normalizeEstadoCartera($value): string
+    {
+        $value = strtoupper(trim((string) $value));
+
+        return in_array($value, ['ACTIVO', 'CASTIGADO', 'NO APLICA'], true) ? $value : 'NO APLICA';
     }
 
     private function normalizeBooleanInput($value)
@@ -59,6 +67,7 @@ class UpdatePersonaRequest extends FormRequest
             'correo_1'           => 'nullable|email|max:255',
             'correo_2'           => 'nullable|email|max:255',
             'es_demandado'       => 'nullable|boolean',
+            'estado_cartera'     => ['nullable', Rule::in(['ACTIVO', 'CASTIGADO', 'NO APLICA'])],
             'sin_empresa_o_cooperativa' => 'nullable|boolean',
             'empresa'            => 'nullable|string|max:255',
             'cargo'              => 'nullable|string|max:255',

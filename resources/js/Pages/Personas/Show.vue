@@ -58,6 +58,12 @@ const roleClass = computed(() => props.persona.es_demandado
     ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300'
     : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300'
 );
+const estadoCarteraLabel = computed(() => props.persona.estado_cartera || 'NO APLICA');
+const estadoCarteraClass = computed(() => {
+    if (estadoCarteraLabel.value === 'ACTIVO') return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300';
+    if (estadoCarteraLabel.value === 'CASTIGADO') return 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300';
+    return 'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-200';
+});
 const profileStatus = computed(() => missingInfo.value.length ? 'Datos pendientes' : 'Perfil completo');
 const profileStatusClass = computed(() => missingInfo.value.length
     ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300'
@@ -191,6 +197,7 @@ const getRandomColor = (id) => {
                     <div class="mt-1 flex flex-wrap items-center gap-2">
                         <h2 class="truncate text-2xl font-black leading-tight text-gray-950 dark:text-white">{{ persona.nombre_completo }}</h2>
                         <span class="rounded-md border px-2.5 py-1 text-[10px] font-black uppercase" :class="roleClass">{{ roleLabel }}</span>
+                        <span class="rounded-md border px-2.5 py-1 text-[10px] font-black uppercase" :class="estadoCarteraClass">{{ estadoCarteraLabel }}</span>
                         <span class="rounded-md border px-2.5 py-1 text-[10px] font-black uppercase" :class="profileStatusClass">{{ profileStatus }}</span>
                     </div>
                     <p class="mt-1 text-sm font-medium text-gray-600 dark:text-gray-300">{{ persona.tipo_documento || 'Documento' }} {{ documentNumber }}</p>

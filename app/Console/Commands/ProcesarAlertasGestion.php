@@ -5,8 +5,10 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use App\Models\NotaGestion;
 use App\Notifications\GestionDiariaNotification;
+use App\Support\SmtpCircuitBreaker;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ProcesarAlertasGestion extends Command
 {
@@ -15,10 +17,19 @@ class ProcesarAlertasGestion extends Command
 
     public function handle(): int
     {
+        if (SmtpCircuitBreaker::active()) {
+            $until = SmtpCircuitBreaker::until();
+            $this->warn("SMTP en cooldown hasta {$until?->toDateTimeString()}. Se omite esta ejecución.");
+            return self::SUCCESS;
+        }
+
         $this->info("--> Iniciando escaneo de Hoja de Ruta Diaria...");
 
         $notas = NotaGestion::where("is_completed", false)
-            ->with("user")
+            ->where('expires_at', '<=', now()->addHour())
+            ->with("user:id,name,email,preferencias_notificacion")
+            ->orderBy('expires_at')
+            ->limit(50)
             ->get();
 
         $enviadosEnEstaRonda = 0;
@@ -61,13 +72,17 @@ class ProcesarAlertasGestion extends Command
                 }
             } catch (\Exception $e) {
                 $errorMessage = $e->getMessage();
-                \Log::error("Error SMTP en ProcesarAlertasGestion (Tarea #{$nota->id}): " . $errorMessage);
+                Log::error("Error SMTP en ProcesarAlertasGestion (Tarea #{$nota->id}): " . $errorMessage);
                 $this->error("FAIL: No se pudo enviar a {$nota->user->name}. " . $errorMessage);
 
-                // CIRCUIT BREAKER: Detenemos si es Rate Limit
-                if ($this->isSmtpRateLimited($errorMessage)) {
-                    $this->error("ALERTA: Rate Limit detectado en Hostinger. Abortando ejecución.");
-                    return self::FAILURE;
+                if (SmtpCircuitBreaker::isRateLimited($errorMessage)) {
+                    $until = SmtpCircuitBreaker::trip($errorMessage);
+                    Log::warning('SMTP en cooldown para alertas de gestión.', [
+                        'hasta' => $until->toDateTimeString(),
+                        'error' => $errorMessage,
+                    ]);
+                    $this->warn("Rate limit/timeout SMTP detectado. Cooldown hasta {$until->toDateTimeString()}.");
+                    return self::SUCCESS;
                 }
                 
                 // Aun en error no crítico, pausamos para no saturar SMTP.
@@ -105,8 +120,4 @@ class ProcesarAlertasGestion extends Command
         }
     }
 
-    private function isSmtpRateLimited(string $message): bool
-    {
-        return str_contains($message, 'Ratelimit') || str_contains($message, '451');
-    }
 }

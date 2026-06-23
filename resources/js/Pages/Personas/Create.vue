@@ -40,6 +40,7 @@ const form = useForm('CreatePersona', {
   social_links: [],
   addresses: [],
   es_demandado: '0',
+  estado_cartera: 'NO APLICA',
   sin_empresa_o_cooperativa: true,
   cooperativas_ids: [],
   abogados_ids: [],
@@ -178,6 +179,15 @@ const submit = () => {
                         <option value="1">Demandado</option>
                     </SelectInput>
                     <InputError :message="form.errors.es_demandado" />
+                </div>
+                <div class="space-y-2">
+                    <InputLabel value="Estado de cartera" class="font-bold text-xs uppercase" />
+                    <SelectInput v-model="form.estado_cartera" class="w-full">
+                        <option value="NO APLICA">NO APLICA</option>
+                        <option value="ACTIVO">ACTIVO</option>
+                        <option value="CASTIGADO">CASTIGADO</option>
+                    </SelectInput>
+                    <InputError :message="form.errors.estado_cartera" />
                 </div>
                 <div class="space-y-2">
                     <InputLabel value="Fecha de Expedición" class="font-bold text-xs uppercase" />

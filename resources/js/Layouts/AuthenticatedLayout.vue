@@ -29,6 +29,17 @@ import {
     ClipboardDocumentCheckIcon,
 } from "@heroicons/vue/24/outline";
 
+const ChatGptIcon = {
+    template: `
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.1" />
+            <path d="M12 3.8a3.2 3.2 0 0 1 3.03 2.17 3.2 3.2 0 0 1 3.87 3.74 3.2 3.2 0 0 1-.84 5.64 3.2 3.2 0 0 1-4.77 3.46 3.2 3.2 0 0 1-5.03-1.04 3.2 3.2 0 0 1-3.87-3.74 3.2 3.2 0 0 1 .84-5.64A3.2 3.2 0 0 1 10 4.93 3.18 3.18 0 0 1 12 3.8Z" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round" />
+            <path d="M8.28 8.1 12 5.95l3.72 2.15v4.3L12 14.55 8.28 12.4V8.1Z" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round" />
+            <path d="m8.28 12.4 3.72-2.15 3.72 2.15M12 5.95v4.3M12 14.55v3.5" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+    `,
+};
+
 // 2. DEFINICIÓN DEL MENÚ ------------------------------------------------------
 const NAV_ITEMS = [
     {
@@ -193,6 +204,101 @@ const NAV_ITEMS = [
         ],
     },
 
+    // --- GRUPO: GPTS JURIDICOS ---
+    {
+        type: "dropdown",
+        label: "GPTs Jurídicos",
+        icon: ChatGptIcon,
+        active: [],
+        roles: ["admin", "gestor", "abogado"],
+        items: [
+            {
+                type: "external",
+                label: "Penalista Experto",
+                href: "https://chatgpt.com/g/g-68c1f9d07ec88191865a8f01b915cc1e-penalista-experto",
+                assistant: "chatgpt",
+                roles: ["admin", "gestor", "abogado"],
+            },
+            {
+                type: "external",
+                label: "Abogado Civil Director Jurídico Experto",
+                href: "https://chatgpt.com/g/g-68360119b4d48191898d44cb97865146-abogado-civil-director-juridico-experto",
+                assistant: "chatgpt",
+                roles: ["admin", "gestor", "abogado"],
+            },
+            {
+                type: "external",
+                label: "Abogado Tributario",
+                href: "https://chatgpt.com/g/g-697e4e376978819190f074bab801d55c-abogado-tributario",
+                assistant: "chatgpt",
+                roles: ["admin", "gestor", "abogado"],
+            },
+            {
+                type: "external",
+                label: "Familia Colombia Magistrado",
+                href: "https://chatgpt.com/g/g-69415ce693f081919ead4a228b2bfc31-familia-colombia-magistrado",
+                assistant: "chatgpt",
+                roles: ["admin", "gestor", "abogado"],
+            },
+            {
+                type: "external",
+                label: "Migración",
+                href: "https://chatgpt.com/g/g-69415ce693f081919ead4a228b2bfc31-familia-colombia-magistrado",
+                assistant: "chatgpt",
+                roles: ["admin", "gestor", "abogado"],
+            },
+            {
+                type: "external",
+                label: "Migratorio Colombiano Abogado Experto",
+                href: "https://chatgpt.com/g/g-693acd718bfc81919ce349a4ef2a45c7-migratorio-colombiano-abogado-experto",
+                assistant: "chatgpt",
+                roles: ["admin", "gestor", "abogado"],
+            },
+            {
+                type: "external",
+                label: "Disciplinario Experto Senior en Derecho",
+                href: "https://chatgpt.com/g/g-693ac1dfbc9c8191b6f426d5069d659a-disciplinario-experto-senior-en-derecho",
+                assistant: "chatgpt",
+                roles: ["admin", "gestor", "abogado"],
+            },
+            {
+                type: "external",
+                label: "Abogado de Tránsito Experto",
+                href: "https://chatgpt.com/g/g-693303a96fb08191af43516900ab64a4-abogado-de-transito-experto",
+                assistant: "chatgpt",
+                roles: ["admin", "gestor", "abogado"],
+            },
+            {
+                type: "external",
+                label: "Comercial Abogado Estratégico",
+                href: "https://chatgpt.com/g/g-68d53e641c9081918d527d57cb18f223-comercial-abogado-estrategico",
+                assistant: "chatgpt",
+                roles: ["admin", "gestor", "abogado"],
+            },
+            {
+                type: "external",
+                label: "Laboral Abogado Experto",
+                href: "https://chatgpt.com/g/g-68c33089c8a88191a3be954336acf6a3-laboral-abogado-experto",
+                assistant: "chatgpt",
+                roles: ["admin", "gestor", "abogado"],
+            },
+            {
+                type: "external",
+                label: "Derecho Administrativo Abogado Experto",
+                href: "https://chatgpt.com/g/g-68c20146e4fc8191879018872c6245bb-derecho-administrativo-abogado-experto",
+                assistant: "chatgpt",
+                roles: ["admin", "gestor", "abogado"],
+            },
+            {
+                type: "external",
+                label: "Infancia y Adolescencia Abogado Experto",
+                href: "https://chatgpt.com/g/g-68c1cae1891881918c6a54795a238a16-infancia-y-adolecencia-abogado-experto",
+                assistant: "chatgpt",
+                roles: ["admin", "gestor", "abogado"],
+            },
+        ],
+    },
+
     // --- GRUPO: HERRAMIENTAS ---
     {
         type: "dropdown",
@@ -229,25 +335,6 @@ const NAV_ITEMS = [
                 type: "external",
                 label: "Tyba",
                 href: "https://procesojudicial.ramajudicial.gov.co/Justicia21/Administracion/Ciudadanos/frmConsulta",
-                roles: ["admin", "gestor", "abogado"],
-            },
-            {
-                type: "external",
-                label: "Asistente ChatGPT",
-                href: "https://chatgpt.com/g/g-68360119b4d48191898d44cb97865146-abogado-civil-director-juridico-experto?model=gpt-5-pro",
-                roles: ["admin", "gestor", "abogado"],
-            },
-            {
-                type: "external",
-                label: "Asistente Gemini",
-                href: "https://gemini.google.com/",
-                roles: ["admin", "gestor", "abogado"],
-            },
-            {
-                type: "external",
-                label: "Asistente Claude",
-                href: "https://claude.ai/",
-                recommendation: "Se recomienda la app de escritorio",
                 roles: ["admin", "gestor", "abogado"],
             },
         ],
@@ -645,7 +732,8 @@ onBeforeUnmount(() => {
                                     <Dropdown
                                         align="left"
                                         :width="
-                                            item.label === 'Configuración'
+                                            item.label === 'Configuración' ||
+                                            item.label === 'GPTs Jurídicos'
                                                 ? '64'
                                                 : '56'
                                         "
@@ -680,6 +768,9 @@ onBeforeUnmount(() => {
                                         </template>
 
                                         <template #content>
+                                            <div
+                                                :class="item.label === 'GPTs Jurídicos' ? 'max-h-[70vh] overflow-y-auto py-1' : ''"
+                                            >
                                             <template
                                                 v-for="(
                                                     subItem, index
@@ -700,19 +791,24 @@ onBeforeUnmount(() => {
                                                     "
                                                     :href="subItem.href"
                                                     target="_blank"
+                                                    rel="noopener noreferrer"
                                                     class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                                                 >
-                                                    {{ subItem.label }}
-                                                    <div
-                                                        v-if="
-                                                            subItem.recommendation
-                                                        "
-                                                        class="text-xs text-gray-500 dark:text-gray-400 mt-1 ps-6"
-                                                    >
-                                                        {{
-                                                            subItem.recommendation
-                                                        }}
-                                                    </div>
+                                                    <span class="flex min-w-0 items-start gap-2">
+                                                        <ChatGptIcon
+                                                            v-if="subItem.assistant === 'chatgpt'"
+                                                            class="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+                                                        />
+                                                        <span class="min-w-0 flex-1">
+                                                            <span class="block whitespace-normal leading-5">{{ subItem.label }}</span>
+                                                            <span
+                                                                v-if="subItem.recommendation"
+                                                                class="mt-1 block text-xs text-gray-500 dark:text-gray-400"
+                                                            >
+                                                                {{ subItem.recommendation }}
+                                                            </span>
+                                                        </span>
+                                                    </span>
                                                 </a>
                                                 <DropdownLink
                                                     v-else
@@ -726,6 +822,7 @@ onBeforeUnmount(() => {
                                                     {{ subItem.label }}
                                                 </DropdownLink>
                                             </template>
+                                            </div>
                                         </template>
                                     </Dropdown>
                                 </div>
@@ -938,14 +1035,20 @@ onBeforeUnmount(() => {
                                     rel="noopener noreferrer"
                                     class="block w-full border-l-4 border-transparent py-2 ps-10 pe-4 text-start text-base font-medium text-gray-600 transition duration-150 ease-in-out hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                                 >
-                                    <span class="block truncate">{{
-                                        subItem.label
-                                    }}</span>
-                                    <span
-                                        v-if="subItem.recommendation"
-                                        class="mt-0.5 block truncate text-xs font-semibold text-gray-400 dark:text-gray-500"
-                                    >
-                                        {{ subItem.recommendation }}
+                                    <span class="flex min-w-0 items-start gap-2">
+                                        <ChatGptIcon
+                                            v-if="subItem.assistant === 'chatgpt'"
+                                            class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                                        />
+                                        <span class="min-w-0 flex-1">
+                                            <span class="block whitespace-normal leading-5">{{ subItem.label }}</span>
+                                            <span
+                                                v-if="subItem.recommendation"
+                                                class="mt-0.5 block text-xs font-semibold text-gray-400 dark:text-gray-500"
+                                            >
+                                                {{ subItem.recommendation }}
+                                            </span>
+                                        </span>
                                     </span>
                                 </a>
                                 <ResponsiveNavLink

@@ -6,6 +6,7 @@ use App\Models\IncidenteJuridico;
 use App\Models\NotificacionCaso;
 use App\Models\User;
 use App\Notifications\AlertaProgramadaNotification;
+use App\Support\SmtpCircuitBreaker;
 use Carbon\CarbonInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -22,6 +23,8 @@ class ProcesarAlertasProgramadas implements ShouldQueue
 
     private const MAX_FINALES_POR_EJECUCION = 200;
     private const MAX_RECORDATORIOS_POR_EJECUCION = 25;
+    private const HORA_INICIO_LABORAL = 8;
+    private const HORA_FIN_LABORAL = 18;
 
     public int $tries = 3;
     public int $timeout = 120;
@@ -43,6 +46,23 @@ class ProcesarAlertasProgramadas implements ShouldQueue
             'errores' => 0,
         ];
 
+        if (!$this->estaEnHorarioLaboral($now)) {
+            Log::info('Procesamiento de alertas programadas omitido fuera de horario laboral.', [
+                'fecha' => $now->toDateTimeString(),
+                'timezone' => $tz,
+            ]);
+
+            return $stats;
+        }
+
+        if (SmtpCircuitBreaker::active()) {
+            Log::warning('Procesamiento de alertas programadas omitido por cooldown SMTP.', [
+                'hasta' => SmtpCircuitBreaker::until()?->toDateTimeString(),
+            ]);
+
+            return $stats;
+        }
+
         $this->procesarAlertasVencidas($now, $stats);
         $this->procesarRecordatoriosFuturos($now, $stats);
 
@@ -51,6 +71,13 @@ class ProcesarAlertasProgramadas implements ShouldQueue
         }
 
         return $stats;
+    }
+
+    private function estaEnHorarioLaboral(CarbonInterface $now): bool
+    {
+        return $now->isWeekday()
+            && $now->hour >= self::HORA_INICIO_LABORAL
+            && $now->hour < self::HORA_FIN_LABORAL;
     }
 
     private function consultaPendientes()
@@ -134,6 +161,10 @@ class ProcesarAlertasProgramadas implements ShouldQueue
         $falloPush = false;
 
         if ($emailEsperado) {
+            if (SmtpCircuitBreaker::active()) {
+                return false;
+            }
+
             try {
                 $user->notify(new AlertaProgramadaNotification(
                     $alerta->caso_id,
@@ -147,6 +178,14 @@ class ProcesarAlertasProgramadas implements ShouldQueue
                 $falloCorreo = true;
                 $stats['errores']++;
                 $this->registrarFallo($alerta, $user, 'mail', $exception);
+
+                if (SmtpCircuitBreaker::isRateLimited($exception->getMessage())) {
+                    $until = SmtpCircuitBreaker::trip($exception->getMessage());
+                    Log::warning('SMTP en cooldown para alertas programadas.', [
+                        'hasta' => $until->toDateTimeString(),
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
             }
         }
 

@@ -16,6 +16,8 @@ Schedule::command('tareas:check-vencidas')
 
 Schedule::command('alertas:procesar-programadas')
     ->everyMinute()
+    ->weekdays()
+    ->between('08:00', '18:00')
     ->timezone('America/Bogota')
     ->withoutOverlapping(10)
     ->name('procesar_alertas_programadas');

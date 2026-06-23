@@ -600,7 +600,6 @@ class CasoController extends Controller
         return Inertia::render('Casos/Create', [
             'cooperativas' => $cooperativas,
             'abogadosYGestores' => User::whereIn('tipo_usuario', ['abogado', 'gestor'])->select('id', 'name')->get(),
-            'personas' => Persona::select('id', 'nombre_completo', 'numero_documento')->get(),
             'estructuraProcesal' => EspecialidadJuridica::with([
                 'tiposProceso.subtipos.subprocesos' => fn($q) => $q->orderBy('nombre')
             ])->orderBy('nombre')->get(),
@@ -858,7 +857,6 @@ class CasoController extends Controller
             'caso' => $caso,
             'cooperativas' => ($user->tipo_usuario === 'admin') ? Cooperativa::select('id', 'nombre')->get() : $user->cooperativas()->select('id', 'nombre')->get(),
             'abogadosYGestores' => User::whereIn('tipo_usuario', ['abogado', 'gestor'])->select('id', 'name')->get(),
-            'personas' => Persona::select('id', 'nombre_completo', 'numero_documento')->get(),
             'estructuraProcesal' => EspecialidadJuridica::with(['tiposProceso.subtipos.subprocesos' => fn($q) => $q->orderBy('nombre')])->orderBy('nombre')->get(),
             'etapas_procesales' => DB::table('etapas_procesales')->orderBy('nombre')->pluck('nombre')->all(),
         ]);
@@ -1097,7 +1095,6 @@ class CasoController extends Controller
             'casoAClonar' => $caso,
             'cooperativas' => Cooperativa::all(['id', 'nombre']),
             'abogadosYGestores' => User::whereIn('tipo_usuario', ['abogado', 'gestor'])->select('id', 'name')->get(),
-            'personas' => Persona::select('id', 'nombre_completo', 'numero_documento')->get(),
             'estructuraProcesal' => EspecialidadJuridica::with(['tiposProceso.subtipos.subprocesos' => fn($q) => $q->orderBy('nombre')])->orderBy('nombre')->get(),
             'etapas_procesales' => DB::table('etapas_procesales')->orderBy('nombre')->pluck('nombre')->all(),
         ]);

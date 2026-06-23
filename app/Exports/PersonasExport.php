@@ -168,7 +168,7 @@ class PersonasExport implements FromQuery, WithHeadings, WithMapping, ShouldAuto
     {
         return [
             'ID', 'Nombre Completo', 'Tipo Rol', 'Tipo Documento', 'Número Documento', 
-            'Fecha Expedición', 'Celular', 'Correo', 'Empresa', 'Cargo', 
+            'Fecha Expedición', 'Celular', 'Correo', 'Empresa', 'Cargo', 'Estado Cartera', 
             'Direcciones', 'Cooperativas', 'Abogados', 'Estado'
         ];
     }
@@ -191,6 +191,7 @@ class PersonasExport implements FromQuery, WithHeadings, WithMapping, ShouldAuto
             $persona->correo_1,
             $persona->empresa,
             $persona->cargo,
+            $persona->estado_cartera ?? 'NO APLICA',
             $mapArray($persona->addresses, 'label', 'address'),
             $persona->sin_empresa_o_cooperativa && $persona->cooperativas->isEmpty()
                 ? 'Sin empresa o cooperativa'
