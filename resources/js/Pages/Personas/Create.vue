@@ -132,7 +132,7 @@ const submit = () => {
             </div>
         </div>
         <div class="flex items-center gap-3 w-full md:w-auto">
-            <PrimaryButton @click="submit" class="w-full md:w-auto !bg-indigo-600 hover:!bg-indigo-700 !px-10 !py-3 !text-sm !font-black !rounded-lg !shadow-sm dark:!shadow-none flex items-center justify-center gap-2" :disabled="form.processing">
+            <PrimaryButton data-tutorial="personas-guardar" @click="submit" class="w-full md:w-auto !bg-indigo-600 hover:!bg-indigo-700 !px-10 !py-3 !text-sm !font-black !rounded-lg !shadow-sm dark:!shadow-none flex items-center justify-center gap-2" :disabled="form.processing">
                 <CheckCircleIcon v-if="!form.processing" class="w-5 h-5" />
                 <ArrowPathIcon v-else class="w-5 h-5 animate-spin" />
                 Finalizar Registro
@@ -148,7 +148,7 @@ const submit = () => {
           
           <!-- SECCIÓN 1: IDENTIDAD CORE -->
           <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 bg-gray-50 dark:bg-gray-900/30 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
+            <div data-tutorial="personas-identidad" class="px-5 py-4 bg-gray-50 dark:bg-gray-900/30 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
                 <IdentificationIcon class="w-5 h-5 text-indigo-500" />
                 <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Identidad y Documentación</h3>
             </div>
@@ -202,7 +202,7 @@ const submit = () => {
 
           <!-- SECCIÓN 2: CONECTIVIDAD -->
           <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
+            <div data-tutorial="personas-contacto" class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
                 <EnvelopeIcon class="w-5 h-5 text-indigo-500" />
                 <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Canales de Contacto</h3>
             </div>
@@ -234,7 +234,7 @@ const submit = () => {
 
           <!-- SECCIÓN 3: LOCALIZACIÓN -->
           <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <div data-tutorial="personas-direcciones" class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                 <div class="flex items-center gap-3">
                     <MapPinIcon class="w-5 h-5 text-red-500" />
                     <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Direcciones Físicas</h3>
@@ -274,7 +274,7 @@ const submit = () => {
 
           <!-- SECCIÓN 4: LABORAL Y NOTAS -->
           <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
+            <div data-tutorial="personas-laboral" class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
                 <BriefcaseIcon class="w-5 h-5 text-indigo-500" />
                 <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Entorno Profesional</h3>
             </div>
@@ -298,7 +298,7 @@ const submit = () => {
           <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
               <!-- Cooperativas -->
               <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-                <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <div data-tutorial="personas-asignaciones" class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                     <div class="flex items-center gap-3">
                         <BuildingOfficeIcon class="w-5 h-5 text-emerald-500" />
                         <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-[10px]">Vincular Empresas *</h3>
@@ -338,7 +338,7 @@ const submit = () => {
 
           <!-- SECCIÓN 6: ECOSISTEMA DIGITAL -->
           <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <div data-tutorial="personas-enlaces" class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                 <div class="flex items-center gap-3">
                     <GlobeAltIcon class="w-5 h-5 text-blue-500" />
                     <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Redes y Enlaces Digitales</h3>

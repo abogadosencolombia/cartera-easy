@@ -190,6 +190,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('procesos/{proceso}/pin', [ProcesoRadicadoController::class, 'togglePin'])->name('procesos.pin');
     Route::patch('procesos/{proceso}/quick-review', [ProcesoRadicadoController::class, 'quickReview'])->name('procesos.quick_review');
     Route::patch('procesos/{proceso}/checklist', [ProcesoRadicadoController::class, 'updateChecklist'])->name('procesos.checklist.update');
+    Route::patch('procesos/{id}/restore', [ProcesoRadicadoController::class, 'restore'])->whereNumber('id')->name('procesos.restore');
     Route::delete('procesos/{proceso}', [ProcesoRadicadoController::class, 'destroy'])->name('procesos.destroy');
     
     // --- NUEVA RUTA PARA CAMBIAR ETAPA (Show.vue) ---

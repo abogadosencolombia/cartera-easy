@@ -3,6 +3,8 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AlertasController;
+use App\Http\Controllers\Api\TwilioInboundController;
+use App\Http\Controllers\Api\TwilioStatusCallbackController;
 
 // --- NUEVAS IMPORTACIONES PARA EL CHATBOT ---
 use App\Events\ChatbotResponseReceived;
@@ -105,3 +107,6 @@ Route::middleware('auth:sanctum')->group(function() {
     Route::post('/chat/send', [App\Http\Controllers\Api\ChatwootApiController::class, 'sendMessage']);
     Route::get('/chat/history', [App\Http\Controllers\Api\ChatwootApiController::class, 'getHistory']);
 });
+
+Route::post('/twilio/status-callback', TwilioStatusCallbackController::class)->name('twilio.status-callback');
+Route::post('/twilio/inbound', TwilioInboundController::class)->name('twilio.inbound');

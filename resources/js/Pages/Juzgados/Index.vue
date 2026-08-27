@@ -109,14 +109,14 @@ const getInitials = (name) => {
                     
                     <div class="flex flex-wrap gap-3 w-full md:w-auto">
                         <template v-if="$page.props.auth.user.tipo_usuario === 'admin'">
-                            <Link :href="route('juzgados.import.form')" class="flex-1 md:flex-none">
+                            <Link data-tutorial="juzgados-importar" :href="route('juzgados.import.form')" class="flex-1 md:flex-none">
                                 <SecondaryButton class="w-full flex justify-center items-center gap-2 !rounded-full !py-3 !px-6 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-300">
                                     <ArrowUpTrayIcon class="h-4 w-4" />
                                     <span class="font-bold">Importar Excel</span>
                                 </SecondaryButton>
                             </Link>
                             
-                            <Link :href="route('juzgados.create')" class="flex-1 md:flex-none">
+                            <Link data-tutorial="juzgados-registrar" :href="route('juzgados.create')" class="flex-1 md:flex-none">
                                 <PrimaryButton class="w-full flex justify-center items-center gap-2 !rounded-full !py-3 !px-8 !bg-gradient-to-r !from-indigo-600 !to-violet-600 hover:!from-indigo-700 hover:!to-violet-700 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg shadow-indigo-500/20">
                                     <PlusIcon class="h-4 w-4" />
                                     <span class="font-bold">Nuevo Despacho</span>
@@ -132,7 +132,7 @@ const getInitials = (name) => {
             <div class="max-w-6xl mx-auto sm:px-6 lg:px-8 space-y-6">
                 
                 <!-- Buscador y Resumen -->
-                <div class="flex flex-col md:flex-row gap-4 items-center justify-between bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 border border-gray-100 dark:border-gray-700">
+                <div data-tutorial="juzgados-busqueda" class="flex flex-col md:flex-row gap-4 items-center justify-between bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 border border-gray-100 dark:border-gray-700">
                     <div class="relative w-full md:max-w-md">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <MagnifyingGlassIcon class="h-5 w-5 text-gray-400" />
@@ -162,7 +162,7 @@ const getInitials = (name) => {
                 <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-2xl border border-gray-100 dark:border-gray-700">
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm text-left">
-                            <thead>
+                            <thead data-tutorial="juzgados-listado">
                                 <tr class="text-xs text-gray-500 uppercase bg-gray-50/50 dark:bg-gray-700/50 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">
                                     <th scope="col" class="px-6 py-3 font-bold">Despacho / Entidad</th>
                                     <th scope="col" class="px-6 py-3 font-bold text-center">Ubicación</th>
@@ -224,7 +224,8 @@ const getInitials = (name) => {
                                     <td class="px-6 py-3.5 text-right">
                                         <div class="flex justify-end items-center gap-2" v-if="$page.props.auth.user.tipo_usuario === 'admin'">
                                             <Link 
-                                                :href="route('juzgados.edit', juzgado.id)" 
+                                                :href="route('juzgados.edit', juzgado.id)"
+                                                :data-tutorial="juzgados.data[0]?.id === juzgado.id ? 'juzgados-editar-primero' : null"
                                                 class="p-2 text-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400 hover:text-white hover:bg-blue-600 dark:hover:bg-blue-500 rounded-xl transition-all duration-200 hover:scale-110 active:scale-95 shadow-sm hover:shadow-md" 
                                                 title="Editar Información"
                                             >

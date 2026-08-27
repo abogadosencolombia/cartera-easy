@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue';
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import TextInput from '@/Components/TextInput.vue';
 import SelectInput from '@/Components/SelectInput.vue';
@@ -68,6 +68,8 @@ const props = defineProps({
 });
 
 const { getRevisionStatus } = useProcesos();
+const page = usePage();
+const isAdmin = computed(() => page.props.auth?.user?.tipo_usuario === 'admin');
 
 // --- LÓGICA DE VISTA RÁPIDA ---
 const selectedProceso = ref(null);
@@ -121,15 +123,15 @@ const tiposEntidad = [
 ];
 
 // --- FILTROS ---
-const filterStorageKey = 'radicados.index.filters';
+const filterStorageKey = `radicados.index.filters.${page.props.auth?.user?.id ?? 'anonymous'}.${page.props.auth?.user?.tipo_usuario ?? 'guest'}`;
 
 /**
  * CONFIGURACIÓN DE FILTROS
  * Se definen las llaves permitidas para el filtrado. 
  * 'fecha_inicio' y 'fecha_fin' permiten realizar búsquedas por rango de REGISTRO EN EL SISTEMA.
  */
-const filterKeys = ['search', 'estado', 'juzgado_id', 'tipo_proceso_id', 'tipo_entidad', 'sin_radicado', 'solo_vencidos', 'cerrados', 'actualizados_hoy', 'integridad_baja', 'fecha_inicio', 'fecha_fin'];
-const booleanFilterKeys = ['sin_radicado', 'solo_vencidos', 'cerrados', 'actualizados_hoy', 'integridad_baja'];
+const filterKeys = ['search', 'estado', 'juzgado_id', 'tipo_proceso_id', 'tipo_entidad', 'sin_radicado', 'solo_vencidos', 'cerrados', 'actualizados_hoy', 'integridad_baja', 'papelera', 'fecha_inicio', 'fecha_fin'];
+const booleanFilterKeys = ['sin_radicado', 'solo_vencidos', 'cerrados', 'actualizados_hoy', 'integridad_baja', 'papelera'];
 
 const parseBooleanFilter = (value) => value === true || value === 'true' || value === 1 || value === '1';
 
@@ -137,15 +139,15 @@ const readStoredFilters = () => {
     if (typeof window === 'undefined') return {};
 
     try {
-        return JSON.parse(sessionStorage.getItem(filterStorageKey) || '{}') || {};
+        const filters = JSON.parse(sessionStorage.getItem(filterStorageKey) || '{}') || {};
+        if (!isAdmin.value) delete filters.papelera;
+        return filters;
     } catch {
         return {};
     }
 };
 
 const storedFilters = readStoredFilters();
-
-const initialFilterValue = (key, fallback = '') => props.filtros?.[key] ?? storedFilters[key] ?? fallback;
 
 const hasUsefulFilterValue = (filters) => filterKeys.some((key) => {
     if (key === 'estado') {
@@ -177,6 +179,11 @@ const hasUsefulUrlFilter = () => {
     });
 };
 
+const useStoredFiltersOnLoad = !hasUsefulUrlFilter();
+const initialFilterValue = (key, fallback = '') => props.filtros?.[key]
+    ?? (useStoredFiltersOnLoad ? storedFilters[key] : undefined)
+    ?? fallback;
+
 const search = ref(initialFilterValue('search'));
 const estado = ref(initialFilterValue('estado') || 'TODOS');
 const juzgadoId = ref(initialFilterValue('juzgado_id'));
@@ -200,6 +207,7 @@ const soloVencidos = ref(parseBooleanFilter(initialFilterValue('solo_vencidos', 
 const cerrados = ref(parseBooleanFilter(initialFilterValue('cerrados', false)));
 const actualizadosHoy = ref(parseBooleanFilter(initialFilterValue('actualizados_hoy', false)));
 const integridadBaja = ref(parseBooleanFilter(initialFilterValue('integridad_baja', false)));
+const papelera = ref(isAdmin.value && parseBooleanFilter(initialFilterValue('papelera', false)));
 
 const currentFilterPayload = () => ({
     search: search.value,
@@ -215,6 +223,7 @@ const currentFilterPayload = () => ({
     cerrados: cerrados.value,
     actualizados_hoy: actualizadosHoy.value,
     integridad_baja: integridadBaja.value,
+    papelera: isAdmin.value && papelera.value,
 });
 /**
  * ESTADO DEL PANEL DE FILTROS (COLLAPSIBLE)
@@ -250,10 +259,14 @@ const persistFilters = (filters) => {
 
     if (typeof window === 'undefined') return;
 
-    if (hasUsefulFilterValue(filters)) {
-        sessionStorage.setItem(filterStorageKey, JSON.stringify(filters));
-    } else {
-        sessionStorage.removeItem(filterStorageKey);
+    try {
+        if (hasUsefulFilterValue(filters)) {
+            sessionStorage.setItem(filterStorageKey, JSON.stringify(filters));
+        } else {
+            sessionStorage.removeItem(filterStorageKey);
+        }
+    } catch {
+        // El filtrado no depende de que el navegador permita sessionStorage.
     }
 };
 
@@ -285,6 +298,7 @@ const clearControlFilters = () => {
     cerrados.value = false;
     actualizadosHoy.value = false;
     integridadBaja.value = false;
+    papelera.value = false;
 };
 
 const applyControlFilter = (filterKey) => {
@@ -294,18 +308,27 @@ const applyControlFilter = (filterKey) => {
         cerrados,
         actualizados_hoy: actualizadosHoy,
         integridad_baja: integridadBaja,
+        papelera,
     };
     const target = filterRefs[filterKey];
     if (!target) return;
 
     const nextValue = !target.value;
+    if (filterKey === 'papelera' && nextValue) {
+        resetFilters();
+        papelera.value = true;
+        return;
+    }
+
+    const keepTrashMode = filterKey !== 'papelera' && papelera.value;
     clearControlFilters();
+    if (keepTrashMode) papelera.value = true;
     target.value = nextValue;
 };
 
 // Se actualiza isDirty para detectar cambios en el rango de fechas y activar el botón de limpiar
 const isDirty = computed(() => {
-    return search.value !== '' || estado.value !== 'TODOS' || juzgadoId.value !== '' || tipoProcesoId.value !== '' || tipoEntidad.value !== '' || sinRadicado.value === true || soloVencidos.value === true || cerrados.value === true || actualizadosHoy.value === true || integridadBaja.value === true || fechaInicio.value !== '' || fechaFin.value !== '';
+    return search.value !== '' || estado.value !== 'TODOS' || juzgadoId.value !== '' || tipoProcesoId.value !== '' || tipoEntidad.value !== '' || sinRadicado.value === true || soloVencidos.value === true || cerrados.value === true || actualizadosHoy.value === true || integridadBaja.value === true || papelera.value === true || fechaInicio.value !== '' || fechaFin.value !== '';
 });
 
 /*
@@ -314,7 +337,11 @@ const isDirty = computed(() => {
 */
 const resetFilters = () => {
     if (typeof window !== 'undefined') {
-        sessionStorage.removeItem(filterStorageKey);
+        try {
+            sessionStorage.removeItem(filterStorageKey);
+        } catch {
+            // La interfaz se limpia aunque no haya almacenamiento disponible.
+        }
     }
 
     search.value = '';
@@ -331,6 +358,7 @@ const resetFilters = () => {
     cerrados.value = false;
     actualizadosHoy.value = false;
     integridadBaja.value = false;
+    papelera.value = false;
 };
 
 const applyFilters = debounce(() => {
@@ -346,10 +374,12 @@ const applyFilters = debounce(() => {
  * Dispara el proceso de filtrado cada vez que cualquier referencia reactiva cambia.
  * Incluye el nuevo rango de fechas (fechaInicio y fechaFin).
  */
-watch([search, estado, juzgadoId, tipoProcesoId, tipoEntidad, fechaInicio, fechaFin, sinRadicado, soloVencidos, cerrados, actualizadosHoy, integridadBaja], applyFilters);
+watch([search, estado, juzgadoId, tipoProcesoId, tipoEntidad, fechaInicio, fechaFin, sinRadicado, soloVencidos, cerrados, actualizadosHoy, integridadBaja, papelera], applyFilters);
 
 onMounted(() => {
-    reapplyStoredFiltersIfNeeded();
+    if (!reapplyStoredFiltersIfNeeded()) {
+        persistFilters(currentFilterPayload());
+    }
 });
 
 // --- EXPORTAR ---
@@ -401,6 +431,25 @@ const submitReopenCase = () => {
     reopenForm.patch(route('procesos.reopen', procesoToManage.value.id), {
         preserveScroll: true,
         onSuccess: () => { showReopenModal.value = false; procesoToManage.value = null; }
+    });
+};
+
+const restoreProceso = (proceso) => {
+    AppAlert.fire({
+        title: '¿Recuperar expediente?',
+        text: `Se devolverá ${proceso.radicado || 'ID #' + proceso.id} al listado activo.`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#059669',
+        confirmButtonText: 'Sí, recuperar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            router.patch(route('procesos.restore', proceso.id), {}, {
+                preserveScroll: true,
+                onSuccess: () => AppAlert.fire('Recuperado', 'El proceso volvió al listado activo.', 'success')
+            });
+        }
     });
 };
 
@@ -507,6 +556,7 @@ const activeFilterCount = computed(() => filterKeys.reduce((count, key) => {
             cerrados,
             actualizados_hoy: actualizadosHoy,
             integridad_baja: integridadBaja,
+            papelera,
         };
         return count + (refMap[key]?.value ? 1 : 0);
     }
@@ -526,12 +576,12 @@ const resultRange = computed(() => {
 });
 
 const summaryCards = computed(() => [
-    { key: 'total', label: 'Total expedientes', value: props.stats?.total ?? '...', description: 'En seguimiento', icon: ScaleIcon, iconClass: 'text-slate-500', filterKey: null },
-    { key: 'sin_radicado', label: 'Sin radicado', value: props.stats?.sin_radicado ?? '...', description: 'Pendientes de número', icon: ArchiveBoxXMarkIcon, iconClass: 'text-amber-500', filterKey: 'sin_radicado', ref: sinRadicado, activeClass: 'ring-2 ring-amber-300 border-amber-200 bg-amber-50/70 dark:border-amber-500/60 dark:bg-amber-900/10' },
-    { key: 'solo_vencidos', label: 'Revisión vencida', value: props.stats?.vencidos ?? '...', description: 'Acción requerida', icon: ExclamationTriangleIcon, iconClass: 'text-rose-500', filterKey: 'solo_vencidos', ref: soloVencidos, activeClass: 'ring-2 ring-rose-300 border-rose-200 bg-rose-50/70 dark:border-rose-500/60 dark:bg-rose-900/10' },
-    { key: 'revisar_hoy', label: 'Revisar hoy', value: props.stats?.revisar_hoy ?? '...', description: 'Agenda del día', icon: ClockIcon, iconClass: 'text-teal-500', filterKey: null },
+    { key: 'total', label: papelera.value ? 'En papelera' : 'Total expedientes', value: props.stats?.total ?? '...', description: papelera.value ? 'Registros eliminados' : 'En seguimiento', icon: ScaleIcon, iconClass: 'text-slate-500', filterKey: null },
+    { key: 'sin_radicado', label: 'Sin radicado', value: props.stats?.sin_radicado ?? '...', description: papelera.value ? 'Sin número al eliminar' : 'Pendientes de número', icon: ArchiveBoxXMarkIcon, iconClass: 'text-amber-500', filterKey: 'sin_radicado', ref: sinRadicado, activeClass: 'ring-2 ring-amber-300 border-amber-200 bg-amber-50/70 dark:border-amber-500/60 dark:bg-amber-900/10' },
+    { key: 'solo_vencidos', label: 'Revisión vencida', value: props.stats?.vencidos ?? '...', description: papelera.value ? 'Estado al eliminar' : 'Acción requerida', icon: ExclamationTriangleIcon, iconClass: 'text-rose-500', filterKey: 'solo_vencidos', ref: soloVencidos, activeClass: 'ring-2 ring-rose-300 border-rose-200 bg-rose-50/70 dark:border-rose-500/60 dark:bg-rose-900/10' },
+    { key: 'revisar_hoy', label: papelera.value ? 'Revisión prevista hoy' : 'Revisar hoy', value: props.stats?.revisar_hoy ?? '...', description: papelera.value ? 'Fecha registrada' : 'Agenda del día', icon: ClockIcon, iconClass: 'text-teal-500', filterKey: null },
     { key: 'integridad_baja', label: 'Integridad baja', value: props.stats?.integridad_baja ?? '...', description: 'Datos por completar', icon: ExclamationTriangleIcon, iconClass: 'text-orange-500', filterKey: 'integridad_baja', ref: integridadBaja, activeClass: 'ring-2 ring-orange-300 border-orange-200 bg-orange-50/70 dark:border-orange-500/60 dark:bg-orange-900/10' },
-    { key: 'actualizados_hoy', label: 'Actualizados hoy', value: props.stats?.actualizados_hoy ?? '...', description: 'Movimientos recientes', icon: ArrowPathIcon, iconClass: 'text-indigo-500', filterKey: 'actualizados_hoy', ref: actualizadosHoy, activeClass: 'ring-2 ring-indigo-300 border-indigo-200 bg-indigo-50/70 dark:border-indigo-500/60 dark:bg-indigo-900/10' },
+    { key: 'actualizados_hoy', label: 'Actualizados hoy', value: props.stats?.actualizados_hoy ?? '...', description: papelera.value ? 'Movimientos en eliminados' : 'Movimientos recientes', icon: ArrowPathIcon, iconClass: 'text-indigo-500', filterKey: 'actualizados_hoy', ref: actualizadosHoy, activeClass: 'ring-2 ring-indigo-300 border-indigo-200 bg-indigo-50/70 dark:border-indigo-500/60 dark:bg-indigo-900/10' },
 ]);
 
 const controlFilterItems = computed(() => [
@@ -540,7 +590,8 @@ const controlFilterItems = computed(() => [
     { key: 'integridad_baja', label: 'Integridad baja', count: props.stats?.integridad_baja, ref: integridadBaja, icon: ExclamationTriangleIcon, activeClass: 'bg-orange-600 text-white border-orange-600' },
     { key: 'cerrados', label: 'Cerrados', count: props.stats?.cerrados, ref: cerrados, icon: CheckCircleIcon, activeClass: 'bg-emerald-600 text-white border-emerald-600' },
     { key: 'actualizados_hoy', label: 'Actualizados hoy', count: props.stats?.actualizados_hoy, ref: actualizadosHoy, icon: ArrowPathIcon, activeClass: 'bg-indigo-600 text-white border-indigo-600' },
-]);
+    { key: 'papelera', label: 'Papelera total', count: props.stats?.papelera ?? 0, ref: papelera, icon: TrashIcon, activeClass: 'bg-slate-800 text-white border-slate-800', adminOnly: true },
+].filter(item => !item.adminOnly || isAdmin.value));
 
 const userInitials = (name) => {
     if (!name) return 'SA';
@@ -561,7 +612,8 @@ const integrityTone = (proceso) => {
     if (score >= 60) return 'bg-amber-500';
     return 'bg-rose-500';
 };
-const isInactiveProcess = (proceso) => getInactivityDays(proceso.updated_at) >= 30 && proceso.estado !== 'CERRADO';
+const isTrashedProcess = (proceso) => Boolean(proceso.deleted_at);
+const isInactiveProcess = (proceso) => getInactivityDays(proceso.updated_at) >= 30 && proceso.estado !== 'CERRADO' && !isTrashedProcess(proceso);
 const isControlActive = (item) => Boolean(item.ref?.value);
 
 const copyLegalInfo = (proceso) => {
@@ -607,7 +659,7 @@ const copyLegalInfo = (proceso) => {
         <div class="py-6">
             <div class="mx-auto max-w-[1600px] space-y-6 px-4 sm:px-6 lg:px-8">
                 <!-- Encabezado y Acciones Principales -->
-                <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5">
+                <section data-tutorial="radicados-index-header" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5">
                     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div class="flex min-w-0 items-center gap-3">
                             <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300">
@@ -636,6 +688,7 @@ const copyLegalInfo = (proceso) => {
                                 Exportar
                             </button>
                             <Link
+                                data-tutorial="radicados-registrar"
                                 :href="route('procesos.create')"
                                 class="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-600 bg-indigo-600 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-indigo-700"
                             >
@@ -647,7 +700,7 @@ const copyLegalInfo = (proceso) => {
                 </section>
 
                 <!-- Indicadores -->
-                <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                <section data-tutorial="radicados-indicadores" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                     <template v-for="card in summaryCards" :key="card.key">
                         <button
                             v-if="card.filterKey"
@@ -679,7 +732,7 @@ const copyLegalInfo = (proceso) => {
                 </section>
 
                 <!-- Filtros -->
-                <section class="relative rounded-lg border border-gray-200 bg-white p-4 pb-8 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5 sm:pb-10">
+                <section data-tutorial="radicados-filtros" class="relative rounded-lg border border-gray-200 bg-white p-4 pb-8 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5 sm:pb-10">
 
                     <!-- ENCABEZADO DE FILTROS: Siempre visible -->
                     <div class="flex flex-col gap-3 border-b border-gray-200 pb-4 dark:border-gray-600 lg:flex-row lg:items-center lg:justify-between">
@@ -721,7 +774,7 @@ const copyLegalInfo = (proceso) => {
                             <!-- FILA 1: Control rápido de filtros predefinidos -->
                             <div class="lg:col-span-12">
                                 <label class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Control rápido</label>
-                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6">
                                     <button
                                         v-for="item in controlFilterItems"
                                         :key="item.key"
@@ -912,6 +965,7 @@ const copyLegalInfo = (proceso) => {
                     -->
                     <div class="absolute -bottom-3.5 left-0 right-0 flex justify-center">
                         <button
+                            data-tutorial="radicados-filtros-toggle"
                             type="button"
                             @click="showFilters = !showFilters"
                             class="group flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-gray-600 shadow-md transition-all hover:border-indigo-300 hover:text-indigo-600 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400 dark:hover:text-indigo-400"
@@ -927,7 +981,7 @@ const copyLegalInfo = (proceso) => {
 
                 <!-- Listado de Radicados -->
                 <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                    <div class="flex flex-col gap-3 border-b border-gray-100 p-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
+                    <div data-tutorial="radicados-listado" class="flex flex-col gap-3 border-b border-gray-100 p-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h3 class="text-sm font-black uppercase tracking-tight text-gray-950 dark:text-white">Listado de expedientes judiciales</h3>
                             <p class="text-xs font-semibold text-gray-500 dark:text-gray-400">{{ resultRange }}</p>
@@ -965,19 +1019,22 @@ const copyLegalInfo = (proceso) => {
 
                                 <tbody class="divide-y divide-gray-100 bg-white dark:divide-gray-700 dark:bg-gray-800">
                                     <tr
-                                        v-for="proceso in procesos.data"
+                                        v-for="(proceso, procesoIndex) in procesos.data"
                                         :key="proceso.id"
+                                        :data-tutorial="procesoIndex === 0 ? 'radicados-primer-registro' : null"
                                         class="group cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-900/35"
-                                        :class="{ 'bg-indigo-50/50 dark:bg-indigo-900/10': proceso.is_pinned }"
-                                        @click="openQuickView(proceso)"
+                                        :class="{ 'bg-indigo-50/50 dark:bg-indigo-900/10': proceso.is_pinned, 'bg-slate-50/80 opacity-90 dark:bg-slate-900/30': isTrashedProcess(proceso) }"
+                                        @click="!isTrashedProcess(proceso) && openQuickView(proceso)"
                                     >
                                         <td class="relative px-4 py-4 align-top">
                                             <div v-if="proceso.is_pinned" class="absolute bottom-0 left-0 top-0 w-1 bg-indigo-500"></div>
                                             <div class="min-w-0 space-y-2">
                                                 <div class="flex flex-wrap items-center gap-2">
-                                                    <Link @click.stop :href="route('procesos.show', proceso.id)" class="break-all text-sm font-black leading-5 text-indigo-700 hover:underline dark:text-indigo-300">
+                                                    <Link v-if="!isTrashedProcess(proceso)" @click.stop :href="route('procesos.show', proceso.id)" class="break-all text-sm font-black leading-5 text-indigo-700 hover:underline dark:text-indigo-300">
                                                         {{ proceso.radicado || 'SIN RADICADO' }}
                                                     </Link>
+                                                    <span v-else class="break-all text-sm font-black leading-5 text-slate-700 dark:text-slate-200">{{ proceso.radicado || 'SIN RADICADO' }}</span>
+                                                    <span v-if="isTrashedProcess(proceso)" class="rounded bg-slate-200 px-1.5 py-0.5 text-[9px] font-black uppercase text-slate-700 dark:bg-slate-700 dark:text-slate-200">Eliminado {{ formatDate(proceso.deleted_at) }}</span>
                                                     <span v-if="proceso.is_pinned" class="rounded bg-indigo-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200">Fijado</span>
                                                     <span v-if="proceso.es_spoa_nunc" class="rounded bg-indigo-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200">SPOA/NUNC</span>
                                                     <button v-if="proceso.radicado" type="button" @click.stop="copyToClipboard(proceso.radicado)" class="rounded border border-gray-200 p-1 text-gray-400 hover:border-indigo-200 hover:text-indigo-600 dark:border-gray-700" title="Copiar radicado">
@@ -1077,10 +1134,10 @@ const copyLegalInfo = (proceso) => {
                                             </div>
                                         </td>
 
-                                        <td class="sticky right-0 z-10 bg-white px-4 py-4 text-right align-top shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] transition-colors group-hover:bg-gray-50 dark:bg-gray-800 dark:group-hover:bg-gray-900" :class="{ '!bg-indigo-50 dark:!bg-indigo-900/20': proceso.is_pinned }" @click.stop>
+                                        <td :data-tutorial="procesoIndex === 0 ? 'radicados-acciones-primer-registro' : null" class="sticky right-0 z-10 bg-white px-4 py-4 text-right align-top shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] transition-colors group-hover:bg-gray-50 dark:bg-gray-800 dark:group-hover:bg-gray-900" :class="{ '!bg-indigo-50 dark:!bg-indigo-900/20': proceso.is_pinned }" @click.stop>
                                             <div class="flex items-center justify-end gap-2">
                                                 <button
-                                                    v-if="proceso.estado === 'ACTIVO'"
+                                                    v-if="proceso.estado === 'ACTIVO' && !isTrashedProcess(proceso)"
                                                     type="button"
                                                     @click.stop="quickReview(proceso)"
                                                     class="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white dark:border-emerald-900/40 dark:bg-emerald-900/10 dark:text-emerald-300"
@@ -1089,6 +1146,7 @@ const copyLegalInfo = (proceso) => {
                                                     <HandThumbUpIcon class="h-4 w-4" />
                                                 </button>
                                                 <button
+                                                    v-if="!isTrashedProcess(proceso)"
                                                     type="button"
                                                     @click.stop="togglePin(proceso)"
                                                     class="rounded-lg border p-2 transition-colors"
@@ -1097,11 +1155,20 @@ const copyLegalInfo = (proceso) => {
                                                 >
                                                     <PinIcon class="h-4 w-4" :class="{ 'rotate-45': !proceso.is_pinned }" />
                                                 </button>
-                                                <Link @click.stop :href="route('procesos.show', proceso.id)" class="rounded-lg border border-indigo-200 bg-indigo-50 p-2 text-indigo-700 transition-colors hover:bg-indigo-600 hover:text-white dark:border-indigo-900/40 dark:bg-indigo-900/10 dark:text-indigo-300" title="Ver expediente">
+                                                <button
+                                                    v-if="isTrashedProcess(proceso) && $page.props.auth.user.tipo_usuario === 'admin'"
+                                                    type="button"
+                                                    @click.stop="restoreProceso(proceso)"
+                                                    class="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white dark:border-emerald-900/40 dark:bg-emerald-900/10 dark:text-emerald-300"
+                                                    title="Recuperar expediente"
+                                                >
+                                                    <ArrowPathIcon class="h-4 w-4" />
+                                                </button>
+                                                <Link v-else :data-tutorial="procesoIndex === 0 ? 'radicados-ver-primer' : null" @click.stop :href="route('procesos.show', proceso.id)" class="rounded-lg border border-indigo-200 bg-indigo-50 p-2 text-indigo-700 transition-colors hover:bg-indigo-600 hover:text-white dark:border-indigo-900/40 dark:bg-indigo-900/10 dark:text-indigo-300" title="Ver expediente">
                                                     <EyeIcon class="h-4 w-4" />
                                                 </Link>
 
-                                                <Dropdown align="right" width="48" teleport>
+                                                <Dropdown v-if="!isTrashedProcess(proceso)" align="right" width="48" teleport>
                                                     <template #trigger>
                                                         <button type="button" class="rounded-lg border border-gray-200 bg-white p-2 text-gray-500 transition-colors hover:border-indigo-200 hover:text-indigo-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
                                                             <EllipsisVerticalIcon class="h-4 w-4" />
@@ -1131,20 +1198,24 @@ const copyLegalInfo = (proceso) => {
 
                         <div class="divide-y divide-gray-100 dark:divide-gray-700 md:hidden">
                             <article
-                                v-for="proceso in procesos.data"
+                                v-for="(proceso, mobileIndex) in procesos.data"
                                 :key="'mobile-' + proceso.id"
-                                @click="openQuickView(proceso)"
+                                :data-tutorial="mobileIndex === 0 ? 'radicados-primer-registro' : null"
+                                @click="!isTrashedProcess(proceso) && openQuickView(proceso)"
                                 class="cursor-pointer bg-white p-4 transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-900/40"
-                                :class="{ 'border-l-4 border-indigo-500 bg-indigo-50/40 dark:bg-indigo-900/10': proceso.is_pinned }"
+                                :class="{ 'border-l-4 border-indigo-500 bg-indigo-50/40 dark:bg-indigo-900/10': proceso.is_pinned, 'bg-slate-50/80 opacity-90 dark:bg-slate-900/30': isTrashedProcess(proceso) }"
                             >
                                 <div class="flex items-start justify-between gap-3">
                                     <div class="min-w-0">
-                                        <Link @click.stop :href="route('procesos.show', proceso.id)" class="break-all text-base font-black leading-5 text-indigo-700 dark:text-indigo-300">
+                                        <Link v-if="!isTrashedProcess(proceso)" @click.stop :href="route('procesos.show', proceso.id)" class="break-all text-base font-black leading-5 text-indigo-700 dark:text-indigo-300">
                                             {{ proceso.radicado || 'SIN RADICADO' }}
                                         </Link>
+                                        <span v-else class="break-all text-base font-black leading-5 text-slate-700 dark:text-slate-200">{{ proceso.radicado || 'SIN RADICADO' }}</span>
+                                        <p v-if="isTrashedProcess(proceso)" class="mt-1 text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Eliminado {{ formatDate(proceso.deleted_at) }}</p>
                                         <p class="mt-1 line-clamp-2 text-[11px] font-semibold leading-5 text-gray-500 dark:text-gray-400">{{ proceso.asunto || 'Sin asunto registrado' }}</p>
                                     </div>
                                     <button
+                                        v-if="!isTrashedProcess(proceso)"
                                         type="button"
                                         @click.stop="togglePin(proceso)"
                                         class="shrink-0 rounded-lg border p-2"
@@ -1188,14 +1259,15 @@ const copyLegalInfo = (proceso) => {
                                     </div>
                                 </dl>
 
-                                <div class="mt-4 flex items-center justify-between gap-3 border-t border-gray-100 pt-3 dark:border-gray-700">
+                                <div :data-tutorial="mobileIndex === 0 ? 'radicados-acciones-primer-registro' : null" class="mt-4 flex items-center justify-between gap-3 border-t border-gray-100 pt-3 dark:border-gray-700">
                                     <div class="min-w-0">
                                         <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Responsable</p>
                                         <p class="text-[11px] font-bold text-gray-700 dark:text-gray-300">{{ firstName(proceso.abogado?.name) }} · {{ firstName(proceso.responsable_revision?.name) }}</p>
                                     </div>
                                     <div class="flex shrink-0 gap-2">
-                                        <button v-if="proceso.estado === 'ACTIVO'" type="button" @click.stop="quickReview(proceso)" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-black uppercase text-emerald-700">Revisar</button>
-                                        <Link @click.stop :href="route('procesos.show', proceso.id)" class="rounded-lg bg-indigo-600 px-3 py-2 text-[10px] font-black uppercase text-white">Ver</Link>
+                                        <button v-if="proceso.estado === 'ACTIVO' && !isTrashedProcess(proceso)" type="button" @click.stop="quickReview(proceso)" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-black uppercase text-emerald-700">Revisar</button>
+                                        <button v-if="isTrashedProcess(proceso) && $page.props.auth.user.tipo_usuario === 'admin'" type="button" @click.stop="restoreProceso(proceso)" class="rounded-lg bg-emerald-600 px-3 py-2 text-[10px] font-black uppercase text-white">Recuperar</button>
+                                        <Link v-else :data-tutorial="mobileIndex === 0 ? 'radicados-ver-primer' : null" @click.stop :href="route('procesos.show', proceso.id)" class="rounded-lg bg-indigo-600 px-3 py-2 text-[10px] font-black uppercase text-white">Ver</Link>
                                     </div>
                                 </div>
                             </article>

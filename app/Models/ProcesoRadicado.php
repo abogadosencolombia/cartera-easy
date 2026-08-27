@@ -133,6 +133,72 @@ class ProcesoRadicado extends Model
         });
     }
 
+    public function scopeSearchSmart($query, ?string $search)
+    {
+        $words = array_values(array_filter(preg_split('/\s+/', trim((string) $search))));
+
+        foreach ($words as $word) {
+            $normalized = self::normalizeSearchTerm($word);
+            $cleanNumber = preg_replace('/[^0-9]/', '', $word);
+
+            $query->where(function ($subq) use ($word, $normalized, $cleanNumber) {
+                $subq->where('radicado', 'ilike', "%{$word}%")
+                    ->orWhereRaw(
+                        "TRANSLATE(asunto, 'áéíóúüÁÉÍÓÚÜñÑ', 'aeiouuAEIOUUnN') ILIKE ?",
+                        ["%{$normalized}%"]
+                    )
+                    ->orWhereHas('tipoProceso', function ($tipoQuery) use ($word, $normalized) {
+                        $tipoQuery->where('nombre', 'ilike', "%{$word}%")
+                            ->orWhereRaw(
+                                "TRANSLATE(nombre, 'áéíóúüÁÉÍÓÚÜñÑ', 'aeiouuAEIOUUnN') ILIKE ?",
+                                ["%{$normalized}%"]
+                            );
+                    })
+                    ->orWhereHas('juzgado', function ($juzgadoQuery) use ($word, $normalized) {
+                        $juzgadoQuery->where('nombre', 'ilike', "%{$word}%")
+                            ->orWhereRaw(
+                                "TRANSLATE(nombre, 'áéíóúüÁÉÍÓÚÜñÑ', 'aeiouuAEIOUUnN') ILIKE ?",
+                                ["%{$normalized}%"]
+                            );
+                    })
+                    ->orWhereHas('demandantes', function ($personaQuery) use ($word, $normalized, $cleanNumber) {
+                        $personaQuery->whereRaw(
+                            "TRANSLATE(nombre_completo, 'áéíóúüÁÉÍÓÚÜñÑ', 'aeiouuAEIOUUnN') ILIKE ?",
+                            ["%{$normalized}%"]
+                        );
+
+                        if ($cleanNumber) {
+                            $personaQuery->orWhere('numero_documento', 'ilike', "%{$cleanNumber}%");
+                        }
+                    })
+                    ->orWhereHas('demandados', function ($personaQuery) use ($word, $normalized, $cleanNumber) {
+                        $personaQuery->whereRaw(
+                            "TRANSLATE(nombre_completo, 'áéíóúüÁÉÍÓÚÜñÑ', 'aeiouuAEIOUUnN') ILIKE ?",
+                            ["%{$normalized}%"]
+                        );
+
+                        if ($cleanNumber) {
+                            $personaQuery->orWhere('numero_documento', 'ilike', "%{$cleanNumber}%");
+                        }
+                    });
+
+                if ($cleanNumber) {
+                    $subq->orWhereRaw("regexp_replace(radicado, '[^0-9]', '', 'g') ILIKE ?", ["%{$cleanNumber}%"]);
+                }
+            });
+        }
+
+        return $query;
+    }
+
+    private static function normalizeSearchTerm(string $term): string
+    {
+        return strtr($term, [
+            'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n',
+            'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U', 'Ü' => 'U', 'Ñ' => 'N',
+        ]);
+    }
+
     public function estaEnSeguimiento(): bool
     {
         return empty($this->nota_cierre)

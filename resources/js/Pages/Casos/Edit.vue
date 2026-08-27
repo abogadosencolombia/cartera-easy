@@ -69,14 +69,40 @@ const isFormDisabled = computed(() => (user.tipo_usuario !== 'admin' && props.ca
 const isMinimized = ref(false);
 
 const formatDateForInput = (d) => d ? new Date(d).toISOString().split('T')[0] : null;
-const safeJsonParse = (s) => { if (!s) return []; try { const p = JSON.parse(s); return Array.isArray(p) ? p : []; } catch (e) { return []; } };
+const safeJsonParse = (value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.map(item => typeof item === 'object' && item !== null ? { ...item } : item);
+    if (typeof value === 'object') return [{ ...value }];
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? [parsed] : []);
+    } catch {
+        return [];
+    }
+};
+
+const mapAssignedUsers = (caso) => {
+    const assignedUsers = new Map();
+
+    if (caso?.user) {
+        assignedUsers.set(caso.user.id, { id: caso.user.id, name: caso.user.name });
+    }
+
+    if (Array.isArray(caso?.users)) {
+        caso.users.forEach(user => {
+            if (!assignedUsers.has(user.id)) {
+                assignedUsers.set(user.id, { id: user.id, name: user.name });
+            }
+        });
+    }
+
+    return Array.from(assignedUsers.values());
+};
 
 const form = useForm({
     _method: 'PATCH',
     cooperativa_id: props.caso.cooperativa ? { id: props.caso.cooperativa.id, nombre: props.caso.cooperativa.nombre } : null,
-    user_id: props.caso.users?.length > 0 
-        ? props.caso.users.map(u => ({ id: u.id, name: u.name })) 
-        : (props.caso.user ? [{ id: props.caso.user.id, name: props.caso.user.name }] : []),
+    user_id: mapAssignedUsers(props.caso),
     deudor_id: props.caso.deudor_id,
     deudor: {
         id: props.caso.deudor_id,
@@ -163,9 +189,7 @@ watch(() => props.caso.id, (newId) => {
     if (newId) {
         form.defaults({
             cooperativa_id: props.caso.cooperativa ? { id: props.caso.cooperativa.id, nombre: props.caso.cooperativa.nombre } : null,
-            user_id: props.caso.users?.length > 0 
-                ? props.caso.users.map(u => ({ id: u.id, name: u.name })) 
-                : (props.caso.user ? [{ id: props.caso.user.id, name: props.caso.user.name }] : []),
+            user_id: mapAssignedUsers(props.caso),
             deudor_id: props.caso.deudor_id,
             deudor: {
                 id: props.caso.deudor_id,
@@ -211,30 +235,53 @@ watch(() => props.caso.id, (newId) => {
 const casosExistentes = ref([]);
 const buscandoCasos = ref(false);
 const faltaIdentificacion = computed(() => !form.radicado && !form.referencia_credito);
+let duplicateLookupRequest = 0;
 
-const checkDuplicados = debounce(() => {
-    if (!form.radicado && !form.referencia_credito) {
-        casosExistentes.value = [];
-        return;
-    }
-    
-    buscandoCasos.value = true;
+const performDuplicateLookup = debounce((requestId, radicado, referenciaCredito) => {
     axios.get(route('casos.verificar_duplicados'), {
         params: {
-            radicado: form.radicado,
-            referencia_credito: form.referencia_credito,
+            radicado,
+            referencia_credito: referenciaCredito,
             ignore_id: props.caso.id
         }
     })
     .then(res => {
-        casosExistentes.value = res.data;
+        if (requestId === duplicateLookupRequest) {
+            casosExistentes.value = Array.isArray(res.data) ? res.data : [];
+        }
     })
-    .catch(err => console.error('Error buscando duplicados:', err))
-    .finally(() => buscandoCasos.value = false);
+    .catch(err => {
+        if (requestId === duplicateLookupRequest) {
+            console.error('Error buscando duplicados:', err);
+            casosExistentes.value = [];
+        }
+    })
+    .finally(() => {
+        if (requestId === duplicateLookupRequest) {
+            buscandoCasos.value = false;
+        }
+    });
 }, 500);
 
-watch(() => form.radicado, checkDuplicados);
-watch(() => form.referencia_credito, checkDuplicados);
+const scheduleDuplicateLookup = () => {
+    const requestId = ++duplicateLookupRequest;
+    const radicado = form.radicado;
+    const referenciaCredito = form.referencia_credito;
+
+    casosExistentes.value = [];
+
+    if (!radicado && !referenciaCredito) {
+        performDuplicateLookup.cancel();
+        buscandoCasos.value = false;
+        return;
+    }
+
+    buscandoCasos.value = true;
+    performDuplicateLookup(requestId, radicado, referenciaCredito);
+};
+
+watch(() => form.radicado, scheduleDuplicateLookup);
+watch(() => form.referencia_credito, scheduleDuplicateLookup);
 
 // --- AUTO-FORMATO ---
 watch(() => form.deudor.numero_documento, (newVal) => {
@@ -275,9 +322,18 @@ const addMonths = (field, months) => {
 // --- CASCADA ---
 const formatLabel = (text) => text?.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) || '';
 const especialidades = computed(() => props.estructuraProcesal);
-const tiposDisponibles = ref([]);
-const subtiposDisponibles = ref([]);
-const subprocesosDisponibles = ref([]);
+const tiposDisponibles = computed(() => {
+    const especialidad = especialidades.value.find(item => item.id === form.especialidad_id);
+    return especialidad?.tipos_proceso ?? [];
+});
+const subtiposDisponibles = computed(() => {
+    const tipo = tiposDisponibles.value.find(item => item.nombre === form.tipo_proceso);
+    return tipo?.subtipos ?? [];
+});
+const subprocesosDisponibles = computed(() => {
+    const subtipo = subtiposDisponibles.value.find(item => item.nombre === form.subtipo_proceso);
+    return subtipo?.subprocesos ?? [];
+});
 
 // Opciones rápidas con iconos (Diseño Premium)
 const opcionesRapidasEsp = computed(() => {
@@ -300,32 +356,67 @@ const etapasRapidas = [
     { id: 'TERMINADO POR PAGO TOTAL', icono: ArrowPathIcon }
 ];
 
-watch(() => form.especialidad_id, (id, oldId) => {
-    const esp = especialidades.value.find(e => e.id === id);
-    tiposDisponibles.value = esp ? esp.tipos_proceso : [];
-    if (oldId !== undefined) {
+watch(() => form.especialidad_id, () => {
+    if (form.tipo_proceso && !tiposDisponibles.value.some(item => item.nombre === form.tipo_proceso)) {
         form.tipo_proceso = null;
         form.subtipo_proceso = null;
         form.subproceso = null;
     }
-}, { immediate: true });
+});
 
-watch(() => form.tipo_proceso, (val, oldVal) => {
-    const t = tiposDisponibles.value.find(x => x.nombre === val);
-    subtiposDisponibles.value = t ? t.subtipos : [];
-    if (oldVal !== undefined) {
+watch(() => form.tipo_proceso, () => {
+    if (form.subtipo_proceso && !subtiposDisponibles.value.some(item => item.nombre === form.subtipo_proceso)) {
         form.subtipo_proceso = null;
         form.subproceso = null;
     }
-}, { immediate: true });
+});
 
-watch(() => form.subtipo_proceso, (val, oldVal) => {
-    const s = subtiposDisponibles.value.find(x => x.nombre === val);
-    subprocesosDisponibles.value = s ? s.subprocesos : [];
-    if (oldVal !== undefined) {
+watch(() => form.subtipo_proceso, () => {
+    if (form.subproceso && !subprocesosDisponibles.value.some(item => item.nombre === form.subproceso)) {
         form.subproceso = null;
     }
-}, { immediate: true });
+});
+
+const deudorDraftFields = ['nombre_completo', 'tipo_documento', 'numero_documento', 'dv', 'celular_1', 'correo_1', 'cooperativas_ids', 'abogados_ids'];
+let deudorNewDraft = null;
+let deudorExistingSelection = form.deudor.selected;
+let deudorExistingId = form.deudor.id ?? form.deudor_id;
+
+const snapshotDeudorDraft = () => Object.fromEntries(
+    deudorDraftFields.map((field) => [field, Array.isArray(form.deudor[field]) ? [...form.deudor[field]] : form.deudor[field]]),
+);
+
+const toggleDeudorMode = () => {
+    const nextIsNew = !form.deudor.is_new;
+
+    if (form.deudor.is_new && !nextIsNew) {
+        deudorNewDraft = snapshotDeudorDraft();
+    }
+
+    if (nextIsNew) {
+        deudorExistingSelection = form.deudor.selected;
+        deudorExistingId = form.deudor.id ?? form.deudor_id;
+        form.deudor_id = null;
+        form.deudor.id = null;
+        form.deudor.selected = null;
+        Object.assign(form.deudor, deudorNewDraft ?? {
+            nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '',
+            celular_1: '', correo_1: '', cooperativas_ids: [], abogados_ids: [],
+        });
+    } else {
+        form.deudor_id = deudorExistingId;
+        form.deudor.id = deudorExistingId;
+        form.deudor.selected = deudorExistingSelection;
+    }
+
+    form.deudor.is_new = nextIsNew;
+};
+
+watch(() => props.caso.id, () => {
+    deudorNewDraft = null;
+    deudorExistingSelection = form.deudor.selected;
+    deudorExistingId = form.deudor.id ?? form.deudor_id;
+});
 
 const submit = () => {
     form.transform(data => ({
@@ -348,7 +439,7 @@ const submit = () => {
     <Head :title="'Editar Caso #' + caso.id" />
     <AuthenticatedLayout>
         <template #header>
-             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+             <div data-tutorial="casos-edit-header" class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                  <div class="min-w-0">
                      <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Edicion de expediente</p>
                      <div class="mt-1 flex flex-wrap items-center gap-2">
@@ -370,7 +461,7 @@ const submit = () => {
                      <Link :href="route('casos.show', caso.id)" class="w-full sm:w-auto">
                         <SecondaryButton class="w-full justify-center sm:w-auto">Cancelar</SecondaryButton>
                      </Link>
-                     <PrimaryButton class="w-full justify-center sm:w-auto" @click="submit" :disabled="form.processing || isFormDisabled">
+                     <PrimaryButton data-tutorial="casos-edit-save" class="w-full justify-center sm:w-auto" @click="submit" :disabled="form.processing || isFormDisabled">
                         <ArrowPathIcon v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
                         Actualizar caso
                      </PrimaryButton>
@@ -400,7 +491,7 @@ const submit = () => {
 
                 <div class="overflow-visible rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
                     <div class="border-b border-gray-200 px-3 dark:border-gray-700">
-                        <nav class="flex gap-2 overflow-x-auto py-3" aria-label="Secciones de edicion del caso">
+                        <nav data-tutorial="casos-edit-tabs" class="flex gap-2 overflow-x-auto py-3" aria-label="Secciones de edicion del caso">
                             <button
                                 v-for="tab in tabItems"
                                 :key="tab.id"
@@ -516,7 +607,7 @@ const submit = () => {
                                     <div><InputLabel value="Cooperativa / Empresa *" /><AsyncSelect v-model="form.cooperativa_id" :endpoint="route('cooperativas.search')" placeholder="Asignar a..." label-key="nombre" /><InputError :message="form.errors.cooperativa_id" /></div>
                                     <div><InputLabel value="Abogado(s) a Cargo *" /><AsyncSelect v-model="form.user_id" :endpoint="route('users.search')" multiple placeholder="Asignar gestores..." label-key="name" /><InputError :message="form.errors.user_id" /></div>
                                     <div class="md:col-span-2 space-y-4">
-                                        <div class="flex justify-between items-center"><InputLabel value="Deudor Principal *" /><button type="button" @click="form.deudor.is_new = !form.deudor.is_new" class="text-[10px] font-bold text-indigo-600 uppercase">{{ form.deudor.is_new ? '← Buscar' : '+ Nuevo' }}</button></div>
+                                        <div class="flex justify-between items-center"><InputLabel value="Deudor Principal *" /><button type="button" @click="toggleDeudorMode" class="text-[10px] font-bold text-indigo-600 uppercase">{{ form.deudor.is_new ? '← Buscar' : '+ Nuevo' }}</button></div>
                                         <div v-if="!form.deudor.is_new">
                                             <AsyncSelect v-model="form.deudor.selected" :endpoint="route('personas.search')" label-key="nombre_completo" />
                                             <InputError :message="form.errors.deudor_id" />
@@ -553,7 +644,7 @@ const submit = () => {
                                             </div>
                                             <div class="md:col-span-3 grid grid-cols-1 gap-4 mt-2 md:grid-cols-2">
                                                 <div>
-                                                    <AsyncSelect v-model="form.deudor.cooperativas_ids" :endpoint="route('cooperativas.search')" multiple label-key="nombre" placeholder="Cooperativas * (Mín. 1)" />
+                                                    <AsyncSelect v-model="form.deudor.cooperativas_ids" :endpoint="route('cooperativas.search')" multiple label-key="nombre" placeholder="Cooperativas (opcional)" />
                                                     <InputError :message="form.errors['deudor.cooperativas_ids']" class="mt-2" />
                                                 </div>
                                                 <AsyncSelect v-model="form.deudor.abogados_ids" :endpoint="route('users.search')" multiple label-key="name" placeholder="Abogados..." />
@@ -698,8 +789,8 @@ const submit = () => {
                                     <div><InputLabel value="Origen Documental *" /><SelectInput v-model="form.origen_documental"><option value="pagaré">Pagaré</option><option value="libranza">Libranza</option><option value="contrato">Contrato</option><option value="otro">Otro</option></SelectInput><InputError :message="form.errors.origen_documental" /></div>
                                     <div><InputLabel value="Medio de Contacto" /><SelectInput v-model="form.medio_contacto"><option :value="null">-- Seleccione --</option><option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="telefono">Teléfono</option></SelectInput><InputError :message="form.errors.medio_contacto" /></div>
                                     <div class="xl:col-span-3 grid grid-cols-1 gap-5 md:grid-cols-2">
-                                        <div><InputLabel value="URL Carpeta Drive (Opcional)" /><TextInput v-model="form.link_drive" type="url" class="w-full" placeholder="https://drive.google.com/..." /><InputError :message="form.errors.link_drive" /></div>
-                                        <div><InputLabel value="URL Expediente Digital (Opcional)" /><TextInput v-model="form.link_expediente" type="url" class="w-full" placeholder="https://expediente.justicia.gov.co/..." /><InputError :message="form.errors.link_expediente" /></div>
+                                        <div><InputLabel value="URL Carpeta Drive (Opcional)" /><TextInput v-model="form.link_drive" type="url" class="w-full" placeholder="https://drive.google.com/..." /><p class="mt-1 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">Si no existe, créela como: DOCUMENTO - NOMBRE COMPLETO - NÚMERO DE PAGARÉ, y comparta el enlace con el equipo.</p><InputError :message="form.errors.link_drive" /></div>
+                                        <div><InputLabel value="URL Expediente Digital (Opcional)" /><TextInput v-model="form.link_expediente" type="url" class="w-full" placeholder="https://expediente.justicia.gov.co/..." /><p class="mt-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">Agréguelo cuando la entidad judicial lo habilite.</p><InputError :message="form.errors.link_expediente" /></div>
                                     </div>
                                 </div>
                                 </div>

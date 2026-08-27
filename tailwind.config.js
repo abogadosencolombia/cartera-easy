@@ -13,7 +13,23 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Figtree', ...defaultTheme.fontFamily.sans],
+                sans: ['DM Sans', ...defaultTheme.fontFamily.sans],
+                display: ['Manrope', ...defaultTheme.fontFamily.sans],
+            },
+            colors: {
+                brand: {
+                    50: '#effcf9',
+                    100: '#d7f7ef',
+                    200: '#b3eddf',
+                    300: '#7dddc9',
+                    400: '#43c4ae',
+                    500: '#24a894',
+                    600: '#188274',
+                    700: '#176c62',
+                    800: '#17574f',
+                    900: '#174841',
+                    950: '#082b28',
+                },
             },
             keyframes: {
                 blink: {

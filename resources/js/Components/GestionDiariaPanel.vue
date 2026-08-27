@@ -313,7 +313,7 @@ onMounted(fetchNotas);
         
         <div class="absolute inset-y-0 right-0 flex w-full max-w-2xl transform flex-col bg-white shadow-2xl transition-transform duration-300 dark:bg-gray-950">
             <!-- Header -->
-            <div class="border-b border-slate-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-950">
+            <div data-tutorial="gestion-panel-resumen" class="border-b border-slate-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-950">
                 <div class="flex items-start justify-between gap-4">
                     <div class="flex min-w-0 gap-3">
                         <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300">
@@ -359,14 +359,14 @@ onMounted(fetchNotas);
                         <ChevronRightIcon class="h-5 w-5 text-sky-600 dark:text-sky-400" />
                     </div>
                     <div class="space-y-5">
-                        <div>
+                        <div data-tutorial="gestion-descripcion">
                             <label class="mb-1.5 block text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Descripción <span class="text-red-500">*</span></label>
                             <input v-model="form.descripcion" type="text" placeholder="Ej: Radicar memorial de impulso procesal"
                                    class="w-full rounded-lg border-slate-200 text-sm font-semibold text-slate-900 transition focus:border-sky-500 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white">
                         </div>
                         
                         <div class="grid gap-4 sm:grid-cols-2">
-                            <div class="relative">
+                            <div data-tutorial="gestion-despacho" class="relative">
                                 <label class="mb-1.5 block text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Despacho / entidad <span class="text-red-500">*</span></label>
                                 <div class="relative">
                                     <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -388,7 +388,7 @@ onMounted(fetchNotas);
                                     </div>
                                 </div>
                             </div>
-                            <div>
+                            <div data-tutorial="gestion-recordatorio">
                                 <label class="mb-1.5 block text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Recordatorio <span class="text-red-500">*</span></label>
                                 <input v-model="form.expires_at" type="datetime-local" :min="minReminder"
                                        class="w-full rounded-lg border-slate-200 text-sm font-semibold text-slate-900 transition focus:border-sky-500 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white">
@@ -406,7 +406,7 @@ onMounted(fetchNotas);
                             </div>
                         </div>
 
-                        <div class="border-t border-slate-100 pt-5 dark:border-gray-800">
+                        <div data-tutorial="gestion-vinculacion" class="border-t border-slate-100 pt-5 dark:border-gray-800">
                             <div class="mb-3 flex items-center justify-between gap-3">
                                 <label class="block text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Vincular expediente</label>
                                 <button v-if="form.relacionable_type || searchVinculacion" @click="clearRelacion" type="button" class="text-xs font-black uppercase tracking-widest text-slate-400 transition hover:text-red-600">
@@ -454,7 +454,7 @@ onMounted(fetchNotas);
                         </div>
 
                         <!-- Sección de Archivos -->
-                        <div class="border-t border-slate-100 pt-5 dark:border-gray-800">
+                        <div data-tutorial="gestion-anexos" class="border-t border-slate-100 pt-5 dark:border-gray-800">
                             <label class="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Anexos</label>
                             <div class="flex flex-wrap items-center gap-3">
                                 <button @click="fileInput?.click()" type="button" :disabled="fileLimitReached"
@@ -479,7 +479,7 @@ onMounted(fetchNotas);
                             </div>
                         </div>
 
-                        <button @click="saveNota" :disabled="loading" 
+                        <button data-tutorial="gestion-registrar" @click="saveNota" :disabled="loading"
                                 class="inline-flex w-full items-center justify-center rounded-lg bg-sky-600 px-4 py-3 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-sky-100 transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50 dark:shadow-none">
                             <span v-if="loading" class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white/70 border-t-transparent"></span>
                             {{ loading ? 'Procesando' : 'Registrar gestión' }}
@@ -489,7 +489,7 @@ onMounted(fetchNotas);
 
                 <!-- Listado -->
                 <div class="space-y-4 pb-8">
-                    <div class="flex items-center justify-between gap-3 px-1">
+                    <div data-tutorial="gestion-listado" class="flex items-center justify-between gap-3 px-1">
                         <div>
                             <h4 class="text-sm font-black text-slate-950 dark:text-white">Pendientes y actuaciones</h4>
                             <p class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">Marque como hecha cuando la gestión quede registrada.</p>

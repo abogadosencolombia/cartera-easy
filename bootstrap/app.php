@@ -25,6 +25,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Twilio signs the original form values, including whitespace in Body.
+        // Keep this webhook byte-for-byte intact until its signature is checked.
+        $middleware->trimStrings(except: [
+            fn (\Illuminate\Http\Request $request): bool => $request->is('api/twilio/inbound'),
+        ]);
+
         $middleware->web(append: [
             TrustProxies::class,  // PRIMERO TrustProxies
             \App\Http\Middleware\HandleInertiaRequests::class,  // DESPUÉS Inertia

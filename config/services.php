@@ -49,4 +49,23 @@ return [
         'webhook_token' => env('CHATBOT_WEBHOOK_TOKEN'),
     ],
 
+    'twilio' => [
+        'account_sid' => env('TWILIO_ACCOUNT_SID'),
+        'api_key_sid' => env('TWILIO_API_KEY_SID'),
+        'api_key_secret' => env('TWILIO_API_KEY_SECRET'),
+        'auth_token' => env('TWILIO_AUTH_TOKEN'),
+        'from' => env('TWILIO_FROM'),
+        'messaging_service_sid' => env('TWILIO_MESSAGING_SERVICE_SID'),
+        'status_callback_url' => env('TWILIO_STATUS_CALLBACK_URL'),
+        'inbound_webhook_url' => env('TWILIO_INBOUND_WEBHOOK_URL'),
+        'campaign_manifest_root' => env(
+            'TWILIO_CAMPAIGN_MANIFEST_ROOT',
+            storage_path('app/private/twilio/campaigns'),
+        ),
+        'rne_proof_root' => env(
+            'TWILIO_RNE_PROOF_ROOT',
+            storage_path('app/private/twilio/rne'),
+        ),
+    ],
+
 ];

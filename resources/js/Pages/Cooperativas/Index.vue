@@ -100,6 +100,7 @@ const getRandomColor = (id) => {
                     <Link
                         v-if="can.create_cooperativas"
                         :href="route('cooperativas.create')"
+                        data-tutorial="cooperativas-registrar"
                         class="flex-1 md:flex-none inline-flex items-center justify-center px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-sm transition-all shadow-sm shadow-indigo-200 dark:shadow-none"
                     >
                         <PlusIcon class="w-5 h-5 mr-2" />
@@ -113,7 +114,7 @@ const getRandomColor = (id) => {
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
                 
                 <!-- BARRA DE HERRAMIENTAS -->
-                <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div data-tutorial="cooperativas-busqueda" class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4">
                     <div class="relative w-full sm:max-w-md">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <MagnifyingGlassIcon class="h-4 w-4 text-gray-400" />
@@ -148,7 +149,7 @@ const getRandomColor = (id) => {
                                     {{ coop.nombre[0] }}
                                 </div>
                                 <div class="min-w-0 flex-1">
-                                    <h3 class="font-black text-lg text-gray-900 dark:text-white truncate" :title="coop.nombre">{{ coop.nombre }}</h3>
+                                    <h3 :data-tutorial="cooperativas.data[0]?.id === coop.id ? 'cooperativas-listado' : null" class="font-black text-lg text-gray-900 dark:text-white truncate" :title="coop.nombre">{{ coop.nombre }}</h3>
                                     <p class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Entidad Aliada</p>
                                 </div>
                             </div>
@@ -186,12 +187,12 @@ const getRandomColor = (id) => {
 
                         <!-- Pie de la tarjeta con acciones -->
                         <div class="p-6 bg-gray-50/50 dark:bg-gray-800/50 border-t border-gray-50 dark:border-gray-700 flex items-center justify-between rounded-b-[2rem]">
-                            <Link :href="route('cooperativas.show', coop.id)"
+                            <Link :href="route('cooperativas.show', coop.id)" :data-tutorial="cooperativas.data[0]?.id === coop.id ? 'cooperativas-ver-primera' : null"
                                   class="inline-flex items-center gap-2 px-5 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl font-black text-[10px] uppercase tracking-widest text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
                                 <EyeIcon class="w-4 h-4" />
                                 Gestionar
                             </Link>
-                            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div :data-tutorial="cooperativas.data[0]?.id === coop.id ? 'cooperativas-acciones-primera' : null" class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Link :href="route('cooperativas.edit', coop.id)" class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
                                     <PencilSquareIcon class="w-5 h-5" />
                                 </Link>
@@ -228,4 +229,3 @@ const getRandomColor = (id) => {
         </div>
 </AuthenticatedLayout>
 </template>
-

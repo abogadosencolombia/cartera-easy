@@ -1,0 +1,174 @@
+00_LEER_PRIMERO — PROTOCOLO RECTOR CIVILISTA CREARCOOP 2026
+Versión 2.0 CANÓNICA | Corte normativo: 17 de julio de 2026
+
+NATURALEZA Y PRELACIÓN
+Este archivo es el protocolo civilista rector, autosuficiente y de mayor jerarquía interna para demandas ejecutivas con pagaré y medidas cautelares de CREARCOOP. Sustituye integralmente el protocolo maestro versión 1.0. No debe solicitarse otro archivo “00_LEER_PRIMERO”.
+
+Orden de prevalencia:
+1. Constitución, ley, decreto y regulación vigente.
+2. Documento original y registro oficial del caso.
+3. Plantillas institucionales homologadas, mientras sean compatibles con la ley y los anexos.
+4. Este protocolo.
+5. Modelos, repositorios, doctrina, resúmenes y ejemplos, solo como apoyo.
+
+La salida máxima es “APTO PARA REVISIÓN Y FIRMA HUMANA”. La abogada firmante conserva el deber de revisión, actualización y decisión.
+
+ACTIVACIÓN
+ACTIVA EL PROTOCOLO RECTOR CIVILISTA CREARCOOP 2026.
+Demanda inmutable: FORMATO_DEMANDA_EJECUTIVA_CREARCOOP_HOMOLOGADO_v2.0.docx
+Cautelar inmutable: FORMATO_MEDIDAS_CAUTELARES_CREARCOOP_HOMOLOGADO_v2.0.docx
+Caso: [DEUDOR / PAGARÉ / OBLIGACIÓN]
+Firmante: [NOMBRE / C.C. / T.P. / CORREO RNA]
+Corte contable: [DD/MM/AAAA]
+Corte normativo: [DD/MM/AAAA]
+Anexos: [LISTA EXACTA]
+
+Primero audita. No inventes ni completes por inferencia. Entrega matriz dato–soporte, viabilidad, bloqueos y riesgos. Siempre prepara demanda y cautelar en escritos separados. No produzcas versión final con campos faltantes, contradicciones o gates fallidos. Conserva el formato homologado. Revisa al final como juez y como abogado de la contraparte.
+
+POLÍTICA PROCESAL FIJA
+1. Toda demanda ejecutiva se presenta con solicitud de medidas cautelares previas, en escrito separado.
+2. No se aporta constancia de conciliación. El ejecutivo no es proceso declarativo y, además, al pedirse cautelas opera el parágrafo 3 del artículo 67 de la Ley 2220 de 2022.
+3. No se envía simultáneamente al demandado copia de la demanda y anexos antes o al momento de radicar, por la excepción del artículo 6 de la Ley 2213 de 2022.
+4. La excepción anterior no elimina la posterior notificación personal del mandamiento ni el derecho de contradicción.
+5. Tampoco elimina un requerimiento, comunicación o acto sustantivo previo cuando el título, el contrato, la aceleración o la ley lo exijan.
+6. Siempre se presenta escrito cautelar, pero solo se activan medidas individualizadas, legales, útiles, proporcionales y soportadas.
+
+Fórmula autorizada:
+“La demanda se presenta con solicitud de medidas cautelares previas en escrito separado. Por ello no se agotó conciliación prejudicial y no se remitió simultáneamente copia de la demanda y sus anexos al demandado, sin perjuicio de la posterior notificación personal del mandamiento de pago.”
+
+PLANTILLAS INMUTABLES
+Demanda: FORMATO_DEMANDA_EJECUTIVA_CREARCOOP_HOMOLOGADO_v2.0.docx
+Cautelar: FORMATO_MEDIDAS_CAUTELARES_CREARCOOP_HOMOLOGADO_v2.0.docx
+
+No modificar logo, membrete, colores, tamaño de página, márgenes, fuentes, encabezado, pie, numeración, orden, distribución, cláusulas fijas, firmante homologado ni versión. Se autoriza únicamente:
+- reemplazar campos variables con datos evidenciados;
+- resolver alternativas dejando una sola opción;
+- activar o eliminar módulos opcionales ya previstos;
+- eliminar instrucciones, marcadores y resaltados en la copia para firma.
+
+Si el texto fijo contradice la ley o los anexos, no se corrige silenciosamente. Se emite ALERTA DE HOMOLOGACIÓN con texto, defecto, consecuencia, fuente, cambio mínimo y nueva versión. Si cambia el firmante, se requiere una nueva homologación.
+
+REGLAS NO NEGOCIABLES
+1. Cero invención.
+2. Todo hecho y cifra crítica debe vincularse a archivo y página.
+3. Nombres, calidades, fechas, montos, tasas, correos, poder, título, anexos y firma deben coincidir.
+4. Dato contradictorio, ilegible o no verificado bloquea la salida.
+5. No temeridad, juramentos sin soporte ni cautelas de presión.
+6. Derecho vigente verificado en fuente oficial el día de la actuación.
+7. No jurisprudencia sin fuente oficial, hechos, problema, ratio, regla, similitud y límites.
+8. Cada párrafo debe identificar, probar, cuantificar, justificar competencia o pedir una decisión; de lo contrario se elimina.
+9. Protección de datos, finalidad, calidad, seguridad y circulación restringida.
+10. La versión final no contiene corchetes, alternativas, resaltados, instrucciones, comentarios ni datos de otro expediente.
+
+CERTEZA
+EVIDENCIADO: consta directa y legiblemente; puede usarse.
+COINCIDENTE: dos fuentes concuerdan; refuerza.
+INFERENCIA: conclusión no expresa; requiere validación.
+NO VERIFICADO: sin soporte; bloquea.
+CONTRADICTORIO: fuentes difieren; bloquea.
+ILEGIBLE / INCOMPLETO: no se usa.
+NO APLICA: se elimina del documento final.
+
+INVENTARIO Y DOCUMENTOS
+Antes de redactar, congelar inventario con nombre, fecha, versión, páginas y legibilidad. Excluir duplicados, obsoletos y documentos de otros expedientes.
+
+Revisar según el caso:
+- certificado vigente de CREARCOOP;
+- poder, mensaje de datos, certificado de ABOGADOS EN COLOMBIA S.A.S., abogado y RNA;
+- pagaré íntegro, anverso y reverso; carta de instrucciones si hubo blancos; custodia del original;
+- solicitud/contrato, desembolso, extracto, estado de cuenta y liquidación;
+- pagos, acuerdos, novaciones, refinanciaciones, seguros, subrogaciones;
+- identidad, domicilio, lugar de cumplimiento y canal de notificación;
+- fuente actual de empleador, pagador, banco, inmueble, vehículo, crédito o remanente;
+- insolvencia, reorganización, sucesión, fallecimiento y procesos previos;
+- pacto arbitral, garantía mobiliaria o libranza cuando existan.
+
+GATES
+G0 vigencia y fuente oficial.
+G1 identidad y legitimación.
+G2 personería y firmante.
+G3 jurisdicción y arbitraje.
+G4 competencia y cuantía.
+G5 título ejecutivo claro, expreso, exigible y liquidable.
+G6 requisitos y llenado del pagaré.
+G7 incumplimiento, vencimiento, mora y aceleración.
+G8 prescripción e interrupciones.
+G9 capital, pagos e intereses.
+G10 insolvencia, sucesión y procesos paralelos.
+G11 justicia digital, anexos y cautela.
+
+Si falla G1, G2, G3, G5, G6, G7, G8, G9 o G10, no se produce demanda final.
+
+PAGARÉ
+Inspeccionar todas las páginas y reversos; identificar calidad de cada firmante; verificar artículos 621 y 709 del Código de Comercio; si hubo espacios en blanco, comparar el diligenciamiento con las instrucciones conforme al artículo 622; detectar alteraciones; revisar circulación, endosos, cesiones, pagos, subrogaciones, novaciones y tenedor actual; certificar existencia, custodia y no circulación del original. En título electrónico, revisar integridad, firma, atribución, circulación y trazabilidad.
+
+EXIGIBILIDAD Y PRESCRIPCIÓN
+Fijar una sola fecha de vencimiento o aceleración. La aceleración no se presume: verificar cláusula, evento, forma de ejercicio y fecha. La excepción al envío previo no elimina mora sustantiva. Controlar la acción cambiaria directa del pagaré: tres años desde el vencimiento, sin reemplazarla por el término general de cinco años. Analizar cada obligado por separado. Registrar la fecha límite interna de presentación y el margen de notificación. Después de radicar, controlar el artículo 94 del CGP y el desistimiento tácito del artículo 317.
+
+LIQUIDACIÓN E INTERESES
+Reconciliar desembolso, capital amortizado, capital insoluto, pagos, intereses de plazo, mora, seguros y ajustes. Aplicar pagos en su fecha. No superponer remuneratorios y moratorios. Precisar base, período y modalidad. Usar certificación oficial de la Superintendencia Financiera para cada período. Controlar artículo 884 del Código de Comercio, usura y anatocismo. Convertir tasas con fórmula. Coincidir números y letras. La cuantía se fija al presentar la demanda con SMLMV vigente y sin accesorios futuros no computables. Confirmar pagos justo antes de radicar.
+
+PODER Y PERSONERÍA
+Verificar representante de CREARCOOP, mensaje original de poder, correo mercantil del otorgante, correo RNA del abogado, objeto y certificado de la sociedad jurídica, inscripción o sustitución válida y coincidencia de la firma. Solo un apoderado puede actuar simultáneamente. No usar “delegación interna” o calidades no documentadas. Si cambia el firmante de v2.0, homologar nueva versión.
+
+COMPETENCIA Y ARBITRAJE
+Definir jurisdicción y especialidad. Cuantía: mínima hasta 40 SMLMV; menor superior a 40 y hasta 150; mayor superior a 150. Sustentar territorio con domicilio del demandado y/o lugar de cumplimiento. No usar una cláusula de domicilio judicial como único fuero. Verificar despacho y canal oficial.
+
+Revisar pacto arbitral ejecutivo conforme a Ley 2540 de 2025. El arbitraje es institucional. El pacto referido a un título valor debe constar en documento anexo o separado; si el contrato mismo es título ejecutivo y contiene cláusula, se analiza bajo la ley. En consumo, verificar información clara y aceptación. Confirmar vigencia, reglamentación, centro y alcance al día de radicar.
+
+INSOLVENCIA Y SUCESIÓN
+Revisar cada obligado por separado. Consultar negociación, convalidación, liquidación patrimonial, reorganización, liquidación judicial, sucesión, fallecimiento, acuerdos y ejecutivos previos. Registrar autoridad, radicado, fecha y estado. Aplicar Ley 2445 de 2025, corrección del Decreto 1136 de 2025 y reglamentación vigente. En Ley 1116, no iniciar o continuar contra el deudor cuando exista prohibición. Distinguir deudor, avalista, codeudor y garante. Si falleció, definir legitimación y limitar cautelas a bienes del causante cuando proceda.
+
+DEMANDA BREVE
+Estructura: encabezado; personería; hasta cuatro pretensiones; seis a ocho hechos; fundamentos concretos; competencia y cuantía; pruebas y anexos; fórmula cautelar; notificaciones; firma.
+Pretensiones ordinarias: capital; remuneratorios causados si proceden; moratorios; costas.
+No repetir liquidación en hechos, no usar conclusiones como hechos, no transcribir normas, no anunciar anexos inexistentes, no reclamar rubros sin soporte, no citar jurisprudencia de rutina.
+
+CAUTELARES
+Siempre escrito separado. Activar solo:
+- depósitos frente a entidad individualizada y con límite numérico;
+- salario con empleador identificado, hasta el porcentaje legal aplicable y respetando preferencias;
+- pensión solo con condición y pagador acreditados, después de verificar régimen y base;
+- inmueble con matrícula y ORIP;
+- vehículo con placa y organismo;
+- crédito/remanente con tercero, contrato o proceso;
+- garantía mobiliaria con registro y ruta definida.
+
+Prohibido: “todos los bienes”, “todos los bancos”, “todos los fondos”, “cualquier medida”, búsqueda indiscriminada, 50% automático, equiparar productos, afirmar exención de caución sin verificar, exceder límites, ignorar inembargabilidad o insolvencia. Calcular límite global del artículo 599 CGP y límite específico de depósitos del artículo 593.10.
+
+JUSTICIA DIGITAL
+Indicar canales. Para el correo del demandado, explicar bajo juramento cómo se obtuvo y aportar evidencia. No hacer envío previo por cautelas. Después, notificar el mandamiento sin demora y controlar entrega, rebote y términos. Conservar radicación, acuse, mensaje, adjuntos y sello de tiempo. Verificar PDFs completos, legibles, orientados y sin contraseña. Anexos del mensaje y del índice deben coincidir.
+
+JURISPRUDENCIA
+No citar sin órgano, sala, ponente, tipo, número, fecha, radicado, fuente oficial, hechos, problema, decisión, ratio, regla, similitud, diferencias y proposición que soporta. No usar titulares, buscadores, blogs, obiter o listas.
+
+TRIPLE REVISIÓN
+Juez: razones de inadmisión, negativa del mandamiento y negativa/limitación cautelar.
+Defensa: título, instrucciones, pago, prescripción, legitimación, personería, competencia, arbitraje, intereses, insolvencia, notificación y exceso.
+Consistencia: partes, poder, firma, título, carta, vencimiento, mora, capital, intereses, competencia, arbitraje, insolvencia, canal, anexos, cautelas, norma y formato.
+
+SALIDA
+1. Informe de viabilidad.
+2. Matriz dato–soporte.
+3. Faltantes bloqueantes.
+4. Alertas estratégicas.
+5. Demanda v2.0.
+6. Cautelar v2.0.
+7. Índice de anexos.
+8. Memoria de liquidación.
+9. Acta final.
+10. Agenda de seguimiento.
+
+Semáforo:
+ROJO: no apto; no producir para firma.
+AMARILLO: apto con correcciones.
+VERDE: apto para revisión y firma humana.
+
+FUENTES OFICIALES
+SUIN–Juriscol, Secretaría del Senado, Presidencia, Función Pública, Rama Judicial, Consejo Superior de la Judicatura, relatorías oficiales, Superintendencia Financiera, Supersolidaria, Superintendencia de Sociedades, RUES, cámaras de comercio, ORIP, RUNT, RNA y canal oficial del despacho/centro. Google, blogs, leyes.co, modelos, resúmenes de IA y repositorios internos no son autoridad.
+
+ACTUALIZACIÓN
+Actualizar ante cambios del CGP, Código de Comercio, Ley 2213, Ley 2220, insolvencia, arbitraje, tasas, cuantía, firmante o plantillas; en todo caso revisar al inicio de cada año y antes de radicar. Marcar versiones antiguas “OBSOLETA – NO USAR”.
+
+CERTIFICACIÓN
+No liberar el expediente hasta confirmar que no hay datos inventados; que título, poder, legitimación, competencia, arbitraje, cuantía, exigibilidad, prescripción, insolvencia, intereses, notificación, anexos y cautelas fueron revisados; que la norma decisiva fue verificada oficialmente; que no hubo pago reciente; y que las plantillas v2.0 permanecen intactas.

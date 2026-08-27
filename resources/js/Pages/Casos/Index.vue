@@ -18,7 +18,7 @@ const tiposEntidad = [
     'Juzgado', 'Fiscalía', 'Secretaría', 'Despacho', 'Centro de Servicios',
     'Corte', 'Tribunal', 'Notaría', 'Superintendencia'
 ];
-import { Head, Link, useForm, router } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage, router } from '@inertiajs/vue3';
 import { ref, watch, reactive, computed, onMounted } from 'vue';
 import { TrashIcon, MagnifyingGlassIcon, InboxIcon, EyeIcon, ArrowDownTrayIcon, FunnelIcon, ArchiveBoxXMarkIcon, ChevronDownIcon, ChevronUpIcon, CheckIcon, XMarkIcon, DocumentDuplicateIcon, CloudArrowUpIcon, BanknotesIcon, ExclamationCircleIcon, ArrowPathIcon, CheckCircleIcon, UserGroupIcon, ScaleIcon, PhoneIcon, EnvelopeIcon, BuildingOfficeIcon, BuildingLibraryIcon, ClockIcon, ExclamationTriangleIcon, UserIcon, ClipboardDocumentListIcon, LinkIcon, MapPinIcon as PinIcon, EllipsisVerticalIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'; 
 import { getCaseFinancialStatus } from '@/Utils/caseFinancialStatus';
@@ -44,8 +44,10 @@ const props = defineProps({
 });
 
 // --- Lógica de Búsqueda y Filtros Combinada ---
+const page = usePage();
 const selectedJuzgado = ref(props.selectedJuzgado || null);
-const filterStorageKey = 'casos.index.filters';
+const legacyFilterStorageKey = 'casos.index.filters';
+const filterStorageKey = `casos.index.filters.${page.props.auth?.user?.id ?? 'anonymous'}.${page.props.auth?.user?.tipo_usuario ?? 'guest'}`;
 const filterKeys = ['search', 'abogado_id', 'cooperativa_id', 'juzgado_id', 'tipo_entidad', 'etapa_procesal', 'sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy', 'integridad_baja', 'fecha_inicio', 'fecha_fin'];
 const booleanFilterKeys = ['sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy', 'integridad_baja'];
 
@@ -121,6 +123,9 @@ const readStoredFilters = () => {
     if (typeof window === 'undefined') return {};
 
     try {
+        // La clave antigua no tenía propietario verificable y podía exponer la
+        // búsqueda del usuario anterior en una estación compartida.
+        sessionStorage.removeItem(legacyFilterStorageKey);
         return JSON.parse(sessionStorage.getItem(filterStorageKey) || '{}') || {};
     } catch {
         return {};
@@ -128,8 +133,6 @@ const readStoredFilters = () => {
 };
 
 const storedFilters = readStoredFilters();
-
-const initialFilterValue = (key, fallback = '') => props.filters?.[key] ?? storedFilters[key] ?? fallback;
 
 const hasUsefulFilterValue = (filters) => filterKeys.some((key) => {
     if (booleanFilterKeys.includes(key)) {
@@ -152,6 +155,11 @@ const hasUsefulUrlFilter = () => {
         return String(params.get(key) ?? '').trim() !== '';
     });
 };
+
+const useStoredFiltersOnLoad = !hasUsefulUrlFilter();
+const initialFilterValue = (key, fallback = '') => props.filters?.[key]
+    ?? (useStoredFiltersOnLoad ? storedFilters[key] : undefined)
+    ?? fallback;
 
 const filterForm = reactive({
     search: initialFilterValue('search'),
@@ -190,10 +198,14 @@ const currentFilterPayload = () => ({
 const persistFilters = (filters) => {
     if (typeof window === 'undefined') return;
 
-    if (hasUsefulFilterValue(filters)) {
-        sessionStorage.setItem(filterStorageKey, JSON.stringify(filters));
-    } else {
-        sessionStorage.removeItem(filterStorageKey);
+    try {
+        if (hasUsefulFilterValue(filters)) {
+            sessionStorage.setItem(filterStorageKey, JSON.stringify(filters));
+        } else {
+            sessionStorage.removeItem(filterStorageKey);
+        }
+    } catch {
+        // Los filtros siguen funcionando aunque sessionStorage esté bloqueado.
     }
 };
 
@@ -243,7 +255,11 @@ const isDirty = computed(() => {
 
 const resetFilters = () => {
     if (typeof window !== 'undefined') {
-        sessionStorage.removeItem(filterStorageKey);
+        try {
+            sessionStorage.removeItem(filterStorageKey);
+        } catch {
+            // Limpiar la interfaz no depende de que el navegador permita storage.
+        }
     }
 
     filterForm.search = '';
@@ -444,11 +460,20 @@ const userInitials = (name) => {
     return name.split(' ').filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase();
 };
 
-const responsibleNames = (caso) => caso.users?.length
-    ? caso.users.map(user => user.name).filter(Boolean).join(', ')
+const responsibleUsers = (caso) => caso.users?.length
+    ? caso.users
+    : (caso.user ? [caso.user] : []);
+
+const responsibleNames = (caso) => responsibleUsers(caso).length
+    ? responsibleUsers(caso).map(user => user.name).filter(Boolean).join(', ')
     : 'Sin asignar';
 
-const primaryResponsible = (caso) => caso.users?.[0]?.name || 'Sin asignar';
+const primaryResponsible = (caso) => responsibleUsers(caso)[0]?.name || 'Sin asignar';
+const caseActivityDate = (caso) => caso.ultima_actividad || caso.updated_at;
+const closedStates = ['CERRADO', 'FINALIZADO', 'ARCHIVADO', 'TERMINADO'];
+const isClosedCase = (caso) => Boolean(caso.nota_cierre)
+    || closedStates.includes(String(caso.estado_proceso || '').trim().toUpperCase())
+    || closedStates.includes(String(caso.estado || '').trim().toUpperCase());
 
 const integrityScore = (caso) => Number(caso.integridad_score || 0);
 const integrityBarStyle = (caso) => ({ width: `${Math.min(Math.max(integrityScore(caso), 0), 100)}%` });
@@ -459,7 +484,7 @@ const integrityTone = (caso) => {
     return 'bg-rose-500';
 };
 
-const isInactiveCase = (caso) => getInactivityDays(caso.updated_at) >= 30 && !caso.nota_cierre;
+const isInactiveCase = (caso) => getInactivityDays(caseActivityDate(caso)) >= 20 && !isClosedCase(caso);
 
 // --- Lógica de Eliminación ---
 const confirmingCaseDeletion = ref(false);
@@ -645,7 +670,7 @@ const copyLegalInfo = (caso) => {
             <div class="mx-auto max-w-[1600px] space-y-4 px-4 sm:px-6 lg:px-8">
                 
                 <!-- Encabezado y Acciones Principales -->
-                <section class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 sm:p-5 shadow-sm">
+                <section data-tutorial="casos-index-header" class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 sm:p-5 shadow-sm">
                     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div class="min-w-0">
                             <div class="flex items-center gap-3">
@@ -653,7 +678,7 @@ const copyLegalInfo = (caso) => {
                                     <ArchiveBoxXMarkIcon class="h-6 w-6" />
                                 </div>
                                 <div class="min-w-0">
-                                    <h2 id="tour-casos-title" class="text-xl font-black tracking-tight text-gray-950 dark:text-white sm:text-2xl">
+                                    <h2 class="text-xl font-black tracking-tight text-gray-950 dark:text-white sm:text-2xl">
                                         Gestión de Casos
                                     </h2>
                                     <p class="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -665,7 +690,6 @@ const copyLegalInfo = (caso) => {
 
                         <div class="grid w-full grid-cols-1 gap-2 sm:grid-cols-3 lg:w-auto">
                             <Link
-                                id="tour-btn-importar"
                                 :href="route('casos.import.show')"
                                 class="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-indigo-700 shadow-sm transition-colors hover:border-indigo-300 hover:bg-indigo-100 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-300"
                             >
@@ -673,7 +697,6 @@ const copyLegalInfo = (caso) => {
                                 Carga asistida
                             </Link>
                             <button
-                                id="tour-btn-exportar"
                                 type="button"
                                 @click="exportarExcel"
                                 class="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-emerald-700"
@@ -682,6 +705,7 @@ const copyLegalInfo = (caso) => {
                                 Exportar
                             </button>
                             <Link
+                                data-tutorial="casos-registrar"
                                 :href="route('casos.create')"
                                 class="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-600 bg-indigo-600 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-indigo-700"
                             >
@@ -693,7 +717,7 @@ const copyLegalInfo = (caso) => {
                 </section>
 
                 <!-- Indicadores -->
-                <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                <section data-tutorial="casos-indicadores" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                     <template v-for="card in summaryCards" :key="card.key">
                         <button
                             v-if="card.filterKey"
@@ -728,7 +752,7 @@ const copyLegalInfo = (caso) => {
                 </section>
 
                 <!-- Filtros -->
-                <section class="relative rounded-lg border border-gray-200 bg-white p-4 pb-8 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5 sm:pb-10">
+                <section data-tutorial="casos-filtros" class="relative rounded-lg border border-gray-200 bg-white p-4 pb-8 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5 sm:pb-10">
                     <!-- ENCABEZADO DE FILTROS: Siempre visible -->
                     <div class="flex flex-col gap-3 border-b border-gray-200 pb-4 dark:border-gray-600 lg:flex-row lg:items-center lg:justify-between">
                         <div class="flex items-center gap-3">
@@ -996,6 +1020,7 @@ const copyLegalInfo = (caso) => {
                     <!-- BOTÓN DE CONTROL (TOGGLE): Pestaña central en el borde inferior -->
                     <div class="absolute -bottom-3.5 left-0 right-0 flex justify-center z-10">
                         <button
+                            data-tutorial="casos-filtros-toggle"
                             type="button"
                             @click="showFilters = !showFilters"
                             class="group flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-gray-600 shadow-md transition-all hover:border-indigo-300 hover:text-indigo-600 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400 dark:hover:text-indigo-400"
@@ -1011,7 +1036,7 @@ const copyLegalInfo = (caso) => {
 
                 <!-- Listado de Casos -->
                 <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                    <div class="flex flex-col gap-3 border-b border-gray-100 p-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
+                    <div data-tutorial="casos-listado" class="flex flex-col gap-3 border-b border-gray-100 p-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h3 class="text-sm font-black uppercase tracking-tight text-gray-950 dark:text-white">Listado de expedientes</h3>
                             <p class="text-xs font-semibold text-gray-500 dark:text-gray-400">{{ resultRange }}</p>
@@ -1051,8 +1076,9 @@ const copyLegalInfo = (caso) => {
 
                                 <tbody class="divide-y divide-gray-100 bg-white dark:divide-gray-700 dark:bg-gray-800">
                                     <tr
-                                        v-for="caso in casos.data"
+                                        v-for="(caso, casoIndex) in casos.data"
                                         :key="caso.id"
+                                        :data-tutorial="casoIndex === 0 ? 'casos-primer-registro' : null"
                                         class="group cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-900/35"
                                         :class="{ 'bg-indigo-50/50 dark:bg-indigo-900/10': caso.is_pinned }"
                                         @click="openQuickView(caso)"
@@ -1124,16 +1150,16 @@ const copyLegalInfo = (caso) => {
                                             <div class="space-y-3">
                                                 <div class="flex items-center gap-2">
                                                     <div class="flex -space-x-2">
-                                                        <template v-if="caso.users && caso.users.length > 0">
+                                                        <template v-if="responsibleUsers(caso).length > 0">
                                                             <div
-                                                                v-for="u in caso.users.slice(0, 3)"
+                                                                v-for="u in responsibleUsers(caso).slice(0, 3)"
                                                                 :key="u.id"
                                                                 class="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-indigo-50 text-[9px] font-black uppercase text-indigo-700 dark:border-gray-800 dark:bg-indigo-900/40 dark:text-indigo-200"
                                                                 :title="u.name"
                                                             >
                                                                 {{ userInitials(u.name) }}
                                                             </div>
-                                                            <div v-if="caso.users.length > 3" class="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-gray-100 text-[9px] font-black text-gray-600 dark:border-gray-800 dark:bg-gray-700 dark:text-gray-300">+{{ caso.users.length - 3 }}</div>
+                                                            <div v-if="responsibleUsers(caso).length > 3" class="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-gray-100 text-[9px] font-black text-gray-600 dark:border-gray-800 dark:bg-gray-700 dark:text-gray-300">+{{ responsibleUsers(caso).length - 3 }}</div>
                                                         </template>
                                                         <div v-else class="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-[9px] font-black text-gray-500 dark:bg-gray-700 dark:text-gray-300">SA</div>
                                                     </div>
@@ -1142,10 +1168,10 @@ const copyLegalInfo = (caso) => {
                                                     </p>
                                                 </div>
                                                 <div>
-                                                    <p class="text-[11px] font-black text-gray-700 dark:text-gray-300">{{ formatDate(caso.updated_at) }}</p>
-                                                    <p class="text-[10px] font-semibold text-gray-400">Hace {{ formatTimeAgo(caso.updated_at) }}</p>
+                                                    <p class="text-[11px] font-black text-gray-700 dark:text-gray-300">{{ formatDate(caseActivityDate(caso)) }}</p>
+                                                    <p class="text-[10px] font-semibold text-gray-400">Última actuación · hace {{ formatTimeAgo(caseActivityDate(caso)) }}</p>
                                                     <span v-if="isInactiveCase(caso)" class="mt-1 inline-flex rounded border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[9px] font-black uppercase text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/10 dark:text-rose-300">
-                                                        Inactivo {{ getInactivityDays(caso.updated_at) }}d
+                                                        Inactivo {{ getInactivityDays(caseActivityDate(caso)) }}d
                                                     </span>
                                                 </div>
                                             </div>
@@ -1165,7 +1191,7 @@ const copyLegalInfo = (caso) => {
                                             </div>
                                         </td>
 
-                                        <td class="sticky right-0 z-10 bg-white px-4 py-4 text-right align-top shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] transition-colors group-hover:bg-gray-50 dark:bg-gray-800 dark:group-hover:bg-gray-900" :class="{ '!bg-indigo-50 dark:!bg-indigo-900/20': caso.is_pinned }" @click.stop>
+                                        <td :data-tutorial="casoIndex === 0 ? 'casos-acciones-primer-registro' : null" class="sticky right-0 z-10 bg-white px-4 py-4 text-right align-top shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] transition-colors group-hover:bg-gray-50 dark:bg-gray-800 dark:group-hover:bg-gray-900" :class="{ '!bg-indigo-50 dark:!bg-indigo-900/20': caso.is_pinned }" @click.stop>
                                             <div class="flex items-center justify-end gap-2">
                                                 <button
                                                     v-if="!caso.nota_cierre && ['admin', 'abogado', 'gestor'].includes($page.props.auth.user.tipo_usuario)"
@@ -1188,6 +1214,7 @@ const copyLegalInfo = (caso) => {
                                                 </button>
 
                                                 <Link
+                                                    :data-tutorial="casoIndex === 0 ? 'casos-ver-primer' : null"
                                                     :href="route('casos.show', caso.id)"
                                                     class="rounded-lg border border-indigo-200 bg-indigo-50 p-2 text-indigo-700 transition-colors hover:bg-indigo-600 hover:text-white dark:border-indigo-900/40 dark:bg-indigo-900/10 dark:text-indigo-300"
                                                     title="Ver expediente"
@@ -1232,8 +1259,9 @@ const copyLegalInfo = (caso) => {
 
                         <div class="divide-y divide-gray-100 dark:divide-gray-700 md:hidden">
                             <article
-                                v-for="caso in casos.data"
+                                v-for="(caso, mobileIndex) in casos.data"
                                 :key="'mobile-' + caso.id"
+                                :data-tutorial="mobileIndex === 0 ? 'casos-primer-registro' : null"
                                 @click="openQuickView(caso)"
                                 class="cursor-pointer bg-white p-4 transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-900/40"
                                 :class="{ 'border-l-4 border-indigo-500 bg-indigo-50/40 dark:bg-indigo-900/10': caso.is_pinned }"
@@ -1268,7 +1296,7 @@ const copyLegalInfo = (caso) => {
                                         {{ caso.etapa_procesal || caso.estado_proceso || 'Sin etapa' }}
                                     </span>
                                     <span v-if="caso.nota_cierre" class="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/10 dark:text-emerald-300">Cerrado</span>
-                                    <span v-if="isInactiveCase(caso)" class="rounded border border-rose-200 bg-rose-50 px-2 py-1 text-[9px] font-black uppercase text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/10 dark:text-rose-300">Inactivo {{ getInactivityDays(caso.updated_at) }}d</span>
+                                    <span v-if="isInactiveCase(caso)" class="rounded border border-rose-200 bg-rose-50 px-2 py-1 text-[9px] font-black uppercase text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/10 dark:text-rose-300">Inactivo {{ getInactivityDays(caseActivityDate(caso)) }}d</span>
                                 </div>
 
                                 <dl class="mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
@@ -1291,14 +1319,14 @@ const copyLegalInfo = (caso) => {
                                     </div>
                                 </dl>
 
-                                <div class="mt-4 flex items-center justify-between gap-3 border-t border-gray-100 pt-3 dark:border-gray-700">
+                                <div :data-tutorial="mobileIndex === 0 ? 'casos-acciones-primer-registro' : null" class="mt-4 flex items-center justify-between gap-3 border-t border-gray-100 pt-3 dark:border-gray-700">
                                     <div class="min-w-0">
-                                        <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Actualizado</p>
-                                        <p class="text-[11px] font-bold text-gray-700 dark:text-gray-300">{{ formatDate(caso.updated_at) }} · hace {{ formatTimeAgo(caso.updated_at) }}</p>
+                                        <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Última actuación</p>
+                                        <p class="text-[11px] font-bold text-gray-700 dark:text-gray-300">{{ formatDate(caseActivityDate(caso)) }} · hace {{ formatTimeAgo(caseActivityDate(caso)) }}</p>
                                     </div>
                                     <div class="flex shrink-0 gap-2">
                                         <Link @click.stop :href="route('casos.edit', caso.id)" class="rounded-lg border border-gray-200 px-3 py-2 text-[10px] font-black uppercase text-gray-600 dark:border-gray-700 dark:text-gray-300">Editar</Link>
-                                        <Link @click.stop :href="route('casos.show', caso.id)" class="rounded-lg bg-indigo-600 px-3 py-2 text-[10px] font-black uppercase text-white">Ver</Link>
+                                        <Link :data-tutorial="mobileIndex === 0 ? 'casos-ver-primer' : null" @click.stop :href="route('casos.show', caso.id)" class="rounded-lg bg-indigo-600 px-3 py-2 text-[10px] font-black uppercase text-white">Ver</Link>
                                     </div>
                                 </div>
                             </article>
@@ -1341,7 +1369,7 @@ const copyLegalInfo = (caso) => {
                     <ul class="text-[11px] text-amber-800 space-y-1.5 list-disc pl-5 font-bold leading-tight">
                         <li>El caso dejará de aparecer en la lista de activos.</li>
                         <li>Toda la información (actuaciones, documentos y pagos) <span class="text-indigo-600 underline">SE CONSERVA</span>.</li>
-                        <li>Podrás consultarlo y recuperarlo desde el filtro de "Estado: Cerrados/Papelera".</li>
+                        <li>La recuperación no está disponible desde este listado y requiere soporte administrativo.</li>
                         <li>Use esta opción para corregir errores de registro o casos archivados.</li>
                     </ul>
                 </div>
@@ -1443,14 +1471,14 @@ const copyLegalInfo = (caso) => {
                         <section class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
                             <div class="mb-3 flex items-center justify-between gap-3">
                                 <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Responsables</p>
-                                <span class="rounded-md bg-gray-100 px-2 py-1 text-[10px] font-black text-gray-600 dark:bg-gray-800 dark:text-gray-300">{{ selectedCaso.users?.length || 0 }}</span>
+                                <span class="rounded-md bg-gray-100 px-2 py-1 text-[10px] font-black text-gray-600 dark:bg-gray-800 dark:text-gray-300">{{ responsibleUsers(selectedCaso).length }}</span>
                             </div>
                             <div class="space-y-2">
-                                <div v-for="u in selectedCaso.users" :key="u.id" class="flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300">
+                                <div v-for="u in responsibleUsers(selectedCaso)" :key="u.id" class="flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300">
                                     <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[10px] dark:bg-gray-900">{{ userInitials(u.name) }}</span>
                                     <span class="truncate">{{ u.name }}</span>
                                 </div>
-                                <p v-if="!selectedCaso.users?.length" class="text-xs font-semibold text-gray-400">Sin abogados asignados</p>
+                                <p v-if="!responsibleUsers(selectedCaso).length" class="text-xs font-semibold text-gray-400">Sin abogados asignados</p>
                             </div>
                         </section>
 
@@ -1502,7 +1530,7 @@ const copyLegalInfo = (caso) => {
                                     </div>
                                     <div>
                                         <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Especialidad</p>
-                                        <p class="mt-1 text-xs font-black uppercase text-gray-800 dark:text-gray-200">{{ selectedCaso.especialidad?.nombre || 'Civil' }}</p>
+                                        <p class="mt-1 text-xs font-black uppercase text-gray-800 dark:text-gray-200">{{ selectedCaso.especialidad?.nombre || 'Sin especialidad' }}</p>
                                     </div>
                                     <div>
                                         <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Tipo proceso</p>
@@ -1514,7 +1542,7 @@ const copyLegalInfo = (caso) => {
                                     </div>
                                     <div>
                                         <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Etapa actual</p>
-                                        <p class="mt-1 text-xs font-black text-gray-800 dark:text-gray-200">{{ selectedCaso.etapa_actual || 'N/A' }}</p>
+                                        <p class="mt-1 text-xs font-black text-gray-800 dark:text-gray-200">{{ selectedCaso.etapa_procesal || 'N/A' }}</p>
                                     </div>
                                     <div class="rounded-lg border border-amber-100 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
                                         <p class="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300">Garantía</p>
@@ -1605,7 +1633,7 @@ const copyLegalInfo = (caso) => {
 
                 <div class="flex shrink-0 flex-col gap-3 border-t border-gray-200 bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <p class="text-[10px] font-bold text-gray-500 dark:text-gray-400">
-                        Actualizado {{ formatDate(selectedCaso.updated_at) }} · hace {{ formatTimeAgo(selectedCaso.updated_at) }}
+                        Última actuación {{ formatDate(caseActivityDate(selectedCaso)) }} · hace {{ formatTimeAgo(caseActivityDate(selectedCaso)) }}
                     </p>
                     <div class="flex flex-col gap-2 sm:flex-row">
                         <Link :href="route('casos.edit', selectedCaso.id)" class="inline-flex justify-center rounded-lg border border-gray-200 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">

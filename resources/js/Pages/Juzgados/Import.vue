@@ -131,7 +131,7 @@ const submit = () => {
                     <div class="p-10">
                         <form @submit.prevent="submit" class="space-y-8">
                             
-                            <div 
+                            <div data-tutorial="juzgados-import-form"
                                 @dragover.prevent="isDragging = true"
                                 @dragleave.prevent="isDragging = false"
                                 @drop.prevent="handleDrop"
@@ -201,7 +201,7 @@ const submit = () => {
                                     <InformationCircleIcon class="h-4 w-4" />
                                     Formatos soportados: .xlsx, .xls
                                 </div>
-                                <PrimaryButton 
+                                <PrimaryButton data-tutorial="juzgados-import-submit"
                                     class="!px-10 !py-4 !bg-indigo-600 hover:!bg-indigo-700 shadow-xl shadow-indigo-100 dark:shadow-none !rounded-2xl flex items-center gap-2" 
                                     :class="{ 'opacity-50': form.processing }" 
                                     :disabled="form.processing"

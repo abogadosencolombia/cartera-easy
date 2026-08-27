@@ -64,6 +64,7 @@ let isCommitted = false;
 
 const openCommitmentModal = () => {
     const today = new Date().toISOString().split('T')[0];
+    globalRevisionDate.value = form.fecha_proxima_revision || '';
     if (!globalRevisionDate.value || globalRevisionDate.value < today) {
         globalRevisionDate.value = today;
     }
@@ -91,14 +92,34 @@ const closeTheCase = () => {
 };
 
 const formatDateForInput = (dateString) => dateString ? dateString.substring(0, 10) : '';
-const mapToSelectOption = (obj, labelKey = 'nombre_completo') => obj ? { id: obj.id, [labelKey]: obj[labelKey] } : null;
+const mapToSelectOption = (obj, labelKey = 'nombre_completo') => obj ? {
+    id: obj.id,
+    [labelKey]: obj[labelKey],
+    numero_documento: obj.numero_documento,
+} : null;
+
+const isIncompleteParty = (item) => {
+    const documentNumber = String(item.numero_documento || '').trim().toUpperCase();
+    const name = String(item.nombre_completo || '')
+        .trim()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase();
+
+    return item.sin_info
+        || !name
+        || !documentNumber
+        || documentNumber.startsWith('TEMP-')
+        || name.includes('POR IDENTIFICAR')
+        || name.includes('PERSONA INDETERMINADA');
+};
 
 const loadPersonasArray = (personas) => {
     if (!personas || personas.length === 0) return [{ 
         id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', sin_info: false, cooperativas_ids: [], abogados_ids: []
     }];
     return personas.map(p => {
-        const isIncomplete = p.nombre_completo === 'DEMANDADO POR IDENTIFICAR' || p.nombre_completo === 'DEMANDANTE POR IDENTIFICAR' || p.nombre_completo === 'PERSONA INDETERMINADA';
+        const isIncomplete = isIncompleteParty(p);
         return { 
             id: p.id, 
             selected: mapToSelectOption(p), 
@@ -166,6 +187,45 @@ const addDemandado = () => form.demandados.push({
 });
 const removeDemandado = (index) => { if (form.demandados.length > 1) form.demandados.splice(index, 1); };
 
+const partyDrafts = new WeakMap();
+const partyExistingSelections = new WeakMap();
+const partyDraftFields = ['id', 'nombre_completo', 'tipo_documento', 'numero_documento', 'dv', 'sin_info', 'cooperativas_ids', 'abogados_ids'];
+const snapshotPartyDraft = (item) => Object.fromEntries(
+    partyDraftFields.map((field) => [field, Array.isArray(item[field]) ? [...item[field]] : item[field]]),
+);
+
+const togglePartyMode = (item) => {
+    const nextIsNew = !item.is_new;
+
+    if (item.is_new && !nextIsNew) {
+        partyDrafts.set(item, snapshotPartyDraft(item));
+    }
+
+    if (nextIsNew) {
+        const savedDraft = partyDrafts.get(item);
+        if (savedDraft || !isIncompleteParty(item)) {
+            partyExistingSelections.set(item, { id: item.id, selected: item.selected });
+            item.id = null;
+            item.selected = null;
+            Object.assign(item, savedDraft ?? {
+                nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '',
+                sin_info: false, cooperativas_ids: [], abogados_ids: [],
+            });
+        }
+    }
+
+    if (!nextIsNew) {
+        const existingSelection = partyExistingSelections.get(item);
+        if (existingSelection) {
+            item.id = existingSelection.id;
+            item.selected = existingSelection.selected;
+        }
+        item.sin_info = false;
+    }
+
+    item.is_new = nextIsNew;
+};
+
 const submit = () => {
   // OBLIGATORIEDAD: Si no han pasado por el modal de compromiso, se abre antes de enviar.
   if (!isCommitted) {
@@ -219,9 +279,9 @@ const selectedEtapaName = computed(() => props.etapas.find(e => e.id === form.et
 const partyCompleteness = computed(() => {
     const parties = [...form.demandantes, ...form.demandados];
     const pending = parties.filter((party) => {
-        if (party.sin_info) return true;
-        if (party.is_new) return !party.nombre_completo || !party.numero_documento;
-        return !party.selected?.id;
+        if (party.is_new) return isIncompleteParty(party);
+        if (!party.selected?.id) return true;
+        return isIncompleteParty(party.selected);
     }).length;
 
     return { pending };
@@ -279,7 +339,7 @@ const summaryCards = computed(() => [
 
   <AuthenticatedLayout>
     <template #header>
-      <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div data-tutorial="radicados-edit-header" class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="min-w-0">
           <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Edición de radicado</p>
           <div class="mt-1 flex flex-wrap items-center gap-2">
@@ -301,7 +361,7 @@ const summaryCards = computed(() => [
           <Link :href="route('procesos.show', props.proceso.id)" class="w-full sm:w-auto">
             <SecondaryButton class="w-full justify-center sm:w-auto">Cancelar</SecondaryButton>
           </Link>
-          <PrimaryButton @click="submit" :disabled="form.processing || isClosed" :class="{ 'opacity-25': form.processing || isClosed }" class="w-full justify-center sm:w-auto">
+          <PrimaryButton data-tutorial="radicados-edit-save" @click="submit" :disabled="form.processing || isClosed" :class="{ 'opacity-25': form.processing || isClosed }" class="w-full justify-center sm:w-auto">
             <ArrowPathIcon v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
             {{ form.processing ? 'Guardando...' : 'Actualizar radicado' }}
           </PrimaryButton>
@@ -339,7 +399,7 @@ const summaryCards = computed(() => [
           <div class="space-y-6 min-w-0">
             <fieldset :disabled="isClosed" :class="{ 'opacity-60': isClosed }">
               <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm ring-1 ring-gray-950/5 dark:border-gray-700 dark:bg-gray-900 dark:ring-white/10">
-                <div class="border-b border-gray-200 bg-gray-50/80 px-4 py-5 dark:border-gray-700 dark:bg-gray-800/60 sm:px-6">
+                <div data-tutorial="radicados-edit-form" class="border-b border-gray-200 bg-gray-50/80 px-4 py-5 dark:border-gray-700 dark:bg-gray-800/60 sm:px-6">
                   <h3 class="text-lg font-black text-gray-950 dark:text-gray-100">Información del Proceso</h3>
                   <p class="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">Partes, juzgado, tipo, etapa y datos descriptivos del proceso.</p>
                 </div>
@@ -373,7 +433,7 @@ const summaryCards = computed(() => [
                       <div class="flex flex-col gap-3 border-b border-gray-100 pb-3 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
                         <span class="text-xs font-black text-gray-400 uppercase tracking-[0.18em]">Demandante #{{ index + 1 }}</span>
                         <div class="flex flex-wrap items-center gap-2">
-                          <button type="button" @click="item.is_new = !item.is_new" class="rounded-lg px-3 py-2 text-xs font-black uppercase transition" :class="item.is_new ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-300' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300'">
+                          <button type="button" @click="togglePartyMode(item)" class="rounded-lg px-3 py-2 text-xs font-black uppercase transition" :class="item.is_new ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-300' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300'">
                             {{ item.is_new ? '← Buscar existente' : '+ Crear nuevo' }}
                           </button>
                           <button v-if="form.demandantes.length > 1" type="button" @click="removeDemandante(index)" class="rounded-lg p-2 text-red-500 transition hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20">
@@ -420,7 +480,7 @@ const summaryCards = computed(() => [
                       <div class="flex flex-col gap-3 border-b border-gray-100 pb-3 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
                         <span class="text-xs font-black text-gray-400 uppercase tracking-[0.18em]">Demandado #{{ index + 1 }}</span>
                         <div class="flex flex-wrap items-center gap-2">
-                          <button type="button" @click="item.is_new = !item.is_new" class="rounded-lg px-3 py-2 text-xs font-black uppercase transition" :class="item.is_new ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-300' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300'">
+                          <button type="button" @click="togglePartyMode(item)" class="rounded-lg px-3 py-2 text-xs font-black uppercase transition" :class="item.is_new ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-300' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300'">
                             {{ item.is_new ? '← Buscar existente' : '+ Crear nuevo' }}
                           </button>
                           <button v-if="form.demandados.length > 1" type="button" @click="removeDemandado(index)" class="rounded-lg p-2 text-red-500 transition hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20"><TrashIcon class="w-5 h-5"/></button>
@@ -565,11 +625,13 @@ const summaryCards = computed(() => [
                     <div>
                       <InputLabel value="Link expediente" />
                       <TextInput v-model="form.link_expediente" type="url" class="mt-1 block w-full" />
+                      <p class="mt-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">La entidad lo entrega después de la radicación y la solicitud de acceso. Reitere la solicitud hasta obtenerlo.</p>
                       <InputError :message="form.errors.link_expediente" />
                     </div>
                     <div>
                       <InputLabel value="Ubicación Drive" />
                       <TextInput v-model="form.ubicacion_drive" type="url" class="mt-1 block w-full" />
+                      <p class="mt-1 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">Si no existe, créela como: DOCUMENTO - NOMBRE COMPLETO, y comparta el enlace con el equipo.</p>
                       <InputError :message="form.errors.ubicacion_drive" />
                     </div>
                   </section>

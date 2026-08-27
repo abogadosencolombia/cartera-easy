@@ -77,7 +77,7 @@ const submit = () => {
                     <!-- Sección 1: Información General -->
                     <div class="bg-white dark:bg-gray-800 shadow-xl shadow-gray-200/40 dark:shadow-none rounded-[2.5rem] border border-gray-100 dark:border-gray-700 overflow-hidden group transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl hover:border-indigo-200 dark:hover:border-indigo-800 relative">
                         <div class="absolute top-0 left-0 w-1.5 h-full bg-indigo-500"></div>
-                        <div class="p-6 border-b border-gray-50 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-700/30 flex items-center gap-2">
+                        <div data-tutorial="juzgados-identidad" class="p-6 border-b border-gray-50 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-700/30 flex items-center gap-2">
                             <IdentificationIcon class="h-6 w-6 text-indigo-500 group-hover:scale-125 group-hover:rotate-6 transition-all duration-300 ml-2" />
                             <h3 class="font-black text-gray-900 dark:text-white tracking-tight">Identificación del Despacho</h3>
                         </div>
@@ -121,7 +121,7 @@ const submit = () => {
                     </div>
 
                     <!-- Sección 2: Ubicación y Contacto -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div data-tutorial="juzgados-ubicacion-contacto" class="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <!-- Ubicación -->
                         <div class="bg-white dark:bg-gray-800 shadow-xl shadow-gray-200/40 dark:shadow-none rounded-[2.5rem] border border-gray-100 dark:border-gray-700 overflow-hidden group transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl hover:border-red-100 dark:hover:border-red-900/30 relative">
                             <div class="absolute top-0 left-0 w-1.5 h-full bg-red-500"></div>
@@ -193,7 +193,7 @@ const submit = () => {
                                 Cancelar
                             </SecondaryButton>
                         </Link>
-                        <PrimaryButton 
+                        <PrimaryButton data-tutorial="juzgados-guardar"
                             class="!px-12 !py-4 !rounded-full !bg-gradient-to-r !from-indigo-600 !to-violet-600 hover:!from-indigo-700 hover:!to-violet-700 !text-sm font-bold flex items-center gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-indigo-500/40 active:scale-95 shadow-lg shadow-indigo-500/20" 
                             :disabled="form.processing"
                         >

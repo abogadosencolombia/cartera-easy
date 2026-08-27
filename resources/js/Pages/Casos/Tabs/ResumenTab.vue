@@ -77,6 +77,7 @@ const legalFields = computed(() => [
 
 const timelineFields = computed(() => [
     { label: 'Fecha Demanda', value: props.formatDate(props.caso.fecha_apertura) },
+    { label: 'Última Actuación', value: props.formatDate(props.caso.ultima_actividad || props.caso.updated_at) },
     { label: 'Vencimiento', value: props.formatDate(props.caso.fecha_vencimiento) },
     { label: 'Garantía', value: props.caso.tipo_garantia_asociada || 'N/A' },
     { label: 'Origen', value: props.caso.origen_documental || 'N/A' },

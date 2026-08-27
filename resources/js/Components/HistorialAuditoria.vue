@@ -86,7 +86,7 @@ const getIcon = (evento) => eventoIconos[evento] || eventoIconos['DEFAULT'];
                         </div>
                         
                         <div v-if="evento.detalle_nuevo && Object.keys(evento.detalle_nuevo).length > 0" class="overflow-hidden rounded-xl border border-white/5 bg-black/20">
-                            <table class="w-full text-[9px] table-auto">
+                            <table class="cc-table-preserve w-full text-[9px] table-auto">
                                 <thead class="bg-white/5 border-b border-white/5 text-gray-400">
                                     <tr>
                                         <th class="px-2 py-1 text-left font-black uppercase tracking-tighter w-1/4">Campo</th>

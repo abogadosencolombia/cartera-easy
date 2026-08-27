@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use App\Models\Caso;
 use App\Models\ValidacionLegal;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 class DebugCumplimientoCommand extends Command
 {
@@ -80,9 +81,9 @@ class DebugCumplimientoCommand extends Command
 
             // Llamadas a las verificaciones
             $this->verificarPlazoDemanda($caso, $config);
-            $this->verificarDocumento($caso, $config, 'sin_pagare', 'pagare', 'exige_pagare');
+            $this->verificarDocumento($caso, $config, 'sin_pagare', 'pagaré', 'exige_pagare');
             $this->verificarDocumento($caso, $config, 'sin_carta_instrucciones', 'carta instrucciones', 'exige_carta_instrucciones');
-            $this->verificarDocumento($caso, $config, 'sin_certificacion_saldo', 'certificacion saldo', 'exige_certificacion_saldo');
+            $this->verificarDocumento($caso, $config, 'sin_certificacion_saldo', 'certificación saldo', 'exige_certificacion_saldo');
         }
 
         $this->info('************************************************');
@@ -114,7 +115,9 @@ class DebugCumplimientoCommand extends Command
         $this->comment("   -> Verificando documento '{$tipoDocEnBD}'...");
         if (isset($config->$campoConfig) && $config->$campoConfig) {
             $this->info("      La cooperativa exige este documento.");
-            $tieneDocumento = $caso->documentos()->where('tipo_documento', $tipoDocEnBD)->exists();
+            $tipoEsperado = $this->normalizarDocumento($tipoDocEnBD);
+            $tieneDocumento = $caso->documentos
+                ->contains(fn ($documento) => $this->normalizarDocumento($documento->tipo_documento) === $tipoEsperado);
             $estado = $tieneDocumento ? 'cumple' : 'incumple';
             $this->info("      => RESULTADO: {$estado}");
             $this->actualizarValidacion($caso, $tipoValidacion, $estado, $tieneDocumento ? 'Documento encontrado.' : 'Documento faltante.');
@@ -124,6 +127,11 @@ class DebugCumplimientoCommand extends Command
             $this->info("      => RESULTADO: {$estado}");
             $this->actualizarValidacion($caso, $tipoValidacion, $estado, 'No exigido por la cooperativa.');
         }
+    }
+
+    private function normalizarDocumento(?string $nombreDocumento): string
+    {
+        return Str::of($nombreDocumento ?? '')->ascii()->lower()->squish()->toString();
     }
 
     private function actualizarValidacion(Caso $caso, string $tipo, string $estado, string $observacion): void

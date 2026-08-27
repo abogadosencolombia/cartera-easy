@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Exports\Concerns\PreservesExcelIdentifiers;
 use App\Models\Caso;
 use App\Models\Cooperativa;
 use App\Models\Juzgado;
@@ -10,12 +11,14 @@ use App\Models\User;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 
-class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
+class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents, WithCustomValueBinder
 {
+    use PreservesExcelIdentifiers;
     protected $filtros;
     protected ?User $user;
 
@@ -105,7 +108,14 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
 
         $inactivo20 = filter_var($this->filtros['inactivo_20_dias'] ?? false, FILTER_VALIDATE_BOOLEAN);
         if ($inactivo20) {
-            $query->where('updated_at', '<', now()->subDays(20))
+            $cutoff = now()->subDays(20);
+            $query->where(function ($activityQuery) use ($cutoff) {
+                $activityQuery->where('ultima_actividad', '<', $cutoff)
+                    ->orWhere(function ($fallbackQuery) use ($cutoff) {
+                        $fallbackQuery->whereNull('ultima_actividad')
+                            ->where('updated_at', '<', $cutoff);
+                    });
+            })
                   ->paraSeguimiento();
         }
 
@@ -115,7 +125,7 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
                   ->paraSeguimiento();
         }
 
-        return $query->latest('updated_at');
+        return $query->orderByDesc('updated_at')->orderByDesc('id');
     }
 
     private function applyVisibilityScope($query): void
@@ -161,7 +171,10 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
             'Correo Deudor',
             'Direccion Deudor',
             'Ciudad Deudor',
-            'Codeudores (Nombre (CC: 123); ...)',
+            'Nombre Codeudor(es)',
+            'Documento Codeudor(es)',
+            'Celular/Teléfono Codeudor(es)',
+            'Correo Codeudor(es)',
             'Abogados Responsables',
             'Cooperativa (Seleccionar lista)',
             'Juzgado (Seleccionar lista)',
@@ -197,7 +210,7 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
     public function map($caso): array
     {
         $abogados = $caso->users->pluck('name')->implode(', ');
-        $codeudores = $caso->codeudores->map(fn($c) => "{$c->nombre_completo} ({$c->tipo_documento}: {$c->numero_documento})")->implode('; ');
+        $codeudores = $this->mapCodeudores($caso);
 
         return [
             $caso->id,
@@ -212,7 +225,10 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
             $caso->deudor?->correo_1,
             $caso->deudor?->direccion,
             $caso->deudor?->ciudad,
-            $codeudores,
+            $codeudores['nombres'],
+            $codeudores['documentos'],
+            $codeudores['celulares'],
+            $codeudores['correos'],
             $abogados,
             $caso->cooperativa?->nombre,
             $caso->juzgado?->nombre,
@@ -245,6 +261,41 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
         ];
     }
 
+
+    private function mapCodeudores(Caso $caso): array
+    {
+        if ($caso->codeudores->isEmpty()) {
+            return [
+                'nombres' => 'No tiene',
+                'documentos' => 'No tiene',
+                'celulares' => 'No tiene',
+                'correos' => 'No tiene',
+            ];
+        }
+
+        return [
+            'nombres' => $caso->codeudores
+                ->map(fn ($codeudor) => $this->valorOPlaceholder($codeudor->nombre_completo))
+                ->implode('; '),
+            'documentos' => $caso->codeudores
+                ->map(fn ($codeudor) => trim(($codeudor->tipo_documento ?: 'Doc') . ': ' . $this->valorOPlaceholder($codeudor->numero_documento)))
+                ->implode('; '),
+            'celulares' => $caso->codeudores
+                ->map(fn ($codeudor) => $this->valorOPlaceholder($codeudor->celular))
+                ->implode('; '),
+            'correos' => $caso->codeudores
+                ->map(fn ($codeudor) => $this->valorOPlaceholder($codeudor->correo))
+                ->implode('; '),
+        ];
+    }
+
+    private function valorOPlaceholder(?string $value): string
+    {
+        $value = trim((string) $value);
+
+        return $value !== '' ? $value : 'No tiene';
+    }
+
     public function registerEvents(): array
     {
         return [
@@ -273,19 +324,22 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
                 // 4. Ajuste de Anchos y Text Wrapping
                 $longTextFields = [
                     'E' => 35, // Nombre Deudor
-                    'M' => 45, // Codeudores
-                    'N' => 30, // Abogados
-                    'O' => 25, // Cooperativa
-                    'P' => 35, // Juzgado
-                    'Q' => 20, // Especialidad
-                    'R' => 25, // Tipo Proceso
-                    'S' => 25, // Subtipo
-                    'T' => 25, // Subproceso
-                    'U' => 25, // Etapa
-                    'AJ' => 50, // Notas Legales
-                    'AK' => 40, // Nota Cierre
-                    'AH' => 40, // Link Drive
-                    'AI' => 40, // Link Expediente
+                    'M' => 35, // Nombre Codeudor(es)
+                    'N' => 24, // Documento Codeudor(es)
+                    'O' => 24, // Celular/Teléfono Codeudor(es)
+                    'P' => 32, // Correo Codeudor(es)
+                    'Q' => 30, // Abogados
+                    'R' => 25, // Cooperativa
+                    'S' => 35, // Juzgado
+                    'T' => 20, // Especialidad
+                    'U' => 25, // Tipo Proceso
+                    'V' => 25, // Subtipo
+                    'W' => 25, // Subproceso
+                    'X' => 25, // Etapa
+                    'AM' => 50, // Notas Legales
+                    'AN' => 40, // Nota Cierre
+                    'AK' => 40, // Link Drive
+                    'AL' => 40, // Link Expediente
                 ];
 
                 foreach ($longTextFields as $col => $width) {
@@ -298,7 +352,7 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
                 foreach(range('A','Z') as $col) {
                     if (!isset($longTextFields[$col])) $sheet->getColumnDimension($col)->setAutoSize(true);
                 }
-                foreach(['AA','AB','AC','AD','AE','AF','AG','AH','AI','AN','AO','AP','AQ','AR'] as $col) {
+                foreach(['AA','AB','AC','AD','AE','AF','AG','AH','AI','AJ','AK','AL','AM','AN','AO','AP','AQ','AR','AS'] as $col) {
                     if (!isset($longTextFields[$col])) $sheet->getColumnDimension($col)->setAutoSize(true);
                 }
 
@@ -327,10 +381,10 @@ class CasosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
                 $this->fillColumn($dataSheet, 'C', $especialidades);
                 $this->fillColumn($dataSheet, 'D', $etapas);
 
-                $this->applyValidation($sheet, "N2:N{$lastRow}", 'DATA_SISTEMA!$A$1:$A$' . count($cooperativas));
-                $this->applyValidation($sheet, "O2:O{$lastRow}", 'DATA_SISTEMA!$B$1:$B$' . count($juzgados));
-                $this->applyValidation($sheet, "P2:P{$lastRow}", 'DATA_SISTEMA!$C$1:$C$' . count($especialidades));
-                $this->applyValidation($sheet, "T2:T{$lastRow}", 'DATA_SISTEMA!$D$1:$D$' . count($etapas));
+                $this->applyValidation($sheet, "R2:R{$lastRow}", 'DATA_SISTEMA!$A$1:$A$' . count($cooperativas));
+                $this->applyValidation($sheet, "S2:S{$lastRow}", 'DATA_SISTEMA!$B$1:$B$' . count($juzgados));
+                $this->applyValidation($sheet, "T2:T{$lastRow}", 'DATA_SISTEMA!$C$1:$C$' . count($especialidades));
+                $this->applyValidation($sheet, "X2:X{$lastRow}", 'DATA_SISTEMA!$D$1:$D$' . count($etapas));
             },
         ];
     }

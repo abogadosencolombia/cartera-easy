@@ -205,7 +205,7 @@ const getRandomColor = (id) => {
             </div>
         </div>
 
-        <Link :href="route('personas.edit', persona.id)" class="inline-flex w-full items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-indigo-700 sm:w-auto">
+        <Link data-tutorial="personas-show-edit-link" :href="route('personas.edit', persona.id)" class="inline-flex w-full items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-indigo-700 sm:w-auto">
             <PencilSquareIcon class="mr-2 h-4 w-4" /> Editar perfil
         </Link>
       </div>
@@ -213,7 +213,7 @@ const getRandomColor = (id) => {
 
     <div class="min-h-screen bg-gray-50/60 py-6 dark:bg-gray-900/40">
       <div class="mx-auto max-w-[1600px] space-y-5 px-4 sm:px-6 lg:px-8">
-        <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <section data-tutorial="personas-show-summary" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <article
                 v-for="item in summaryCards"
                 :key="item.label"
@@ -247,7 +247,7 @@ const getRandomColor = (id) => {
         <div class="grid grid-cols-1 gap-5 xl:grid-cols-12 xl:items-start">
             <main class="xl:col-span-8 space-y-5">
                 <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                    <div class="flex items-center gap-2 border-b border-gray-200 px-5 py-4 dark:border-gray-700">
+                    <div data-tutorial="personas-show-profile" class="flex items-center gap-2 border-b border-gray-200 px-5 py-4 dark:border-gray-700">
                         <IdentificationIcon class="h-5 w-5 text-indigo-500" />
                         <div>
                             <p class="text-[10px] font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-300">Perfil</p>
@@ -299,7 +299,7 @@ const getRandomColor = (id) => {
                 </section>
 
                 <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                    <div class="flex flex-col gap-3 border-b border-gray-200 px-5 py-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
+                    <div data-tutorial="personas-show-documents" class="flex flex-col gap-3 border-b border-gray-200 px-5 py-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
                         <div class="flex items-center gap-2">
                             <CloudArrowUpIcon class="h-5 w-5 text-indigo-500" />
                             <div>
@@ -349,7 +349,7 @@ const getRandomColor = (id) => {
 
                 <section class="grid grid-cols-1 gap-5 2xl:grid-cols-2">
                     <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                        <div class="flex items-center justify-between gap-3 border-b border-gray-200 bg-indigo-50/60 px-5 py-4 dark:border-gray-700 dark:bg-indigo-950/20">
+                        <div data-tutorial="personas-show-cases" class="flex items-center justify-between gap-3 border-b border-gray-200 bg-indigo-50/60 px-5 py-4 dark:border-gray-700 dark:bg-indigo-950/20">
                             <h3 class="text-sm font-black text-gray-950 dark:text-white">Casos de cobro</h3>
                             <Link v-if="persona.casos_count > persona.casos?.length" :href="route('casos.index', { search: persona.numero_documento })" class="text-[10px] font-black uppercase text-indigo-600 hover:underline dark:text-indigo-300">Ver todos</Link>
                         </div>

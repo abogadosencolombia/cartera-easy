@@ -14,6 +14,51 @@ class Persona extends Model
 {
     use HasFactory, SoftDeletes;
 
+    public function scopeSearchSmart($query, ?string $search)
+    {
+        $words = array_values(array_filter(preg_split('/\s+/', trim((string) $search))));
+
+        foreach ($words as $word) {
+            $normalized = self::normalizeSearchTerm($word);
+            $cleanNumber = preg_replace('/[^0-9]/', '', $word);
+
+            $query->where(function ($subq) use ($word, $normalized, $cleanNumber) {
+                $subq->where('nombre_completo', 'ilike', "%{$word}%")
+                    ->orWhere('numero_documento', 'ilike', "%{$word}%")
+                    ->orWhereRaw(
+                        "TRANSLATE(nombre_completo, 'áéíóúüÁÉÍÓÚÜñÑ', 'aeiouuAEIOUUnN') ILIKE ?",
+                        ["%{$normalized}%"]
+                    );
+
+                if ($cleanNumber) {
+                    $subq->orWhere('numero_documento', 'ilike', "%{$cleanNumber}%");
+                }
+            });
+        }
+
+        return $query;
+    }
+
+    private static function normalizeSearchTerm(string $term): string
+    {
+        return strtr($term, [
+            'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n',
+            'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U', 'Ü' => 'U', 'Ñ' => 'N',
+        ]);
+    }
+
+    public function esRegistroIncompleto(): bool
+    {
+        $numeroDocumento = strtoupper(trim((string) $this->numero_documento));
+        $nombre = str(self::normalizeSearchTerm((string) $this->nombre_completo))->lower()->toString();
+
+        return blank($this->nombre_completo)
+            || blank($numeroDocumento)
+            || str_starts_with($numeroDocumento, 'TEMP-')
+            || str_contains($nombre, 'por identificar')
+            || str_contains($nombre, 'persona indeterminada');
+    }
+
     protected $fillable = [
         'nombre_completo', 'tipo_documento', 'numero_documento', 'dv', 'telefono_fijo',
         'celular_1', 'celular_2', 'correo_1', 'correo_2', 'empresa', 'cargo', 'es_demandado',

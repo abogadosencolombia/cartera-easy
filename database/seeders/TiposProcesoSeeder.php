@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\TipoProceso;
+use Illuminate\Database\Seeder;
 
 class TiposProcesoSeeder extends Seeder
 {
@@ -22,6 +22,7 @@ class TiposProcesoSeeder extends Seeder
             'LIQUIDATORIO',
             'DECLARATIVO',
             'COMPRAVENTA',
+            'RECUPERACIÓN DE VIDA CREDITICIA',
         ];
 
         foreach ($tipos as $nombre) {

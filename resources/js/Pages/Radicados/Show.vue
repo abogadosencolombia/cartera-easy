@@ -318,7 +318,7 @@ const tabItems = computed(() => [
 
   <AuthenticatedLayout>
     <template #header>
-      <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div data-tutorial="radicados-show-header" class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="min-w-0 flex-1">
           <div class="flex items-start gap-3">
             <Link :href="route('procesos.index')" class="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:border-indigo-300 hover:text-indigo-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:text-indigo-300">
@@ -350,7 +350,7 @@ const tabItems = computed(() => [
           </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+        <div data-tutorial="radicados-show-actions" class="flex flex-wrap items-center gap-2 lg:justify-end">
           <button @click="copyLegalInfo" class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-wider text-gray-700 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">
             <DocumentDuplicateIcon class="mr-1.5 h-3.5 w-3.5 text-gray-500" /> Copiar info
           </button>
@@ -365,7 +365,7 @@ const tabItems = computed(() => [
           <PrimaryButton @click="openEtapaModal" v-if="!isClosed" class="!py-2 !text-[10px]">
             <ArrowPathIcon class="mr-1.5 h-3.5 w-3.5" /> Etapa
           </PrimaryButton>
-          <Link :href="route('procesos.edit', proceso.id)" v-if="!isClosed">
+          <Link data-tutorial="radicados-show-edit-link" :href="route('procesos.edit', proceso.id)" v-if="!isClosed">
             <SecondaryButton class="!py-2 !text-[10px]">
               <PencilSquareIcon class="mr-1.5 h-3.5 w-3.5" /> Editar
             </SecondaryButton>
@@ -389,7 +389,7 @@ const tabItems = computed(() => [
 
     <div class="py-6">
       <div class="mx-auto max-w-[1600px] space-y-5 px-4 sm:px-6 lg:px-8">
-        <section class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <section data-tutorial="radicados-show-summary" class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <article
             v-for="item in dashboardCards"
             :key="item.label"
@@ -430,7 +430,7 @@ const tabItems = computed(() => [
 
         <section class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <div class="border-b border-gray-200 px-3 dark:border-gray-700">
-            <nav class="flex gap-2 overflow-x-auto py-3 scrollbar-hide" aria-label="Secciones del radicado">
+            <nav data-tutorial="radicados-show-tabs" class="flex gap-2 overflow-x-auto py-3 scrollbar-hide" aria-label="Secciones del radicado">
               <button
                 v-for="tab in tabItems"
                 :key="tab.id"

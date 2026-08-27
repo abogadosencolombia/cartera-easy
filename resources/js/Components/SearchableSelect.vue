@@ -68,7 +68,7 @@ const selectedOption = computed(() =>
             <div class="relative w-full cursor-default overflow-hidden rounded-lg bg-white dark:bg-gray-900 text-left border border-gray-300 dark:border-gray-700 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500 transition-all duration-200 shadow-sm"
                  :class="{ 'opacity-50 cursor-not-allowed bg-gray-50 dark:bg-gray-800': disabled }">
                 <ComboboxInput
-                    class="w-full border-none py-2.5 pl-10 pr-10 text-sm leading-5 text-gray-900 dark:text-gray-100 bg-transparent focus:ring-0"
+                    class="cc-input-preserve w-full border-none py-2.5 pl-10 pr-10 text-sm leading-5 text-gray-900 dark:text-gray-100 bg-transparent focus:ring-0"
                     :displayValue="() => selectedOption ? formatLabel(selectedOption[labelKey]) : ''"
                     @change="query = $event.target.value"
                     :placeholder="placeholder"

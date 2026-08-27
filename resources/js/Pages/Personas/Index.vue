@@ -245,6 +245,7 @@ const copyToClipboard = (text) => {
                 </button>
                 <Link
                     :href="route('personas.create')"
+                    data-tutorial="personas-registrar"
                     class="inline-flex flex-1 items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-indigo-700 sm:flex-none"
                 >
                     <PlusIcon class="mr-2 h-4 w-4" />
@@ -274,7 +275,7 @@ const copyToClipboard = (text) => {
             </article>
         </section>
 
-        <section class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <section data-tutorial="personas-filtros" class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <div class="border-b border-gray-200 p-4 dark:border-gray-700">
                 <div class="grid grid-cols-1 gap-3 xl:grid-cols-12">
                     <div class="xl:col-span-4">
@@ -350,7 +351,7 @@ const copyToClipboard = (text) => {
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <div class="overflow-x-auto custom-scrollbar-horizontal">
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead class="bg-gray-50 dark:bg-gray-900/50">
+              <thead data-tutorial="personas-listado" class="bg-gray-50 dark:bg-gray-900/50">
                 <tr class="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
                   <th class="px-5 py-4 text-left">Persona</th>
                   <th class="px-5 py-4 text-left">Identificacion</th>
@@ -448,9 +449,9 @@ const copyToClipboard = (text) => {
                     </span>
                   </td>
 
-                  <td class="sticky right-0 z-10 bg-white px-5 py-4 text-right transition group-hover:bg-gray-50 dark:bg-gray-800 dark:group-hover:bg-gray-900">
+                  <td :data-tutorial="personasData[0]?.id === p.id ? 'personas-acciones-primer-registro' : null" class="sticky right-0 z-10 bg-white px-5 py-4 text-right transition group-hover:bg-gray-50 dark:bg-gray-800 dark:group-hover:bg-gray-900">
                     <div class="flex items-center justify-end gap-2">
-                      <Link :href="route('personas.show', p.id)" class="rounded-lg border border-indigo-200 bg-indigo-50 p-2 text-indigo-600 transition hover:bg-indigo-600 hover:text-white dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-300" title="Ver ficha">
+                      <Link :href="route('personas.show', p.id)" :data-tutorial="personasData[0]?.id === p.id ? 'personas-ver-primer' : null" class="rounded-lg border border-indigo-200 bg-indigo-50 p-2 text-indigo-600 transition hover:bg-indigo-600 hover:text-white dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-300" title="Ver ficha">
                           <EyeIcon class="h-4 w-4"/>
                       </Link>
                       <Link :href="route('personas.edit', p.id)" class="rounded-lg border border-sky-200 bg-sky-50 p-2 text-sky-600 transition hover:bg-sky-600 hover:text-white dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-300" title="Editar">

@@ -456,6 +456,8 @@ const submit = () => {
     });
 };
 
+let shouldGenerateInitialSchedule = false;
+
 onMounted(() => {
     if (props.plantilla) {
         const clienteOriginal = props.clientes.find((client) => client.id === props.plantilla.cliente_id);
@@ -475,7 +477,7 @@ onMounted(() => {
         });
         form.reset();
         if (clienteOriginal) selectClient(clienteOriginal);
-        setTimeout(generarCuotasAutomaticas, 100);
+        shouldGenerateInitialSchedule = true;
         return;
     }
 
@@ -493,7 +495,7 @@ onMounted(() => {
         });
         form.reset();
         if (props.clienteSeleccionado) selectClient(props.clienteSeleccionado);
-        setTimeout(generarCuotasAutomaticas, 100);
+        shouldGenerateInitialSchedule = true;
         return;
     }
 
@@ -540,6 +542,11 @@ const { clearDraft } = useFormDraft(form, contractDraftKey, {
         syncPagosIniciales();
     },
     restoreExtraAfterTick: true,
+    onRestored: ({ hadDraft }) => {
+        if (shouldGenerateInitialSchedule && !hadDraft) {
+            generarCuotasAutomaticas();
+        }
+    },
 });
 </script>
 
@@ -562,7 +569,7 @@ const { clearDraft } = useFormDraft(form, contractDraftKey, {
                         <p class="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">{{ sourceLabel }}</p>
                     </div>
                 </div>
-                <button
+                <button data-tutorial="contratos-guardar"
                     type="button"
                     @click="submit"
                     :disabled="!canSubmit"
@@ -595,7 +602,7 @@ const { clearDraft } = useFormDraft(form, contractDraftKey, {
                 <div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
                     <main class="space-y-5">
                         <section class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                            <div class="border-b border-gray-200 p-5 dark:border-gray-700">
+                            <div data-tutorial="contratos-datos-base" class="border-b border-gray-200 p-5 dark:border-gray-700">
                                 <div class="flex items-center gap-3">
                                     <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
                                         <UserIcon class="h-5 w-5" />
@@ -659,7 +666,7 @@ const { clearDraft } = useFormDraft(form, contractDraftKey, {
                         </section>
 
                         <section class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                            <div class="border-b border-gray-200 p-5 dark:border-gray-700">
+                            <div data-tutorial="contratos-acuerdo" class="border-b border-gray-200 p-5 dark:border-gray-700">
                                 <div class="flex items-center gap-3">
                                     <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
                                         <BanknotesIcon class="h-5 w-5" />
@@ -741,7 +748,7 @@ const { clearDraft } = useFormDraft(form, contractDraftKey, {
                         </section>
 
                         <section class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                            <div class="flex flex-col gap-4 border-b border-gray-200 p-5 dark:border-gray-700 lg:flex-row lg:items-center lg:justify-between">
+                            <div data-tutorial="contratos-cronograma" class="flex flex-col gap-4 border-b border-gray-200 p-5 dark:border-gray-700 lg:flex-row lg:items-center lg:justify-between">
                                 <div class="flex items-center gap-3">
                                     <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
                                         <CalendarDaysIcon class="h-5 w-5" />
@@ -941,7 +948,7 @@ const { clearDraft } = useFormDraft(form, contractDraftKey, {
                                 <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-50 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
                                     <DocumentTextIcon class="h-5 w-5" />
                                 </span>
-                                <div>
+                                <div data-tutorial="contratos-resumen">
                                     <h3 class="text-sm font-black uppercase tracking-widest text-gray-950 dark:text-white">Resumen</h3>
                                     <p class="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Antes de guardar</p>
                                 </div>

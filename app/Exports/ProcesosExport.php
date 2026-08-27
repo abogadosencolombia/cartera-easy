@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Exports\Concerns\PreservesExcelIdentifiers;
 use App\Models\ProcesoRadicado;
 use App\Models\Juzgado;
 use App\Models\TipoProceso;
@@ -10,12 +11,14 @@ use App\Models\User;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 
-class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
+class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents, WithCustomValueBinder
 {
+    use PreservesExcelIdentifiers;
     protected $filtros;
     protected ?User $user;
 
@@ -31,16 +34,19 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
             ->with(['juzgado', 'abogado', 'responsableRevision', 'demandantes', 'demandados', 'tipoProceso', 'etapaActual', 'creator'])
             ->select('proceso_radicados.*');
 
+        $papelera = filter_var($this->filtros['papelera'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        if ($papelera) {
+            if ($this->user?->tipo_usuario === 'admin') {
+                $query->onlyTrashed();
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
         $this->applyVisibilityScope($query);
 
         if (!empty($this->filtros['search'])) {
-            $search = $this->filtros['search'];
-            $query->where(function ($q) use ($search) {
-                $q->where('radicado', 'ilike', "%{$search}%")
-                    ->orWhere('asunto', 'ilike', "%{$search}%")
-                    ->orWhereHas('demandantes', fn($sq) => $sq->where('nombre_completo', 'ilike', "%{$search}%"))
-                    ->orWhereHas('demandados', fn($sq) => $sq->where('nombre_completo', 'ilike', "%{$search}%"));
-            });
+            $query->searchSmart($this->filtros['search']);
         }
         
         if (!empty($this->filtros['estado']) && $this->filtros['estado'] !== 'TODOS') {
@@ -99,7 +105,7 @@ class ProcesosExport implements FromQuery, WithHeadings, WithMapping, WithEvents
             $query->where('integridad_score', '<', 80)->paraSeguimiento();
         }
 
-        return $query->latest('updated_at');
+        return $query->orderByDesc('updated_at')->orderByDesc('id');
     }
 
     private function applyVisibilityScope($query): void

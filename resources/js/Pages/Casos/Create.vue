@@ -53,17 +53,39 @@ const props = defineProps({
 
 const safeParseJson = (jsonString) => {
   if (!jsonString) return [];
+  if (Array.isArray(jsonString)) return jsonString.map(item => typeof item === 'object' && item !== null ? { ...item } : item);
+  if (typeof jsonString === 'object') return [{ ...jsonString }];
   try {
     const parsed = JSON.parse(jsonString);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? [parsed] : []);
   } catch (e) {
     return [];
   }
 };
 
+const mapAssignedUsers = (caso) => {
+    const assignedUsers = new Map();
+
+    // El responsable singular sigue siendo el principal en módulos heredados,
+    // por eso debe conservar la primera posición al clonar.
+    if (caso?.user) {
+        assignedUsers.set(caso.user.id, { id: caso.user.id, name: caso.user.name });
+    }
+
+    if (Array.isArray(caso?.users)) {
+        caso.users.forEach(user => {
+            if (!assignedUsers.has(user.id)) {
+                assignedUsers.set(user.id, { id: user.id, name: user.name });
+            }
+        });
+    }
+
+    return Array.from(assignedUsers.values());
+};
+
 const initialData = {
     cooperativa_id: props.casoAClonar?.cooperativa || null,
-    user_id: props.casoAClonar?.user ? [{ id: props.casoAClonar.user.id, name: props.casoAClonar.user.name }] : [],
+    user_id: mapAssignedUsers(props.casoAClonar),
     deudor_id: props.casoAClonar?.deudor_id || null,
     deudor: {
         id: props.casoAClonar?.deudor_id || null,
@@ -114,18 +136,12 @@ const initialData = {
     es_spoa_nunc: !!props.casoAClonar?.es_spoa_nunc,
 };
 
-const selectedJuzgado = ref(null);
-watch(selectedJuzgado, (val) => {
-    form.juzgado_id = val?.id || null;
-});
-
 const form = useForm(initialData);
-const { clearDraft } = useFormDraft(form, `draft:create:casos:${props.casoAClonar?.id || 'nuevo'}`);
 
 watch(() => props.casoAClonar, (newCaso) => {
     form.defaults({
         cooperativa_id: newCaso?.cooperativa || null,
-        user_id: newCaso?.user ? [{ id: newCaso.user.id, name: newCaso.user.name }] : [],
+        user_id: mapAssignedUsers(newCaso),
         deudor_id: newCaso?.deudor_id || null,
         deudor: {
             id: newCaso?.deudor_id || null,
@@ -186,6 +202,66 @@ watch(() => form.deudor.numero_documento, (newVal) => {
 });
 
 // --- HELPERS DINÁMICOS ---
+const deudorDraftFields = ['nombre_completo', 'tipo_documento', 'numero_documento', 'dv', 'celular_1', 'correo_1', 'cooperativas_ids', 'abogados_ids'];
+let deudorNewDraft = null;
+let deudorExistingSelection = form.deudor.selected;
+let deudorExistingId = form.deudor.id ?? form.deudor_id;
+
+const snapshotDeudorDraft = () => Object.fromEntries(
+    deudorDraftFields.map((field) => [field, Array.isArray(form.deudor[field]) ? [...form.deudor[field]] : form.deudor[field]]),
+);
+
+const setDeudorMode = (isNew) => {
+    if (form.deudor.is_new === isNew) return;
+
+    if (form.deudor.is_new && !isNew) {
+        deudorNewDraft = snapshotDeudorDraft();
+    }
+
+    if (isNew) {
+        deudorExistingSelection = form.deudor.selected;
+        deudorExistingId = form.deudor.id ?? form.deudor_id;
+        form.deudor_id = null;
+        form.deudor.id = null;
+        form.deudor.selected = null;
+        Object.assign(form.deudor, deudorNewDraft ?? {
+            nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '',
+            celular_1: '', correo_1: '', cooperativas_ids: [], abogados_ids: [],
+        });
+    } else {
+        form.deudor_id = deudorExistingId;
+        form.deudor.id = deudorExistingId;
+        form.deudor.selected = deudorExistingSelection;
+    }
+
+    form.deudor.is_new = isNew;
+};
+
+watch(() => props.casoAClonar?.id, () => {
+    deudorNewDraft = null;
+    deudorExistingSelection = form.deudor.selected;
+    deudorExistingId = form.deudor.id ?? form.deudor_id;
+});
+
+const { clearDraft } = useFormDraft(form, `draft:create:casos:${props.casoAClonar?.id || 'nuevo'}`, {
+    extra: () => ({
+        deudorNewDraft: form.deudor.is_new ? snapshotDeudorDraft() : deudorNewDraft,
+        deudorExistingSelection: form.deudor.is_new ? deudorExistingSelection : form.deudor.selected,
+        deudorExistingId: form.deudor.is_new ? deudorExistingId : (form.deudor.id ?? form.deudor_id),
+    }),
+    restoreExtra: (draft) => {
+        if (Object.prototype.hasOwnProperty.call(draft, 'deudorNewDraft')) {
+            deudorNewDraft = draft.deudorNewDraft;
+        }
+        if (Object.prototype.hasOwnProperty.call(draft, 'deudorExistingSelection')) {
+            deudorExistingSelection = draft.deudorExistingSelection;
+        }
+        if (Object.prototype.hasOwnProperty.call(draft, 'deudorExistingId')) {
+            deudorExistingId = draft.deudorExistingId;
+        }
+    },
+});
+
 const addCodeudor = () => {
     form.sin_codeudores = false;
     form.codeudores.push({ nombre_completo: '', tipo_documento: 'CC', numero_documento: '', celular: '', correo: '', addresses: [], social_links: [] });
@@ -217,36 +293,39 @@ const addMonths = (field, months) => {
 // --- CASCADA PROCESOS ---
 const formatLabel = (text) => text?.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) || '';
 const especialidades = computed(() => props.estructuraProcesal);
-const tiposDisponibles = ref([]);
-const subtiposDisponibles = ref([]);
-const subprocesosDisponibles = ref([]);
+const tiposDisponibles = computed(() => {
+    const especialidad = especialidades.value.find(item => item.id === form.especialidad_id);
+    return especialidad?.tipos_proceso ?? [];
+});
+const subtiposDisponibles = computed(() => {
+    const tipo = tiposDisponibles.value.find(item => item.nombre === form.tipo_proceso);
+    return tipo?.subtipos ?? [];
+});
+const subprocesosDisponibles = computed(() => {
+    const subtipo = subtiposDisponibles.value.find(item => item.nombre === form.subtipo_proceso);
+    return subtipo?.subprocesos ?? [];
+});
 
-watch(() => form.especialidad_id, (newId, oldId) => {
-    const esp = especialidades.value.find(e => e.id === newId);
-    tiposDisponibles.value = esp ? esp.tipos_proceso : [];
-    if (oldId !== undefined) {
+watch(() => form.especialidad_id, () => {
+    if (form.tipo_proceso && !tiposDisponibles.value.some(item => item.nombre === form.tipo_proceso)) {
         form.tipo_proceso = null; 
         form.subtipo_proceso = null; 
         form.subproceso = null;
     }
-}, { immediate: true });
+});
 
-watch(() => form.tipo_proceso, (newVal, oldVal) => {
-    const tipo = tiposDisponibles.value.find(t => t.nombre === newVal);
-    subtiposDisponibles.value = tipo ? tipo.subtipos : [];
-    if (oldVal !== undefined) {
+watch(() => form.tipo_proceso, () => {
+    if (form.subtipo_proceso && !subtiposDisponibles.value.some(item => item.nombre === form.subtipo_proceso)) {
         form.subtipo_proceso = null; 
         form.subproceso = null;
     }
-}, { immediate: true });
+});
 
-watch(() => form.subtipo_proceso, (newVal, oldVal) => {
-    const subtipo = subtiposDisponibles.value.find(s => s.nombre === newVal);
-    subprocesosDisponibles.value = subtipo ? subtipo.subprocesos : [];
-    if (oldVal !== undefined) {
+watch(() => form.subtipo_proceso, () => {
+    if (form.subproceso && !subprocesosDisponibles.value.some(item => item.nombre === form.subproceso)) {
         form.subproceso = null;
     }
-}, { immediate: true });
+});
 
 watch([() => form.radicado, () => form.referencia_credito, () => form.asunto], debounce(() => {
     const url = new URL(window.location);
@@ -264,56 +343,108 @@ watch([() => form.radicado, () => form.referencia_credito, () => form.asunto], d
 }, 500));
 
 // Mantener deudor_id sincronizado con la selección
-const casosExistentes = ref([]);
-const buscandoCasos = ref(false);
+const casosPorIdentificacion = ref([]);
+const casosPorDeudor = ref([]);
+const buscandoIdentificacion = ref(false);
+const buscandoDeudor = ref(false);
+const buscandoCasos = computed(() => buscandoIdentificacion.value || buscandoDeudor.value);
+const casosExistentes = computed(() => {
+    const uniqueCases = new Map();
+
+    [...casosPorIdentificacion.value, ...casosPorDeudor.value].forEach(caso => {
+        // Caso y proceso judicial viven en tablas distintas y pueden compartir
+        // el mismo ID. El enlace identifica de forma estable el expediente real.
+        const identity = caso.link || `${caso.tipo || 'CASO'}:${caso.id}`;
+        uniqueCases.set(identity, caso);
+    });
+
+    return Array.from(uniqueCases.values());
+});
 
 const faltaIdentificacion = computed(() => !form.radicado && !form.referencia_credito);
+let duplicateLookupRequest = 0;
 
-const checkDuplicados = debounce(() => {
-    // Si ambos están vacíos, no buscamos duplicados pero mostramos aviso de "incompleto"
-    if (!form.radicado && !form.referencia_credito) {
-        if (!form.deudor.selected) casosExistentes.value = [];
-        return;
-    }
-    
-    buscandoCasos.value = true;
+const performDuplicateLookup = debounce((requestId, radicado, referenciaCredito) => {
     axios.get(route('casos.verificar_duplicados'), {
         params: {
-            radicado: form.radicado,
-            referencia_credito: form.referencia_credito
+            radicado,
+            referencia_credito: referenciaCredito,
         }
     })
     .then(res => {
-        // Combinamos con los del deudor si existen
-        const idsExistentes = new Set(casosExistentes.value.map(c => c.id));
-        res.data.forEach(caso => {
-            if (!idsExistentes.has(caso.id)) {
-                casosExistentes.value.push(caso);
-            }
-        });
+        if (requestId === duplicateLookupRequest) {
+            casosPorIdentificacion.value = Array.isArray(res.data) ? res.data : [];
+        }
     })
-    .catch(err => console.error('Error buscando duplicados:', err))
-    .finally(() => buscandoCasos.value = false);
+    .catch(err => {
+        if (requestId === duplicateLookupRequest) {
+            console.error('Error buscando duplicados:', err);
+            casosPorIdentificacion.value = [];
+        }
+    })
+    .finally(() => {
+        if (requestId === duplicateLookupRequest) {
+            buscandoIdentificacion.value = false;
+        }
+    });
 }, 500);
 
-watch(() => form.radicado, checkDuplicados);
-watch(() => form.referencia_credito, checkDuplicados);
+const scheduleDuplicateLookup = () => {
+    const requestId = ++duplicateLookupRequest;
+    const radicado = form.radicado;
+    const referenciaCredito = form.referencia_credito;
+
+    casosPorIdentificacion.value = [];
+
+    if (!radicado && !referenciaCredito) {
+        performDuplicateLookup.cancel();
+        buscandoIdentificacion.value = false;
+        return;
+    }
+
+    buscandoIdentificacion.value = true;
+    performDuplicateLookup(requestId, radicado, referenciaCredito);
+};
+
+watch(() => form.radicado, scheduleDuplicateLookup);
+watch(() => form.referencia_credito, scheduleDuplicateLookup);
+
+let deudorLookupRequest = 0;
 
 watch(() => form.deudor.selected, (newVal) => {
+    const requestId = ++deudorLookupRequest;
+
     if (newVal && !form.deudor.is_new) {
         form.deudor_id = newVal.id;
         form.deudor.id = newVal.id;
+        casosPorDeudor.value = [];
         
         // Consultar casos existentes
-        buscandoCasos.value = true;
+        buscandoDeudor.value = true;
         axios.get(route('personas.casos_existentes', newVal.id))
             .then(res => {
-                casosExistentes.value = res.data;
+                if (requestId === deudorLookupRequest) {
+                    casosPorDeudor.value = Array.isArray(res.data) ? res.data : [];
+                }
             })
-            .catch(err => console.error('Error buscando casos:', err))
-            .finally(() => buscandoCasos.value = false);
+            .catch(err => {
+                if (requestId === deudorLookupRequest) {
+                    console.error('Error buscando casos:', err);
+                    casosPorDeudor.value = [];
+                }
+            })
+            .finally(() => {
+                if (requestId === deudorLookupRequest) {
+                    buscandoDeudor.value = false;
+                }
+            });
     } else {
-        casosExistentes.value = [];
+        if (!newVal && !form.deudor.is_new) {
+            form.deudor_id = null;
+            form.deudor.id = null;
+        }
+        buscandoDeudor.value = false;
+        casosPorDeudor.value = [];
     }
 }, { deep: true });
 
@@ -360,11 +491,11 @@ const submit = () => {
 
         <div class="py-8">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <form @submit.prevent="submit" class="space-y-8">
+                <form data-tutorial="casos-formulario" @submit.prevent="submit" class="space-y-8">
 
                     <!-- SECCIÓN 1: PARTES -->
                     <div class="bg-white dark:bg-gray-800 shadow-xl shadow-slate-200/50 dark:shadow-none rounded-3xl border border-gray-100 dark:border-gray-700 overflow-visible">
-                        <div class="p-6 bg-gray-50/50 dark:bg-gray-700/30 border-b border-gray-100 dark:border-gray-700 flex items-center">
+                        <div data-tutorial="casos-partes" class="p-6 bg-gray-50/50 dark:bg-gray-700/30 border-b border-gray-100 dark:border-gray-700 flex items-center">
                             <div class="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm mr-3">
                                 <UsersIcon class="h-5 w-5 text-indigo-600" />
                             </div>
@@ -373,12 +504,12 @@ const submit = () => {
                         
                         <div class="p-8 space-y-8">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div>
+                                <div data-tutorial="casos-cooperativa">
                                     <InputLabel value="Cooperativa / Empresa *" class="font-bold text-xs uppercase text-gray-400 mb-2" />
                                     <AsyncSelect v-model="form.cooperativa_id" :endpoint="route('cooperativas.search')" placeholder="Seleccione empresa..." label-key="nombre" class="bg-gray-50/50 focus-within:bg-white transition-all rounded-xl" />
                                     <InputError :message="form.errors.cooperativa_id" class="mt-2" />
                                 </div>
-                                <div>
+                                <div data-tutorial="casos-responsables">
                                     <InputLabel value="Abogado(s) a Cargo *" class="font-bold text-xs uppercase text-gray-400 mb-2" />
                                     <AsyncSelect v-model="form.user_id" :endpoint="route('users.search')" multiple placeholder="Asignar responsables..." label-key="name" class="bg-gray-50/50 focus-within:bg-white transition-all rounded-xl" />
                                     <InputError :message="form.errors.user_id" class="mt-2" />
@@ -386,15 +517,15 @@ const submit = () => {
                             </div>
 
                             <div class="md:col-span-2 pt-6 border-t dark:border-gray-700 space-y-6">
-                                <div class="flex justify-between items-center">
+                                <div data-tutorial="casos-deudor" class="flex justify-between items-center">
                                     <InputLabel value="Deudor Principal *" class="font-bold text-xs uppercase text-gray-400" />
                                     <div class="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-xl">
-                                        <button type="button" @click="form.deudor.is_new = false" 
+                                        <button type="button" @click="setDeudorMode(false)"
                                             :class="!form.deudor.is_new ? 'bg-white dark:bg-gray-800 shadow-sm text-indigo-600 ring-1 ring-gray-200 dark:ring-gray-600' : 'text-gray-500 hover:text-gray-700'"
                                             class="px-4 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all">
                                             Buscar Existente
                                         </button>
-                                        <button type="button" @click="form.deudor.is_new = true" 
+                                        <button type="button" @click="setDeudorMode(true)"
                                             :class="form.deudor.is_new ? 'bg-white dark:bg-gray-800 shadow-sm text-indigo-600 ring-1 ring-gray-200 dark:ring-gray-600' : 'text-gray-500 hover:text-gray-700'"
                                             class="px-4 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all">
                                             Registrar Nuevo
@@ -490,19 +621,19 @@ const submit = () => {
                                             <InputError :message="form.errors['deudor.dv']" class="mt-2" />
                                         </div>
                                         <div>
-                                            <InputLabel value="Celular *" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
+                                            <InputLabel value="Celular" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
                                             <TextInput v-model="form.deudor.celular_1" placeholder="300 000 0000" class="w-full bg-white transition-all" />
                                             <InputError :message="form.errors['deudor.celular_1']" class="mt-2" />
                                         </div>
                                         <div>
-                                            <InputLabel value="Correo Electrónico *" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
+                                            <InputLabel value="Correo Electrónico" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
                                             <TextInput v-model="form.deudor.correo_1" type="email" placeholder="correo@ejemplo.com" class="w-full bg-white transition-all" />
                                             <InputError :message="form.errors['deudor.correo_1']" class="mt-2" />
                                         </div>
                                     </div>
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div>
-                                            <InputLabel value="Vincular a Cooperativas *" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
+                                            <InputLabel value="Vincular a Cooperativas" class="text-[10px] font-black text-gray-400 uppercase mb-1" />
                                             <AsyncSelect v-model="form.deudor.cooperativas_ids" :endpoint="route('cooperativas.search')" placeholder="Asignar cooperativas..." multiple label-key="nombre" class="bg-white transition-all rounded-xl" />
                                             <InputError :message="form.errors['deudor.cooperativas_ids']" class="mt-2" />
                                         </div>
@@ -518,7 +649,7 @@ const submit = () => {
 
                     <!-- SECCIÓN 2: CRÉDITO Y PROCESO -->
                     <div class="bg-white dark:bg-gray-800 shadow-xl shadow-slate-200/50 dark:shadow-none rounded-3xl border border-gray-100 dark:border-gray-700 overflow-visible">
-                        <div class="p-6 bg-gray-50/50 dark:bg-gray-700/30 border-b border-gray-100 dark:border-gray-700 flex items-center">
+                        <div data-tutorial="casos-credito-proceso" class="p-6 bg-gray-50/50 dark:bg-gray-700/30 border-b border-gray-100 dark:border-gray-700 flex items-center">
                             <div class="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm mr-3">
                                 <ScaleIcon class="h-5 w-5 text-indigo-600" />
                             </div>
@@ -527,7 +658,7 @@ const submit = () => {
                         
                         <div class="p-8 space-y-10">
                             <!-- Fila 1: Identificadores -->
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            <div data-tutorial="casos-identificadores" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                                 <div>
                                     <InputLabel value="Número De Pagaré" class="font-bold text-xs uppercase text-gray-400 mb-2" />
                                     <div class="relative">
@@ -570,7 +701,7 @@ const submit = () => {
                             </div>
 
                             <!-- Fila 2: Valores Financieros -->
-                            <div class="p-8 bg-indigo-50/30 dark:bg-indigo-900/10 rounded-3xl border border-indigo-100 dark:border-indigo-800/50 grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <div data-tutorial="casos-valores" class="p-8 bg-indigo-50/30 dark:bg-indigo-900/10 rounded-3xl border border-indigo-100 dark:border-indigo-800/50 grid grid-cols-1 md:grid-cols-3 gap-8">
                                 <div>
                                     <InputLabel value="Monto de Crédito *" class="font-bold text-[10px] uppercase text-indigo-400 mb-2" />
                                     <div class="relative">
@@ -711,7 +842,7 @@ const submit = () => {
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                                 <div class="lg:col-span-3">
                                     <InputLabel value="Juzgado / Despacho Judicial" class="font-bold text-xs uppercase text-gray-400 mb-2" />
-                                    <AsyncSelect v-model="selectedJuzgado" :endpoint="route('juzgados.search')" placeholder="Escriba el nombre del despacho..." label-key="nombre" class="bg-gray-50/50 focus-within:bg-white transition-all rounded-xl" />
+                                    <AsyncSelect v-model="form.juzgado_id" :endpoint="route('juzgados.search')" placeholder="Escriba el nombre del despacho..." label-key="nombre" class="bg-gray-50/50 focus-within:bg-white transition-all rounded-xl" />
                                     <InputError :message="form.errors.juzgado_id" class="mt-2" />
                                 </div>
 
@@ -748,7 +879,7 @@ const submit = () => {
                             </div>
 
                             <!-- Fila 6: Enlaces Digitales -->
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t dark:border-gray-700">
+                            <div data-tutorial="casos-enlaces-digitales" class="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t dark:border-gray-700">
                                 <div>
                                     <InputLabel value="URL Carpeta Drive (Repositorio)" class="font-bold text-xs uppercase text-gray-400 mb-2" />
                                     <div class="relative">
@@ -757,6 +888,9 @@ const submit = () => {
                                         </div>
                                         <TextInput v-model="form.link_drive" type="url" class="pl-10 block w-full bg-gray-50/50 focus:bg-white transition-all text-xs" placeholder="https://drive.google.com/..." />
                                     </div>
+                                    <p class="mt-2 text-[11px] font-semibold leading-5 text-indigo-700 dark:text-indigo-300">
+                                        Si la carpeta no existe, créela en Drive y nómbrela: DOCUMENTO - NOMBRE COMPLETO - NÚMERO DE PAGARÉ. Pegue aquí el enlace con acceso para el equipo.
+                                    </p>
                                     <InputError :message="form.errors.link_drive" class="mt-2" />
                                 </div>
                                 <div>
@@ -767,6 +901,9 @@ const submit = () => {
                                         </div>
                                         <TextInput v-model="form.link_expediente" type="url" class="pl-10 block w-full bg-gray-50/50 focus:bg-white transition-all text-xs" placeholder="https://procesos.ramajudicial.gov.co/..." />
                                     </div>
+                                    <p class="mt-2 text-[11px] font-semibold leading-5 text-emerald-700 dark:text-emerald-300">
+                                        Este enlace corresponde al expediente judicial en Tyba, Samai o la plataforma aplicable. Agréguelo cuando la entidad lo habilite.
+                                    </p>
                                     <InputError :message="form.errors.link_expediente" class="mt-2" />
                                 </div>
                             </div>
@@ -775,7 +912,7 @@ const submit = () => {
 
                     <!-- SECCIÓN 3: CODEUDORES -->
                     <div class="bg-white dark:bg-gray-800 shadow-xl shadow-slate-200/50 dark:shadow-none rounded-3xl border border-gray-100 dark:border-gray-700 overflow-visible">
-                        <div class="p-6 bg-gray-50/50 dark:bg-gray-700/30 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                        <div data-tutorial="casos-codeudores" class="p-6 bg-gray-50/50 dark:bg-gray-700/30 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
                             <div class="flex items-center">
                                 <div class="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm mr-3">
                                     <BriefcaseIcon class="h-5 w-5 text-indigo-600" />
@@ -938,7 +1075,7 @@ const submit = () => {
                     </div>
 
                     <!-- BOTÓN FINAL -->
-                    <div class="flex flex-col md:flex-row items-center justify-between p-6 bg-indigo-950 rounded-[2.5rem] shadow-2xl shadow-indigo-300 dark:shadow-none animate-in fade-in slide-in-from-bottom-4">
+                    <div data-tutorial="casos-guardar" class="flex flex-col md:flex-row items-center justify-between p-6 bg-indigo-950 rounded-[2.5rem] shadow-2xl shadow-indigo-300 dark:shadow-none animate-in fade-in slide-in-from-bottom-4">
                         <div class="flex items-center gap-4 mb-4 md:mb-0 pl-4">
                             <div class="p-3 bg-white/10 rounded-2xl">
                                 <CheckCircleIcon class="h-6 w-6 text-emerald-400" />

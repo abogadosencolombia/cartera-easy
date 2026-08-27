@@ -15,7 +15,7 @@ import NavLink from "@/Components/NavLink.vue";
 import ResponsiveNavLink from "@/Components/ResponsiveNavLink.vue";
 import ToastList from "@/Components/ToastList.vue";
 import GestionDiariaPanel from "@/Components/GestionDiariaPanel.vue";
-import WelcomeTour from "@/Components/WelcomeTour.vue";
+import TutorialCenter from "@/Components/TutorialCenter.vue";
 import AlertasUrgentesOverlay from "@/Components/AlertasUrgentesOverlay.vue";
 
 import {
@@ -215,6 +215,8 @@ const NAV_ITEMS = [
             {
                 type: "external",
                 label: "Penalista Experto",
+                tutorialKey: "gpt-penal",
+                recommendation: "Análisis penal, delitos, defensa, denuncia y procedimiento.",
                 href: "https://chatgpt.com/g/g-68c1f9d07ec88191865a8f01b915cc1e-penalista-experto",
                 assistant: "chatgpt",
                 roles: ["admin", "gestor", "abogado"],
@@ -222,6 +224,8 @@ const NAV_ITEMS = [
             {
                 type: "external",
                 label: "Abogado Civil Director Jurídico Experto",
+                tutorialKey: "gpt-civil",
+                recommendation: "Obligaciones, contratos, responsabilidad y litigios civiles.",
                 href: "https://chatgpt.com/g/g-68360119b4d48191898d44cb97865146-abogado-civil-director-juridico-experto",
                 assistant: "chatgpt",
                 roles: ["admin", "gestor", "abogado"],
@@ -229,6 +233,8 @@ const NAV_ITEMS = [
             {
                 type: "external",
                 label: "Abogado Tributario",
+                tutorialKey: "gpt-tributario",
+                recommendation: "Impuestos, requerimientos, sanciones y estrategia tributaria.",
                 href: "https://chatgpt.com/g/g-697e4e376978819190f074bab801d55c-abogado-tributario",
                 assistant: "chatgpt",
                 roles: ["admin", "gestor", "abogado"],
@@ -236,6 +242,8 @@ const NAV_ITEMS = [
             {
                 type: "external",
                 label: "Familia Colombia Magistrado",
+                tutorialKey: "gpt-familia",
+                recommendation: "Divorcio, alimentos, custodia, sucesiones y asuntos de familia.",
                 href: "https://chatgpt.com/g/g-69415ce693f081919ead4a228b2bfc31-familia-colombia-magistrado",
                 assistant: "chatgpt",
                 roles: ["admin", "gestor", "abogado"],
@@ -243,13 +251,17 @@ const NAV_ITEMS = [
             {
                 type: "external",
                 label: "Migración",
-                href: "https://chatgpt.com/g/g-69415ce693f081919ead4a228b2bfc31-familia-colombia-magistrado",
+                tutorialKey: "gpt-migracion",
+                recommendation: "Orientación inicial sobre trámites y situaciones migratorias.",
+                href: "https://chatgpt.com/g/g-nvnUPFTra-migracion-global",
                 assistant: "chatgpt",
                 roles: ["admin", "gestor", "abogado"],
             },
             {
                 type: "external",
                 label: "Migratorio Colombiano Abogado Experto",
+                tutorialKey: "gpt-migratorio",
+                recommendation: "Visas, regularización, nacionalidad y procedimientos colombianos.",
                 href: "https://chatgpt.com/g/g-693acd718bfc81919ce349a4ef2a45c7-migratorio-colombiano-abogado-experto",
                 assistant: "chatgpt",
                 roles: ["admin", "gestor", "abogado"],
@@ -257,6 +269,8 @@ const NAV_ITEMS = [
             {
                 type: "external",
                 label: "Disciplinario Experto Senior en Derecho",
+                tutorialKey: "gpt-disciplinario",
+                recommendation: "Procesos disciplinarios, faltas, defensa y recursos.",
                 href: "https://chatgpt.com/g/g-693ac1dfbc9c8191b6f426d5069d659a-disciplinario-experto-senior-en-derecho",
                 assistant: "chatgpt",
                 roles: ["admin", "gestor", "abogado"],
@@ -264,6 +278,8 @@ const NAV_ITEMS = [
             {
                 type: "external",
                 label: "Abogado de Tránsito Experto",
+                tutorialKey: "gpt-transito",
+                recommendation: "Comparendos, accidentes, licencias y procedimientos de tránsito.",
                 href: "https://chatgpt.com/g/g-693303a96fb08191af43516900ab64a4-abogado-de-transito-experto",
                 assistant: "chatgpt",
                 roles: ["admin", "gestor", "abogado"],
@@ -271,6 +287,8 @@ const NAV_ITEMS = [
             {
                 type: "external",
                 label: "Comercial Abogado Estratégico",
+                tutorialKey: "gpt-comercial",
+                recommendation: "Sociedades, negocios, contratos y conflictos comerciales.",
                 href: "https://chatgpt.com/g/g-68d53e641c9081918d527d57cb18f223-comercial-abogado-estrategico",
                 assistant: "chatgpt",
                 roles: ["admin", "gestor", "abogado"],
@@ -278,6 +296,8 @@ const NAV_ITEMS = [
             {
                 type: "external",
                 label: "Laboral Abogado Experto",
+                tutorialKey: "gpt-laboral",
+                recommendation: "Contratos laborales, despidos, prestaciones y seguridad social.",
                 href: "https://chatgpt.com/g/g-68c33089c8a88191a3be954336acf6a3-laboral-abogado-experto",
                 assistant: "chatgpt",
                 roles: ["admin", "gestor", "abogado"],
@@ -285,6 +305,8 @@ const NAV_ITEMS = [
             {
                 type: "external",
                 label: "Derecho Administrativo Abogado Experto",
+                tutorialKey: "gpt-administrativo",
+                recommendation: "Actos administrativos, recursos, contratación y litigio estatal.",
                 href: "https://chatgpt.com/g/g-68c20146e4fc8191879018872c6245bb-derecho-administrativo-abogado-experto",
                 assistant: "chatgpt",
                 roles: ["admin", "gestor", "abogado"],
@@ -292,6 +314,8 @@ const NAV_ITEMS = [
             {
                 type: "external",
                 label: "Infancia y Adolescencia Abogado Experto",
+                tutorialKey: "gpt-infancia",
+                recommendation: "Protección de menores, restablecimiento de derechos y familia.",
                 href: "https://chatgpt.com/g/g-68c1cae1891881918c6a54795a238a16-infancia-y-adolecencia-abogado-experto",
                 assistant: "chatgpt",
                 roles: ["admin", "gestor", "abogado"],
@@ -310,30 +334,40 @@ const NAV_ITEMS = [
             {
                 type: "external",
                 label: "Consulta de procesos",
+                tutorialKey: "herramienta-consulta-procesos",
+                recommendation: "Consulta Nacional Unificada de la Rama Judicial.",
                 href: "https://consultaprocesos.ramajudicial.gov.co/procesos/Index",
                 roles: ["admin", "gestor", "abogado"],
             },
             {
                 type: "external",
                 label: "Procesos rama judicial",
+                tutorialKey: "herramienta-justicia21",
+                recommendation: "Consulta histórica o complementaria en Justicia XXI.",
                 href: "https://procesos.ramajudicial.gov.co/procesoscs/ConsultaJusticias21.aspx?EntryId=1ND%2fT1QaEBFgDjwxVoCZ45pYS4g%3d",
                 roles: ["admin", "gestor", "abogado"],
             },
             {
                 type: "external",
                 label: "MonoLegal",
+                tutorialKey: "herramienta-monolegal",
+                recommendation: "Vigilancia y consulta de expedientes administrados en MonoLegal.",
                 href: "https://nuevoexpedientedigital.monolegal.co/#/admin/default",
                 roles: ["admin", "gestor", "abogado"],
             },
             {
                 type: "external",
                 label: "Publicaciones Procesales",
+                tutorialKey: "herramienta-publicaciones",
+                recommendation: "Consulta estados, traslados y publicaciones procesales.",
                 href: "https://publicacionesprocesales.ramajudicial.gov.co/",
                 roles: ["admin", "gestor", "abogado"],
             },
             {
                 type: "external",
                 label: "Tyba",
+                tutorialKey: "herramienta-tyba",
+                recommendation: "Consulta procesos y actuaciones gestionados en Tyba.",
                 href: "https://procesojudicial.ramajudicial.gov.co/Justicia21/Administracion/Ciudadanos/frmConsulta",
                 roles: ["admin", "gestor", "abogado"],
             },
@@ -594,6 +628,10 @@ const openGestionDiariaPanel = () => {
     showGestionPanel.value = true;
 };
 
+const closeGestionDiariaPanel = () => {
+    showGestionPanel.value = false;
+};
+
 const flushWorkSessionWithBeacon = () => {
     sendWorkSessionHeartbeat({ beacon: true });
 };
@@ -602,6 +640,7 @@ const flushWorkSessionWithBeacon = () => {
 onMounted(() => {
     initPush().catch(() => {});
     window.addEventListener("open-gestion-diaria", openGestionDiariaPanel);
+    window.addEventListener("close-gestion-diaria", closeGestionDiariaPanel);
     window.addEventListener("pagehide", flushWorkSessionWithBeacon);
     activityEvents.forEach((eventName) => {
         window.addEventListener(eventName, markUserActivity, {
@@ -620,6 +659,7 @@ onBeforeUnmount(() => {
     clearWorkSessionHeartbeatTimer();
     flushWorkSessionWithBeacon();
     window.removeEventListener("open-gestion-diaria", openGestionDiariaPanel);
+    window.removeEventListener("close-gestion-diaria", closeGestionDiariaPanel);
     window.removeEventListener("pagehide", flushWorkSessionWithBeacon);
     activityEvents.forEach((eventName) => {
         window.removeEventListener(eventName, markUserActivity);
@@ -630,15 +670,15 @@ onBeforeUnmount(() => {
 <template>
     <a
         href="#main-content"
-        class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:bg-white focus:text-black focus:px-3 focus:py-2 focus:rounded"
+        class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[200] focus:bg-white focus:text-black focus:px-3 focus:py-2 focus:rounded"
     >
         Saltar al contenido
     </a>
 
-    <div class="min-h-screen min-w-0 bg-gray-100 dark:bg-gray-900">
+    <div class="app-shell min-h-screen min-w-0 bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
         <!-- NAVBAR PRINCIPAL - Añadimos z-[100] para que los dropdowns floten sobre todo -->
         <nav
-            class="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 relative z-[100]"
+            class="app-navbar bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 relative z-[100]"
         >
             <div
                 class="mx-auto max-w-screen-2xl px-3 sm:px-4 lg:px-6 xl:px-8 overflow-visible"
@@ -662,9 +702,10 @@ onBeforeUnmount(() => {
                                 <!-- Opción Especial: Gestión Diaria abre el Panel Lateral -->
                                 <button
                                     v-if="item.label === 'Gestión Diaria'"
+                                    data-tutorial="gestion-diaria"
                                     type="button"
                                     @click="showGestionPanel = true"
-                                    class="inline-flex h-16 shrink-0 items-center border-b-2 border-transparent px-2 text-xs font-semibold leading-5 text-gray-500 transition hover:text-gray-700 hover:border-gray-300 focus:outline-none xl:text-sm"
+                                    class="inline-flex h-16 shrink-0 items-center border-b-2 border-transparent px-2 text-xs font-semibold leading-5 text-gray-500 transition hover:text-gray-700 hover:border-gray-300 focus:outline-none dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600 xl:text-sm"
                                 >
                                     <div class="relative flex items-center">
                                         <component
@@ -693,6 +734,7 @@ onBeforeUnmount(() => {
                                 <!-- Opción 2: Links comunes -->
                                 <NavLink
                                     v-else-if="item.type === 'link'"
+                                    :data-tutorial="item.label === 'Dashboard' ? 'dashboard' : item.label === 'Analítica' ? 'analitica' : null"
                                     :href="item.href"
                                     :active="isRouteActive(item.active)"
                                 >
@@ -740,6 +782,7 @@ onBeforeUnmount(() => {
                                     >
                                         <template #trigger>
                                             <button
+                                                :data-tutorial="item.label === 'Casos' ? 'casos' : item.label === 'Directorio' ? 'directorio' : item.label === 'Administración' ? 'administracion' : item.label === 'GPTs Jurídicos' ? 'gpts-juridicos' : item.label === 'Herramientas' ? 'herramientas' : null"
                                                 class="inline-flex h-16 shrink-0 items-center border-b-2 px-2 text-xs font-semibold leading-5 transition focus:outline-none xl:text-sm"
                                                 :class="
                                                     isRouteActive(item.active)
@@ -790,9 +833,10 @@ onBeforeUnmount(() => {
                                                         'external'
                                                     "
                                                     :href="subItem.href"
+                                                    :data-tutorial="subItem.tutorialKey"
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                    class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none dark:text-gray-300 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
                                                 >
                                                     <span class="flex min-w-0 items-start gap-2">
                                                         <ChatGptIcon
@@ -933,6 +977,7 @@ onBeforeUnmount(() => {
                         </Link>
 
                         <button
+                            data-tutorial-menu-toggle
                             @click="
                                 showingNavigationDropdown =
                                     !showingNavigationDropdown
@@ -986,11 +1031,12 @@ onBeforeUnmount(() => {
                         <!-- Móvil: Gestión Diaria -->
                         <button
                             v-if="item.label === 'Gestión Diaria'"
+                            data-tutorial="gestion-diaria"
                             @click="
                                 showGestionPanel = true;
                                 showingNavigationDropdown = false;
                             "
-                            class="flex w-full items-center pl-3 pr-4 py-2 border-l-4 border-transparent text-left text-base font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300 transition duration-150 ease-in-out"
+                            class="flex w-full items-center pl-3 pr-4 py-2 border-l-4 border-transparent text-left text-base font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300 transition duration-150 ease-in-out dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 dark:hover:border-gray-600"
                         >
                             <component
                                 :is="item.icon"
@@ -1004,6 +1050,7 @@ onBeforeUnmount(() => {
                                 item.type === 'link' ||
                                 item.type === 'notification'
                             "
+                            :data-tutorial="item.label === 'Dashboard' ? 'dashboard' : item.label === 'Analítica' ? 'analitica' : null"
                             :href="item.href"
                             :active="isRouteActive(item.active)"
                         >
@@ -1014,7 +1061,10 @@ onBeforeUnmount(() => {
                             {{ item.label }}
                         </ResponsiveNavLink>
                         <template v-else-if="item.type === 'dropdown'">
-                            <div class="px-4 pb-1 pt-4">
+                            <div
+                                class="px-4 pb-1 pt-4"
+                                :data-tutorial="item.label === 'Casos' ? 'casos' : item.label === 'Directorio' ? 'directorio' : item.label === 'Administración' ? 'administracion' : item.label === 'GPTs Jurídicos' ? 'gpts-juridicos' : item.label === 'Herramientas' ? 'herramientas' : null"
+                            >
                                 <span
                                     class="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-gray-500"
                                     >{{ item.label }}</span
@@ -1031,6 +1081,7 @@ onBeforeUnmount(() => {
                                 <a
                                     v-else-if="subItem.type === 'external'"
                                     :href="subItem.href"
+                                    :data-tutorial="subItem.tutorialKey"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     class="block w-full border-l-4 border-transparent py-2 ps-10 pe-4 text-start text-base font-medium text-gray-600 transition duration-150 ease-in-out hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
@@ -1074,7 +1125,7 @@ onBeforeUnmount(() => {
                         >
                             {{ currentUser.name }}
                         </div>
-                        <div class="truncate text-sm font-medium text-gray-500">
+                        <div class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
                             {{ currentUser.email }}
                         </div>
                     </div>
@@ -1102,13 +1153,13 @@ onBeforeUnmount(() => {
             </div>
         </nav>
 
-        <header class="bg-white dark:bg-gray-800 shadow" v-if="$slots.header">
+        <header class="app-page-header bg-white dark:bg-gray-800 shadow" v-if="$slots.header">
             <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
                 <slot name="header" />
             </div>
         </header>
 
-        <main id="main-content" class="min-w-0">
+        <main id="main-content" class="app-main min-w-0">
             <slot />
         </main>
 
@@ -1117,7 +1168,7 @@ onBeforeUnmount(() => {
             @close="showGestionPanel = false"
         />
         <ToastList />
-        <WelcomeTour />
+        <TutorialCenter />
         <!-- Overlay de Alertas Urgentes al Iniciar Sesión -->
         <AlertasUrgentesOverlay />
     </div>

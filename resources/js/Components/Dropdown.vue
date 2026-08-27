@@ -12,7 +12,7 @@ const props = defineProps({
     },
     contentClasses: {
         type: String,
-        default: 'py-1 bg-white',
+        default: 'py-1 bg-white dark:bg-gray-800',
     },
     teleport: {
         type: Boolean,
@@ -39,6 +39,7 @@ const closeOnEscape = (e) => {
 const widthClass = computed(() => {
     return {
         48: 'w-48',
+        56: 'w-56',
         64: 'w-64',
         full: 'w-full',
     }[props.width.toString()];
@@ -57,6 +58,7 @@ const alignmentClasses = computed(() => {
 const widthPixels = computed(() => {
     return {
         48: 192,
+        56: 224,
         64: 256,
         full: triggerRef.value?.offsetWidth || 192,
     }[props.width.toString()] || 192;

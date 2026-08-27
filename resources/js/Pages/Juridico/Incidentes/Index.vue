@@ -88,13 +88,13 @@ const estadoClass = (estado) => {
                         </template>
 
                         <template #content>
-                            <a :href="`${exportUrl}&format=xlsx`" class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 hover:bg-gray-100">
+                            <a :href="`${exportUrl}&format=xlsx`" class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">
                                 <div class="flex items-center">
                                     <ArrowDownTrayIcon class="h-4 w-4 mr-2" />
                                     Exportar a Excel
                                 </div>
                             </a>
-                            <a :href="`${exportUrl}&format=pdf`" target="_blank" class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 hover:bg-gray-100">
+                            <a :href="`${exportUrl}&format=pdf`" target="_blank" class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">
                                 <div class="flex items-center">
                                     <ArrowDownTrayIcon class="h-4 w-4 mr-2" />
                                     Exportar a PDF

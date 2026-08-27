@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\ValidationException;
 use App\Services\ExpedienteIntegrityService;
 
 class ProcesoRadicadoController extends Controller
@@ -46,11 +47,12 @@ class ProcesoRadicadoController extends Controller
         $query = ProcesoRadicado::with(['abogado:id,name', 'responsableRevision:id,name', 'juzgado:id,nombre', 'tipoProceso:id,nombre', 'demandantes', 'demandados', 'etapaActual:id,nombre,riesgo']);
 
         if ($search = $request->input('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('radicado', 'ilike', "%{$search}%")->orWhere('asunto', 'ilike', "%{$search}%")
-                  ->orWhereHas('demandantes', fn($sq) => $sq->where('nombre_completo', 'ilike', "%{$search}%"))
-                  ->orWhereHas('demandados', fn($sq) => $sq->where('nombre_completo', 'ilike', "%{$search}%"));
-            });
+            $query->searchSmart($search);
+        }
+
+        if ($request->boolean('papelera')) {
+            abort_unless(Auth::user()?->isAdmin(), 403);
+            $query->onlyTrashed();
         }
 
         if ($request->filled('estado') && $request->estado !== 'TODOS') { $query->where('estado', $request->estado); }
@@ -95,6 +97,8 @@ class ProcesoRadicadoController extends Controller
             'vencidos' => (clone $statsQuery)->where('fecha_proxima_revision', '<', now()->toDateString())->paraSeguimiento()->count(),
             'revisar_hoy' => (clone $statsQuery)->where('fecha_proxima_revision', now()->toDateString())->paraSeguimiento()->count(),
             'actualizados_hoy' => $aplicarActualizadosHoy(clone $statsQuery)->count(),
+            'papelera' => Auth::user()?->isAdmin() ? ProcesoRadicado::onlyTrashed()->count() : 0,
+            'eliminados_hoy' => Auth::user()?->isAdmin() ? ProcesoRadicado::onlyTrashed()->whereDate('deleted_at', now()->toDateString())->count() : 0,
             'integridad_baja' => $integridadDisponible
                 ? (clone $statsQuery)->where('integridad_score', '<', 80)->paraSeguimiento()->count()
                 : 0,
@@ -380,6 +384,9 @@ class ProcesoRadicadoController extends Controller
             if ($doc) { 
                 $persona = Persona::withTrashed()->where('numero_documento', $doc)->first();
                 if ($persona) {
+                    if ($persona->trashed()) {
+                        $persona->restore();
+                    }
                     $persona->update(['nombre_completo' => $nombre, 'tipo_documento' => $tipoDoc]);
                 } else {
                     $persona = Persona::create(['numero_documento' => $doc, 'nombre_completo' => $nombre, 'tipo_documento' => $tipoDoc]);
@@ -658,34 +665,12 @@ class ProcesoRadicadoController extends Controller
             $personaId = $d['id'] ?? ($d['selected']['id'] ?? null);
             
             if (!empty($d['is_new'])) {
-                $numDoc = $d['numero_documento'] ?? null;
-                if (empty($numDoc)) {
-                    $numDoc = 'TEMP-' . substr(md5(uniqid()), 0, 12);
+                $persona = $this->resolvePersonaForNewParty($d, $personaId, false);
+
+                if ($persona) {
+                    $this->syncPersonaAssignments($persona, $d);
                 }
 
-                // Si es nuevo o estamos editando uno incompleto sin ID aún
-                if ($personaId) {
-                    $persona = Persona::withTrashed()->find($personaId);
-                    if ($persona) {
-                        $persona->update([
-                            'nombre_completo' => trim($d['nombre_completo'] ?? 'SIN NOMBRE'),
-                            'tipo_documento' => $d['tipo_documento'] ?? 'CC',
-                            'numero_documento' => $numDoc,
-                            'dv' => $d['dv'] ?? null,
-                            'es_demandado' => false,
-                        ]);
-                    }
-                } else {
-                    $persona = Persona::create([
-                        'nombre_completo' => trim($d['nombre_completo'] ?? 'SIN NOMBRE'),
-                        'tipo_documento' => $d['tipo_documento'] ?? 'CC',
-                        'numero_documento' => $numDoc,
-                        'dv' => $d['dv'] ?? null,
-                        'es_demandado' => false,
-                    ]);
-                }
-                
-                if ($persona) $this->syncPersonaAssignments($persona, $d);
                 $personaId = $persona?->id;
             }
 
@@ -704,37 +689,22 @@ class ProcesoRadicadoController extends Controller
             $personaId = $d['id'] ?? ($d['selected']['id'] ?? null);
 
             if (!empty($d['is_new'])) {
-                $numDoc = $d['numero_documento'] ?? null;
-                if (empty($numDoc)) {
-                    $numDoc = 'TEMP-' . substr(md5(uniqid()), 0, 12);
-                }
-                
-                if ($personaId) {
-                    $persona = Persona::withTrashed()->find($personaId);
-                    if ($persona) {
-                        $persona->update([
-                            'nombre_completo' => trim($d['nombre_completo'] ?? 'SIN NOMBRE'),
-                            'tipo_documento' => $d['tipo_documento'] ?? 'CC',
-                            'numero_documento' => $numDoc,
-                            'dv' => $d['dv'] ?? null,
-                            'es_demandado' => true,
-                        ]);
-                    }
-                } else {
-                    $persona = Persona::create([
-                        'nombre_completo' => trim($d['nombre_completo'] ?? 'SIN NOMBRE'),
-                        'tipo_documento' => $d['tipo_documento'] ?? 'CC',
-                        'numero_documento' => $numDoc,
-                        'dv' => $d['dv'] ?? null,
-                        'es_demandado' => true,
-                    ]);
+                $persona = $this->resolvePersonaForNewParty($d, $personaId, true);
+
+                if ($persona) {
+                    $this->syncPersonaAssignments($persona, $d);
                 }
 
-                if ($persona) $this->syncPersonaAssignments($persona, $d);
                 $personaId = $persona?->id;
             }
 
             if ($personaId) {
+                if (($syncData[$personaId]['tipo'] ?? null) === 'DEMANDANTE') {
+                    throw ValidationException::withMessages([
+                        'demandados' => 'Una misma persona no puede figurar simultáneamente como demandante y demandada.',
+                    ]);
+                }
+
                 $syncData[$personaId] = ['tipo' => 'DEMANDADO'];
                 if (!$firstDemandadoId) $firstDemandadoId = $personaId;
             }
@@ -748,7 +718,7 @@ class ProcesoRadicadoController extends Controller
 
             return !empty($personaData['sin_info'])
                 || Str::startsWith($numeroDocumento, 'TEMP-')
-                || Str::contains($nombre, 'por identificar');
+                || Str::contains($nombre, ['por identificar', 'persona indeterminada']);
         }) || Persona::whereIn('id', array_keys($syncData))->get()->contains(function ($persona) {
             $numeroDocumento = strtoupper(trim((string) $persona->numero_documento));
             $nombre = Str::of((string) $persona->nombre_completo)->ascii()->lower()->toString();
@@ -756,7 +726,7 @@ class ProcesoRadicadoController extends Controller
             return blank($persona->nombre_completo)
                 || blank($numeroDocumento)
                 || Str::startsWith($numeroDocumento, 'TEMP-')
-                || Str::contains($nombre, 'por identificar');
+                || Str::contains($nombre, ['por identificar', 'persona indeterminada']);
         });
 
         // Actualizar columnas directas para compatibilidad
@@ -765,6 +735,57 @@ class ProcesoRadicadoController extends Controller
             'demandado_id' => $firstDemandadoId,
             'info_incompleta' => $infoIncompleta,
         ]);
+    }
+
+    private function resolvePersonaForNewParty(array $data, $currentPersonaId, bool $esDemandado): Persona
+    {
+        $numDoc = trim((string) ($data['numero_documento'] ?? ''));
+        if ($numDoc === '') {
+            $numDoc = 'TEMP-' . substr(md5(uniqid()), 0, 12);
+        }
+
+        $payload = [
+            'nombre_completo' => trim($data['nombre_completo'] ?? 'SIN NOMBRE'),
+            'tipo_documento' => $data['tipo_documento'] ?? 'CC',
+            'numero_documento' => $numDoc,
+            'dv' => $data['dv'] ?? null,
+            'es_demandado' => $esDemandado,
+        ];
+
+        $persona = null;
+        $personaByDocument = null;
+
+        if (!str_starts_with(strtoupper($numDoc), 'TEMP-')) {
+            $personaByDocument = Persona::withTrashed()
+                ->where('numero_documento', $numDoc)
+                ->first();
+
+            if ($personaByDocument && (string) $personaByDocument->id !== (string) $currentPersonaId) {
+                $persona = $personaByDocument;
+            }
+        }
+
+        if (!$persona && $currentPersonaId) {
+            $existing = Persona::withTrashed()->find($currentPersonaId);
+
+            if ($existing && $existing->esRegistroIncompleto()) {
+                $persona = $existing;
+            }
+        }
+
+        $persona ??= $personaByDocument;
+
+        if ($persona) {
+            if ($persona->trashed()) {
+                $persona->restore();
+            }
+
+            $persona->update($payload);
+
+            return $persona;
+        }
+
+        return Persona::create($payload);
     }
 
     private function syncPersonaAssignments(Persona $persona, array $data): void
@@ -806,6 +827,28 @@ class ProcesoRadicadoController extends Controller
 
         $proceso->delete(); 
         return to_route('procesos.index')->with('success', 'El proceso ha sido suspendido y movido a la papelera.'); 
+    }
+
+    public function restore($id)
+    {
+        $proceso = ProcesoRadicado::onlyTrashed()->findOrFail($id);
+        $this->authorize('delete', $proceso);
+
+        $radicado = $proceso->radicado ?: "ID #{$proceso->id}";
+        $proceso->restore();
+
+        AuditoriaEvento::create([
+            'user_id' => Auth::id(),
+            'evento' => 'RESTAURAR_RADICADO',
+            'descripcion_breve' => "Proceso judicial restaurado desde papelera: {$radicado}",
+            'auditable_id' => $proceso->id,
+            'auditable_type' => ProcesoRadicado::class,
+            'criticidad' => 'media',
+            'direccion_ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        return back(303)->with('success', 'El proceso fue recuperado correctamente.');
     }
 
     public function close(Request $request, ProcesoRadicado $proceso)

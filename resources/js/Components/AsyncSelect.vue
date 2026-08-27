@@ -11,12 +11,13 @@ import {
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
-  modelValue: [Object, Array, null],
+  modelValue: { type: [Object, Array], default: null },
   endpoint: { type: String, required: true },
   multiple: { type: Boolean, default: false },
   placeholder: { type: String, default: 'Seleccione opciones...' },
   labelKey: { type: String, default: 'nombre' }, // Puede ser 'nombre', 'name', 'nombre_completo'
   clearable: { type: Boolean, default: true },
+  disabled: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['update:modelValue']);
@@ -26,10 +27,15 @@ const results = ref([]);
 const isOpen = ref(false);
 const loading = ref(false);
 const container = ref(null);
+const panel = ref(null);
+const inheritedDisabled = ref(false);
 let timeout = null;
+let fetchRequest = 0;
+let disabledObserver = null;
 
 const { bottom, left, width, top } = useElementBounding(container);
 const { height: windowHeight } = useWindowSize();
+const isDisabled = computed(() => props.disabled || inheritedDisabled.value);
 
 const floatingStyles = computed(() => {
     const dropdownHeight = 320; 
@@ -55,33 +61,74 @@ onMounted(() => {
         // Si hay un valor inicial, podríamos cargar su label si fuera necesario, 
         // pero displayLabel ya lo maneja si el objeto viene completo.
     }
+
+    const parentFieldset = container.value?.closest('fieldset');
+    const updateInheritedDisabled = () => {
+        inheritedDisabled.value = Boolean(parentFieldset?.disabled);
+    };
+
+    updateInheritedDisabled();
+    if (parentFieldset && typeof MutationObserver !== 'undefined') {
+        disabledObserver = new MutationObserver(updateInheritedDisabled);
+        disabledObserver.observe(parentFieldset, { attributes: true, attributeFilter: ['disabled'] });
+    }
+
     document.addEventListener('click', handleClickOutside);
 });
 
 onUnmounted(() => {
+    clearTimeout(timeout);
+    fetchRequest++;
+    disabledObserver?.disconnect();
     document.removeEventListener('click', handleClickOutside);
 });
 
+const closeDropdown = () => {
+    isOpen.value = false;
+    clearTimeout(timeout);
+    fetchRequest++;
+    loading.value = false;
+};
+
 const handleClickOutside = (e) => {
-    if (container.value && !container.value.contains(e.target)) {
-        isOpen.value = false;
+    const clickedTrigger = container.value?.contains(e.target);
+    const clickedPanel = panel.value?.contains(e.target);
+
+    if (!clickedTrigger && !clickedPanel) {
+        closeDropdown();
     }
 };
 
-const fetchResults = (term) => {
+const fetchResults = (term, requestId = ++fetchRequest) => {
     loading.value = true;
     axios.get(props.endpoint, { params: { term } })
         .then(res => {
-            results.value = Array.isArray(res.data) ? res.data : [];
+            if (requestId === fetchRequest) {
+                results.value = Array.isArray(res.data) ? res.data : [];
+            }
+        })
+        .catch(() => {
+            if (requestId === fetchRequest) {
+                results.value = [];
+            }
         })
         .finally(() => {
-            loading.value = false;
+            if (requestId === fetchRequest) {
+                loading.value = false;
+            }
         });
 };
 
 watch(query, (newQuery) => {
     clearTimeout(timeout);
-    timeout = setTimeout(() => fetchResults(newQuery), 300);
+    const requestId = ++fetchRequest;
+
+    if (!isOpen.value) {
+        loading.value = false;
+        return;
+    }
+
+    timeout = setTimeout(() => fetchResults(newQuery, requestId), 300);
 });
 
 const isSelected = (item) => {
@@ -93,6 +140,8 @@ const isSelected = (item) => {
 };
 
 const select = (item) => {
+    if (isDisabled.value) return;
+
     if (props.multiple) {
         let newValue = Array.isArray(props.modelValue) ? [...props.modelValue] : [];
         const index = newValue.findIndex(i => i.id === item.id);
@@ -104,39 +153,54 @@ const select = (item) => {
         emit('update:modelValue', newValue);
     } else {
         emit('update:modelValue', item);
-        isOpen.value = false;
+        closeDropdown();
     }
     query.value = '';
 };
 
 const removeItem = (item) => {
-    if (props.multiple && Array.isArray(props.modelValue)) {
+    if (!isDisabled.value && props.multiple && Array.isArray(props.modelValue)) {
         emit('update:modelValue', props.modelValue.filter(i => i.id !== item.id));
     }
 };
 
 const clearSelection = () => {
+    if (isDisabled.value) return;
+
     emit('update:modelValue', props.multiple ? [] : null);
     query.value = '';
 };
 
 const toggle = () => {
-    isOpen.value = !isOpen.value;
+    if (isDisabled.value) return;
+
     if (isOpen.value) {
-        query.value = '';
-        fetchResults('');
+        closeDropdown();
+        return;
     }
+
+    isOpen.value = true;
+    query.value = '';
+    fetchResults('');
 };
+
+watch(isDisabled, (disabled) => {
+    if (disabled) closeDropdown();
+});
 </script>
 
 <template>
   <div class="relative w-full" ref="container">
     <!-- Trigger Principal (Estilo Calendar/Input) -->
-    <div 
+    <button
+        type="button"
         @click="toggle"
-        class="min-h-[42px] w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm shadow-sm cursor-pointer hover:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all flex flex-wrap gap-1.5 items-center justify-between"
+        :disabled="isDisabled"
+        :aria-expanded="isOpen"
+        aria-haspopup="listbox"
+        class="min-h-[42px] w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-left text-sm shadow-sm cursor-pointer hover:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all flex flex-wrap gap-1.5 items-center justify-between disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-gray-300"
     >
-        <div class="flex flex-wrap gap-1.5 flex-1 min-w-0">
+        <span class="flex flex-wrap gap-1.5 flex-1 min-w-0">
             <!-- Icono inicial si no hay nada -->
             <MagnifyingGlassIcon v-if="!multiple && !modelValue" class="h-4 w-4 text-gray-400" />
             
@@ -160,9 +224,9 @@ const toggle = () => {
             <span v-else class="text-gray-400 dark:text-gray-500 truncate">
                 {{ placeholder }}
             </span>
-        </div>
+        </span>
         
-        <div class="flex items-center gap-2 shrink-0 ml-2">
+        <span class="flex items-center gap-2 shrink-0 ml-2">
             <ArrowPathIcon v-if="loading" class="h-4 w-4 text-indigo-500 animate-spin" />
             
             <!-- Botón para limpiar (Simple) -->
@@ -174,13 +238,15 @@ const toggle = () => {
             />
 
             <ChevronDownIcon class="h-4 w-4 text-gray-400 transition-transform duration-300" :class="{'rotate-180': isOpen}" />
-        </div>
-    </div>
+        </span>
+    </button>
 
     <!-- Panel Dropdown Premium -->
     <Teleport to="body">
         <div 
             v-if="isOpen" 
+            ref="panel"
+            @click.stop
             class="fixed z-[9999] mt-1 rounded-xl bg-white dark:bg-gray-800 shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top"
             :style="floatingStyles"
         >
@@ -190,6 +256,7 @@ const toggle = () => {
                     <input 
                         v-model="query"
                         type="text"
+                        :disabled="isDisabled"
                         class="w-full pl-9 pr-4 py-2 text-sm rounded-lg border-gray-200 dark:border-gray-600 dark:bg-gray-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                         placeholder="Escribe para filtrar..."
                         @click.stop

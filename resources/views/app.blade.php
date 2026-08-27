@@ -9,14 +9,14 @@
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+        <link href="https://fonts.bunny.net/css?family=dm-sans:400,500,600,700%7Cmanrope:600,700,800&display=swap" rel="stylesheet" />
 
         <!-- Scripts y Estilos con Vite -->
         @routes
         @vite(['resources/js/app.js', "resources/js/Pages/{$page['component']}.vue"])
         @inertiaHead
     </head>
-    <body class="font-sans antialiased">
+    <body class="font-sans antialiased selection:bg-teal-200 selection:text-teal-950">
         <!-- El punto donde Inertia inyectará tu aplicación de Vue -->
         @inertia
     </body>

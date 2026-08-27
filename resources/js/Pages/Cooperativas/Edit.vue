@@ -94,7 +94,7 @@ const getRandomColor = (id) => {
                         <div :class="`w-14 h-14 rounded-2xl flex items-center justify-center text-white text-xl font-black shadow-lg ${getRandomColor(cooperativa.id)}`">
                             {{ cooperativa.nombre[0] }}
                         </div>
-                        <div>
+                        <div data-tutorial="cooperativas-edit-header">
                             <h2 class="font-black text-2xl text-gray-900 dark:text-white leading-tight">
                                 Editar: {{ cooperativa.nombre }}
                             </h2>
@@ -103,7 +103,7 @@ const getRandomColor = (id) => {
                     </div>
                 </div>
                 <div class="flex items-center gap-3 w-full md:w-auto">
-                    <PrimaryButton @click="submit" class="w-full md:w-auto !bg-indigo-600 hover:!bg-indigo-700 !px-10 !py-3 !text-sm !font-black !rounded-xl !shadow-xl !shadow-indigo-200 dark:!shadow-none flex items-center justify-center gap-2" :disabled="form.processing">
+                    <PrimaryButton data-tutorial="cooperativas-edit-save" @click="submit" class="w-full md:w-auto !bg-indigo-600 hover:!bg-indigo-700 !px-10 !py-3 !text-sm !font-black !rounded-xl !shadow-xl !shadow-indigo-200 dark:!shadow-none flex items-center justify-center gap-2" :disabled="form.processing">
                         <CheckCircleIcon v-if="!form.processing" class="w-5 h-5" />
                         <ArrowPathIcon v-else class="w-5 h-5 animate-spin" />
                         Guardar Cambios

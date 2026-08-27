@@ -79,6 +79,7 @@ return [
     'admin_address' => env('MAIL_TO_ADMIN_ADDRESS'),
 
     'alerts' => [
+        'automation_enabled' => (bool) env('MAIL_ALERT_AUTOMATION_ENABLED', true),
         'burst_limit' => (int) env('MAIL_ALERT_BURST_LIMIT', 2),
         'pause_seconds' => (int) env('MAIL_ALERT_PAUSE_SECONDS', 30),
         'cooldown_minutes' => (int) env('MAIL_ALERT_COOLDOWN_MINUTES', 60),

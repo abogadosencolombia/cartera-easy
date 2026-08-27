@@ -34,7 +34,10 @@ const form = useForm({
     addresses: [],
 });
 
-const { clearDraft } = useFormDraft(form, 'draft:create:users');
+const { clearDraft } = useFormDraft(form, 'draft:create:users', {
+    // Las contraseñas no deben persistir en el almacenamiento del navegador.
+    fields: ['name', 'email', 'tipo_usuario', 'cooperativas', 'especialidades', 'persona_id', 'addresses'],
+});
 
 // --- LÓGICA DE DIRECCIONES ---
 function addAddress() {

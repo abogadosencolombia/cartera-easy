@@ -39,6 +39,23 @@ const selectedFiles = ref([]); // Lista de { archivo, tipo_documento, fecha_carg
 const processing = ref(false);
 const fileInput = ref(null);
 
+const documentTypes = [
+    { value: "PAGARÉ", label: "PAGARÉ" },
+    { value: "CARTA INSTRUCCIONES", label: "CARTA INSTRUCCIONES" },
+    { value: "CERTIFICACIÓN SALDO", label: "CERTIFICACIÓN SALDO" },
+    { value: "LIBRANZA", label: "LIBRANZA" },
+    { value: "DEMANDA EN WORD", label: "DEMANDA EN WORD" },
+    { value: "DEMANDA EN PDF", label: "DEMANDA EN PDF" },
+    { value: "MEDIDAS CAUTELARES", label: "MEDIDAS CAUTELARES" },
+    { value: "SUBSANACION", label: "SUBSANACION" },
+    { value: "MEMORIAL DE SUBSANACION", label: "MEMORIAL DE SUBSANACION" },
+    { value: "AUTOS", label: "AUTOS" },
+    { value: "MEMORIAL", label: "MEMORIAL" },
+    { value: "CÉDULA DEUDOR", label: "CÉDULA DEUDOR" },
+    { value: "CÉDULA CODEUDOR", label: "CÉDULA CODEUDOR" },
+    { value: "OTROS", label: "OTROS" },
+];
+
 const openUploadModal = () => { 
     selectedFiles.value = []; 
     confirmingDocumentUpload.value = true; 
@@ -58,7 +75,7 @@ const onPickFiles = (e) => {
     files.forEach(file => {
         selectedFiles.value.push({
             archivo: file,
-            tipo_documento: 'pagaré',
+            tipo_documento: 'PAGARÉ',
             fecha_carga: today,
             asociado_a: defaultAsociado,
             nota: ''
@@ -171,16 +188,7 @@ const deleteDocument = () => {
                                 <div>
                                     <InputLabel value="Tipo *" class="text-[9px] uppercase font-bold text-gray-400" />
                                     <SelectInput v-model="item.tipo_documento" class="w-full h-9 text-[11px]" required>
-                                        <option value="pagaré">Pagaré</option>
-                                        <option value="carta instrucciones">Carta Instrucciones</option>
-                                        <option value="certificación saldo">Certificación Saldo</option>
-                                        <option value="libranza">Libranza</option>
-                                        <option value="demanda">Demanda</option>
-                                        <option value="autos">Autos</option>
-                                        <option value="memorial">Memorial</option>
-                                        <option value="cédula deudor">Cédula Deudor</option>
-                                        <option value="cédula codeudor">Cédula Codeudor</option>
-                                        <option value="otros">Otros</option>
+                                        <option v-for="type in documentTypes" :key="type.value" :value="type.value">{{ type.label }}</option>
                                     </SelectInput>
                                 </div>
                                 <div>

@@ -141,7 +141,7 @@ const getRandomColor = (id) => {
                 <div :class="`w-14 h-14 rounded-lg flex items-center justify-center text-white text-xl font-black shadow-lg ${getRandomColor(persona.id)}`">
                     {{ persona.nombre_completo[0] }}
                 </div>
-                <div>
+                <div data-tutorial="personas-edit-header">
                     <h2 class="font-black text-2xl text-gray-900 dark:text-white leading-tight">
                         Editar: {{ persona.nombre_completo }}
                     </h2>
@@ -150,7 +150,7 @@ const getRandomColor = (id) => {
             </div>
         </div>
         <div class="flex items-center gap-3 w-full md:w-auto">
-            <PrimaryButton @click="submit" class="w-full md:w-auto !bg-indigo-600 hover:!bg-indigo-700 !px-10 !py-3 !text-sm !font-black !rounded-lg !shadow-sm dark:!shadow-none flex items-center justify-center gap-2" :disabled="form.processing">
+            <PrimaryButton data-tutorial="personas-edit-save" @click="submit" class="w-full md:w-auto !bg-indigo-600 hover:!bg-indigo-700 !px-10 !py-3 !text-sm !font-black !rounded-lg !shadow-sm dark:!shadow-none flex items-center justify-center gap-2" :disabled="form.processing">
                 <CheckCircleIcon v-if="!form.processing" class="w-5 h-5" />
                 <ArrowPathIcon v-else class="w-5 h-5 animate-spin" />
                 Guardar Cambios

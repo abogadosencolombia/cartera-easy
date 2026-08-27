@@ -43,11 +43,7 @@ class PersonaController extends Controller
 
         // --- 2. Búsqueda General ---
         $query->when($request->input('search'), function ($q, $search) {
-            $q->where(function ($subq) use ($search) {
-                $subq->where('nombre_completo', 'ilike', "%{$search}%")
-                     ->orWhere('numero_documento', 'ilike', "%{$search}%")
-                     ->orWhere('id', 'ilike', "%{$search}%");
-            });
+            $q->searchSmart($search);
         });
 
         // --- 3. Filtro por Cooperativa ---
@@ -334,16 +330,7 @@ class PersonaController extends Controller
         $this->applyPersonaVisibilityFilter($query, $user);
 
         if (!empty($term)) {
-            $words = explode(' ', $term);
-            foreach ($words as $word) {
-                if (empty(trim($word))) continue;
-                $normalized = $this->normalizeTerm(trim($word));
-                $query->where(function($q) use ($word, $normalized) {
-                    $q->where('nombre_completo', 'ilike', "%{$word}%")
-                         ->orWhere('numero_documento', 'ilike', "%{$word}%")
-                         ->orWhereRaw("TRANSLATE(nombre_completo, 'áéíóúüÁÉÍÓÚÜ', 'aeiouuAEIOUU') ILIKE ?", ["%{$normalized}%"]);
-                });
-            }
+            $query->searchSmart($term);
         }
 
         $personas = $query->orderBy('nombre_completo')

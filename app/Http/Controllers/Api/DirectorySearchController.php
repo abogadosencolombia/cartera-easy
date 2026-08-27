@@ -66,10 +66,8 @@ class DirectorySearchController extends Controller
             return response()->json([]);
         }
 
-        $results = Persona::where(function ($q) use ($query) {
-                $q->where('nombre_completo', 'ILIKE', "%{$query}%")
-                    ->orWhere('numero_documento', 'ILIKE', "%{$query}%");
-            })
+        $results = Persona::query()
+            ->searchSmart($query)
             ->select('id', 'nombre_completo', 'numero_documento')
             ->limit(10)
             ->get()

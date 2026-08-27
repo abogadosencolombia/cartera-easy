@@ -44,7 +44,7 @@ const submit = () => {
                         <div class="p-4 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl shadow-lg shadow-blue-200 dark:shadow-none transform transition-transform hover:scale-105 duration-300">
                             <PencilIcon class="h-8 w-8 text-white" />
                         </div>
-                        <div>
+                        <div data-tutorial="juzgados-edit-header">
                             <div class="flex items-center gap-3">
                                 <h2 class="font-black text-3xl text-gray-900 dark:text-white leading-tight tracking-tight">
                                     Editar Despacho
@@ -188,7 +188,7 @@ const submit = () => {
                                 Cancelar
                             </SecondaryButton>
                         </Link>
-                        <PrimaryButton 
+                        <PrimaryButton data-tutorial="juzgados-edit-save"
                             class="!px-12 !py-4 !rounded-full !bg-gradient-to-r !from-blue-600 !to-cyan-600 hover:!from-blue-700 hover:!to-cyan-700 !text-sm font-bold flex items-center gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-500/40 active:scale-95 shadow-lg shadow-blue-500/20" 
                             :disabled="form.processing"
                         >

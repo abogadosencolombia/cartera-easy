@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\Caso;
 use App\Models\RequisitoDocumento;
 use App\Models\ValidacionLegal;
+use Illuminate\Support\Str;
 
 class CasoObserver
 {
@@ -69,7 +70,10 @@ class CasoObserver
         }
 
         foreach ($requisitos as $requisito) {
-            $documentoExiste = $caso->documentos()->where('tipo_documento', $requisito->tipo_documento_requerido)->exists();
+            $tipoEsperado = $this->normalizarDocumento($requisito->tipo_documento_requerido);
+            $documentoExiste = $caso->documentos()
+                ->pluck('tipo_documento')
+                ->contains(fn ($tipo) => $this->normalizarDocumento($tipo) === $tipoEsperado);
             
             ValidacionLegal::create([
                 'caso_id' => $caso->id,
@@ -81,5 +85,10 @@ class CasoObserver
                 'nivel_riesgo' => $requisito->nivel_riesgo ?? 'medio',
             ]);
         }
+    }
+
+    private function normalizarDocumento(?string $nombreDocumento): string
+    {
+        return Str::of($nombreDocumento ?? '')->ascii()->lower()->squish()->toString();
     }
 }

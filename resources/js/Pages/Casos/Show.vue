@@ -126,7 +126,7 @@ const confirmUnlockCase = () => {
 
     <AuthenticatedLayout>
         <template #header>
-            <div class="flex flex-col md:flex-row justify-between md:items-center gap-4">
+            <div data-tutorial="casos-show-header" class="flex flex-col md:flex-row justify-between md:items-center gap-4">
                 <div class="flex items-center gap-3">
                     <Link :href="route('casos.index')" class="p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 text-gray-400 hover:text-indigo-600 transition-all">
                         <ArrowLeftIcon class="h-4 w-4" />
@@ -140,11 +140,11 @@ const confirmUnlockCase = () => {
                     </div>
                 </div>
                 
-                <div class="flex flex-wrap items-center gap-2">
+                <div data-tutorial="casos-show-actions" class="flex flex-wrap items-center gap-2">
                     <button @click="copyLegalInfo" class="inline-flex items-center px-3 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg font-bold text-[10px] text-gray-600 dark:text-gray-300 uppercase tracking-wider hover:bg-white transition-all shadow-sm">
                         <DocumentDuplicateIcon class="h-3.5 w-3.5 mr-1.5 text-gray-400" /> Copiar Datos
                     </button>
-                    <Link v-if="puedeEditar" :href="route('casos.edit', caso.id)" class="inline-flex items-center px-3 py-1.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg font-bold text-[10px] text-gray-700 dark:text-gray-300 uppercase tracking-wider hover:bg-gray-50 transition-all shadow-sm">
+                    <Link v-if="puedeEditar" data-tutorial="casos-show-edit-link" :href="route('casos.edit', caso.id)" class="inline-flex items-center px-3 py-1.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg font-bold text-[10px] text-gray-700 dark:text-gray-300 uppercase tracking-wider hover:bg-gray-50 transition-all shadow-sm">
                         <PencilSquareIcon class="h-3.5 w-3.5 mr-1.5 text-indigo-500" /> Editar
                     </Link>
                     <Link v-if="!caso.contrato && puedeEditar" :href="route('honorarios.contratos.create', { caso_id: caso.id, monto: resumen_financiero.saldo_pendiente })" class="inline-flex items-center px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-bold text-[10px] uppercase tracking-wider hover:bg-indigo-700 transition-all shadow-sm">
@@ -207,7 +207,7 @@ const confirmUnlockCase = () => {
                 </div>
 
                 <!-- DASHBOARD COMPACTO -->
-                <div class="bg-white dark:bg-gray-800 shadow-sm rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div data-tutorial="casos-show-summary" class="bg-white dark:bg-gray-800 shadow-sm rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                     <div class="grid grid-cols-1 lg:grid-cols-4">
                         <!-- Info Resumida -->
                         <div class="p-5 bg-gray-50/50 dark:bg-gray-700/30 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-700">
@@ -256,7 +256,7 @@ const confirmUnlockCase = () => {
                 <!-- NAVEGACIÓN Y CONTENIDO -->
                 <div class="bg-white dark:bg-gray-800 shadow-sm rounded-2xl border border-gray-200 dark:border-gray-700 overflow-visible">
                     <div class="border-b border-gray-100 dark:border-gray-700 px-4">
-                        <nav class="-mb-px flex space-x-6 overflow-x-auto scrollbar-hide">
+                        <nav data-tutorial="casos-show-tabs" class="-mb-px flex space-x-6 overflow-x-auto scrollbar-hide">
                             <button
                                 v-for="tab in [
                                     { id: 'resumen', label: 'Resumen', icon: InformationCircleIcon },

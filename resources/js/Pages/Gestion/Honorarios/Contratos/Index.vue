@@ -203,6 +203,7 @@ const resumenVinculo = (contrato) => {
                 </div>
                 <Link
                     :href="route('honorarios.contratos.create')"
+                    data-tutorial="contratos-registrar"
                     class="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-600 bg-indigo-600 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-indigo-700"
                 >
                     <PlusIcon class="h-4 w-4" />
@@ -213,7 +214,7 @@ const resumenVinculo = (contrato) => {
 
         <div class="min-h-screen bg-gray-50/70 py-6 dark:bg-gray-950/40">
             <div class="mx-auto max-w-[1600px] space-y-5 px-4 sm:px-6 lg:px-8">
-                <section class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <section data-tutorial="contratos-indicadores" class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <article class="rounded-lg border border-emerald-200 bg-white p-4 shadow-sm dark:border-emerald-900/60 dark:bg-gray-900">
                         <div class="flex items-start justify-between gap-3">
                             <div>
@@ -267,7 +268,7 @@ const resumenVinculo = (contrato) => {
                     </article>
                 </section>
 
-                <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:p-5">
+                <section data-tutorial="contratos-filtros" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:p-5">
                     <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                         <div class="relative min-w-0 flex-1">
                             <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
@@ -315,7 +316,7 @@ const resumenVinculo = (contrato) => {
                 <section class="space-y-3">
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                         <div>
-                            <h3 class="text-sm font-black uppercase tracking-widest text-gray-950 dark:text-white">Contratos registrados</h3>
+                            <h3 data-tutorial="contratos-listado" class="text-sm font-black uppercase tracking-widest text-gray-950 dark:text-white">Contratos registrados</h3>
                             <p class="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Cada fila muestra saldo estimado, pagos, cargos y proximo vencimiento.</p>
                         </div>
                         <p class="text-xs font-bold text-gray-500 dark:text-gray-400">{{ contratosRows.length }} visible(s) en esta pagina</p>
@@ -332,6 +333,7 @@ const resumenVinculo = (contrato) => {
                                     <div class="flex flex-wrap items-center gap-2">
                                         <Link
                                             :href="route('honorarios.contratos.show', c.id)"
+                                            :data-tutorial="contratosRows[0]?.id === c.id ? 'contratos-ver-primero' : null"
                                             class="min-w-0 text-base font-black text-gray-950 transition hover:text-indigo-700 dark:text-white dark:hover:text-indigo-300"
                                             :title="c.persona_nombre"
                                         >

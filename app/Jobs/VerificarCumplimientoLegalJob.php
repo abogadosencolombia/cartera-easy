@@ -11,6 +11,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class VerificarCumplimientoLegalJob implements ShouldQueue
 {
@@ -48,9 +49,9 @@ class VerificarCumplimientoLegalJob implements ShouldQueue
             }
 
             $this->verificarPlazoDemanda($caso, $config);
-            $this->verificarDocumento($caso, $config, 'sin_pagare', 'pagare', 'exige_pagare');
+            $this->verificarDocumento($caso, $config, 'sin_pagare', 'pagaré', 'exige_pagare');
             $this->verificarDocumento($caso, $config, 'sin_carta_instrucciones', 'carta instrucciones', 'exige_carta_instrucciones');
-            $this->verificarDocumento($caso, $config, 'sin_certificacion_saldo', 'certificacion saldo', 'exige_certificacion_saldo');
+            $this->verificarDocumento($caso, $config, 'sin_certificacion_saldo', 'certificación saldo', 'exige_certificacion_saldo');
         }
     }
 
@@ -80,8 +81,9 @@ class VerificarCumplimientoLegalJob implements ShouldQueue
     private function verificarDocumento(Caso $caso, $config, string $tipoValidacion, string $tipoDocEnBD, string $campoConfig): void
     {
         if ($config->$campoConfig) {
-            // La relación 'documentos' debe existir en el modelo Caso.
-            $tieneDocumento = $caso->documentos()->where('tipo_documento', $tipoDocEnBD)->exists();
+            $tipoEsperado = $this->normalizarDocumento($tipoDocEnBD);
+            $tieneDocumento = $caso->documentos
+                ->contains(fn ($documento) => $this->normalizarDocumento($documento->tipo_documento) === $tipoEsperado);
             $estado = $tieneDocumento ? 'cumple' : 'incumple';
             $observacion = $tieneDocumento ? 'Documento registrado correctamente.' : 'Documento faltante según la configuración de la cooperativa.';
         } else {
@@ -89,6 +91,11 @@ class VerificarCumplimientoLegalJob implements ShouldQueue
             $observacion = 'La cooperativa no exige este documento.';
         }
         $this->actualizarValidacion($caso, $tipoValidacion, $estado, $observacion);
+    }
+
+    private function normalizarDocumento(?string $nombreDocumento): string
+    {
+        return Str::of($nombreDocumento ?? '')->ascii()->lower()->squish()->toString();
     }
 
     private function actualizarValidacion(Caso $caso, string $tipo, string $estado, string $observacion): void

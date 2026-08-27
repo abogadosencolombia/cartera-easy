@@ -67,6 +67,12 @@ class EtapasProcesalesSeeder extends Seeder
             $this->etapa('ACUERDO DE PAGO PREJUDICIAL', 1, 5, 'BAJO', 'ABOGADO'),
             $this->etapa('SIN DEMANDA POR ACUERDO DE PAGO', 8, 0, 'BAJO', 'SISTEMA'),
 
+            // RECUPERACIÓN DE VIDA CREDITICIA
+            $this->etapa('PETICIÓN', 1, 15, 'MEDIO', 'ABOGADO', 'Presentación y seguimiento de la petición para la recuperación de la vida crediticia.'),
+            $this->etapa('ACCIÓN DE TUTELA', 2, 1, 'ALTO', 'ABOGADO', 'Preparación y presentación de la acción de tutela.'),
+            $this->etapa('IMPUGNACIÓN', 5, 3, 'ALTO', 'ABOGADO', 'Impugnación del fallo de tutela de primera instancia.'),
+            $this->etapa('SEGUNDA INSTANCIA', 5, 20, 'ALTO', 'JUZGADO', 'Trámite y decisión de la tutela en segunda instancia.'),
+
             // FASE 1: POSTULACIÓN
             $this->etapa('POR PRESENTAR', 2, 3, 'MEDIO', 'ABOGADO'),
             $this->etapa('ELABORACIÓN DE DEMANDA', 2, 5, 'BAJO', 'ABOGADO'),
@@ -78,9 +84,12 @@ class EtapasProcesalesSeeder extends Seeder
             $this->etapa('CALIFICACIÓN: INADMITIDA', 2, 5, 'MEDIO', 'ABOGADO'),
             $this->etapa('CALIFICACIÓN: RECHAZADA', 2, 3, 'ALTO', 'ABOGADO'),
             $this->etapa('SUBSANACIÓN DE DEMANDA', 2, 5, 'MEDIO', 'ABOGADO'),
+            $this->etapa('SUBSANACION 2', 2, 5, 'MEDIO', 'ABOGADO', 'Segunda subsanación requerida dentro de la etapa de admisión.'),
             $this->etapa('REFORMA DE DEMANDA', 2, 5, 'MEDIO', 'ABOGADO'),
+            $this->etapa('SOLICITUD DE REFORMA A LA DEMANDA', 2, 5, 'MEDIO', 'ABOGADO', 'Preparación o presentación de una solicitud de reforma de la demanda.'),
             $this->etapa('RETIRO DE DEMANDA', 8, 0, 'MEDIO', 'ABOGADO'),
             $this->etapa('RECHAZADA POR COMPETENCIA', 2, 5, 'ALTO', 'ABOGADO'),
+            $this->etapa('CONFLICTO DE COMPETENCIA', 2, 5, 'ALTO', 'JUZGADO', 'Definición del despacho competente para continuar el proceso.'),
             $this->etapa('REQUIERE PREVIO DESISTIMIENTO', 2, 5, 'ALTO', 'ABOGADO'),
 
             // FASE 2: NOTIFICACIÓN
@@ -190,6 +199,7 @@ class EtapasProcesalesSeeder extends Seeder
             $this->etapa('TERMINADO POR REESTRUCTURACIÓN', 8, 0, 'BAJO', 'ABOGADO'),
             $this->etapa('TERMINADO POR DESISTIMIENTO TÁCITO (ART. 317 CGP)', 8, 0, 'MUY_ALTO', 'ABOGADO'),
             $this->etapa('TERMINADO POR DESISTIMIENTO TÁCITO', 8, 0, 'MUY_ALTO', 'ABOGADO'),
+            $this->etapa('TERMINADO POR DESISTIMIENTO TACITO', 8, 0, 'MUY_ALTO', 'ABOGADO', 'Terminación por desistimiento tácito, conservando la variante histórica sin tilde.'),
             $this->etapa('TERMINADO POR PRESCRIPCIÓN', 8, 0, 'MUY_ALTO', 'ABOGADO'),
             $this->etapa('TERMINADO POR PERENCIÓN', 8, 0, 'ALTO', 'ABOGADO'),
             $this->etapa('TERMINADO POR VENTA DE CARTERA', 8, 0, 'BAJO', 'SISTEMA'),
@@ -197,6 +207,7 @@ class EtapasProcesalesSeeder extends Seeder
             $this->etapa('TERMINADO POR ADJUDICACIÓN DE BIENES', 8, 0, 'BAJO', 'SISTEMA'),
             $this->etapa('SOLICITUD DE SUSPENSIÓN DEL PROCESO', 8, 5, 'MEDIO', 'ABOGADO'),
             $this->etapa('SUSPENDIDO', 8, 0, 'MEDIO', 'JUZGADO'),
+            $this->etapa('SUSPENDIDO POR ACUERDO DE PAGO', 8, 0, 'MEDIO', 'JUZGADO', 'Proceso suspendido mientras se cumple un acuerdo de pago.'),
             $this->etapa('SUSPENDIDO POR TRÁMITE DE INSOLVENCIA', 8, 0, 'ALTO', 'JUZGADO'),
             $this->etapa('ARCHIVO DEFINITIVO', 8, 0, 'BAJO', 'JUZGADO'),
         ];

@@ -27,6 +27,7 @@ class Codeudor extends Model
         'nombre_completo',
         'tipo_documento',
         'numero_documento',
+        'dv',
         'celular',
         'correo',
         'addresses',      // JSONB
@@ -51,4 +52,3 @@ class Codeudor extends Model
         return $this->belongsToMany(Caso::class, 'caso_codeudor', 'codeudor_id', 'caso_id');
     }
 }
-

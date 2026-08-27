@@ -2,7 +2,86 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+    --cc-brand: #188274;
+    --cc-brand-strong: #176c62;
+    --cc-brand-soft: #e8f7f3;
+    --cc-ink: #17262f;
+    --cc-muted: #64747d;
+    --cc-line: #dce6e8;
+    --cc-surface: #ffffff;
+    --cc-canvas: #f3f7f7;
+    --cc-shadow-sm: 0 1px 2px rgb(22 53 60 / 0.04), 0 8px 22px rgb(22 53 60 / 0.05);
+    --cc-shadow-lg: 0 18px 50px rgb(22 53 60 / 0.14);
+}
+
 @layer base {
+    html {
+        scroll-behavior: smooth;
+        background: var(--cc-canvas);
+    }
+
+    body {
+        min-width: 320px;
+        background: var(--cc-canvas);
+        color: var(--cc-ink);
+        font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+        text-rendering: optimizeLegibility;
+    }
+
+    h1, h2, h3, h4 {
+        font-family: Manrope, ui-sans-serif, system-ui, sans-serif;
+        letter-spacing: -0.025em;
+    }
+
+    button, a, input, select, textarea {
+        -webkit-tap-highlight-color: rgb(36 168 148 / 0.18);
+    }
+
+    :focus-visible {
+        outline: 3px solid var(--cc-brand) !important;
+        outline-offset: 2px !important;
+    }
+
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #bdcbce; border: 3px solid transparent; border-radius: 999px; background-clip: padding-box; }
+    ::-webkit-scrollbar-thumb:hover { background-color: #8ca1a5; }
+
+    .dark {
+        --cc-brand: #43c4ae;
+        --cc-brand-strong: #7dddc9;
+        --cc-brand-soft: rgb(23 108 98 / 0.24);
+        --cc-ink: #e7efef;
+        --cc-muted: #9fb0b4;
+        --cc-line: #2d4045;
+        --cc-surface: #17262b;
+        --cc-canvas: #101b20;
+        --cc-shadow-sm: 0 10px 24px rgb(0 0 0 / 0.15);
+        --cc-shadow-lg: 0 18px 50px rgb(0 0 0 / 0.34);
+        color-scheme: dark;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --cc-brand: #43c4ae;
+            --cc-brand-strong: #7dddc9;
+            --cc-brand-soft: rgb(23 108 98 / 0.24);
+            --cc-ink: #e7efef;
+            --cc-muted: #9fb0b4;
+            --cc-line: #2d4045;
+            --cc-surface: #17262b;
+            --cc-canvas: #101b20;
+            --cc-shadow-sm: 0 10px 24px rgb(0 0 0 / 0.15);
+            --cc-shadow-lg: 0 18px 50px rgb(0 0 0 / 0.34);
+            color-scheme: dark;
+        }
+
+        ::-webkit-scrollbar-thumb { background-color: #52666a; }
+
+        input[type="date"] { color-scheme: dark; }
+    }
+
     /* Mejorar la apariencia de los campos de fecha nativos */
     input[type="date"] {
         border-radius: 0.5rem; /* rounded-lg */
@@ -24,6 +103,159 @@
 }
 
 @layer components {
+    /* Base visual transversal: moderniza las pantallas sin alterar su contenido. */
+    .app-shell {
+        background:
+            radial-gradient(circle at 8% 0%, rgb(36 168 148 / 0.07), transparent 28rem),
+            var(--cc-canvas) !important;
+        color: var(--cc-ink) !important;
+    }
+
+    .app-navbar {
+        border-color: rgb(220 230 232 / 0.86) !important;
+        background: rgb(255 255 255 / 0.9) !important;
+        box-shadow: 0 1px 0 rgb(23 72 65 / 0.03);
+    }
+
+    .dark .app-navbar {
+        border-color: rgb(45 64 69 / 0.9) !important;
+        background: rgb(23 38 43 / 0.9) !important;
+    }
+
+    .app-navbar a, .app-navbar button { border-radius: 0.65rem; }
+    .app-navbar [class*="border-b-2"] { height: 2.75rem; border-bottom-width: 0 !important; }
+    .app-navbar .border-indigo-400 { background: var(--cc-brand-soft); color: var(--cc-brand-strong) !important; }
+    .app-navbar [class*="hover:border-gray"]:hover { background: rgb(241 246 246); color: var(--cc-ink) !important; }
+    .dark .app-navbar [class*="hover:border-gray"]:hover { background: rgb(255 255 255 / 0.06); }
+
+    .app-page-header {
+        border-bottom: 1px solid var(--cc-line);
+        background: rgb(255 255 255 / 0.68) !important;
+        box-shadow: none !important;
+    }
+
+    .dark .app-page-header { background: rgb(23 38 43 / 0.66) !important; }
+    .app-page-header > div { padding-top: 1.35rem; padding-bottom: 1.35rem; }
+    .app-main { animation: cc-page-in 220ms ease-out; }
+
+    /* Tarjetas y paneles existentes reciben una superficie coherente. */
+    .app-main :where(.shadow, .shadow-sm, .shadow-md) { box-shadow: var(--cc-shadow-sm); }
+    .app-main :where(.rounded-lg, .rounded-xl, .rounded-2xl) { border-radius: 1rem; }
+
+    /* Controles cómodos y legibles para uso prolongado. */
+    .app-shell :where(
+        input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]):not(.cc-input-preserve):not([role="combobox"]),
+        select:not(.cc-input-preserve),
+        textarea:not(.cc-input-preserve)
+    ) {
+        border-color: var(--cc-line);
+        border-radius: 0.75rem;
+        box-shadow: 0 1px 2px rgb(22 53 60 / 0.035);
+        transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+    }
+
+    .app-shell :where(
+        input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]):not(.cc-input-preserve):not([role="combobox"]),
+        select:not(.cc-input-preserve),
+        textarea:not(.cc-input-preserve)
+    ):hover { border-color: #b5c6c9; }
+    .app-shell :where(
+        input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]):not(.cc-input-preserve):not([role="combobox"]),
+        select:not(.cc-input-preserve),
+        textarea:not(.cc-input-preserve)
+    ):focus {
+        border-color: var(--cc-brand) !important;
+        box-shadow: 0 0 0 3px rgb(36 168 148 / 0.14) !important;
+        outline: none;
+    }
+
+    .app-shell :where(
+        input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]):not(.cc-input-preserve),
+        select:not(.cc-input-preserve),
+        textarea:not(.cc-input-preserve)
+    ):disabled,
+    .app-shell fieldset:disabled :where(
+        input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]):not(.cc-input-preserve),
+        select:not(.cc-input-preserve),
+        textarea:not(.cc-input-preserve)
+    ) {
+        cursor: not-allowed;
+        border-color: #dce4e5;
+        background-color: #edf2f2;
+        color: #7d8d91;
+        box-shadow: none;
+        opacity: 0.78;
+    }
+
+    :where(.app-shell) :where(button, a) {
+        transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+        transition-duration: 160ms;
+        transition-timing-function: ease;
+    }
+
+    .app-shell :where(table:not(.cc-table-preserve) thead) { background: #f4f8f8; }
+    .dark .app-shell :where(table:not(.cc-table-preserve) thead) { background: rgb(255 255 255 / 0.035); }
+    .app-shell :where(table:not(.cc-table-preserve) th) { color: #566a70; letter-spacing: 0.045em; }
+    .dark .app-shell :where(table:not(.cc-table-preserve) th) { color: #9fb0b4; }
+    .app-shell :where(table:not(.cc-table-preserve) tbody tr) { transition: background-color 140ms ease; }
+    .app-shell :where(table:not(.cc-table-preserve) tbody tr:hover) { background: rgb(232 247 243 / 0.55); }
+    .dark .app-shell :where(table:not(.cc-table-preserve) tbody tr:hover) { background: rgb(67 196 174 / 0.07); }
+
+    @media (prefers-color-scheme: dark) {
+        .app-navbar {
+            border-color: rgb(45 64 69 / 0.9) !important;
+            background: rgb(23 38 43 / 0.9) !important;
+        }
+
+        .app-navbar [class*="hover:border-gray"]:hover { background: rgb(255 255 255 / 0.06); }
+        .app-page-header { background: rgb(23 38 43 / 0.66) !important; }
+        .app-shell :where(
+            input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]):not(.cc-input-preserve),
+            select:not(.cc-input-preserve),
+            textarea:not(.cc-input-preserve)
+        ):disabled,
+        .app-shell fieldset:disabled :where(
+            input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]):not(.cc-input-preserve),
+            select:not(.cc-input-preserve),
+            textarea:not(.cc-input-preserve)
+        ) {
+            border-color: #34494e;
+            background-color: #203238;
+            color: #82969a;
+        }
+        .app-shell :where(table:not(.cc-table-preserve) thead) { background: rgb(255 255 255 / 0.035); }
+        .app-shell :where(table:not(.cc-table-preserve) th) { color: #9fb0b4; }
+        .app-shell :where(table:not(.cc-table-preserve) tbody tr:hover) { background: rgb(67 196 174 / 0.07); }
+    }
+
+    /* Menús, modales y ayudas visuales. */
+    [role="menu"], .app-navbar [class*="origin-top"] {
+        border: 1px solid var(--cc-line);
+        border-radius: 0.9rem !important;
+        box-shadow: var(--cc-shadow-lg) !important;
+        overflow: hidden;
+    }
+
+    .fixed.inset-0 > .relative.z-10.bg-white,
+    .fixed.inset-0 > .relative.z-10.dark\\:bg-gray-800 {
+        border: 1px solid var(--cc-line);
+        border-radius: 1.1rem;
+        box-shadow: var(--cc-shadow-lg);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
+
+    @media (max-width: 1279px) {
+        .app-navbar > div + div { max-height: calc(100vh - 4rem); overflow-y: auto; }
+    }
+
+    @keyframes cc-page-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
     .cc-inline-alert {
         display: flex;
         align-items: flex-start;

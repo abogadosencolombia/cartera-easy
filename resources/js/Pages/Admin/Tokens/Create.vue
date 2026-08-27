@@ -15,7 +15,11 @@ const form = useForm({
     activo: true,
 });
 
-const { clearDraft } = useFormDraft(form, 'draft:create:admin.tokens');
+const { clearDraft } = useFormDraft(form, 'draft:create:admin.tokens', {
+    // Las credenciales secretas se introducen siempre de nuevo; nunca se
+    // escriben en sessionStorage.
+    fields: ['proveedor', 'client_id', 'activo'],
+});
 
 const submit = () => {
     form.post(route('admin.tokens.store'), {

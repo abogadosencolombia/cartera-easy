@@ -19,12 +19,14 @@ Schedule::command('alertas:procesar-programadas')
     ->weekdays()
     ->between('08:00', '18:00')
     ->timezone('America/Bogota')
+    ->skip(fn (): bool => ! config('mail.alerts.automation_enabled'))
     ->withoutOverlapping(10)
     ->name('procesar_alertas_programadas');
 
 Schedule::command('gestion:procesar-alertas')
     ->everyFiveMinutes()
     ->timezone('America/Bogota')
+    ->skip(fn (): bool => ! config('mail.alerts.automation_enabled'))
     ->withoutOverlapping(4)
     ->name('procesar_alertas_gestion_diaria');
 
@@ -32,6 +34,7 @@ Schedule::command('alertas:procesar-vencimientos')
     ->hourly()
     ->between('07:00', '22:00')
     ->timezone('America/Bogota')
+    ->skip(fn (): bool => ! config('mail.alerts.automation_enabled'))
     ->withoutOverlapping(59)
     ->name('generar_alertas_juridicas_financieras');
 

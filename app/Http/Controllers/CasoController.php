@@ -177,7 +177,14 @@ class CasoController extends Controller
         }
 
         if ($request->boolean('inactivo_20_dias')) {
-            $query->where('updated_at', '<', now()->subDays(20))
+            $cutoff = now()->subDays(20);
+            $query->where(function ($activityQuery) use ($cutoff) {
+                $activityQuery->where('ultima_actividad', '<', $cutoff)
+                    ->orWhere(function ($fallbackQuery) use ($cutoff) {
+                        $fallbackQuery->whereNull('ultima_actividad')
+                            ->where('updated_at', '<', $cutoff);
+                    });
+            })
                   ->paraSeguimiento();
         }
 
@@ -220,7 +227,7 @@ class CasoController extends Controller
             'cooperativas' => $cooperativas,
             'selectedJuzgado' => $selectedJuzgado,
             'etapas_procesales' => $etapas_procesales,
-            'filters' => $request->only(['search', 'abogado_id', 'cooperativa_id', 'juzgado_id', 'tipo_entidad', 'etapa_procesal', 'sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy', 'integridad_baja']),
+            'filters' => $request->only(['search', 'abogado_id', 'cooperativa_id', 'juzgado_id', 'tipo_entidad', 'etapa_procesal', 'sin_radicado', 'inactivo_20_dias', 'cerrados', 'actualizados_hoy', 'integridad_baja', 'fecha_inicio', 'fecha_fin']),
             'stats' => $stats,
             'can' => ['delete_cases' => true],
         ]);
@@ -429,6 +436,10 @@ class CasoController extends Controller
                 // 1. Upsert Persona (Deudor)
                     $deudor = Persona::withTrashed()->where('numero_documento', trim($row['documento_deudor']))->first();
                     if ($deudor) {
+                        if ($deudor->trashed()) {
+                            $deudor->restore();
+                        }
+
                         $personaData = [
                             'nombre_completo' => trim($row['nombre_deudor']),
                             'tipo_documento' => $row['tipo_documento'] ?? 'CC',
@@ -679,7 +690,7 @@ class CasoController extends Controller
 
         $datosDeudor = $validated['deudor'];
         $datosCodeudores = $validated['codeudores'] ?? [];
-        $userIds = $validated['user_id'];
+        $userIds = array_values(array_unique(array_map('intval', $validated['user_id'])));
 
         unset($validated['deudor'], $validated['codeudores'], $validated['user_id']);
         $validated['tasa_interes_corriente'] = $validated['tasa_interes_corriente'] ?? 0;
@@ -694,6 +705,10 @@ class CasoController extends Controller
                     }
                     $deudor = Persona::withTrashed()->where('numero_documento', trim($datosDeudor['numero_documento']))->first();
                     if ($deudor) {
+                        if ($deudor->trashed()) {
+                            $deudor->restore();
+                        }
+
                         $deudor->update([
                             'nombre_completo' => trim($datosDeudor['nombre_completo']),
                             'tipo_documento' => $datosDeudor['tipo_documento'],
@@ -870,7 +885,7 @@ class CasoController extends Controller
         $validated = $request->validated();
         $datosDeudor = $validated['deudor'];
         $datosCodeudores = $validated['codeudores'] ?? [];
-        $userIds = $validated['user_id'];
+        $userIds = array_values(array_unique(array_map('intval', $validated['user_id'])));
 
         unset($validated['deudor'], $validated['codeudores'], $validated['user_id']);
 
@@ -882,6 +897,10 @@ class CasoController extends Controller
                     }
                     $deudor = Persona::withTrashed()->where('numero_documento', trim($datosDeudor['numero_documento']))->first();
                     if ($deudor) {
+                        if ($deudor->trashed()) {
+                            $deudor->restore();
+                        }
+
                         $deudor->update([
                             'nombre_completo' => trim($datosDeudor['nombre_completo']),
                             'tipo_documento' => $datosDeudor['tipo_documento'],
@@ -907,7 +926,10 @@ class CasoController extends Controller
                 }
                 
                 $original = $caso->getRawOriginal();
-                $validated['user_id'] = $userIds[0] ?? null;
+                $currentPrimaryUserId = $caso->user_id ? (int) $caso->user_id : null;
+                $validated['user_id'] = $currentPrimaryUserId && in_array($currentPrimaryUserId, $userIds, true)
+                    ? $currentPrimaryUserId
+                    : ($userIds[0] ?? null);
                 $caso->update($validated);
                 $changes = $caso->getChanges();
 
@@ -1090,7 +1112,7 @@ class CasoController extends Controller
     {
         $this->authorize('view', $caso);
         $this->authorize('create', Caso::class);
-        $caso->load('juzgado', 'codeudores', 'cooperativa', 'user', 'deudor');
+        $caso->load('juzgado', 'codeudores', 'cooperativa', 'user', 'users', 'deudor');
         return Inertia::render('Casos/Create', [
             'casoAClonar' => $caso,
             'cooperativas' => Cooperativa::all(['id', 'nombre']),
@@ -1110,6 +1132,7 @@ class CasoController extends Controller
             $c = Codeudor::updateOrCreate(['numero_documento' => $numDoc], [
                 'nombre_completo' => trim($d['nombre_completo'] ?? 'SIN NOMBRE'),
                 'tipo_documento' => $d['tipo_documento'] ?? 'CC',
+                'dv' => $d['dv'] ?? null,
                 'celular' => $d['celular'] ?? null,
                 'correo' => $d['correo'] ?? null,
                 'addresses' => $d['addresses'] ?? null,

@@ -15,7 +15,7 @@ class StoreDocumentoCasoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tipo_documento' => ['required', Rule::in(['pagaré', 'carta instrucciones', 'certificación saldo', 'libranza', 'demanda', 'memorial', 'cédula deudor', 'cédula codeudor', 'otros'])],
+            'tipo_documento' => ['required', Rule::in(['PAGARÉ', 'CARTA INSTRUCCIONES', 'CERTIFICACIÓN SALDO', 'LIBRANZA', 'DEMANDA EN WORD', 'DEMANDA EN PDF', 'MEDIDAS CAUTELARES', 'SUBSANACION', 'MEMORIAL DE SUBSANACION', 'AUTOS', 'MEMORIAL', 'CÉDULA DEUDOR', 'CÉDULA CODEUDOR', 'OTROS'])],
             'archivo' => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:131072', // PDF, Imagen o Word, Máx 5MB
             'fecha_carga' => 'required|date',
         ];

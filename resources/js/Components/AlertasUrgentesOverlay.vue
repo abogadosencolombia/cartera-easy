@@ -71,7 +71,7 @@ const open = () => {
 <template>
     <div v-if="totalUrgencias > 0">
         <!-- MODAL PANTALLA COMPLETA 100% RESPONSIVO -->
-        <div v-if="isExpanded" class="fixed inset-0 z-[100] flex items-center justify-center p-2 md:p-8 bg-slate-950/95 backdrop-blur-xl animate-in fade-in duration-500">
+        <div v-if="isExpanded" class="fixed inset-0 z-[190] flex items-center justify-center p-2 md:p-8 bg-slate-950/95 backdrop-blur-xl animate-in fade-in duration-500">
             
             <div class="relative bg-white dark:bg-gray-900 w-full max-w-4xl rounded-[1.5rem] md:rounded-[3rem] shadow-2xl overflow-hidden border border-red-500/20 flex flex-col md:flex-row h-full max-h-[98vh] md:max-h-[85vh]">
                 
@@ -135,7 +135,7 @@ const open = () => {
                                             <p class="text-[11px] font-black text-gray-800 dark:text-gray-100 uppercase truncate">{{ item.identificador }}</p>
                                             <span class="text-[7px] font-black px-1 rounded bg-red-100 text-red-600 uppercase" v-if="item.estado === 'VENCIDO'">Vencido</span>
                                         </div>
-                                        <p class="text-[9px] text-gray-500 font-bold truncate italic leading-tight">{{ item.partes }}</p>
+                                        <p class="text-[9px] text-gray-500 font-bold truncate italic leading-tight dark:text-gray-300">{{ item.partes }}</p>
                                     </div>
                                 </div>
                                 <Link :href="item.url" @click="minimize" class="p-1.5 bg-white dark:bg-gray-700 rounded-lg shadow-sm text-gray-400 hover:text-red-600 shrink-0 ml-2">
@@ -159,18 +159,18 @@ const open = () => {
                                     type="button"
                                     @click.prevent="fetchUrgencias(paginatedData.prev_page_url)" 
                                     :disabled="!paginatedData.prev_page_url || isLoading"
-                                    class="text-[10px] font-black uppercase flex items-center gap-1 text-gray-400 hover:text-red-600 disabled:opacity-10 transition-colors"
+                                    class="text-[10px] font-black uppercase flex items-center gap-1 text-gray-500 hover:text-red-600 disabled:opacity-10 transition-colors dark:text-gray-300"
                                 >
                                     &larr; Ant.
                                 </button>
-                                <span class="text-[10px] font-black text-gray-400 bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full uppercase tracking-tighter">
+                                <span class="text-[10px] font-black text-gray-500 bg-gray-200 dark:bg-gray-700 dark:text-gray-200 px-3 py-1 rounded-full uppercase tracking-tighter">
                                     Pag. {{ paginatedData.current_page }} / {{ paginatedData.last_page }}
                                 </span>
                                 <button 
                                     type="button"
                                     @click.prevent="fetchUrgencias(paginatedData.next_page_url)" 
                                     :disabled="!paginatedData.next_page_url || isLoading"
-                                    class="text-[10px] font-black uppercase flex items-center gap-1 text-gray-400 hover:text-red-600 disabled:opacity-10 transition-colors"
+                                    class="text-[10px] font-black uppercase flex items-center gap-1 text-gray-500 hover:text-red-600 disabled:opacity-10 transition-colors dark:text-gray-300"
                                 >
                                     Sig. &rarr;
                                 </button>

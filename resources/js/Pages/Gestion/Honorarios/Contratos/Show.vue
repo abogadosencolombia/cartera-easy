@@ -707,7 +707,7 @@ const cargoIcon = (cargo) => {
                     >
                         <ArrowLeftIcon class="h-5 w-5" />
                     </Link>
-                    <div class="min-w-0">
+                    <div data-tutorial="contratos-show-header" class="min-w-0">
                         <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Contrato de honorarios</p>
                         <div class="mt-1 flex flex-wrap items-center gap-2">
                             <h2 class="text-2xl font-black tracking-tight text-gray-950 dark:text-white">Contrato #{{ props.contrato?.id }}</h2>
@@ -719,7 +719,7 @@ const cargoIcon = (cargo) => {
                     </div>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-2">
+                <div data-tutorial="contratos-show-actions" class="flex flex-wrap items-center gap-2">
                     <button
                         v-if="puedeRegistrarGasto"
                         type="button"
@@ -795,7 +795,7 @@ const cargoIcon = (cargo) => {
                     </div>
                 </section>
 
-                <section class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <section data-tutorial="contratos-show-indicadores" class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <article class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
                         <div class="flex items-start justify-between gap-3">
                             <div>
@@ -871,7 +871,7 @@ const cargoIcon = (cargo) => {
                     <main class="space-y-5">
                         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
                             <div class="border-b border-gray-200 px-4 pt-4 dark:border-gray-700 sm:px-5">
-                                <nav class="flex gap-2 overflow-x-auto" aria-label="Secciones del contrato">
+                                <nav data-tutorial="contratos-show-tabs" class="flex gap-2 overflow-x-auto" aria-label="Secciones del contrato">
                                     <button
                                         v-for="tab in tabItems"
                                         :key="tab.id"
@@ -1129,7 +1129,7 @@ const cargoIcon = (cargo) => {
                         </section>
 
                         <section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                            <h3 class="text-sm font-black uppercase tracking-widest text-gray-950 dark:text-white">Documento</h3>
+                            <h3 data-tutorial="contratos-show-documentos" class="text-sm font-black uppercase tracking-widest text-gray-950 dark:text-white">Documento</h3>
                             <div class="mt-4 space-y-2">
                                 <a :href="route('honorarios.contratos.pdf.contrato', props.contrato.id)" target="_blank" rel="noopener" class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-700 transition hover:border-indigo-200 hover:text-indigo-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300">
                                     <DocumentTextIcon class="h-4 w-4" />
@@ -1163,7 +1163,7 @@ const cargoIcon = (cargo) => {
                         </section>
 
                         <section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                            <h3 class="text-sm font-black uppercase tracking-widest text-gray-950 dark:text-white">Acciones</h3>
+                            <h3 data-tutorial="contratos-show-acciones" class="text-sm font-black uppercase tracking-widest text-gray-950 dark:text-white">Acciones</h3>
                             <div class="mt-4 space-y-2">
                                 <button v-if="['PAGOS_PENDIENTES', 'PAGO_PARCIAL'].includes(props.contrato?.estado) && props.contrato?.estado !== 'ACTIVO'" type="button" @click="accionesForm.post(route('honorarios.contratos.activar', props.contrato.id), { preserveScroll: true })" class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-black uppercase tracking-widest text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-300">
                                     Activar contrato

@@ -142,7 +142,7 @@ const getRandomColor = (id) => {
                 </div>
                 
                 <div class="flex items-center gap-3 w-full md:w-auto">
-                    <Link v-if="can.update" :href="route('cooperativas.edit', cooperativa.id)" class="flex-1 md:flex-none inline-flex items-center justify-center px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-none">
+                    <Link v-if="can.update" data-tutorial="cooperativas-show-edit-link" :href="route('cooperativas.edit', cooperativa.id)" class="flex-1 md:flex-none inline-flex items-center justify-center px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-none">
                         <PencilSquareIcon class="w-4 h-4 mr-2" /> Editar Entidad
                     </Link>
                 </div>
@@ -192,7 +192,7 @@ const getRandomColor = (id) => {
                         
                         <!-- Políticas de Cobranza -->
                         <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-                            <div class="px-8 py-5 bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
+                            <div data-tutorial="cooperativas-show-resumen" class="px-8 py-5 bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
                                 <BanknotesIcon class="w-5 h-5 text-indigo-500" />
                                 <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Políticas y Garantías de Cobro</h3>
                             </div>
@@ -224,7 +224,7 @@ const getRandomColor = (id) => {
 
                         <!-- Repositorio Digital -->
                         <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-                            <div class="px-10 py-6 bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                            <div data-tutorial="cooperativas-show-documentos" class="px-10 py-6 bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
                                 <div class="flex items-center gap-3">
                                     <ShieldCheckIcon class="w-5 h-5 text-indigo-500" />
                                     <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Documentos Legales y Soportes</h3>

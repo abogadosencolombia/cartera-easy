@@ -89,7 +89,7 @@ const submit = () => {
                     </div>
                 </div>
                 <div class="flex items-center gap-3 w-full md:w-auto">
-                    <PrimaryButton @click="submit" class="w-full md:w-auto !bg-indigo-600 hover:!bg-indigo-700 !px-10 !py-3 !text-sm !font-black !rounded-xl !shadow-xl !shadow-indigo-200 dark:!shadow-none flex items-center justify-center gap-2" :disabled="form.processing">
+                    <PrimaryButton data-tutorial="cooperativas-guardar" @click="submit" class="w-full md:w-auto !bg-indigo-600 hover:!bg-indigo-700 !px-10 !py-3 !text-sm !font-black !rounded-xl !shadow-xl !shadow-indigo-200 dark:!shadow-none flex items-center justify-center gap-2" :disabled="form.processing">
                         <CheckCircleIcon v-if="!form.processing" class="w-5 h-5" />
                         <ArrowPathIcon v-else class="w-5 h-5 animate-spin" />
                         Finalizar Registro
@@ -104,7 +104,7 @@ const submit = () => {
                     
                     <!-- SECCIÓN 1: IDENTIDAD LEGAL -->
                     <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-                        <div class="px-8 py-5 bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
+                        <div data-tutorial="cooperativas-identidad" class="px-8 py-5 bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
                             <BuildingOfficeIcon class="w-5 h-5 text-indigo-500" />
                             <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Identidad y Personería Jurídica</h3>
                         </div>
@@ -142,7 +142,7 @@ const submit = () => {
 
                     <!-- SECCIÓN 2: REPRESENTACIÓN Y CONTACTO -->
                     <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-                        <div class="px-8 py-5 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
+                        <div data-tutorial="cooperativas-contacto" class="px-8 py-5 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
                             <UserCircleIcon class="w-5 h-5 text-indigo-500" />
                             <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Representación y Contacto Directo</h3>
                         </div>
@@ -181,7 +181,7 @@ const submit = () => {
 
                     <!-- SECCIÓN 3: POLÍTICAS OPERATIVAS -->
                     <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-                        <div class="px-8 py-5 bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
+                        <div data-tutorial="cooperativas-politicas" class="px-8 py-5 bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
                             <ShieldCheckIcon class="w-5 h-5 text-indigo-500" />
                             <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs">Políticas de Cobranza y Garantías</h3>
                         </div>

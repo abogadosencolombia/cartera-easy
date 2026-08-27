@@ -517,7 +517,7 @@ class ExpedienteIntegrityService
         return blank($persona->nombre_completo)
             || blank($documento)
             || Str::startsWith($documento, 'TEMP-')
-            || Str::contains($nombre, 'por identificar');
+            || Str::contains($nombre, ['por identificar', 'persona indeterminada']);
     }
 
     private function hasContact(Model $persona): bool

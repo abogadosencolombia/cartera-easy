@@ -91,7 +91,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
           <DialogPanel class="mx-auto max-w-xl transform divide-y divide-gray-100 dark:divide-gray-700 overflow-hidden rounded-xl bg-white dark:bg-gray-800 shadow-2xl ring-1 ring-black ring-opacity-5 transition-all">
             <div class="relative">
               <MagnifyingGlassIcon class="pointer-events-none absolute left-4 top-3.5 h-5 w-5 text-gray-400" />
-              <input ref="searchInput" v-model="query" type="text" class="h-12 w-full border-0 bg-transparent pl-11 pr-4 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:ring-0 sm:text-sm" placeholder="Buscar y navegar..." />
+              <input ref="searchInput" v-model="query" type="text" class="cc-input-preserve h-12 w-full border-0 bg-transparent pl-11 pr-4 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:ring-0 sm:text-sm" placeholder="Buscar y navegar..." />
             </div>
             <div v-if="searchResults.length > 0" class="max-h-96 overflow-y-auto">
               <ul class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -102,14 +102,14 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
                     <component v-if="item.icon" :is="item.icon" :class="['h-5 w-5 mr-3', activeIndex === index ? 'text-white' : 'text-gray-400']" />
                     <div class="flex flex-col">
                       <span :class="['text-sm font-medium', activeIndex === index ? 'text-white' : 'text-gray-900 dark:text-gray-200']">{{ item.label }}</span>
-                      <span :class="['text-xs', activeIndex === index ? 'text-indigo-200' : 'text-gray-500']">{{ item.group }}</span>
+                      <span :class="['text-xs', activeIndex === index ? 'text-indigo-200' : 'text-gray-500 dark:text-gray-300']">{{ item.group }}</span>
                     </div>
                   </div>
                 </li>
               </ul>
             </div>
              <div v-else class="p-6 text-center">
-              <p class="text-sm text-gray-500">No se encontraron resultados para "{{ query }}"</p>
+              <p class="text-sm text-gray-500 dark:text-gray-300">No se encontraron resultados para "{{ query }}"</p>
             </div>
           </DialogPanel>
         </TransitionChild>

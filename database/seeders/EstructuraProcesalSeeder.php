@@ -2,11 +2,11 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\EspecialidadJuridica;
-use App\Models\TipoProceso;
-use App\Models\SubtipoProceso;
 use App\Models\Subproceso;
+use App\Models\SubtipoProceso;
+use App\Models\TipoProceso;
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 class EstructuraProcesalSeeder extends Seeder
@@ -42,7 +42,7 @@ class EstructuraProcesalSeeder extends Seeder
                         // Aseguramos que siempre sea un array
                         $subprocesosArray = is_array($subprocesos) ? $subprocesos : [$subprocesos];
                         foreach ($subprocesosArray as $subprocesoNombre) {
-                            if (!empty($subprocesoNombre)) {
+                            if (! empty($subprocesoNombre)) {
                                 Subproceso::updateOrCreate(
                                     [
                                         'subtipo_proceso_id' => $subtipoProceso->id,
@@ -55,7 +55,7 @@ class EstructuraProcesalSeeder extends Seeder
                 }
             }
         });
-        
+
         $this->command->info('¡Mapa procesal actualizado con éxito!');
     }
 
@@ -186,6 +186,7 @@ class EstructuraProcesalSeeder extends Seeder
                 ],
             ],
             'CONSTITUCIONAL' => [
+                'RECUPERACIÓN DE VIDA CREDITICIA' => [],
                 'ACCIONES_CONSTITUCIONALES' => [
                     'ACCION_DE_TUTELA' => ['Salud', 'Petición', 'Debido Proceso', 'Mínimo Vital'],
                     'ACCION_POPULAR' => ['Derechos Colectivos'],

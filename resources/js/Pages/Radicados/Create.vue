@@ -84,10 +84,10 @@ const form = useForm('CreateRadicado', {
   a_favor_de: 'DEMANDANTE',
 
   demandantes: [{ 
-    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '', sin_info: false, cooperativas_ids: [], abogados_ids: []
+    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '', sin_info: false, cooperativas_ids: [], abogados_ids: [], _newDraft: null, _existingSelection: null
   }],
   demandados: [{ 
-    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '', sin_info: false, cooperativas_ids: [], abogados_ids: []
+    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '', sin_info: false, cooperativas_ids: [], abogados_ids: [], _newDraft: null, _existingSelection: null
   }],
   
   radicado: '',
@@ -137,14 +137,46 @@ watch([() => form.radicado, () => form.asunto], debounce(() => {
 
 // --- Helpers para Listas Dinámicas ---
 const addDemandante = () => form.demandantes.push({ 
-    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '', sin_info: false, cooperativas_ids: [], abogados_ids: []
+    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '', sin_info: false, cooperativas_ids: [], abogados_ids: [], _newDraft: null, _existingSelection: null
 });
 const removeDemandante = (index) => { if (form.demandantes.length > 1) form.demandantes.splice(index, 1); };
 
 const addDemandado = () => form.demandados.push({ 
-    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '', sin_info: false, cooperativas_ids: [], abogados_ids: []
+    id: null, selected: null, is_new: false, nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '', sin_info: false, cooperativas_ids: [], abogados_ids: [], _newDraft: null, _existingSelection: null
 });
 const removeDemandado = (index) => { if (form.demandados.length > 1) form.demandados.splice(index, 1); };
+
+const partyDraftFields = ['nombre_completo', 'tipo_documento', 'numero_documento', 'dv', 'sin_info', 'cooperativas_ids', 'abogados_ids'];
+const snapshotPartyDraft = (item) => Object.fromEntries(
+    partyDraftFields.map((field) => [field, Array.isArray(item[field]) ? [...item[field]] : item[field]]),
+);
+
+const togglePartyMode = (item) => {
+    const nextIsNew = !item.is_new;
+
+    if (item.is_new && !nextIsNew) {
+        item._newDraft = snapshotPartyDraft(item);
+    }
+
+    if (nextIsNew) {
+        item._existingSelection = { id: item.id, selected: item.selected };
+        item.id = null;
+        item.selected = null;
+        Object.assign(item, item._newDraft ?? {
+            nombre_completo: '', tipo_documento: 'CC', numero_documento: '', dv: '',
+            sin_info: false, cooperativas_ids: [], abogados_ids: [],
+        });
+    } else {
+        const existingSelection = item._existingSelection;
+        if (existingSelection) {
+            item.id = existingSelection.id;
+            item.selected = existingSelection.selected;
+        }
+        item.sin_info = false;
+    }
+
+    item.is_new = nextIsNew;
+};
 
 // --- Wizard Navigation ---
 const nextStep = () => { if (step.value < totalSteps) { transitionName.value = 'slide-next'; step.value++; } };
@@ -166,6 +198,7 @@ const submit = () => {
             tipo_documento: d.tipo_documento,
             numero_documento: d.numero_documento,
             dv: d.dv,
+            sin_info: d.sin_info,
             cooperativas_ids: Array.isArray(d.cooperativas_ids) ? d.cooperativas_ids.map(c => c.id ?? c) : [],
             abogados_ids: Array.isArray(d.abogados_ids) ? d.abogados_ids.map(a => a.id ?? a) : [],
             is_new: true
@@ -245,7 +278,7 @@ const submit = () => {
       <div class="max-w-5xl mx-auto sm:px-6 lg:px-8">
         
         <!-- STEPPER PREMIUM -->
-        <div class="mb-12 relative">
+        <div data-tutorial="radicados-stepper" class="mb-12 relative">
             <!-- Línea de fondo -->
             <div class="absolute top-1/2 left-0 w-full h-0.5 bg-gray-200 dark:bg-gray-700 -translate-y-1/2"></div>
             
@@ -253,6 +286,8 @@ const submit = () => {
                 <button 
                     v-for="(s, idx) in steps" 
                     :key="s.id" 
+                    :data-tutorial="`radicados-step-button-${s.id}`"
+                    :aria-current="s.id === step ? 'step' : undefined"
                     @click="goToStep(s.id)"
                     class="group flex flex-col items-center gap-2 outline-none focus:outline-none"
                 >
@@ -289,7 +324,7 @@ const submit = () => {
           <div class="relative p-8 md:p-10 min-h-[600px]">
               <transition :name="transitionName" mode="out-in">
                 <!-- STEP 1: INFORMACIÓN TÉCNICA -->
-                <div v-if="step === 1" key="step1" class="space-y-8 animate-in fade-in duration-500">
+                <div v-if="step === 1" key="step1" data-tutorial="radicados-identificacion" class="space-y-8 animate-in fade-in duration-500">
                   <div class="flex items-center gap-3 border-b border-gray-50 dark:border-gray-700 pb-4">
                       <div class="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl">
                           <BuildingLibraryIcon class="w-5 h-5 text-indigo-600" />
@@ -328,7 +363,7 @@ const submit = () => {
                         <InputError :message="form.errors.fecha_radicado" />
                     </div>
                     <div class="md:col-span-2 space-y-2">
-                        <InputLabel value="Juzgado o Entidad *" class="font-bold text-xs uppercase" />
+                        <InputLabel value="Juzgado o Entidad" class="font-bold text-xs uppercase" />
                         <AsyncSelect v-model="form.juzgado_id" :endpoint="route('juzgados.search')" placeholder="Escriba para buscar el despacho..." label-key="nombre" />
                         <InputError :message="form.errors.juzgado_id" />
                     </div>
@@ -363,10 +398,10 @@ const submit = () => {
                 </div>
                 
                 <!-- STEP 2: PARTES Y RESPONSABLES -->
-                <div v-else-if="step === 2" key="step2" class="space-y-10 animate-in fade-in duration-500">
+                <div v-else-if="step === 2" key="step2" data-tutorial="radicados-partes" class="space-y-10 animate-in fade-in duration-500">
                   
                   <!-- Responsables y A Favor De -->
-                  <div class="grid grid-cols-1 md:grid-cols-3 gap-8 p-6 bg-indigo-50/30 dark:bg-indigo-900/10 rounded-3xl border border-indigo-100 dark:border-indigo-900/30">
+                  <div data-tutorial="radicados-responsables" class="grid grid-cols-1 md:grid-cols-3 gap-8 p-6 bg-indigo-50/30 dark:bg-indigo-900/10 rounded-3xl border border-indigo-100 dark:border-indigo-900/30">
                       <div class="space-y-2">
                           <InputLabel value="Abogado / Gestor Principal *" class="font-bold text-xs uppercase" />
                           <AsyncSelect v-model="form.abogado_id" :endpoint="route('users.search')" placeholder="Quién lleva el caso..." label-key="name" />
@@ -402,7 +437,7 @@ const submit = () => {
                   </div>
 
                   <!-- Demandantes -->
-                  <div class="space-y-6">
+                  <div data-tutorial="radicados-demandantes" class="space-y-6">
                     <div class="flex justify-between items-center border-b dark:border-gray-700 pb-3">
                         <div class="flex items-center gap-2">
                             <UsersIcon class="w-5 h-5 text-blue-600" />
@@ -420,7 +455,7 @@ const submit = () => {
                             
                             <div class="flex justify-between items-center mb-4">
                                 <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Demandante #{{ index + 1 }}</span>
-                                <button type="button" @click="item.is_new = !item.is_new" class="text-[10px] font-black uppercase text-indigo-600 hover:underline">
+                                <button type="button" @click="togglePartyMode(item)" class="text-[10px] font-black uppercase text-indigo-600 hover:underline">
                                     {{ item.is_new ? '← Buscar' : '+ Nuevo' }}
                                 </button>
                             </div>
@@ -457,7 +492,7 @@ const submit = () => {
                   </div>
 
                   <!-- Demandados -->
-                  <div class="space-y-6">
+                  <div data-tutorial="radicados-demandados" class="space-y-6">
                     <div class="flex justify-between items-center border-b dark:border-gray-700 pb-3">
                         <div class="flex items-center gap-2">
                             <UsersIcon class="w-5 h-5 text-red-600" />
@@ -475,7 +510,7 @@ const submit = () => {
                             
                             <div class="flex justify-between items-center mb-4">
                                 <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Demandado #{{ index + 1 }}</span>
-                                <button type="button" @click="item.is_new = !item.is_new" class="text-[10px] font-black uppercase text-indigo-600 hover:underline">
+                                <button type="button" @click="togglePartyMode(item)" class="text-[10px] font-black uppercase text-indigo-600 hover:underline">
                                     {{ item.is_new ? '← Buscar' : '+ Nuevo' }}
                                 </button>
                             </div>
@@ -513,7 +548,7 @@ const submit = () => {
                 </div>
 
                 <!-- STEP 3: SEGUIMIENTO Y EXTRAS -->
-                <div v-else-if="step === 3" key="step3" class="space-y-8 animate-in fade-in duration-500">
+                <div v-else-if="step === 3" key="step3" data-tutorial="radicados-seguimiento" class="space-y-8 animate-in fade-in duration-500">
                   <div class="flex items-center gap-3 border-b border-gray-50 dark:border-gray-700 pb-4">
                       <div class="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl">
                           <ClockIcon class="w-5 h-5 text-indigo-600" />
@@ -522,7 +557,7 @@ const submit = () => {
                   </div>
 
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div class="p-6 bg-indigo-600 rounded-3xl text-white shadow-xl shadow-indigo-100 dark:shadow-none relative overflow-visible group">
+                    <div data-tutorial="radicados-proxima-revision" class="p-6 bg-indigo-600 rounded-3xl text-white shadow-xl shadow-indigo-100 dark:shadow-none relative overflow-visible group">
                         <div class="absolute -right-6 -top-6 opacity-10 group-hover:scale-110 transition-transform">
                             <ClockIcon class="w-32 h-32" />
                         </div>
@@ -554,13 +589,15 @@ const submit = () => {
                         <Textarea v-model="form.observaciones" rows="3" class="w-full rounded-2xl border-gray-200" placeholder="Cualquier nota relevante para el inicio del caso..." />
                     </div>
 
-                    <div class="space-y-2">
+                    <div data-tutorial="radicados-expediente-digital" class="space-y-2">
                         <InputLabel value="Link Expediente Digital" class="font-bold text-xs uppercase" />
                         <TextInput v-model="form.link_expediente" type="url" class="w-full rounded-xl" placeholder="https://expediente.justicia.gov.co/..." />
+                        <p class="text-[11px] font-semibold leading-5 text-emerald-700 dark:text-emerald-300">La entidad entrega este enlace después de radicar y solicitar acceso. Haga seguimiento y reitere la solicitud las veces necesarias hasta recibirlo.</p>
                     </div>
-                    <div class="space-y-2">
+                    <div data-tutorial="radicados-carpeta-drive" class="space-y-2">
                         <InputLabel value="Carpeta en Drive" class="font-bold text-xs uppercase" />
                         <TextInput v-model="form.ubicacion_drive" type="url" class="w-full rounded-xl" placeholder="https://drive.google.com/..." />
+                        <p class="text-[11px] font-semibold leading-5 text-indigo-700 dark:text-indigo-300">Si no existe, créela en Drive como: DOCUMENTO - NOMBRE COMPLETO. Pegue aquí el enlace con acceso para el equipo.</p>
                     </div>
                   </div>
                 </div>
@@ -588,6 +625,7 @@ const submit = () => {
 
               <PrimaryButton 
                   v-if="step === totalSteps" 
+                  data-tutorial="radicados-guardar"
                   type="submit" 
                   class="!bg-green-600 hover:!bg-green-700 !rounded-xl !px-12 !py-4 !text-lg !font-black uppercase tracking-widest flex items-center gap-3 transition-all transform hover:scale-[1.02] shadow-xl shadow-green-100 dark:shadow-none"
                   :disabled="form.processing"
