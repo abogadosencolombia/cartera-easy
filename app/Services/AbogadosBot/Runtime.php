@@ -241,6 +241,7 @@ final class Runtime
             foreach($this->query("SELECT * FROM events WHERE state='QUEUED' AND seen<? ORDER BY at,seen LIMIT ".max(1,min(30,$limit)),[time()-10])->fetchAll() as $e){
                 try{$this->processEvent($e);}catch(Throwable $ex){$this->mark($e['id'],'ERROR',get_class($ex));$this->ticket($e,'Error de atención automática: revisar mensaje pendiente');$this->health('last_error',get_class($ex).':'.preg_replace('/[^A-Z_0-9]/','',mb_substr($ex->getMessage(),0,70)));}
             }
+            $mail=(new JudicialMail($this,new GoogleSources($this->root)))->tick();$this->health('judicial_mail',$mail['state']);
             $this->flush();$this->health('scheduler','OK');return $this->healthSummary();
         }finally{flock($lock,LOCK_UN);fclose($lock);}
     }
@@ -274,6 +275,12 @@ final class Runtime
             // A name, old inbound message or operational alert never starts that context.
             $followup=$conversation && ($capabilities || $clarification || $selection || $program);
             if($forwarded||(!Policy::directed($text)&&!$directReply&&!$followup)){$this->mark($e['id'],'OBSERVED_NOT_ADDRESSED');return;}
+            if(JudicialMail::requested($text) && (Policy::directed($text)||$directReply)){
+                $monitor=new JudicialMail($this,new GoogleSources($this->root));
+                if(!$monitor->active())$monitor->activate($e['id'],time());
+                $this->queue($e['id'].'|reply',Policy::SANDRA,'Claro, Sandra. Revisaré los nuevos correos de juzgados y fiscalías cada minuto y compartiré el aviso contigo y con Equipo Abogados en Colombia, con remitente, asunto y enlace al correo.');
+                $this->mark($e['id'],'DONE','JUDICIAL_MAIL_RULE');return;
+            }
             if($clarification){
                 $reply=ChiefConversation::reply($conversation['topic']??'general',true);
                 $this->queue($e['id'].'|reply',$e['chat'],$reply);$this->mark($e['id'],'DONE','CLARIFICATION_REPLY');return;

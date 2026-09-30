@@ -36,7 +36,7 @@ final class SourceConversation
         if($source==='drive'&&$term==='')return ['action'=>'clarify','reply'=>'Claro, Sandra. ¿Qué nombre o radicado busco en Drive?'];
         if(mb_strlen($term)>180)return ['action'=>'clarify','reply'=>'¿Qué nombre o radicado específico quieres que busque?'];
         if(preg_match('/\b(?:todos|todas|completo|completa|todo)\b/u',$s))return ['action'=>'clarify','reply'=>'Puedo revisar los resultados por partes. ¿Qué nombre, radicado o fecha quieres consultar primero?'];
-        return ['action'=>'search','source'=>$source,'term'=>$term,'unread'=>(bool)preg_match('/\b(?:sin leer|no leidos)\b/u',$s),'day'=>preg_match('/\bhoy\b/u',$s)?'today':(preg_match('/\bayer\b/u',$s)?'yesterday':null)];
+        return ['action'=>'search','source'=>$source,'term'=>$term,'important'=>(bool)preg_match('/\bimportantes?\b/u',$s),'unread'=>(bool)preg_match('/\b(?:sin leer|no leidos)\b/u',$s),'day'=>preg_match('/\bhoy\b/u',$s)?'today':(preg_match('/\bayer\b/u',$s)?'yesterday':null)];
     }
 
     public function answer(array $plan,array $context=[],?int $now=null):array
@@ -52,18 +52,19 @@ final class SourceConversation
         if($plan['action']==='search'){
             $source=$plan['source'];$term=$plan['term'];$items=[];$more=false;
             if($source==='gmail'){
-                $q='-in:spam -in:trash';
+                $q='-in:spam -in:trash -in:sent';
+                if(!empty($plan['important']))$q.=' -category:promotions -category:social {is:important from:ramajudicial.gov.co from:fiscalia.gov.co subject:audiencia subject:notificacion subject:requerimiento subject:urgente subject:solicitud}';
                 if($term!=='')$q.=' "'.str_replace(['\\','"'],['\\\\','\\"'],$term).'"';
                 if($plan['unread'])$q.=' is:unread';
                 if($plan['day']){$day=(new DateTimeImmutable('@'.$now))->setTimezone(new DateTimeZone('America/Bogota'))->setTime(0,0);if($plan['day']==='yesterday')$day=$day->modify('-1 day');$q.=' after:'.($day->getTimestamp()-1).' before:'.$day->modify('+1 day')->getTimestamp();}
                 $found=$this->google->listMail($q,null,5);$more=!empty($found['nextPageToken']);
                 foreach(array_slice($found['messages']??[],0,5) as $row){$mail=$this->google->mail($row['id'],true);$items[]=$this->mailItem($mail);}
-                $evidence['query']=$q;
+                $evidence['query']=$q;$evidence['importance_filter']=!empty($plan['important']);
             }else{
                 $q="trashed = false and name contains '".str_replace(['\\',"'"],['\\\\',"\\'"],$term)."'";
                 $found=$this->google->listFiles($q,null,5);$more=!empty($found['nextPageToken']);
                 foreach(array_slice($found['files']??[],0,5) as $row)$items[]=$this->driveItem($row);
-                $evidence['query']=$q;
+                $evidence['query']=$q;$evidence['importance_filter']=!empty($plan['important']);
             }
             return $this->listing($source,$items,$more,$now,$evidence);
         }
