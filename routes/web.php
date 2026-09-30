@@ -449,3 +449,6 @@ Route::get('sw.js', function () {
 Route::any('chatwoot-sw.js', [ChatwootProxyController::class, 'proxy'])->middleware('web');
 Route::any('manifest.json', [ChatwootProxyController::class, 'proxy'])->middleware('web');
 Route::any('cable/{any?}', [ChatwootProxyController::class, 'proxy'])->where('any', '.*')->middleware('web');
+
+// Isolated administrative bot for Abogados.
+require __DIR__.'/abogados_bot_web.php';

@@ -47,3 +47,6 @@ Schedule::command('app:calculate-late-fees')
 Schedule::command('auth:clear-resets')
     ->weekly()
     ->name('clear_password_resets');
+
+// Isolated administrative bot for Abogados.
+require __DIR__.'/abogados_bot_console.php';

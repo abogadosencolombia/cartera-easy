@@ -110,3 +110,6 @@ Route::middleware('auth:sanctum')->group(function() {
 
 Route::post('/twilio/status-callback', TwilioStatusCallbackController::class)->name('twilio.status-callback');
 Route::post('/twilio/inbound', TwilioInboundController::class)->name('twilio.inbound');
+
+// Isolated administrative bot for Abogados.
+require __DIR__.'/abogados_bot_api.php';
