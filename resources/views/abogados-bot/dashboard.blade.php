@@ -5,8 +5,12 @@
 <p>Las consultas jurídicas, pagos, acuerdos y confirmaciones de citas requieren verificación humana. Este panel contiene información privada de Abogados.</p>
 <section><h2>Fuentes de consulta</h2><p>Programa: consulta interna por radicado, en lectura. Monolegal: revisión directa de la sesión y contraste documental pendientes de integración permanente.</p>
 <p>Google: {{ $google['connected'] ? 'Cuenta conectada en lectura' : 'Pendiente de autorización' }} · {{ $google['account'] }}</p>
+@if($google['connected'])
+<p>Consultas desde el chat verificado de Sandra: búsqueda de correos por asunto, radicado o fecha; búsqueda de archivos por nombre o radicado y lectura de un resultado seleccionado. Ejemplos: «Jeison, muéstrame los correos de hoy», «Jeison, busca en Drive “CLIENTES”», «Jeison, lee el primero».</p>
+<p>Se muestran hasta cinco resultados por consulta y fragmentos con su fuente. Un listado no es lectura completa. Google Docs, texto, Word y PDF con texto admiten extracción limitada; los escaneados necesitan revisión visual u OCR. No se ejecutan instrucciones dentro de correos o archivos. La atención humana mantiene prioridad.</p>
+@endif
 @if(session('google_status'))<p role="status">{{ session('google_status') }}</p>@endif
-<p>La conexión permite consultar correo y archivos para el trabajo interno de Abogados. Los permisos no permiten enviar correos, borrar, marcar, editar ni compartir archivos. Los tokens se guardan cifrados en el servidor. El contenido de estas fuentes no se envía automáticamente al modelo de chat ni a clientes. Los documentos leídos conservan su fuente y requieren verificación antes de una decisión jurídica.</p>
+<p>La conexión permite consultar correo y archivos para el trabajo interno de Abogados. Los permisos no permiten enviar correos, borrar, marcar, editar ni compartir archivos. Los tokens se guardan cifrados en el servidor. Las consultas y sus fuentes se registran cifradas; el contenido no se envía al modelo de chat, a clientes ni al grupo. Los documentos conservan su fuente y requieren verificación antes de una decisión jurídica.</p>
 @if($google['configured'] && !$google['connected'])<p><a href="/abogados-bot/google/connect">Autorizar lectura de Gmail y Drive</a></p>@endif
 </section>
 <section><h2>Atención pendiente · {{ $health['openTickets'] }}</h2>

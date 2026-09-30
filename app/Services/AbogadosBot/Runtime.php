@@ -11,7 +11,7 @@ final class Runtime
 {
     private PDO $db;
     private array $settings;
-    public function __construct(private ?string $root = null)
+    public function __construct(private ?string $root = null, private ?SourceConversation $sourceConversation = null, private ?\Closure $programReader = null)
     {
         $this->root ??= storage_path('app/private/abogados-bot');
         if (!is_dir($this->root)) throw new RuntimeException('BOT_NOT_CONFIGURED');
@@ -27,6 +27,7 @@ final class Runtime
           CREATE TABLE IF NOT EXISTS tickets(id TEXT PRIMARY KEY, chat TEXT, event TEXT, category TEXT, state TEXT, created INTEGER);
           CREATE TABLE IF NOT EXISTS ticket_sources(ticket TEXT PRIMARY KEY, body TEXT, created INTEGER);
           CREATE TABLE IF NOT EXISTS health(name TEXT PRIMARY KEY, value TEXT, updated INTEGER);
+          CREATE TABLE IF NOT EXISTS source_runs(event TEXT PRIMARY KEY, chat TEXT, body TEXT, created INTEGER);
           CREATE INDEX IF NOT EXISTS events_queue ON events(state,seen);");
         chmod($this->root.'/runtime.sqlite', 0660);umask($mask);
     }
@@ -217,6 +218,7 @@ final class Runtime
     public function readProgramCase(string $radicado): array
     {
         if(!preg_match('/^\d{23}$/D',$radicado))throw new RuntimeException('INVALID_RADICADO');
+        if($this->programReader)return ($this->programReader)($radicado);
         $result=['source'=>'cobrocartera.abogadosencolombiasas.com','checked_at'=>gmdate('c'),'status'=>'UNAVAILABLE','cases'=>[]];
         try{
             $rows=\Illuminate\Support\Facades\DB::table('casos')->where('radicado',$radicado)->whereNull('deleted_at')->limit(2)->get(['id','radicado','estado_proceso','updated_at'])->map(fn($r)=>(array)$r)->all();
@@ -260,24 +262,38 @@ final class Runtime
         if($chat['phase']==='review' && $e['chat']!==Policy::SANDRA){$this->mark($e['id'],'OBSERVED_REVIEW');return;}
         if($e['chat']===Policy::SANDRA){
             $quotedId='';foreach($data['message'] as $part)if(is_array($part))$quotedId=$part['contextInfo']['stanzaId']??$quotedId;
-            $directReply=$quotedId!=='' && $this->query('SELECT 1 FROM outbox WHERE mid=? AND chat=?',[$quotedId,Policy::SANDRA])->fetchColumn();
+            $directReply=$quotedId!=='' && $this->query("SELECT 1 FROM outbox WHERE mid=? AND chat=? AND state IN ('ACCEPTED','DELIVERED','READ')",[$quotedId,Policy::SANDRA])->fetchColumn();
             $normalized=Policy::normalize($text);
             $capabilities=Policy::capability($text);
-            $followup=$capabilities && $this->query("SELECT 1 FROM events WHERE chat=? AND at<=? AND at>? AND state='DONE' AND reason IN ('EXPLICIT_RELEASE','DIRECT_HEALTH_REPLY','DIRECT_ATTENTION','CAPABILITIES_REPLY')",[Policy::SANDRA,$e['at'],$e['at']-900])->fetchColumn();
+            $conversation=$this->chiefContext($e,$quotedId);
+            $clarification=ChiefConversation::clarification($text);
+            $sourcePlan=SourceConversation::plan($text);
+            $selection=$conversation && $conversation['reason']==='SOURCE_REPLY' && ($sourcePlan['action']??'')==='read';
+            $program=ChiefConversation::programRequest($text,($conversation['topic']??'')==='cases');
+            // Only bounded replies to an actual bot answer inherit conversation context.
+            // A name, old inbound message or operational alert never starts that context.
+            $followup=$conversation && ($capabilities || $clarification || $selection || $program);
             if($forwarded||(!Policy::directed($text)&&!$directReply&&!$followup)){$this->mark($e['id'],'OBSERVED_NOT_ADDRESSED');return;}
+            if($clarification){
+                $reply=ChiefConversation::reply($conversation['topic']??'general',true);
+                $this->queue($e['id'].'|reply',$e['chat'],$reply);$this->mark($e['id'],'DONE','CLARIFICATION_REPLY');return;
+            }
+            if($program && (Policy::directed($text)||$directReply||($conversation['topic']??'')==='cases')){
+                $this->programReply($e,$program);return;
+            }
+            if($sourcePlan && (Policy::directed($text)||$directReply||$selection)){
+                $this->sourceReply($e,$sourcePlan,$quotedId?:($selection?$conversation['mid']:''));return;
+            }
             if($capabilities){
-                $reply=match($capabilities){
-                    'audio'=>'Sí, Sandra, puedes enviarme audios. Si alguna parte no se entiende bien, te preguntaré antes de actuar.',
-                    'judiciary'=>'Todavía no tengo lista la consulta directa de la Rama Judicial, Sandra. Por ahora puedo buscar el proceso en el programa de Abogados.',
-                    'changes'=>'Por ahora puedo consultar el programa y guardar solicitudes de atención. Los cambios en los expedientes todavía no están habilitados.',
-                    'cases'=>'Puedo buscar el proceso por su radicado en el programa, Sandra. Para decirte cómo va ante el juzgado, aún hace falta revisar el expediente y la actuación original.',
-                    default=>'Claro, Sandra. Puedo atender mensajes y audios, guardar solicitudes de atención y buscar procesos en el programa. Las consultas de Gmail, Drive y Monolegal todavía se están preparando.',
-                };
+                $reply=ChiefConversation::reply($capabilities);
                 $this->queue($e['id'].'|reply',$e['chat'],$reply);$this->mark($e['id'],'DONE','CAPABILITIES_REPLY');return;
             }
             if(preg_match('/^(?:hola[,! ]*)?(?:abogado )?jeison[.! ]*$/u',$normalized)){$this->queue($e['id'].'|reply',$e['chat'],'Hola, Sandra. Te escucho, ¿en qué puedo ayudarte?');$this->mark($e['id'],'DONE','DIRECT_ATTENTION');return;}
             if(preg_match('/(?:prueba|funcionando|estas ahi|estas activo)/u',$normalized)){$this->queue($e['id'].'|reply',$e['chat'],'¡Hola, Sandra! Sí, estoy funcionando. Te escucho.');$this->mark($e['id'],'DONE','DIRECT_HEALTH_REPLY');return;}
-            $this->ticket($e,'Instrucción directa de Sandra: validar alcance y ejecución');$this->mark($e['id'],'REVIEW','SANDRA_DIRECT');return;
+            $needsReview=ChiefConversation::needsReview($text);
+            if($needsReview)$this->ticket($e,'Instrucción directa de Sandra: validar alcance y ejecución');
+            $this->queue($e['id'].'|reply',$e['chat'],ChiefConversation::unsupported($text));
+            $this->mark($e['id'],$needsReview?'REVIEW':'DONE',$needsReview?'SANDRA_DIRECT':'DIRECT_CLARIFY');return;
         }
         if($text===''){
             $this->ticket($e,'Archivo recibido: revisión de contenido');$this->queue($e['id'].'|reply',$e['chat'],'Gracias, el archivo quedó recibido.');$this->holdAfterReply($e);return;
@@ -297,6 +313,56 @@ final class Runtime
     }
     private function holdAfterReply(array $e): void
     { $this->query("UPDATE chats SET phase='review' WHERE jid=?",[$e['chat']]);$this->mark($e['id'],'DONE','REVIEW'); }
+
+    private function chiefContext(array $e,string $quotedId=''): ?array
+    {
+        $row=$this->query("SELECT o.mid,e.body,e.reason FROM outbox o JOIN events e ON o.id=(e.id || '|reply') WHERE o.chat=? AND o.internal=0 AND o.state IN ('ACCEPTED','DELIVERED','READ') AND o.mid IS NOT NULL AND e.at<=? AND e.seen<=? AND o.created>=? AND (?='' OR o.mid=?) ORDER BY o.created DESC,o.rowid DESC LIMIT 1",[Policy::SANDRA,$e['at'],$e['seen'],$e['at']-1800,$quotedId,$quotedId])->fetch();
+        if(!$row)return null;
+        $d=json_decode(Crypt::decryptString($row['body']),true);$t=$d['transcript']??Policy::text($d['message']??[]);
+        return ['mid'=>$row['mid'],'reason'=>$row['reason'],'topic'=>$row['reason']==='SOURCE_REPLY'?'sources':(Policy::capability($t)??'general')];
+    }
+
+    private function programReply(array $e,string $radicado): void
+    {
+        $saved=$this->query('SELECT body FROM source_runs WHERE event=? AND chat=?',[$e['id'],Policy::SANDRA])->fetchColumn();
+        if($saved)$result=json_decode(Crypt::decryptString($saved),true);
+        else{
+            $source=$this->readProgramCase($radicado);
+            $reply=match($source['status']){
+                'MATCH'=>'Sandra, encontré ese radicado en el programa de Abogados. El estado registrado es «'.mb_substr(preg_replace('/[\x00-\x1F]/',' ',(string)($source['cases'][0]['estado_proceso']??'sin estado informado')),0,100).'». Este dato del programa no confirma por sí solo la última actuación del juzgado.',
+                'AMBIGUOUS'=>'Sandra, ese radicado aparece más de una vez en el programa. Hace falta comprobar cuál registro corresponde antes de darte una respuesta.',
+                'NO_EXACT_MATCH'=>'Sandra, no encontré ese radicado exacto en el programa. ¿Puedes comprobar que tenga los 23 dígitos completos?',
+                default=>'Sandra, no pude consultar el programa en este momento. La información del proceso sigue sin verificar.',
+            };
+            $result=['reply'=>$reply,'context'=>[],'evidence'=>$source];
+            $this->query('INSERT OR IGNORE INTO source_runs VALUES(?,?,?,?)',[$e['id'],Policy::SANDRA,Crypt::encryptString(json_encode($result,JSON_UNESCAPED_UNICODE)),time()]);
+        }
+        $this->queue($e['id'].'|reply',Policy::SANDRA,$result['reply']);$this->mark($e['id'],'DONE','PROGRAM_REPLY');
+    }
+
+    private function sourceReply(array $e,array $plan,string $quotedId=''):void
+    {
+        if($e['chat']!==Policy::SANDRA||$this->chat($e['chat'])['hold'])throw new RuntimeException('SOURCE_RECIPIENT_REJECTED');
+        $saved=$this->query('SELECT body FROM source_runs WHERE event=? AND chat=?',[$e['id'],Policy::SANDRA])->fetchColumn();
+        if($saved)$result=json_decode(Crypt::decryptString($saved),true,512,JSON_THROW_ON_ERROR);
+        else{
+            $context=[];
+            $prior=$this->query("SELECT s.body FROM source_runs s JOIN events e ON e.id=s.event JOIN outbox o ON o.id=(e.id || '|reply') WHERE s.chat=? AND e.at<=? AND e.seen<=? AND s.created>? AND (?='' OR o.mid=?) AND o.state IN ('ACCEPTED','DELIVERED','READ') ORDER BY s.created DESC,e.rowid DESC LIMIT 1",[Policy::SANDRA,$e['at'],$e['seen'],time()-900,$quotedId,$quotedId])->fetchColumn();
+            if($prior)$context=json_decode(Crypt::decryptString($prior),true)['context']??[];
+            try{
+                $service=$this->sourceConversation??new SourceConversation(new GoogleSources($this->root),$this->root);
+                $result=$service->answer($plan,$context);
+                $this->health('google_sources','READ_ONLY_OK');
+            }catch(Throwable $ex){
+                $safeCode=preg_match('/^[A-Z_0-9]{1,60}$/D',$ex->getMessage())?$ex->getMessage():'SOURCE_UNAVAILABLE';
+                $this->health('google_sources',$safeCode);
+                $result=['reply'=>'Sandra, no pude completar esa consulta. No voy a darte información sin verificar. Puedes intentar con otro archivo o revisar la conexión en el panel.','context'=>[],'evidence'=>['kind'=>'ERROR','code'=>$safeCode,'checked_at'=>gmdate('c')]];
+            }
+            $this->query('INSERT OR IGNORE INTO source_runs VALUES(?,?,?,?)',[$e['id'],Policy::SANDRA,Crypt::encryptString(json_encode($result,JSON_UNESCAPED_UNICODE)),time()]);
+        }
+        $this->queue($e['id'].'|reply',Policy::SANDRA,$result['reply']);
+        $this->mark($e['id'],'DONE','SOURCE_REPLY');
+    }
 
     public function flush(): void
     {

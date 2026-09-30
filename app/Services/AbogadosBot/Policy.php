@@ -40,7 +40,7 @@ final class Policy
 
     public static function directed(string $text): bool
     {
-        return (bool) preg_match('/^(?:hola[,! ]*|buen(?:os dias|as tardes|as noches)[,! ]*)?(?:abogado\s+)?jeison\b(?:$|[, :!¿-])/u', self::normalize($text));
+        return (bool) preg_match('/^[¡¿ ]*(?:hola[,! ]*|buen(?:os dias|as tardes|as noches)[,! ]*)?(?:abogado\s+)?jeison\b(?:$|[, :!¿?-])/u', self::normalize($text));
     }
 
     /** Only questions about current capabilities may inherit an explicit conversation. */

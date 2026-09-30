@@ -24,11 +24,13 @@ final class GoogleSources
     {
         $allowed=['oauth2.googleapis.com','www.googleapis.com','gmail.googleapis.com'];
         if(!in_array(parse_url($url,PHP_URL_HOST),$allowed,true)||parse_url($url,PHP_URL_SCHEME)!=='https')throw new RuntimeException('GOOGLE_HOST_REJECTED');
-        $c=curl_init($url);$o=[CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>30,CURLOPT_CONNECTTIMEOUT=>8,CURLOPT_FOLLOWLOCATION=>false];
+        $raw='';$large=false;
+        $c=curl_init($url);$o=[CURLOPT_TIMEOUT=>30,CURLOPT_CONNECTTIMEOUT=>8,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_WRITEFUNCTION=>function($c,$chunk)use(&$raw,&$large){if(strlen($raw)+strlen($chunk)>6*1024*1024){$large=true;return 0;}$raw.=$chunk;return strlen($chunk);}];
         if($bearer)$o[CURLOPT_HTTPHEADER]=['Authorization: Bearer '.$bearer];
         if($form){$o[CURLOPT_POST]=true;$o[CURLOPT_POSTFIELDS]=http_build_query($form);}
-        curl_setopt_array($c,$o);$raw=curl_exec($c);$status=curl_getinfo($c,CURLINFO_HTTP_CODE);curl_close($c);
-        if($status<200||$status>=300||!is_string($raw))throw new RuntimeException('GOOGLE_HTTP_'.$status);
+        curl_setopt_array($c,$o);$ok=curl_exec($c);$status=curl_getinfo($c,CURLINFO_HTTP_CODE);curl_close($c);
+        if($large)throw new RuntimeException('GOOGLE_RESPONSE_TOO_LARGE');
+        if($status<200||$status>=300||!$ok)throw new RuntimeException('GOOGLE_HTTP_'.$status);
         return json_decode($raw,true,512,JSON_THROW_ON_ERROR);
     }
     public function authorizationUrl(string $state,string $verifier):string
@@ -67,17 +69,52 @@ final class GoogleSources
         if($s['connected']){$t=$this->read('google-token.enc');$s['verified_at']=$t['verified_at']??null;}
         return $s;
     }
-    public function listMail(string $query,?string $page=null):array
+    public function listMail(string $query,?string $page=null,int $limit=100):array
     {
-        return $this->request('https://gmail.googleapis.com/gmail/v1/users/me/messages?'.http_build_query(array_filter(['q'=>$query,'maxResults'=>100,'pageToken'=>$page])),null,$this->token());
+        return $this->request('https://gmail.googleapis.com/gmail/v1/users/me/messages?'.http_build_query(array_filter(['q'=>$query,'maxResults'=>max(1,min(100,$limit)),'pageToken'=>$page])),null,$this->token());
     }
-    public function mail(string $id):array
+    public function mail(string $id,bool $metadata=false):array
     {
         if(!preg_match('/^[a-f0-9]{8,64}$/D',$id))throw new RuntimeException('INVALID_MAIL_ID');
-        return $this->request('https://gmail.googleapis.com/gmail/v1/users/me/messages/'.$id.'?format=full',null,$this->token());
+        return $this->request('https://gmail.googleapis.com/gmail/v1/users/me/messages/'.$id.'?format='.($metadata?'metadata':'full'),null,$this->token());
     }
-    public function listFiles(string $query,?string $page=null):array
+    public function listFiles(string $query,?string $page=null,int $limit=100):array
     {
-        return $this->request('https://www.googleapis.com/drive/v3/files?'.http_build_query(array_filter(['q'=>$query,'pageSize'=>100,'pageToken'=>$page,'fields'=>'nextPageToken,files(id,name,mimeType,modifiedTime,parents)','supportsAllDrives'=>'true','includeItemsFromAllDrives'=>'true'])),null,$this->token());
+        return $this->request('https://www.googleapis.com/drive/v3/files?'.http_build_query(array_filter(['q'=>$query,'pageSize'=>max(1,min(100,$limit)),'pageToken'=>$page,'fields'=>'nextPageToken,files(id,name,mimeType,modifiedTime,parents,size)','orderBy'=>'modifiedTime desc','supportsAllDrives'=>'true','includeItemsFromAllDrives'=>'true'])),null,$this->token());
+    }
+
+    public function verifyIdentity():array
+    {
+        $token=$this->token();
+        $gmail=$this->request('https://gmail.googleapis.com/gmail/v1/users/me/profile',null,$token);
+        $drive=$this->request('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)',null,$token);
+        if(($gmail['emailAddress']??'')!==self::ACCOUNT||($drive['user']['emailAddress']??'')!==self::ACCOUNT)throw new RuntimeException('GOOGLE_SOURCE_IDENTITY_MISMATCH');
+        return ['account'=>self::ACCOUNT,'verified_at'=>gmdate('c')];
+    }
+
+    public function file(string $id):array
+    {
+        self::fileId($id);
+        return $this->request('https://www.googleapis.com/drive/v3/files/'.$id.'?'.http_build_query(['fields'=>'id,name,mimeType,modifiedTime,size,trashed,capabilities(canDownload)','supportsAllDrives'=>'true']),null,$this->token());
+    }
+    private static function fileId(string $id):void
+    {if(!preg_match('/^[a-zA-Z0-9_-]{10,160}$/D',$id))throw new RuntimeException('INVALID_FILE_ID');}
+
+    /** Only fixed Google endpoints; never follows URLs found in mail or documents. */
+    public function fileBytes(array $file):string
+    {
+        self::fileId($file['id']??'');
+        if(!empty($file['trashed'])||empty($file['capabilities']['canDownload']))throw new RuntimeException('FILE_DOWNLOAD_NOT_ALLOWED');
+        $mime=$file['mimeType']??'';
+        if(!in_array($mime,['application/vnd.google-apps.document','text/plain','application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document'],true))throw new RuntimeException('FILE_FORMAT_UNSUPPORTED');
+        $max=5*1024*1024;
+        if(($file['size']??0)>$max)throw new RuntimeException('FILE_TOO_LARGE');
+        $url='https://www.googleapis.com/drive/v3/files/'.$file['id'].($mime==='application/vnd.google-apps.document'?'/export?mimeType=text%2Fplain':'?alt=media&supportsAllDrives=true');
+        $bytes='';$oversize=false;$c=curl_init($url);
+        curl_setopt_array($c,[CURLOPT_TIMEOUT=>25,CURLOPT_CONNECTTIMEOUT=>8,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_HTTPHEADER=>['Authorization: Bearer '.$this->token()],CURLOPT_WRITEFUNCTION=>function($c,$chunk)use(&$bytes,&$oversize,$max){if(strlen($bytes)+strlen($chunk)>$max){$oversize=true;return 0;}$bytes.=$chunk;return strlen($chunk);}]);
+        $ok=curl_exec($c);$status=curl_getinfo($c,CURLINFO_HTTP_CODE);curl_close($c);
+        if($oversize)throw new RuntimeException('FILE_TOO_LARGE');
+        if(!$ok||$status<200||$status>=300)throw new RuntimeException('GOOGLE_HTTP_'.$status);
+        return $bytes;
     }
 }

@@ -1,7 +1,7 @@
 <?php
 // Server-side acceptance against an isolated SQLite file, with no external sends.
-require dirname(__DIR__).'/vendor/autoload.php';
-$app=require dirname(__DIR__).'/bootstrap/app.php';
+require '/code/vendor/autoload.php';
+$app=require '/code/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 use App\Services\AbogadosBot\Policy;
 use App\Services\AbogadosBot\Runtime;
@@ -57,6 +57,7 @@ $check('release_restores_reception',!(bool)$resumed['hold'] && $resumed['phase']
 $check('fees_not_payment_claim',!str_contains(Policy::plan('fees','',false,['service'=>true])['reply'],'El pago'));
 try{$bot->readProgramCase('123');$ok=false;}catch(RuntimeException $ex){$ok=$ex->getMessage()==='INVALID_RADICADO';}$check('program_rejects_invalid_identifier',$ok);
 $bot->query('INSERT OR REPLACE INTO chats(jid,hold,baseline,phase,last_reply,updated) VALUES(?,0,1,?,?,?)',[Policy::SANDRA,'','',time()]);
+$bot->query("UPDATE outbox SET mid='SYNTHETIC_RELEASE_SENT',state='READ' WHERE id='SYNTHETICREL1|reply'");
 $bot->receive($fixture('SYNTHETICCAP1',Policy::SANDRA,false,'Que puedes hacer'));
 $method->invoke($bot,$bot->query('SELECT * FROM events WHERE id=?',['SYNTHETICCAP1'])->fetch());
 $check('capability_followup_in_explicit_context',$bot->query('SELECT reason FROM events WHERE id=?',['SYNTHETICCAP1'])->fetchColumn()==='CAPABILITIES_REPLY');
