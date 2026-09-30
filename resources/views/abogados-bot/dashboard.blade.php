@@ -3,7 +3,7 @@
 <style>body{font:16px system-ui;background:#f4f6f8;color:#182735;margin:0;padding:32px;max-width:1200px}h1{font-size:28px}article,section{background:white;border:1px solid #dbe3e8;border-radius:12px;padding:20px;margin:16px 0}small{color:#536570}.pill{display:inline-block;background:#e6f2ef;padding:5px 12px;border-radius:20px}table{border-collapse:collapse;width:100%;font-size:14px}td,th{text-align:left;padding:12px;border-bottom:1px solid #dbe3e8;vertical-align:top}p{white-space:pre-wrap;overflow-wrap:anywhere}a{color:#125c85}</style>
 <h1>Abogado Jeison</h1><span class="pill">{{ $health['enabled'] ? 'Recepción administrativa activa' : 'En preparación' }}</span>
 <p>Las consultas jurídicas, pagos, acuerdos y confirmaciones de citas requieren verificación humana. Este panel contiene información privada de Abogados.</p>
-<section><h2>Fuentes de consulta</h2><p>Programa: consulta interna por radicado, en lectura. Monolegal: revisión directa de la sesión y contraste documental pendientes de integración permanente.</p>
+<section><h2>Fuentes de consulta</h2><p>Programa: consulta por radicado. Sandra puede pedir que se agregue una nota administrativa o se actualice un enlace de Drive o del expediente. Jeison muestra el cambio y lo guarda después de su confirmación, conservando auditoría. Los estados jurídicos, términos, partes y valores mantienen revisión humana. Monolegal y Rama Judicial: integración permanente y contraste documental pendientes.</p>
 <p>Google: {{ $google['connected'] ? 'Cuenta conectada en lectura' : 'Pendiente de autorización' }} · {{ $google['account'] }}</p>
 @if($google['connected'])
 <p>Consultas desde el chat verificado de Sandra: búsqueda de correos por asunto, radicado o fecha; búsqueda de archivos por nombre o radicado y lectura de un resultado seleccionado. Ejemplos: «Jeison, muéstrame los correos de hoy», «Jeison, busca en Drive “CLIENTES”», «Jeison, lee el primero».</p>
@@ -12,6 +12,7 @@
 @if(session('google_status'))<p role="status">{{ session('google_status') }}</p>@endif
 <p>La conexión permite consultar correo y archivos para el trabajo interno de Abogados. Los permisos no permiten enviar correos, borrar, marcar, editar ni compartir archivos. Los tokens se guardan cifrados en el servidor. Las consultas y sus fuentes se registran cifradas; el contenido no se envía al modelo de chat, a clientes ni al grupo. Los documentos conservan su fuente y requieren verificación antes de una decisión jurídica.</p>
 @if($google['configured'] && !$google['connected'])<p><a href="/abogados-bot/google/connect">Autorizar lectura de Gmail y Drive</a></p>@endif
+<p>Los nuevos correos de juzgados y fiscalías se revisan cada minuto. Los avisos autorizados van a Sandra y a Equipo Abogados en Colombia con remitente, asunto, fecha de recepción y enlace; no incluyen el cuerpo ni adjuntos. Cada correo y destinatario tiene control de duplicados.</p>
 </section>
 <section><h2>Atención pendiente · {{ $health['openTickets'] }}</h2>
 @forelse($tickets as $ticket)
