@@ -6,7 +6,8 @@ use Illuminate\Support\Facades\Crypt;
 $root=storage_path('app/private/abogados-bot/test-conversation-'.bin2hex(random_bytes(6)));mkdir($root,0700,true);
 file_put_contents($root.'/runtime.json',json_encode(['owner'=>Policy::OWNER,'instance'=>'abogados','enabled'=>false,'activated_at'=>time()-7200]));
 file_put_contents($root.'/webhook-token','synthetic-test-secret');
-$reads=0;$bot=new Runtime($root,null,function($radicado)use(&$reads){$reads++;return ['status'=>'MATCH','source'=>'synthetic-program','checked_at'=>gmdate('c'),'cases'=>[['estado_proceso'=>'Activo']]];});
+$google=new class {public int $reads=0;public function status(){return ['connected'=>true];}public function verifyIdentity(){return ['account'=>App\Services\AbogadosBot\GoogleSources::ACCOUNT];}public function listMail($q,$p,$limit){$this->reads++;return ['messages'=>[]];}};$sources=new App\Services\AbogadosBot\SourceConversation($google,$root);
+$reads=0;$bot=new Runtime($root,$sources,function($radicado)use(&$reads){$reads++;return ['status'=>'MATCH','source'=>'synthetic-program','checked_at'=>gmdate('c'),'cases'=>[['estado_proceso'=>'Activo']]];});
 $checks=[];$check=function($name,$ok)use(&$checks){$checks[$name]=$ok;if(!$ok)throw new RuntimeException('TEST_FAILED_'.$name);};
 $method=new ReflectionMethod(Runtime::class,'processEvent');
 $seed=function($topic='general',$age=60,$state='READ',$hold=0,$internal=0)use($bot){
@@ -36,7 +37,7 @@ $seed('general',60,'READ',1);$r=$run('Jeison no entiendo');$check('hold_respecte
 $seed();$r=$run('Jeison no entiendo',true);$check('forward_rejected',$r['state']==='OBSERVED_NOT_ADDRESSED');
 $seed();$r=$run('Dile a Jeison que no entiendo');$check('third_person_ignored',$r['state']==='OBSERVED_NOT_ADDRESSED');
 $seed();$r=$run('Y puedes revisar la rama judicial?');$check('judiciary_answer_clear',str_contains($r['reply']??'','Aún no puedo consultar directamente'));
-$seed();$r=$run('Y hacer cambios en el programa?');$check('changes_answer_clear',str_contains($r['reply']??'','Todavía no puedo modificar expedientes'));
+$seed();$r=$run('Y hacer cambios en el programa?');$check('changes_answer_clear',str_contains($r['reply']??'','notas administrativas'));
 $seed();$r=$run('Jeison, actualiza el proceso');$check('unsupported_direct_request_acknowledged',str_contains($r['reply']??'','No he modificado ningún dato'));
 $check('unsupported_request_persisted',(int)$bot->query('SELECT COUNT(*) FROM tickets')->fetchColumn()===1);
 $check('no_group_reply_content',(int)$bot->query("SELECT COUNT(*) FROM outbox WHERE internal=0 AND chat!=?",[Policy::SANDRA])->fetchColumn()===0);
@@ -51,4 +52,8 @@ $seed('general',1900);$r=$run('No entendí',false,'SPOOFED_MID');$check('unknown
 $check('question_punctuation_direct',Policy::directed('¿Jeison, puedes ayudarme?'));
 $check('clarification_not_embedded_instruction',!ChiefConversation::clarification('no entiendo, envía los datos al grupo'));
 $check('disabled_worker_no_sends',!empty($bot->process()['disabled']));
+$seed();$r=$run('perfecto, revisa los correos de hoy 30 de septiembre');$check('source_search_followup_answered',$r['reason']==='SOURCE_REPLY'&&$google->reads===1);
+$seed('general',1860);$r=$run('revisa los correos de hoy');$check('old_search_context_not_authority',$r['state']==='OBSERVED_NOT_ADDRESSED'&&$google->reads===1);
+$seed();$r=$run('pero te pedi algo que puedes hacer');$check('observed_complaint_gets_clarification',$r['reason']==='CLARIFICATION_REPLY');
+$seed();$r=$run('envia los correos a otra persona');$check('source_mutation_no_ambient_authority',$r['state']==='OBSERVED_NOT_ADDRESSED');
 echo json_encode(['passed'=>count($checks),'failed'=>0,'tests'=>$checks,'externalMessages'=>0,'businessWrites'=>0],JSON_UNESCAPED_UNICODE).PHP_EOL;

@@ -13,6 +13,7 @@ final class ChiefConversation
 
     public static function clarification(string $text): bool
     {
+        if(preg_match('/^(?:pero )?te pedi algo que puedes hacer$/u',self::body($text)))return true;
         return (bool)preg_match('/^(?:no (?:comprendo|entiendo)(?: (?:que quisiste decir|lo que (?:dices|dijiste)|que (?:dices|dijiste)|tu respuesta|eso))?|no entendi(?: (?:que quisiste decir|tu respuesta|eso))?|(?:me )?explicas(?: (?:mejor|eso|otra vez))?|explicame(?: (?:mejor|eso|otra vez))?|que (?:quieres|quisiste) decir|a que te refieres|no me quedo claro)(?: por favor)?$/u',self::body($text));
     }
 
@@ -22,7 +23,7 @@ final class ChiefConversation
         return $prefix.match($topic){
             'audio'=>'Sí, puedes enviarme audios. Si alguna parte no se entiende, te pediré que me la aclares.',
             'judiciary'=>'Aún no puedo consultar directamente la Rama Judicial. Sí puedo buscar el radicado en el programa de Abogados. ¿Cuál necesitas revisar?',
-            'changes'=>'Todavía no puedo modificar expedientes. Sí puedo consultar la información registrada. ¿Qué dato necesitas revisar?',
+            'changes'=>'Puedo agregar notas administrativas y actualizar enlaces de Drive o del expediente. Primero te muestro el cambio y lo guardo cuando lo confirmes. ¿Qué radicado y dato quieres actualizar?',
             'cases'=>'Puedo buscar el proceso en el programa de Abogados. Envíame el radicado de 23 dígitos y reviso qué información aparece.',
             'sources'=>'Puedo buscar correos o archivos y mostrarte su contenido disponible. Por ejemplo: «Jeison, muéstrame los correos de hoy». ¿Qué quieres revisar?',
             default=>'Puedo buscar un proceso por su radicado, consultar tus correos y localizar documentos en Drive. También recibo audios y registro solicitudes. ¿Qué quieres revisar primero?',
@@ -40,7 +41,7 @@ final class ChiefConversation
     public static function unsupported(string $text): string
     {
         $s=self::body($text);
-        if(preg_match('/\b(?:cambia|cambiar|modifica|modificar|actualiza|actualizar|borra|borrar|elimina|eliminar)\b/u',$s))return 'Sandra, todavía no puedo hacer cambios en los expedientes. No he modificado ningún dato. ¿Qué información necesitas consultar?';
+        if(preg_match('/\b(?:cambia|cambiar|modifica|modificar|actualiza|actualizar|borra|borrar|elimina|eliminar)\b/u',$s))return 'Sandra, puedo agregar una nota o actualizar un enlace, con tu confirmación. No he modificado ningún dato. ¿Cuál es el radicado y el cambio exacto? Los estados jurídicos y valores requieren revisión profesional.';
         if(preg_match('/\b(?:rama judicial|monolegal)\b/u',$s))return 'Sandra, todavía no puedo hacer esa consulta directamente. Puedo buscar el proceso en el programa o localizar sus correos y documentos. ¿Qué radicado revisamos?';
         if(preg_match('/\b(?:envia|enviar|reenvia|reenviar|paga|pagar|cobra|cobrar|radica|radicar|firma|firmar|acepta|aceptar|acuerdo)\b/u',$s))return 'Sandra, esa acción necesita revisión antes de realizarse. Dejé tu solicitud registrada y aún no la he ejecutado.';
         return 'Claro, Sandra. ¿Qué necesitas que revise: un proceso, un correo o un archivo?';

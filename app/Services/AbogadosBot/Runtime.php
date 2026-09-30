@@ -269,12 +269,22 @@ final class Runtime
             $conversation=$this->chiefContext($e,$quotedId);
             $clarification=ChiefConversation::clarification($text);
             $sourcePlan=SourceConversation::plan($text);
+            $administration=new ProgramAdmin($this);
+            $adminPlan=ProgramAdmin::plan($text);
+            $adminPending=$administration->pending();
+            $adminFollowup=$adminPending && (ProgramAdmin::confirm($text)||in_array(ChiefConversation::body($text),['no','cancela','cancelalo','no lo cambies'],true));
             $selection=$conversation && $conversation['reason']==='SOURCE_REPLY' && ($sourcePlan['action']??'')==='read';
             $program=ChiefConversation::programRequest($text,($conversation['topic']??'')==='cases');
             // Only bounded replies to an actual bot answer inherit conversation context.
             // A name, old inbound message or operational alert never starts that context.
-            $followup=$conversation && ($capabilities || $clarification || $selection || $program);
+            $sourceFollowup=$conversation && in_array($sourcePlan['action']??'', ['search','read','help','clarify'],true);
+            $followup=$conversation && ($capabilities || $clarification || $selection || $program || $sourceFollowup || $adminFollowup);
             if($forwarded||(!Policy::directed($text)&&!$directReply&&!$followup)){$this->mark($e['id'],'OBSERVED_NOT_ADDRESSED');return;}
+            if(($adminPlan && (Policy::directed($text)||$directReply)) || ($adminFollowup && ($conversation||$directReply))){
+                try{$reply=$administration->handle($e,$text);}
+                catch(Throwable $ex){$reply=ProgramAdmin::error($ex->getMessage());$this->health('program_admin','REVIEW_REQUIRED');}
+                if($reply!==null){$this->queue($e['id'].'|reply',Policy::SANDRA,$reply);$this->mark($e['id'],'DONE','ADMIN_REPLY');return;}
+            }
             if(JudicialMail::requested($text) && (Policy::directed($text)||$directReply)){
                 $monitor=new JudicialMail($this,new GoogleSources($this->root));
                 if(!$monitor->active())$monitor->activate($e['id'],time());
@@ -288,7 +298,7 @@ final class Runtime
             if($program && (Policy::directed($text)||$directReply||($conversation['topic']??'')==='cases')){
                 $this->programReply($e,$program);return;
             }
-            if($sourcePlan && (Policy::directed($text)||$directReply||$selection)){
+            if($sourcePlan && (Policy::directed($text)||$directReply||$selection||$sourceFollowup)){
                 $this->sourceReply($e,$sourcePlan,$quotedId?:($selection?$conversation['mid']:''));return;
             }
             if($capabilities){
