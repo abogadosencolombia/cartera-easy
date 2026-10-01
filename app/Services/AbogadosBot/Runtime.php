@@ -188,6 +188,7 @@ final class Runtime
         }
         $suffix=substr(explode('@',$event['chat'])[0],-4);
         $reason=match(true){
+            str_contains($category,'Horario de oficina')=>'Una persona necesita el horario de atención de la oficina. Aún falta confirmar el horario vigente.',
             str_contains($category,'Condiciones')=>'Llegó una consulta sobre un acuerdo de pago. Hace falta revisar las condiciones antes de responder.',
             str_contains($category,'Archivo')=>'Hay un archivo pendiente de revisión. Todavía no pude leer su contenido.',
             str_contains($category,'Queja')=>'Recibimos una inconformidad que necesita atención personal.',
@@ -328,7 +329,7 @@ final class Runtime
         $context=[];foreach($this->query("SELECT body FROM events WHERE chat=? AND id!=? AND at<=? AND seen<=? ORDER BY at DESC,seen DESC LIMIT 4",[$e['chat'],$e['id'],$e['at'],$e['seen']])->fetchAll() as $prev){$d=json_decode(Crypt::decryptString($prev['body']),true);$t=$d['transcript']??Policy::text($d['message']??[]);if($t!=='')$context[]=mb_substr($t,0,1200);}
         $classification=$this->classify($text,['priorMessages'=>array_reverse($context),'lastQuestion'=>$chat['last_reply'],'phase'=>$chat['phase'],'authorizedCaseAnswers'=>(new ChiefLearning($this))->context($e['chat'],$e['at'])]);
         $intent=$classification['confidence']==='high'?$classification['intent']:'unclear';
-        $plan=Policy::plan($intent,$chat['phase'],(bool)$classification['greeting'],$classification);
+        $plan=Policy::plan($intent,$chat['phase'],(bool)$classification['greeting'],$classification,$text);
         if($plan['ticket'])$this->ticket($e,$plan['ticket']);
         $this->query('UPDATE chats SET phase=?,updated=? WHERE jid=?',[$plan['phase'],time(),$e['chat']]);
         if($plan['reply']!==$chat['last_reply'])$this->queue($e['id'].'|reply',$e['chat'],$plan['reply']);
