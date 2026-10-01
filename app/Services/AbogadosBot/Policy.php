@@ -7,7 +7,7 @@ final class Policy
     public const OWNER = '573152819233@s.whatsapp.net';
     public const SANDRA = '573016803926@s.whatsapp.net';
     public const GROUP = '120363408832976272@g.us';
-    public const INTENTS = ['greeting','identity','thanks','new_service','appointment','case_status','payment','payment_terms','fees','legal','complaint','third_party','stop','unclear','other'];
+    public const INTENTS = ['greeting','identity','thanks','new_service','professional_offer','appointment','case_status','payment','payment_terms','fees','legal','complaint','third_party','stop','unclear','other'];
 
     public static function normalize(string $text): string
     {
@@ -85,6 +85,7 @@ final class Policy
             'new_service' => $phase === 'service_detail'
                 ? ['reply'=>'Gracias. Tu solicitud quedó registrada.', 'phase'=>'review', 'ticket'=>'Nueva solicitud de servicio']
                 : ['reply'=>'Con gusto. ¿Qué necesitas resolver y en qué ciudad?', 'phase'=>'service_detail', 'ticket'=>null],
+            'professional_offer' => ['reply'=>'Gracias por ofrecer tus servicios. Tu propuesta quedó registrada para revisión.', 'phase'=>'review', 'ticket'=>'Propuesta de colaboración: revisión humana'],
             'appointment' => $phase === 'appointment_detail'
                 ? ['reply'=>'Gracias. Tu solicitud quedó registrada; la cita aún no está confirmada.', 'phase'=>'review', 'ticket'=>'Solicitud de asesoría: verificar agenda y tarifa']
                 : ['reply'=>'Con gusto. ¿Qué día y horario te sirven, y prefieres atención virtual o presencial?', 'phase'=>'appointment_detail', 'ticket'=>null],
