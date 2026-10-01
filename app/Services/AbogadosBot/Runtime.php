@@ -178,6 +178,14 @@ final class Runtime
         if($existing)return $existing;
         $id='AB-'.strtoupper(substr(hash('sha256',$event['id'].'|'.$category),0,10));
         $this->query('INSERT OR IGNORE INTO tickets VALUES(?,?,?,?,?,?)',[$id,$event['chat'],$event['id'],$category,'OPEN',time()]);
+        // An unread attachment proves receipt, not an outstanding task. Preserve it in
+        // the review panel without interrupting the team with an unverified obligation.
+        if($category==='Archivo recibido: revisión de contenido'){
+            $this->query('UPDATE tickets SET state=? WHERE id=?',['CONTENT_UNREVIEWED',$id]);return $id;
+        }
+        if($this->chat($event['chat'])['hold']){
+            $this->query('UPDATE tickets SET state=? WHERE id=?',['IN_HUMAN_REVIEW',$id]);return $id;
+        }
         $body=$this->query('SELECT body FROM events WHERE id=?',[$event['id']])->fetchColumn();
         if($body){
             $data=json_decode(Crypt::decryptString($body),true);$text=$data['transcript']??Policy::text($data['message']??[]);
@@ -248,7 +256,7 @@ final class Runtime
     }
     private function processEvent(array $e): void
     {
-        if($e['at']<time()-7200){$this->mark($e['id'],'REVIEW','STALE');$this->ticket($e,'Mensaje pendiente fuera de ventana de respuesta');return;}
+        if($e['at']<time()-7200){$this->baseline($e);if($this->chat($e['chat'])['hold']){$this->mark($e['id'],'OBSERVED_HUMAN','STALE_HANDLED');return;}$this->mark($e['id'],'REVIEW','STALE');$this->ticket($e,'Mensaje pendiente fuera de ventana de respuesta');return;}
         $data=json_decode(Crypt::decryptString($e['body']),true,512,JSON_THROW_ON_ERROR);
         $text=Policy::text($data['message']);$forwarded=Policy::forwarded($data['message']);
         if(($data['messageType']??'')==='audioMessage'){
@@ -394,6 +402,12 @@ final class Runtime
     {
         if(!$this->enabled())return;
         foreach($this->query("SELECT * FROM outbox WHERE state='READY' ORDER BY created LIMIT 20")->fetchAll() as $o){
+            if($o['internal']&&preg_match('/^(AB-[A-F0-9]{10})\|/',$o['id'],$match)){
+                $ticket=$this->query('SELECT chat,state,category FROM tickets WHERE id=?',[$match[1]])->fetch();
+                if(!$ticket||$ticket['state']!=='OPEN'||$ticket['category']==='Archivo recibido: revisión de contenido'||$this->chat($ticket['chat'])['hold']){
+                    $this->query("UPDATE outbox SET state='SUPPRESSED_HUMAN',updated=? WHERE id=?",[time(),$o['id']]);continue;
+                }
+            }
             if(!$o['internal']){
                 $chat=$this->chat($o['chat']);
                 if($chat['hold']){$this->query("UPDATE outbox SET state='SUPPRESSED_HUMAN',updated=? WHERE id=?",[time(),$o['id']]);continue;}

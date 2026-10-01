@@ -17,6 +17,7 @@ final class ChiefOperations
     {
         $s=ChiefConversation::body($text);
         if(preg_match('/^(?:ella|ellos|dile)\b|\b(?:dijeron|dijo|dice|reenviado)\b/u',$s)||preg_match('/[«»“”]/u',$s))return null;
+        if(preg_match('/\b(?:mandame|enviame|notificame|avisame)\b/u',$s)&&preg_match('/\bmensajes?\b/u',$s)&&preg_match('/\b(?:cortos?|breves?)\b/u',$s)&&preg_match('/\b(?:juzgados?|correos?|notific\w*)\b/u',$s)&&!preg_match('/\b(?:otro|otra|clientes|todos|oculta|omite|borra|elimina)\b/u',$s))return 'brief_notifications';
         if(preg_match('/\b(?:todos los dias|cada dia|diariamente)\b/u',$s)&&preg_match('/\bcorreos?\b/u',$s)&&preg_match('/\b(?:revisar|revisa|revision)\b/u',$s))return 'daily_mail';
         if(preg_match('/^(?:muchisimas |muchas )?gracias\b/u',$s)&&preg_match('/\b(?:compartir|comparte)\b.*\b(?:grupo|equipo)\b/u',$s))return 'routing_reminder';
         if(preg_match('/^(?:lo que necesito es que tu|quiero que|necesito que) (?:aprendas|estudies)\b/u',$s))return 'learning_request';
@@ -36,6 +37,11 @@ final class ChiefOperations
         if($event['chat']!==Policy::SANDRA)throw new \RuntimeException('CHIEF_REQUIRED');
         if(self::kind($text)!==$kind)throw new \RuntimeException('OPERATION_MISMATCH');
         $this->bot->query('INSERT OR IGNORE INTO chief_operational_requests VALUES(?,?,?,?,?)',[$event['id'],$kind,Crypt::encryptString($text),'REVIEW',$event['at']]);
+        if($kind==='brief_notifications'){
+            $this->bot->query('INSERT OR REPLACE INTO chief_operational_rules VALUES(?,?,?,?)',[$kind,$event['id'],Crypt::encryptString(json_encode(['active'=>true,'style'=>'brief','sourceText'=>$text,'scope'=>'administrative_notifications_only'])),$event['at']]);
+            $this->bot->query('UPDATE chief_operational_requests SET state=? WHERE event=?',['CONFIGURED',$event['id']]);
+            return 'Entendido, Sandra. Los avisos serán breves, con el origen y el enlace para consultar.';
+        }
         if($kind==='routing_reminder')return 'Gracias, Sandra. Las novedades de trabajo de Abogados se comparten contigo y con Equipo Abogados en Colombia, cuidando la información privada.';
         if($kind==='learning_request')return 'Claro, Sandra. Continuaré estudiando los documentos por partes y conservando sus fuentes. Las aclaraciones verificadas de un caso quedan ligadas a ese caso; no las tomaré como reglas para todos los demás.';
         $saved=$this->bot->query('SELECT body FROM chief_operational_rules WHERE kind=?',['daily_mail'])->fetchColumn();

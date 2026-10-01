@@ -27,6 +27,8 @@ $bot->query('INSERT INTO events VALUES(?,?,?,?,?,?,?,?)',[$id,$phone,$phone,Cryp
 $event=$bot->query('SELECT * FROM events WHERE id=?',[$id])->fetch();
 $method=new ReflectionMethod(Runtime::class,'processEvent');$method->invoke($bot,$event);
 $check('human_hold_suppresses_office_reply',$bot->query('SELECT state FROM events WHERE id=?',[$id])->fetchColumn()==='OBSERVED_HUMAN'&&(int)$bot->query('SELECT COUNT(*) FROM outbox')->fetchColumn()===0);
+// Separate test fixture: an unattended request is still routed to both destinations.
+$bot->query('UPDATE chats SET hold=0 WHERE jid=?',[$phone]);
 $ticket=$bot->ticket($event,$plan['ticket']);$bot->ticket($event,$plan['ticket']);
 $outbox=$bot->query('SELECT chat,body FROM outbox ORDER BY chat')->fetchAll();
 $check('one_alert_per_destination',count($outbox)===2);
