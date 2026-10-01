@@ -268,6 +268,7 @@ final class Runtime
             $capabilities=Policy::capability($text);
             $conversation=$this->chiefContext($e,$quotedId);
             $clarification=ChiefConversation::clarification($text);
+            $operation=ChiefOperations::kind($text);
             $sourcePlan=SourceConversation::plan($text);
             $administration=new ProgramAdmin($this);
             $adminPlan=ProgramAdmin::plan($text);
@@ -278,8 +279,13 @@ final class Runtime
             // Only bounded replies to an actual bot answer inherit conversation context.
             // A name, old inbound message or operational alert never starts that context.
             $sourceFollowup=$conversation && in_array($sourcePlan['action']??'', ['search','read','help','clarify'],true);
-            $followup=$conversation && ($capabilities || $clarification || $selection || $program || $sourceFollowup || $adminFollowup);
+            $followup=$conversation && ($capabilities || $clarification || $selection || $program || $sourceFollowup || $adminFollowup || $operation);
             if($forwarded||(!Policy::directed($text)&&!$directReply&&!$followup)){$this->mark($e['id'],'OBSERVED_NOT_ADDRESSED');return;}
+            if($operation){
+                $reply=(new ChiefOperations($this))->handle($e,$text,$operation);
+                $this->queue($e['id'].'|reply',Policy::SANDRA,$reply);
+                $this->mark($e['id'],'DONE','OPERATIONAL_REQUEST');return;
+            }
             if(($adminPlan && (Policy::directed($text)||$directReply)) || ($adminFollowup && ($conversation||$directReply))){
                 try{$reply=$administration->handle($e,$text);}
                 catch(Throwable $ex){$reply=ProgramAdmin::error($ex->getMessage());$this->health('program_admin','REVIEW_REQUIRED');}
