@@ -270,7 +270,14 @@ final class Runtime
             $this->hold($target,false);$reply=$target===Policy::SANDRA?'Claro, Sandra. Ya puedo seguir atendiéndote por aquí.':'Claro, Sandra. Retomo la atención en ese chat.';$this->queue($e['id'].'|reply',$e['chat'],$reply);$this->mark($e['id'],'DONE','EXPLICIT_RELEASE');return;
         }
         $this->baseline($e);$chat=$this->chat($e['chat']);
-        if($chat['hold']){$this->mark($e['id'],'OBSERVED_HUMAN');return;}
+        $directedChief=$e['chat']===Policy::SANDRA && !$forwarded && Policy::directed($text);
+        if($directedChief && ($reply=ChiefTurn::informative($text))!==null){
+            $this->queue($e['id'].'|reply',Policy::SANDRA,$reply,true);$this->mark($e['id'],'DONE','CHIEF_SINGLE_TURN');return;
+        }
+        if($chat['hold']){
+            if($directedChief){$reply=ChiefTurn::pending($this,$e,$text);$this->queue($e['id'].'|reply',Policy::SANDRA,$reply,true);$this->mark($e['id'],'REVIEW','CHIEF_SINGLE_TURN_PENDING');return;}
+            $this->mark($e['id'],'OBSERVED_HUMAN');return;
+        }
         if($chat['phase']==='review' && $e['chat']!==Policy::SANDRA){$this->mark($e['id'],'OBSERVED_REVIEW');return;}
         if($e['chat']===Policy::SANDRA){
             $quotedId='';foreach($data['message'] as $part)if(is_array($part))$quotedId=$part['contextInfo']['stanzaId']??$quotedId;
@@ -413,6 +420,14 @@ final class Runtime
                 $ticket=$this->query('SELECT chat,state,category FROM tickets WHERE id=?',[$match[1]])->fetch();
                 if(!$ticket||$ticket['state']!=='OPEN'||$ticket['category']==='Archivo recibido: revisión de contenido'||$this->chat($ticket['chat'])['hold']){
                     $this->query("UPDATE outbox SET state='SUPPRESSED_HUMAN',updated=? WHERE id=?",[time(),$o['id']]);continue;
+                }
+            }
+            if($o['chat']===Policy::SANDRA && str_ends_with($o['id'],'|reply')){
+                $sourceId=substr($o['id'],0,-6);$source=$this->query("SELECT at,reason FROM events WHERE id=?",[$sourceId])->fetch();
+                if($source && str_starts_with($source['reason'],'CHIEF_SINGLE_TURN')){
+                    $staff=$this->query("SELECT body FROM events WHERE chat=? AND at>=? AND id!=?",[Policy::SANDRA,$source['at'],$sourceId])->fetchAll();
+                    $newHuman=false;foreach($staff as $r){$d=json_decode(Crypt::decryptString($r['body']),true);if(!empty($d['key']['fromMe'])&&!$this->ownEcho(Policy::SANDRA,$d)){$newHuman=true;break;}}
+                    if($newHuman){$this->query("UPDATE outbox SET state='SUPPRESSED_HUMAN',updated=? WHERE id=?",[time(),$o['id']]);continue;}
                 }
             }
             if(!$o['internal']){
