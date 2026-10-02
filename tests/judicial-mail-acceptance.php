@@ -1,5 +1,5 @@
 <?php
-require '/code/vendor/autoload.php';$app=require '/code/bootstrap/app.php';$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+require '/code/vendor/autoload.php';require '/code/.codex-work/protected-subject-20261002-2223/JudicialMail.php';$app=require '/code/bootstrap/app.php';$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 use App\Services\AbogadosBot\{Policy,Runtime,JudicialMail,GoogleSources,SourceConversation};
 use Illuminate\Support\Facades\Crypt;
 $checks=[];$check=function($name,$ok)use(&$checks){$checks[$name]=(bool)$ok;if(!$ok)throw new RuntimeException('TEST_FAILED_'.$name);};
@@ -23,7 +23,11 @@ $check('fiscalia_verified',JudicialMail::inspect($mail('aaaaaaaa','fiscalia.gov.
 $check('spoof_suffix_rejected',JudicialMail::inspect($mail('aaaaaaaa','ramajudicial.gov.co.evil.example'))['state']==='NOT_OFFICIAL');
 $check('failed_auth_not_claimed_verified',JudicialMail::inspect($mail('aaaaaaaa','ramajudicial.gov.co',false))['state']==='AUTH_REVIEW');
 $m=$mail('aaaaaaaa');$m['payload']['headers'][2]['value']='attacker.example; dmarc=pass header.from=cendoj.ramajudicial.gov.co';$check('external_auth_header_untrusted',JudicialMail::inspect($m)['state']==='AUTH_REVIEW');
-$m=$mail('aaaaaaaa');$m['payload']['headers'][1]['value']='Código de acceso';$check('access_codes_not_shared',JudicialMail::inspect($m)['state']==='PROTECTED');
+$m=$mail('aaaaaaaa');$m['payload']['headers'][1]['value']='Código de acceso';$meta=JudicialMail::inspect($m);$check('access_codes_not_shared',$meta['state']==='VERIFIED'&&$meta['protected_subject']===true&&!str_contains(JudicialMail::message($meta,'aaaaaaaa'),'Código de acceso'));
+$m=$mail('aaaaaaaa');$m['payload']['headers'][1]['value']='Token: CANARY_PRIVATE_2223 de acceso';$meta=JudicialMail::inspect($m);$notice=JudicialMail::message($meta,'aaaaaaaa');$check('protected_subject_minimal_notice',str_contains($notice,'datos reservados')&&!str_contains($notice,'CANARY_PRIVATE_2223')&&!str_contains($notice,'Token:'));
+$m=$mail('aaaaaaaa','ramajudicial.gov.co',false);$m['payload']['headers'][1]['value']='contraseña: CANARY_PRIVATE_2223';$meta=JudicialMail::inspect($m);$check('protected_subject_keeps_auth_review',$meta['state']==='AUTH_REVIEW'&&!str_contains(JudicialMail::message($meta,'aaaaaaaa'),'CANARY_PRIVATE_2223'));
+$m=$mail('aaaaaaaa','ramajudicial.gov.co.evil.example');$m['payload']['headers'][1]['value']='Token: CANARY_PRIVATE_2223';$check('protected_subject_no_official_bypass',JudicialMail::inspect($m)['state']==='NOT_OFFICIAL');
+$m=$mail('aaaaaaaa');$m['payload']['headers'][1]['value']='Respuesta automática: Token: CANARY_PRIVATE_2223';$m['payload']['headers'][]=['name'=>'Auto-Submitted','value'=>'auto-replied'];$check('protected_receipts_still_informational',JudicialMail::inspect($m)['state']==='INFORMATIONAL_RECEIPT');
 $g->pages=['start'=>['messages'=>[['id'=>'aaaaaaaa'],['id'=>'bbbbbbbb']],'nextPageToken'=>'page2'],'page2'=>['messages'=>[['id'=>'cccccccc']]]];
 $g->mails=['aaaaaaaa'=>$mail('aaaaaaaa'),'bbbbbbbb'=>$mail('bbbbbbbb','ramajudicial.gov.co',true,$now-10),'cccccccc'=>$mail('cccccccc','fiscalia.gov.co')];
 $r=$monitor->tick($now+60);$check('first_page_queued',$r['queued_mail']===1&&$r['has_more']);
@@ -43,4 +47,5 @@ $p=SourceConversation::plan('Jeison que correos llegaron hoy, pero solo correos 
 $g->pages=['start'=>['messages'=>[]]];(new SourceConversation($g,$root))->answer($p,[],$now);$query=end($g->queries)[0];$check('exclude_social_promotions',str_contains($query,'-category:promotions')&&str_contains($query,'-category:social'));
 $check('read_only_no_send_methods',!method_exists($g,'sendMail')&&!method_exists($g,'modifyMail'));
 $check('worker_disabled_no_transmission',!empty($b->process()['disabled']));
+$m=$mail('dddddddd');$m['payload']['headers'][1]['value']='Token: CANARY_PRIVATE_2223 de acceso';$g->mails['dddddddd']=$m;$g->pages=['start'=>['messages'=>[['id'=>'dddddddd']]]];$monitor->tick($now+420);$rows=$b->query("SELECT chat,body FROM outbox WHERE id LIKE 'judicial-mail|dddddddd|%' ORDER BY chat")->fetchAll();$check('protected_notice_both_destinations',array_column($rows,'chat')===[Policy::GROUP,Policy::SANDRA]);$check('protected_notice_contains_no_secret',count($rows)===2&&array_reduce($rows,fn($ok,$row)=>$ok&&!str_contains(Crypt::decryptString($row['body']),'CANARY_PRIVATE_2223'),true));$monitor->tick($now+480);$check('protected_notice_dedup',(int)$b->query("SELECT COUNT(*) FROM outbox WHERE id LIKE 'judicial-mail|dddddddd|%'")->fetchColumn()===2);$check('protected_received_preserved',(int)$b->query('SELECT received FROM judicial_mail_seen WHERE id=?',['dddddddd'])->fetchColumn()===$now+10);
 echo json_encode(['passed'=>count($checks),'failed'=>0,'tests'=>$checks,'externalMessages'=>0,'businessWrites'=>0],JSON_UNESCAPED_UNICODE).PHP_EOL;

@@ -64,7 +64,7 @@ $check('capability_followup_in_explicit_context',$bot->query('SELECT reason FROM
 $bot->query('UPDATE chats SET hold=1 WHERE jid=?',[Policy::SANDRA]);
 $bot->receive($fixture('SYNTHETICCAP2',Policy::SANDRA,false,'Jeison que puedes hacer'));
 $method->invoke($bot,$bot->query('SELECT * FROM events WHERE id=?',['SYNTHETICCAP2'])->fetch());
-$check('capability_followup_never_lifts_hold',$bot->query('SELECT state FROM events WHERE id=?',['SYNTHETICCAP2'])->fetchColumn()==='OBSERVED_HUMAN');
+$check('directed_capability_turn_without_release',$bot->query('SELECT reason FROM events WHERE id=?',['SYNTHETICCAP2'])->fetchColumn()==='CHIEF_SINGLE_TURN' && (int)$bot->query('SELECT hold FROM chats WHERE jid=?',[Policy::SANDRA])->fetchColumn()===1 && (int)$bot->query('SELECT internal FROM outbox WHERE id=?',['SYNTHETICCAP2|reply'])->fetchColumn()===1);
 $check('safe_followup_cases',Policy::capability('Puedes revisar procesos por mí?')==='cases');
 $check('safe_followup_judiciary',Policy::capability('Y puedes revisar la rama judicial?')==='judiciary');
 $check('safe_followup_changes',Policy::capability('Y hacer cambios en el programa?')==='changes');

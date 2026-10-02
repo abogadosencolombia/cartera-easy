@@ -14,7 +14,7 @@ $seed();$r=$run($source);$check('configured_schedule_acknowledged',str_contains(
 $seed();$r=$run(str_replace('siete','ocho',$source));$check('different_time_not_silently_applied',str_contains($r['reply'],'Todavía no he activado'));
 $seed();$r=$run(str_replace('al grupo','a otro grupo',$source));$check('different_recipient_not_silently_applied',str_contains($r['reply'],'Todavía no he activado'));
 $seed(1860);$r=$run($source);$check('stale_context_not_authority',$r['state']==='OBSERVED_NOT_ADDRESSED');
-$seed(60,1);$r=$run('Jeison, '.$source);$check('staff_hold_preserved',$r['state']==='OBSERVED_HUMAN'&&$r['reply']===null);
+$seed(60,1);$r=$run('Jeison, '.$source);$check('staff_hold_preserved_with_pending_directed_order',$r['state']==='REVIEW' && $r['reason']==='CHIEF_SINGLE_TURN_PENDING' && $r['reply']!==null && (int)$bot->query('SELECT hold FROM chats WHERE jid=?',[Policy::SANDRA])->fetchColumn()===1 && (int)$bot->query('SELECT COUNT(*) FROM chief_operational_requests')->fetchColumn()===0 && $bot->query('SELECT state FROM chief_turn_requests WHERE event=?',['CURRENT_TEST'])->fetchColumn()==='REVIEW');
 $seed();$r=$run('Jeison, '.$source,true);$check('forwarded_instruction_rejected',$r['state']==='OBSERVED_NOT_ADDRESSED');
 $check('third_person_is_not_followup',ChiefOperations::kind('Ella dijo que todos los días revisar el correo')===null);
 $seed();$r=$run('Jeison, muchísimas gracias. Estás haciendo una gran labor muy importante siempre compartir al grupo del equipo jurídico.');$check('thanks_routing_no_clarify',str_contains($r['reply'],'Gracias, Sandra.')&&!str_contains($r['reply'],'?'));

@@ -7,6 +7,7 @@ use Throwable;
 /** Internal, account-bound notifications. No Gmail mutations or legal decisions. */
 final class JudicialMail
 {
+    public const COMMUNICATION_VERSION = 'protected-subject-metadata-v1';
     public function __construct(private Runtime $bot, private object $google)
     {
         $bot->query('CREATE TABLE IF NOT EXISTS judicial_mail_rule(id INTEGER PRIMARY KEY CHECK(id=1), enabled INTEGER, activated INTEGER, source_event TEXT, checked INTEGER DEFAULT 0, watermark INTEGER, until_at INTEGER DEFAULT 0, page TEXT, fault TEXT DEFAULT NULL)');
@@ -40,13 +41,15 @@ final class JudicialMail
         $domain=strtolower($m[1][0]);
         if(!preg_match('/^(?:[a-z0-9-]+\.)*(?:ramajudicial\.gov\.co|fiscalia\.gov\.co)$/D',$domain))return ['state'=>'NOT_OFFICIAL'];
         $subject=$h['subject'][0]??'Sin asunto';
-        if(preg_match('/(?:password|contrase[nñ]a|c[oó]digo de (?:acceso|verificaci[oó]n)|api.?key|\bOTP\b|\btoken\b)/iu',$subject))return ['state'=>'PROTECTED'];
+        $protectedSubject=(bool)preg_match('/(?:password|contrase[nñ]a|c[oó]digo de (?:acceso|verificaci[oó]n)|api.?key|\bOTP\b|\btoken\b)/iu',$subject);
+        // Access credentials never leave Gmail. Keep a generic, authenticated notice.
         // Gmail prepends its own Authentication-Results; lower copies cannot confer trust.
         $auth=$h['authentication-results'][0]??'';
         $verified=preg_match('/^\s*mx\.google\.com\s*;/i',$auth)&&preg_match('/\bdmarc=pass\b[^;]*\bheader\.from='.preg_quote($domain,'/').'(?:\s|;|$)/i',$auth);
         // A verified automatic receipt is evidence of delivery, not a new request.
         if($verified&&preg_match('/^\s*(?:respuesta autom[aá]tica|automatic reply|auto(?:matic)? response|acuse (?:de )?recibo)\s*:/iu',$subject)&&preg_match('/^auto-(?:replied|generated)\b/i',$h['auto-submitted'][0]??''))return ['state'=>'INFORMATIONAL_RECEIPT','received'=>(int)floor((int)($mail['internalDate']??0)/1000)];
-        return ['state'=>$verified?'VERIFIED':'AUTH_REVIEW','sender'=>strtolower($m[0][0]),'subject'=>SourceConversation::clean($subject,180),'received'=>(int)floor((int)($mail['internalDate']??0)/1000)];
+        if($protectedSubject)$subject='Información de acceso al expediente judicial (datos reservados)';
+        return ['state'=>$verified?'VERIFIED':'AUTH_REVIEW','sender'=>strtolower($m[0][0]),'subject'=>SourceConversation::clean($subject,180),'protected_subject'=>$protectedSubject,'received'=>(int)floor((int)($mail['internalDate']??0)/1000)];
     }
     public static function message(array $meta,string $id):string
     {

@@ -33,7 +33,7 @@ $seed('general',1860);$r=$run('Jeison, no entiendo');$check('new_direct_clarific
 $seed('general',60,'READY');$r=$run('No entiendo');$check('unsent_reply_not_context',$r['state']==='OBSERVED_NOT_ADDRESSED');
 $seed('general',60,'UNCERTAIN');$r=$run('No entiendo');$check('uncertain_send_not_context',$r['state']==='OBSERVED_NOT_ADDRESSED');
 $seed('general',60,'READ',0,1);$r=$run('No entiendo');$check('internal_alert_not_conversation',$r['state']==='OBSERVED_NOT_ADDRESSED');
-$seed('general',60,'READ',1);$r=$run('Jeison no entiendo');$check('hold_respected',$r['state']==='OBSERVED_HUMAN'&&$r['reply']===null);
+$seed('general',60,'READ',1);$r=$run('Jeison no entiendo');$check('hold_respected_direct_clarification_pending',$r['state']==='REVIEW' && $r['reason']==='CHIEF_SINGLE_TURN_PENDING' && $r['reply']!==null && (int)$bot->query('SELECT hold FROM chats WHERE jid=?',[Policy::SANDRA])->fetchColumn()===1 && $bot->query('SELECT state FROM chief_turn_requests WHERE event=?',['CURRENT_TEST'])->fetchColumn()==='REVIEW' && (int)$bot->query('SELECT COUNT(*) FROM source_runs')->fetchColumn()===0);
 $seed();$r=$run('Jeison no entiendo',true);$check('forward_rejected',$r['state']==='OBSERVED_NOT_ADDRESSED');
 $seed();$r=$run('Dile a Jeison que no entiendo');$check('third_person_ignored',$r['state']==='OBSERVED_NOT_ADDRESSED');
 $seed();$r=$run('Y puedes revisar la rama judicial?');$check('judiciary_answer_clear',str_contains($r['reply']??'','Aún no puedo consultar directamente'));
@@ -64,5 +64,5 @@ $r=$run('Esta persona pide un nuevo plazo de pago',false,'LESSON_MID');
 $check('verified_case_reply_reaches_learning',$r['reason']==='CASE_ANSWER_RECORDED');
 $check('case_reply_does_not_repeat_question',!str_contains($r['reply']??'','?')&&str_contains($r['reply']??'','Guardé tu respuesta'));
 $check('no_repeat_ticket',(int)$bot->query('SELECT COUNT(*) FROM tickets')->fetchColumn()===1);
-$seed('general',60,'READ',1);$r=$run('Jeison, esta persona pide un nuevo plazo',false,'LESSON_MID');$check('learning_cannot_release_human',$r['state']==='OBSERVED_HUMAN'&&$r['reply']===null);
+$seed('general',60,'READ',1);$r=$run('Jeison, esta persona pide un nuevo plazo',false,'LESSON_MID');$check('learning_cannot_release_human',$r['state']==='REVIEW' && $r['reason']==='CHIEF_SINGLE_TURN_PENDING' && (int)$bot->query('SELECT hold FROM chats WHERE jid=?',[Policy::SANDRA])->fetchColumn()===1 && $bot->query('SELECT state FROM chief_turn_requests WHERE event=?',['CURRENT_TEST'])->fetchColumn()==='REVIEW');
 echo json_encode(['passed'=>count($checks),'failed'=>0,'tests'=>$checks,'externalMessages'=>0,'businessWrites'=>0],JSON_UNESCAPED_UNICODE).PHP_EOL;

@@ -29,7 +29,7 @@ file_put_contents($root.'/runtime.json',json_encode(['owner'=>Policy::OWNER,'ins
 $check('staff_before_send_suppresses_both',(int)$b->query("SELECT COUNT(*) FROM outbox WHERE state='SUPPRESSED_HUMAN' AND id LIKE ?",[$later.'|%'])->fetchColumn()===2);
 $check('pre_release_unread_not_sent',(int)$b->query("SELECT COUNT(*) FROM outbox WHERE state='SUPPRESSED_HUMAN' AND id LIKE ?",[$ticket.'|%'])->fetchColumn()===2);
 $mail=['id'=>'aaaaaaaa','threadId'=>'bbbbbbbb','internalDate'=>100000,'payload'=>['headers'=>[['name'=>'From','value'=>'Juzgado <juzgado@cendoj.ramajudicial.gov.co>'],['name'=>'Subject','value'=>'Notificación audiencia'],['name'=>'Message-ID','value'=>'<original@court.test>'],['name'=>'Authentication-Results','value'=>'mx.google.com; dmarc=pass header.from=cendoj.ramajudicial.gov.co']]]];
-$token=$mail;$token['payload']['headers'][1]['value']='Token: PRIVATE de acceso';$check('token_does_not_notify',JudicialMail::inspect($token)['state']==='PROTECTED');
+$token=$mail;$token['payload']['headers'][1]['value']='Token: PRIVATE de acceso';$protected=JudicialMail::inspect($token);$check('token_notice_contains_no_access_data',$protected['state']==='VERIFIED' && $protected['protected_subject']===true && $protected['subject']==='Información de acceso al expediente judicial (datos reservados)' && !str_contains($protected['subject'],'PRIVATE'));
 $auto=$mail;$auto['payload']['headers'][1]['value']='Respuesta automática: memorial';$auto['payload']['headers'][]=['name'=>'Auto-Submitted','value'=>'auto-replied'];$check('verified_automatic_receipt_quiet',JudicialMail::inspect($auto)['state']==='INFORMATIONAL_RECEIPT');
 array_pop($auto['payload']['headers']);$check('subject_alone_not_hidden',JudicialMail::inspect($auto)['state']==='VERIFIED');
 $thread=['id'=>'bbbbbbbb','messages'=>[['internalDate'=>110000,'labelIds'=>['SENT'],'payload'=>['headers'=>[['name'=>'From','value'=>GoogleSources::ACCOUNT],['name'=>'In-Reply-To','value'=>'<original@court.test>']]]]]];
@@ -41,13 +41,13 @@ $t=$thread;$t['messages'][0]['payload']['headers'][0]['value']='outsider@example
 $t=$thread;$t['id']='cccccccc';$check('wrong_thread_rejected',!JudicialMail::answered($mail,$t));
 $notice=JudicialMail::message(JudicialMail::inspect($mail),'aaaaaaaa');$check('brief_no_implied_task',!str_contains($notice,'Revisen')&&!str_contains($notice,'pendiente')&&mb_strlen($notice)<350);
 $g=new class {public array $mails=[],$threads=[];public int $threadCalls=0;public function verifyIdentity(){return ['account'=>GoogleSources::ACCOUNT];}public function listMail($q,$p=null,$limit=10){return ['messages'=>array_map(fn($id)=>['id'=>$id],array_keys($this->mails))];}public function mail($id,$metadata=false){if(!$metadata)throw new RuntimeException('BODY_NOT_NEEDED');return $this->mails[$id];}public function mailThreadMetadata($id){$this->threadCalls++;return $this->threads[$id]??['id'=>$id,'messages'=>[]];}};
-$mail['internalDate']=time()*1000;$token['internalDate']=$mail['internalDate'];$auto['internalDate']=$mail['internalDate'];$auto['payload']['headers'][]=['name'=>'Auto-Submitted','value'=>'auto-generated'];$thread['messages'][0]['internalDate']=$mail['internalDate']+1;
+$mail['internalDate']=time()*1000;$token['internalDate']=$mail['internalDate'];$token['id']='cccccccc';$token['payload']['headers'][2]['value']='<protected@court.test>';$auto['internalDate']=$mail['internalDate'];$auto['payload']['headers'][]=['name'=>'Auto-Submitted','value'=>'auto-generated'];$thread['messages'][0]['internalDate']=$mail['internalDate']+1;
 $g->mails=['aaaaaaaa'=>$mail,'cccccccc'=>$token,'dddddddd'=>$auto,'eeeeeeee'=>array_replace($mail,['threadId'=>'ffffffff'])];$g->threads=['bbbbbbbb'=>$thread];
 $monitor=new JudicialMail($b,$g);$b->query('INSERT INTO judicial_mail_rule(id,enabled,activated,watermark) VALUES(1,1,?,?)',[time()-60,time()-60]);$r=$monitor->tick(time()+1);
-$check('only_unanswered_new_mail_queued',$r['queued_mail']===1&&(int)$b->query("SELECT COUNT(*) FROM outbox WHERE state='READY'")->fetchColumn()===2);
+$check('only_unanswered_new_mail_queued',$r['queued_mail']===2&&(int)$b->query("SELECT COUNT(*) FROM outbox WHERE state='READY'")->fetchColumn()===4);
 $check('answered_recorded_not_deleted',$b->query('SELECT state FROM judicial_mail_seen WHERE id=?',['aaaaaaaa'])->fetchColumn()==='REPLIED_IN_THREAD');
 $check('automatic_recorded_quiet',$b->query('SELECT state FROM judicial_mail_seen WHERE id=?',['dddddddd'])->fetchColumn()==='INFORMATIONAL_RECEIPT');
-$check('token_recorded_quiet',$b->query('SELECT state FROM judicial_mail_seen WHERE id=?',['cccccccc'])->fetchColumn()==='PROTECTED');
-$check('thread_check_only_for_real_new_messages',$g->threadCalls===2);
-$monitor->tick(time()+70);$check('repeat_scan_no_resend',(int)$b->query("SELECT COUNT(*) FROM outbox WHERE state='READY'")->fetchColumn()===2);
+$check('token_notice_recorded_without_secret',$b->query('SELECT state FROM judicial_mail_seen WHERE id=?',['cccccccc'])->fetchColumn()==='VERIFIED' && !str_contains(Crypt::decryptString($b->query('SELECT body FROM outbox WHERE id=?',['judicial-mail|cccccccc|'.Policy::SANDRA])->fetchColumn()),'PRIVATE'));
+$check('thread_check_only_for_real_new_messages',$g->threadCalls===3);
+$monitor->tick(time()+70);$check('repeat_scan_no_resend',(int)$b->query("SELECT COUNT(*) FROM outbox WHERE state='READY'")->fetchColumn()===4);
 echo json_encode(['passed'=>count($checks),'failed'=>0,'tests'=>$checks,'externalMessages'=>0,'businessWrites'=>0]).PHP_EOL;
