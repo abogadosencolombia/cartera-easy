@@ -89,19 +89,19 @@ final class Policy
             'appointment' => $phase === 'appointment_detail'
                 ? ['reply'=>'Gracias. Tu solicitud quedó registrada; la cita aún no está confirmada.', 'phase'=>'review', 'ticket'=>'Solicitud de asesoría: verificar agenda y tarifa']
                 : ['reply'=>'Con gusto. ¿Qué día y horario te sirven, y prefieres atención virtual o presencial?', 'phase'=>'appointment_detail', 'ticket'=>null],
-            'case_status' => ['reply'=>'Claro. Para contarte cómo va tu proceso, primero necesito verificar la información del expediente.', 'phase'=>'review', 'ticket'=>'Consulta de proceso: verificar identidad y fuentes'],
-            'payment' => ['reply'=>'Gracias por avisarnos. Aún falta verificar el ingreso para poder confirmar el pago.', 'phase'=>'review', 'ticket'=>'Pago o acuerdo: requiere verificación y autorización'],
-            'payment_terms' => ['reply'=>'Entiendo tu consulta. Antes de confirmar las condiciones, hace falta revisar el acuerdo de pago.', 'phase'=>'review', 'ticket'=>'Condiciones o acuerdo de pago: requiere autorización'],
+            'case_status' => ['reply'=>'Tu consulta sobre el proceso quedó registrada y sigue pendiente de confirmación.', 'phase'=>'review', 'ticket'=>'Consulta de proceso: verificar identidad y fuentes'],
+            'payment' => ['reply'=>'Gracias por avisarnos. El pago sigue pendiente de confirmación.', 'phase'=>'review', 'ticket'=>'Pago o acuerdo: requiere verificación y autorización'],
+            'payment_terms' => ['reply'=>'Entiendo tu consulta. Las condiciones del pago siguen pendientes de confirmación.', 'phase'=>'review', 'ticket'=>'Condiciones o acuerdo de pago: requiere autorización'],
             'fees' => ['reply'=>'Con gusto. La tarifa depende del servicio que necesitas. ¿Sobre qué asunto buscas asesoría?', 'phase'=>'service_detail', 'ticket'=>null],
-            'third_party' => ['reply'=>'Para cuidar su privacidad, primero necesito verificar tu autorización para recibir esa información.', 'phase'=>'review', 'ticket'=>'Solicitud de tercero: verificar autorización'],
+            'third_party' => ['reply'=>'Para compartir esa información, necesito que acredites tu autorización para recibirla.', 'phase'=>'review', 'ticket'=>'Solicitud de tercero: verificar autorización'],
             'complaint' => ['reply'=>'Lamento lo que nos cuentas. Gracias por explicarlo; dejé registrada tu inconformidad.', 'phase'=>'review', 'ticket'=>'Queja o situación que requiere atención humana'],
-            'legal' => ['reply'=>'Entiendo. Para orientarte bien, primero hay que revisar los documentos y los detalles de tu caso.', 'phase'=>'review', 'ticket'=>'Consulta jurídica: revisión profesional'],
+            'legal' => ['reply'=>'Tu solicitud quedó registrada y está pendiente de orientación profesional.', 'phase'=>'review', 'ticket'=>'Consulta jurídica: revisión profesional'],
             default => $phase === 'purpose' || $phase === 'clarify'
                 ? ['reply'=>'Tu mensaje quedó registrado.', 'phase'=>'review', 'ticket'=>'Solicitud sin regla verificada']
                 : ['reply'=>'¿En qué puedo ayudarte?', 'phase'=>'clarify', 'ticket'=>null],
         };
         $result['reply'] = $prefix.$result['reply'];
-        if($intent==='fees' && !empty($known['service']))$result=['reply'=>$prefix.'Tu solicitud quedó registrada para confirmar la tarifa correspondiente.','phase'=>'review','ticket'=>'Cotización: verificar tarifa vigente del servicio'];
+        if($intent==='fees' && !empty($known['service']))$result=['reply'=>$prefix.'Tu solicitud quedó registrada; la tarifa aún está pendiente de confirmación.','phase'=>'review','ticket'=>'Cotización: verificar tarifa vigente del servicio'];
         if($intent==='new_service' && $known){
             if(empty($known['service']))$result=['reply'=>$prefix.'Con gusto. Cuéntame brevemente qué necesitas resolver.','phase'=>'service_detail','ticket'=>null];
             elseif(empty($known['city']))$result=['reply'=>$prefix.'¿Desde qué ciudad nos escribes?','phase'=>'service_detail','ticket'=>null];

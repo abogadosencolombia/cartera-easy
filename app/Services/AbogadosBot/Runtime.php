@@ -218,11 +218,12 @@ final class Runtime
     {
         if(!$internal&&!preg_match('/^[1-9][0-9]{8,14}@s\.whatsapp\.net$/D',$jid))throw new RuntimeException('INVALID_DESTINATION');
         if($internal&&!in_array($jid,[Policy::SANDRA,Policy::GROUP],true))throw new RuntimeException('INTERNAL_DESTINATION');
+        if(Communication::issue($jid,$text,$internal)!==null)throw new RuntimeException('EXTERNAL_COMMUNICATION_REVIEW');
         $this->query('INSERT OR IGNORE INTO outbox VALUES(?,?,?,?,?,?,?,?,?)',[$id,$jid,Crypt::encryptString($text),hash('sha256',$text),'READY',null,time(),time(),(int)$internal]);
     }
     public function healthSummary(): array
     {
-        return ['enabled'=>$this->enabled(),'events'=>$this->query('SELECT state,COUNT(*) total FROM events GROUP BY state')->fetchAll(),'outbox'=>$this->query('SELECT state,COUNT(*) total FROM outbox GROUP BY state')->fetchAll(),'openTickets'=>(int)$this->query("SELECT COUNT(*) FROM tickets WHERE state='OPEN'")->fetchColumn(),'health'=>$this->query('SELECT * FROM health')->fetchAll()];
+        return ['communicationGuard'=>Communication::VERSION,'enabled'=>$this->enabled(),'events'=>$this->query('SELECT state,COUNT(*) total FROM events GROUP BY state')->fetchAll(),'outbox'=>$this->query('SELECT state,COUNT(*) total FROM outbox GROUP BY state')->fetchAll(),'openTickets'=>(int)$this->query("SELECT COUNT(*) FROM tickets WHERE state='OPEN'")->fetchColumn(),'health'=>$this->query('SELECT * FROM health')->fetchAll()];
     }
     /** Read-only, internal evidence. A CRM match never proves identity or a judicial deadline. */
     public function readProgramCase(string $radicado): array
@@ -403,6 +404,11 @@ final class Runtime
     {
         if(!$this->enabled())return;
         foreach($this->query("SELECT * FROM outbox WHERE state='READY' ORDER BY created LIMIT 20")->fetchAll() as $o){
+            $text=Crypt::decryptString($o['body']);
+            if(($issue=Communication::issue($o['chat'],$text,(bool)$o['internal']))!==null){
+                $this->query("UPDATE outbox SET state='COMMUNICATION_REVIEW',updated=? WHERE id=? AND state='READY'",[time(),$o['id']]);
+                $this->hold($o['chat'],true);$this->health('communication',$issue);continue;
+            }
             if($o['internal']&&preg_match('/^(AB-[A-F0-9]{10})\|/',$o['id'],$match)){
                 $ticket=$this->query('SELECT chat,state,category FROM tickets WHERE id=?',[$match[1]])->fetch();
                 if(!$ticket||$ticket['state']!=='OPEN'||$ticket['category']==='Archivo recibido: revisión de contenido'||$this->chat($ticket['chat'])['hold']){
