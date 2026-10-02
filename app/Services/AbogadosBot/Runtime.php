@@ -407,6 +407,11 @@ final class Runtime
         $this->mark($e['id'],'DONE','SOURCE_REPLY');
     }
 
+    public static function verifiedNotificationGroup(array $group): bool
+    {
+        return ($group['id']??null)===Policy::GROUP && ($group['subject']??null)==='Equipo Abogados en Colombia';
+    }
+
     public function flush(): void
     {
         if(!$this->enabled())return;
@@ -435,9 +440,8 @@ final class Runtime
                 if($chat['hold']){$this->query("UPDATE outbox SET state='SUPPRESSED_HUMAN',updated=? WHERE id=?",[time(),$o['id']]);continue;}
             }
             if($o['chat']===Policy::GROUP){
-                $groups=$this->evolution('/group/fetchAllGroups/abogados?getParticipants=false');
-                $found=array_values(array_filter($groups,fn($g)=>($g['id']??'')===Policy::GROUP && ($g['subject']??'')==='Equipo Abogados en Colombia'));
-                if(count($found)!==1)throw new RuntimeException('GROUP_IDENTITY_UNVERIFIED');
+                $group=$this->evolution('/group/findGroupInfos/abogados?groupJid='.rawurlencode(Policy::GROUP));
+                if(!self::verifiedNotificationGroup($group))throw new RuntimeException('GROUP_IDENTITY_UNVERIFIED');
             }
             if(!$this->query("UPDATE outbox SET state='SENDING',updated=? WHERE id=? AND state='READY'",[time(),$o['id']])->rowCount())continue;
             try{
