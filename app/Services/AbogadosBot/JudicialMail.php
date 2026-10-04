@@ -7,7 +7,7 @@ use Throwable;
 /** Internal, account-bound notifications. No Gmail mutations or legal decisions. */
 final class JudicialMail
 {
-    public const COMMUNICATION_VERSION = 'protected-subject-metadata-v1';
+    public const COMMUNICATION_VERSION = 'protected-subject-and-own-recipient-v2';
     public function __construct(private Runtime $bot, private object $google)
     {
         $bot->query('CREATE TABLE IF NOT EXISTS judicial_mail_rule(id INTEGER PRIMARY KEY CHECK(id=1), enabled INTEGER, activated INTEGER, source_event TEXT, checked INTEGER DEFAULT 0, watermark INTEGER, until_at INTEGER DEFAULT 0, page TEXT, fault TEXT DEFAULT NULL)');
@@ -32,6 +32,24 @@ final class JudicialMail
         if(($this->google->verifyIdentity()['account']??'')!==GoogleSources::ACCOUNT)throw new RuntimeException('MAIL_RULE_ACCOUNT');
         $this->bot->query('INSERT OR IGNORE INTO judicial_mail_rule(id,enabled,activated,source_event,watermark) VALUES(1,1,?,?,?)',[$now,$event,$now]);
     }
+    /** A forwarded foreign mailbox cannot confer Abogados case scope. */
+    public static function recipientScope(array $headers):string
+    {
+        $addresses=function(array $values):array{
+            $out=[];foreach($values as $value){preg_match_all('/[A-Z0-9.!#$%&\x27*+\/=?^_`{|}~-]+@[A-Z0-9.-]+/i',$value,$matches);foreach($matches[0] as $address)$out[]=strtolower($address);}return array_values(array_unique($out));
+        };
+        $account=GoogleSources::ACCOUNT;
+        $direct=$addresses(array_merge($headers['to']??[],$headers['cc']??[]));
+        $forwarders=$addresses($headers['x-forwarded-for']??[]);
+        if(array_diff($forwarders,[$account]))return 'OUT_OF_SCOPE';
+        $forwarded=$addresses($headers['x-forwarded-to']??[]);
+        $delivered=$addresses($headers['delivered-to']??[]);
+        if($forwarded&&!in_array($account,$direct,true)&&(array_diff($direct,[$account])||array_diff($delivered,[$account])))return 'OUT_OF_SCOPE';
+        // A directly addressed message or own delivery without a foreign forwarder
+        // admits Bcc mail; missing recipient evidence stays for local review.
+        if(!in_array($account,$direct,true)&&($delivered[0]??null)!==$account)return 'RECIPIENT_REVIEW';
+        return 'OWN_ACCOUNT';
+    }
     public static function inspect(array $mail):array
     {
         $h=[];foreach($mail['payload']['headers']??[] as $v){$n=strtolower($v['name']??'');$h[$n][]=$v['value']??'';}
@@ -40,6 +58,8 @@ final class JudicialMail
         if(count($m[0])!==1)return ['state'=>'NOT_OFFICIAL'];
         $domain=strtolower($m[1][0]);
         if(!preg_match('/^(?:[a-z0-9-]+\.)*(?:ramajudicial\.gov\.co|fiscalia\.gov\.co)$/D',$domain))return ['state'=>'NOT_OFFICIAL'];
+        $scope=self::recipientScope($h);
+        if($scope!=='OWN_ACCOUNT')return ['state'=>$scope,'received'=>(int)floor((int)($mail['internalDate']??0)/1000)];
         $subject=$h['subject'][0]??'Sin asunto';
         $protectedSubject=(bool)preg_match('/(?:password|contrase[nñ]a|c[oó]digo de (?:acceso|verificaci[oó]n)|api.?key|\bOTP\b|\btoken\b)/iu',$subject);
         // Access credentials never leave Gmail. Keep a generic, authenticated notice.
