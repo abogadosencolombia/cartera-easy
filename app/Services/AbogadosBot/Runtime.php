@@ -89,7 +89,9 @@ final class Runtime
         if (!in_array($kind,['messages.upsert','send.message'],true)) return ['ignored'=>true];
         $data=$payload['data']??[];
         if (array_is_list($data)) { foreach($data as $d) $this->receive(['instance'=>'abogados','event'=>$kind,'data'=>$d]); return ['accepted'=>true]; }
-        $key=$data['key']??[]; $id=(string)($key['id']??''); $jid=Policy::jid($key);
+        $key=$data['key']??[];
+        if(Policy::nonDirectKey($key)) return ['ignored'=>'non_direct_native_origin'];
+        $id=(string)($key['id']??''); $jid=Policy::jid($key);
         if (!$jid || !preg_match('/^[a-zA-Z0-9:_-]{8,160}$/D',$id)) return ['ignored'=>'identity'];
         if (str_ends_with($jid,'@g.us') || $jid===Policy::OWNER) return ['ignored'=>'group_or_self'];
         $at=(int)($data['messageTimestamp']??0);
@@ -221,9 +223,53 @@ final class Runtime
         if(Communication::issue($jid,$text,$internal)!==null)throw new RuntimeException('EXTERNAL_COMMUNICATION_REVIEW');
         $this->query('INSERT OR IGNORE INTO outbox VALUES(?,?,?,?,?,?,?,?,?)',[$id,$jid,Crypt::encryptString($text),hash('sha256',$text),'READY',null,time(),time(),(int)$internal]);
     }
+    private function nonDirectEvent(array $event): bool
+    {
+        if(Policy::nonDirectKey(['remoteJid'=>$event['raw_chat']??'']))return true;
+        $data=json_decode(Crypt::decryptString($event['body']),true,512,JSON_THROW_ON_ERROR);
+        return Policy::nonDirectKey($data['key']??[]);
+    }
+
+    private function nonDirectOutbox(array $outbox): bool
+    {
+        $sourceId=null;
+        if(str_ends_with($outbox['id'],'|reply'))$sourceId=substr($outbox['id'],0,-6);
+        elseif($outbox['internal']&&preg_match('/^(AB-[A-F0-9]{10})\|/',$outbox['id'],$m))
+            $sourceId=$this->query('SELECT event FROM tickets WHERE id=?',[$m[1]])->fetchColumn();
+        if(!$sourceId)return false;
+        $event=$this->query('SELECT * FROM events WHERE id=?',[$sourceId])->fetch();
+        return $event && $this->nonDirectEvent($event);
+    }
+
+    /** Only a new legitimate private turn can repair a status-only review phase. Never lift a staff hold. */
+    private function clearStatusOnlyReview(array $chat): bool
+    {
+        if($chat['hold']||$chat['phase']!=='review'||$chat['last_reply']!=='Gracias, el archivo quedó recibido.'||in_array($chat['jid'],[Policy::SANDRA,Policy::OWNER],true))return false;
+        $sources=$this->query('SELECT e.* FROM tickets t LEFT JOIN events e ON e.id=t.event WHERE t.chat=?',[$chat['jid']])->fetchAll();
+        if(!$sources)return false;
+        foreach($sources as $source)if(!$source['id']||!$this->nonDirectEvent($source))return false;
+        foreach($this->query("SELECT * FROM events WHERE chat=? AND state IN ('DONE','REVIEW','ERROR')",[$chat['jid']])->fetchAll() as $source)
+            if(!$this->nonDirectEvent($source))return false;
+        if(!$this->query("UPDATE chats SET phase='',last_reply='',updated=? WHERE jid=? AND hold=0 AND phase='review' AND last_reply=?",[time(),$chat['jid'],$chat['last_reply']])->rowCount())return false;
+        $this->health('native_review','STATUS_ONLY_PHASE_CORRECTED');return true;
+    }
+
+    /** Customer counts require a delivered own reply and a native private source; historical statuses remain stored. */
+    public function answeredPrivateChats(): int
+    {
+        $chats=[];
+        $rows=$this->query("SELECT e.* FROM outbox o JOIN events e ON o.id=(e.id || '|reply') WHERE o.internal=0 AND o.state IN ('DELIVERED','READ') AND o.chat=e.chat AND e.chat NOT IN (?,?)",[Policy::SANDRA,Policy::OWNER])->fetchAll();
+        foreach($rows as $event){
+            if($this->nonDirectEvent($event))continue;
+            $data=json_decode(Crypt::decryptString($event['body']),true,512,JSON_THROW_ON_ERROR);
+            if(empty($data['key']['fromMe'])&&Policy::jid($data['key']??[])===$event['chat'])$chats[$event['chat']]=true;
+        }
+        return count($chats);
+    }
+
     public function healthSummary(): array
     {
-        return ['communicationGuard'=>Communication::VERSION,'enabled'=>$this->enabled(),'events'=>$this->query('SELECT state,COUNT(*) total FROM events GROUP BY state')->fetchAll(),'outbox'=>$this->query('SELECT state,COUNT(*) total FROM outbox GROUP BY state')->fetchAll(),'openTickets'=>(int)$this->query("SELECT COUNT(*) FROM tickets WHERE state='OPEN'")->fetchColumn(),'health'=>$this->query('SELECT * FROM health')->fetchAll()];
+        return ['privateChatGuard'=>Policy::PRIVATE_CHAT_GUARD,'answeredPrivateChats'=>$this->answeredPrivateChats(),'communicationGuard'=>Communication::VERSION,'enabled'=>$this->enabled(),'events'=>$this->query('SELECT state,COUNT(*) total FROM events GROUP BY state')->fetchAll(),'outbox'=>$this->query('SELECT state,COUNT(*) total FROM outbox GROUP BY state')->fetchAll(),'openTickets'=>(int)$this->query("SELECT COUNT(*) FROM tickets WHERE state='OPEN'")->fetchColumn(),'health'=>$this->query('SELECT * FROM health')->fetchAll()];
     }
     /** Read-only, internal evidence. A CRM match never proves identity or a judicial deadline. */
     public function readProgramCase(string $radicado): array
@@ -258,6 +304,7 @@ final class Runtime
     }
     private function processEvent(array $e): void
     {
+        if($this->nonDirectEvent($e)){$this->mark($e['id'],'OBSERVED_NON_DIRECT','NON_DIRECT_NATIVE_ORIGIN');$this->query("UPDATE outbox SET state='SUPPRESSED_NON_DIRECT',updated=? WHERE id=? AND state='READY'",[time(),$e['id'].'|reply']);return;}
         if($e['at']<time()-7200){$this->baseline($e);if($this->chat($e['chat'])['hold']){$this->mark($e['id'],'OBSERVED_HUMAN','STALE_HANDLED');return;}$this->mark($e['id'],'REVIEW','STALE');$this->ticket($e,'Mensaje pendiente fuera de ventana de respuesta');return;}
         $data=json_decode(Crypt::decryptString($e['body']),true,512,JSON_THROW_ON_ERROR);
         $text=Policy::text($data['message']);$forwarded=Policy::forwarded($data['message']);
@@ -278,7 +325,10 @@ final class Runtime
             if($directedChief){$reply=ChiefTurn::pending($this,$e,$text);$this->queue($e['id'].'|reply',Policy::SANDRA,$reply,true);$this->mark($e['id'],'REVIEW','CHIEF_SINGLE_TURN_PENDING');return;}
             $this->mark($e['id'],'OBSERVED_HUMAN');return;
         }
-        if($chat['phase']==='review' && $e['chat']!==Policy::SANDRA){$this->mark($e['id'],'OBSERVED_REVIEW');return;}
+        if($chat['phase']==='review' && $e['chat']!==Policy::SANDRA){
+            if(!$this->clearStatusOnlyReview($chat)){$this->mark($e['id'],'OBSERVED_REVIEW');return;}
+            $chat=$this->chat($e['chat']);
+        }
         if($e['chat']===Policy::SANDRA){
             $quotedId='';foreach($data['message'] as $part)if(is_array($part))$quotedId=$part['contextInfo']['stanzaId']??$quotedId;
             $directReply=$quotedId!=='' && $this->query("SELECT 1 FROM outbox WHERE mid=? AND chat=? AND state IN ('ACCEPTED','DELIVERED','READ')",[$quotedId,Policy::SANDRA])->fetchColumn();
@@ -416,6 +466,7 @@ final class Runtime
     {
         if(!$this->enabled())return;
         foreach($this->query("SELECT * FROM outbox WHERE state='READY' ORDER BY created LIMIT 20")->fetchAll() as $o){
+            if($this->nonDirectOutbox($o)){$this->query("UPDATE outbox SET state='SUPPRESSED_NON_DIRECT',updated=? WHERE id=? AND state='READY'",[time(),$o['id']]);continue;}
             $text=Crypt::decryptString($o['body']);
             if(($issue=Communication::issue($o['chat'],$text,(bool)$o['internal']))!==null){
                 $this->query("UPDATE outbox SET state='COMMUNICATION_REVIEW',updated=? WHERE id=? AND state='READY'",[time(),$o['id']]);

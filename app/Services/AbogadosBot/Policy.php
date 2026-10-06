@@ -14,10 +14,24 @@ final class Policy
         return mb_strtolower(trim(strtr($text, ['á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','Á'=>'a','É'=>'e','Í'=>'i','Ó'=>'o','Ú'=>'u'])));
     }
 
+    public const PRIVATE_CHAT_GUARD = 'own-native-private-before-intake-and-send-v1';
+
+    /** Alternate PN/LID identifiers cannot turn a status, group or channel into a private chat. */
+    public static function nonDirectKey(array $key): bool
+    {
+        foreach (['remoteJid','remoteJidAlt'] as $field) {
+            $jid=strtolower(trim((string)($key[$field]??'')));
+            foreach (['@broadcast','@g.us','@newsletter'] as $suffix)
+                if (str_ends_with($jid,$suffix)) return true;
+        }
+        return false;
+    }
+
     public static function jid(array $key): ?string
     {
         $primary = $key['remoteJid'] ?? '';
         if (str_ends_with($primary, '@g.us')) return $primary;
+        if (self::nonDirectKey($key)) return null;
         foreach ([$primary, $key['remoteJidAlt'] ?? ''] as $jid) {
             if (preg_match('/^[1-9][0-9]{8,14}@s\.whatsapp\.net$/D', $jid)) return $jid;
         }
