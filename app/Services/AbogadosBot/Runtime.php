@@ -267,9 +267,28 @@ final class Runtime
         return count($chats);
     }
 
+
+    /** A greeting cannot ask for a need already received in the same private batch. */
+    private function deferGreetingBatch(array $event, string $text, bool $forwarded): bool
+    {
+        $greeting = '/^(?:hola(?:\s+(?:buenos dias|buenas tardes|buenas noches))?|buenos dias|buenas tardes|buenas noches)[!.,\s]*$/u';
+        if($forwarded || in_array($event['chat'],[Policy::SANDRA,Policy::OWNER],true) || !preg_match($greeting,Policy::normalize($text)))return false;
+        $source=json_decode(Crypt::decryptString($event['body']),true,512,JSON_THROW_ON_ERROR);
+        if(Policy::nonDirectKey($source['key']??[]) || !empty($source['key']['fromMe']) || Policy::jid($source['key']??[])!==$event['chat'])return false;
+        foreach($this->query("SELECT * FROM events WHERE chat=? AND state='QUEUED' AND at>? AND at<=? AND seen<=? ORDER BY at,seen LIMIT 5",[$event['chat'],$event['at'],$event['at']+90,time()-10])->fetchAll() as $later){
+            $data=json_decode(Crypt::decryptString($later['body']),true,512,JSON_THROW_ON_ERROR);
+            if(Policy::nonDirectKey($data['key']??[]) || !empty($data['key']['fromMe']) || Policy::jid($data['key']??[])!==$event['chat'] || Policy::forwarded($data['message']??[]))continue;
+            if(!in_array($data['messageType']??'',['conversation','extendedTextMessage'],true))continue;
+            $purpose=Policy::normalize(Policy::text($data['message']??[]));
+            if(!preg_match('/\b(?:quiero|necesito|solicito|consultar|consulta|pregunta|tengo|busco|requiero)\b/u',$purpose) || preg_match($greeting,$purpose))continue;
+            $this->mark($event['id'],'DONE','GREETING_BATCH_DEFERRED');return true;
+        }
+        return false;
+    }
+
     public function healthSummary(): array
     {
-        return ['privateChatGuard'=>Policy::PRIVATE_CHAT_GUARD,'answeredPrivateChats'=>$this->answeredPrivateChats(),'communicationGuard'=>Communication::VERSION,'enabled'=>$this->enabled(),'events'=>$this->query('SELECT state,COUNT(*) total FROM events GROUP BY state')->fetchAll(),'outbox'=>$this->query('SELECT state,COUNT(*) total FROM outbox GROUP BY state')->fetchAll(),'openTickets'=>(int)$this->query("SELECT COUNT(*) FROM tickets WHERE state='OPEN'")->fetchColumn(),'health'=>$this->query('SELECT * FROM health')->fetchAll()];
+        return ['greetingBatchGuard'=>'own-private-queued-purpose-before-greeting-question-v1','privateChatGuard'=>Policy::PRIVATE_CHAT_GUARD,'answeredPrivateChats'=>$this->answeredPrivateChats(),'communicationGuard'=>Communication::VERSION,'enabled'=>$this->enabled(),'events'=>$this->query('SELECT state,COUNT(*) total FROM events GROUP BY state')->fetchAll(),'outbox'=>$this->query('SELECT state,COUNT(*) total FROM outbox GROUP BY state')->fetchAll(),'openTickets'=>(int)$this->query("SELECT COUNT(*) FROM tickets WHERE state='OPEN'")->fetchColumn(),'health'=>$this->query('SELECT * FROM health')->fetchAll()];
     }
     /** Read-only, internal evidence. A CRM match never proves identity or a judicial deadline. */
     public function readProgramCase(string $radicado): array
@@ -391,6 +410,7 @@ final class Runtime
         if($text===''){
             $this->ticket($e,'Archivo recibido: revisión de contenido');$this->queue($e['id'].'|reply',$e['chat'],'Gracias, el archivo quedó recibido.');$this->holdAfterReply($e);return;
         }
+        if($this->deferGreetingBatch($e,$text,$forwarded))return;
         $count=$this->query("SELECT COUNT(*) FROM events WHERE at>? AND state='DONE'",[strtotime('today')])->fetchColumn();
         if($count>=500)throw new RuntimeException('DAILY_LIMIT');
         $context=[];foreach($this->query("SELECT body FROM events WHERE chat=? AND id!=? AND at<=? AND seen<=? ORDER BY at DESC,seen DESC LIMIT 4",[$e['chat'],$e['id'],$e['at'],$e['seen']])->fetchAll() as $prev){$d=json_decode(Crypt::decryptString($prev['body']),true);$t=$d['transcript']??Policy::text($d['message']??[]);if($t!=='')$context[]=mb_substr($t,0,1200);}
