@@ -41,7 +41,10 @@ final class Policy
 
     public static function text(array $message): string
     {
-        return trim((string) ($message['conversation'] ?? $message['extendedTextMessage']['text'] ?? ''));
+        foreach ([$message['conversation'] ?? null, $message['extendedTextMessage']['text'] ?? null, $message['documentMessage']['caption'] ?? null] as $text) {
+            if (is_string($text)) return trim($text);
+        }
+        return '';
     }
 
     public static function forwarded(array $message): bool
